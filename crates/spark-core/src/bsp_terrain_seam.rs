@@ -142,6 +142,41 @@ impl Ribbon {
         let projections=[projection(base,0,&seam.base_shader_path,start)?,projection(donor,plan.donor_bsp_index,&seam.donor_shader_path,sub(end,plan.translation))?];
         Ok(Self{rows,roof,projections,source_boundary})
     }
+    /// Keep source collision at supported native teleporter pads where a seam overlaps a map.
+    /// Clip only the new air volume against the source free-space boundary.
+    pub(super) fn preserve_teleporter_floors(
+        &self, mut ribbon: Manifold, source_space: &Manifold, path: &Path, map: &MapInspection,
+        mesh: &MeshData, bsp: usize, translation: V, material: usize, lowest: f64, token: &CancelToken,
+    ) -> Result<Manifold> {
+        if map.header.scenario_type != 1 { return Ok(ribbon); }
+        let existing = maps::scenario_netgame_flags(path, map)?;
+        let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, bsp)?;
+        let radius = 0.6;
+        let min: V = std::array::from_fn(|i| self.rows.iter().flatten().map(|p| p[i]).fold(f64::INFINITY, f64::min));
+        let max: V = std::array::from_fn(|i| self.rows.iter().flatten().map(|p| p[i]).fold(f64::NEG_INFINITY, f64::max));
+        for flag in existing.iter().filter(|flag| matches!(flag.kind, 6 | 7)) {
+            let [x, y, z] = add(flag.position.map(f64::from), translation);
+            if x < min[0] - radius || x > max[0] + radius || y < min[1] - radius || y > max[1] + radius {
+                continue;
+            }
+            let mut near = flag.position;
+            near[2] += 0.05;
+            let Some(floor) = checker.native_ground_z(near, 0.5) else { continue; };
+            if (flag.position[2] - floor).abs() > 0.15 { continue; }
+            if f64::from(floor) + translation[2] <= min[2] + 0.03 { continue; }
+            let side = [0., radius, 0.];
+            let envelope = passage_solid([x - radius, y, lowest], [x + radius, y, lowest],
+                side, side, z + 0.6 - lowest, material, None)?;
+            let native_solid = checked(envelope.boolean_with_engine_and_token(
+                source_space, OpType::Subtract, BooleanEngine::Auto, Some(token),
+            ), "Native teleporter floor protection")?;
+            ribbon = checked(ribbon.boolean_with_engine_and_token(
+                &native_solid, OpType::Subtract, BooleanEngine::Auto, Some(token),
+            ), "Terrain seam around a native teleporter floor")?;
+        }
+        Ok(ribbon)
+    }
+
     pub fn solid(&self,plan:&BspAssembly,materials:[usize;2],sky:usize)->Result<Manifold>{
         let mut gl=MeshGL64{num_prop:5,..Default::default()};
         let mut emit=|points:[V;3],material:usize,source:usize|->Result<()> {

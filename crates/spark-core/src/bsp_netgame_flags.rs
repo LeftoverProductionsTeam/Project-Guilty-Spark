@@ -9,6 +9,29 @@ use crate::{
 };
 use std::{collections::BTreeMap, path::Path};
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreservedFloor {
+    position: [f32; 3],
+    bsp: usize,
+    ground_z: f32,
+}
+
+fn supported_floors(path: &Path, map: &MapInspection, anchors: &[([f32; 3], usize)]) -> Result<Vec<PreservedFloor>> {
+    let mut found = Vec::new();
+    for batch in anchors.chunks(1024) {
+        let probes = batch.iter().map(|(p, _)| [p[0], p[1], p[2] + 0.05]).collect::<Vec<_>>();
+        let rows = maps::bsp_point_locations(path, map, &probes, Some(0.5))?;
+        for ((position, bsp), row) in batch.iter().copied().zip(rows) {
+            if let Some(ground) = row.ground.iter().find(|ground| usize::from(ground.bsp) == bsp
+                && (position[2] - ground.z).abs() <= 0.15) {
+                found.push(PreservedFloor { position, bsp, ground_z: ground.z });
+            }
+        }
+    }
+    Ok(found)
+}
+
 const FLAG_TYPES: [Option<&str>; 9] = [
     Some("ctf_flag"),
     None,
@@ -28,6 +51,8 @@ pub(crate) struct PreparedFlags {
     donor: Vec<NativeNetgameFlag>,
     original_teleporter_homes: Vec<Option<usize>>,
     merged_home: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    preserved_floors: Vec<PreservedFloor>,
 }
 
 fn teleporter_side(kind: u16) -> Option<usize> {
@@ -98,7 +123,7 @@ impl PreparedFlags {
             row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
         }
         let original_teleporter_homes=teleporter_homes(&base_source.preserved_path,base_map,&base)?;
-        Ok(Self { base, donor, original_teleporter_homes, merged_home:None })
+        Ok(Self { base, donor, original_teleporter_homes, merged_home:None, preserved_floors: Vec::new() })
     }
 
 
@@ -114,11 +139,21 @@ impl PreparedFlags {
         let original_teleporter_homes = teleporter_homes(base_path, base_map, &base)?;
         let mut used: std::collections::BTreeSet<_> = base.iter().zip(&original_teleporter_homes)
             .filter(|(_, home)| **home == Some(destination_bsp)).map(|(row, _)| row.usage_id).collect();
+        let base_anchors = base.iter().zip(&original_teleporter_homes)
+            .filter_map(|(flag, home)| home.map(|bsp| (flag.position, bsp))).collect::<Vec<_>>();
+        let mut preserved_floors = supported_floors(base_path, base_map, &base_anchors)?;
         let mut donor = Vec::new();
         for &source in donors {
             let MergedTeleporterDonor { path: donor_path, map: donor_map, translation, yaw } = source;
             let mut donor_channels: BTreeMap<i16, Vec<NativeNetgameFlag>> = BTreeMap::new();
-            for mut flag in maps::scenario_netgame_flags(donor_path, donor_map)? {
+            let stock_flags = maps::scenario_netgame_flags(donor_path, donor_map)?;
+            let stock_anchors = stock_flags.iter().filter(|flag| teleporter_side(flag.kind).is_some())
+                .map(|flag| (flag.position, 0)).collect::<Vec<_>>();
+            preserved_floors.extend(supported_floors(donor_path, donor_map, &stock_anchors)?.into_iter().map(|floor| PreservedFloor {
+                position: bsp_assembly::transform(floor.position.map(f64::from), translation, yaw).map(|p| p as f32),
+                bsp: destination_bsp, ground_z: (f64::from(floor.ground_z) + translation[2]) as f32,
+            }));
+            for mut flag in stock_flags {
                 if teleporter_side(flag.kind).is_none() { continue; }
                 if flag.usage_id < 0 || flag.weapon_group.is_some() {
                     return invalid("A donor teleporter has an invalid channel or unsupported item binding");
@@ -157,7 +192,7 @@ impl PreparedFlags {
         if base.len()+donor.len()>limit {
             return invalid(format!("Combined teleporter markers exceed this target’s {limit} multiplayer flag slots"));
         }
-        Ok(Self { base, donor, original_teleporter_homes, merged_home: Some(destination_bsp) })
+        Ok(Self { base, donor, original_teleporter_homes, merged_home: Some(destination_bsp), preserved_floors })
     }
 
     pub(crate) fn total_count(&self) -> usize { self.base.len() + self.donor.len() }
@@ -168,7 +203,17 @@ impl PreparedFlags {
         let rows=maps::scenario_netgame_flags(output,map)?;
         let (_, regions)=crate::bsp_audio::inspect_placement_regions(output, &map.sha256,
             rows.iter().filter(|flag|teleporter_side(flag.kind).is_some()).map(|flag|flag.position))?;
-        self.verify(&rows,true,&regions)
+        let report = self.verify(&rows,true,&regions)?;
+        let anchors = self.preserved_floors.iter().map(|floor| (floor.position, floor.bsp)).collect::<Vec<_>>();
+        let current = supported_floors(output, map, &anchors)?;
+        for expected in &self.preserved_floors {
+            if !current.iter().any(|ground| ground.position == expected.position && ground.bsp == expected.bsp
+                && (ground.ground_z - expected.ground_z).abs() <= 0.05) {
+                return invalid(format!("Native assembly removed the stock teleporter floor at {:?} in BSP {}.",
+                    expected.position, expected.bsp));
+            }
+        }
+        Ok(report)
     }
 
     pub(crate) fn append(

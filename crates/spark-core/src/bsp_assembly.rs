@@ -866,7 +866,13 @@ fn generate_end(
                 Some(terrain::trim_donor(right, &donor, &donor_mesh, &donor_faces, assembly, sky_material.unwrap(), &token)?)
             } else { right };
             if let (Some(ribbon),Some(slots))=(&terrain_ribbon,terrain_materials){
-                combined=checked(combined.boolean_with_engine_and_token(&ribbon.solid(assembly,slots,sky_material.unwrap())?,OpType::Add,BooleanEngine::Auto,Some(&token)),"Terrain seam join")?;
+                let generated = ribbon.solid(assembly, slots, sky_material.unwrap())?;
+                let generated = ribbon.preserve_teleporter_floors(generated, &combined, base_path, base,
+                    &base_mesh, assembly.base_bsp_index, [0.; 3], slots[0], lowest_source - 1., &token)?;
+                let donor_space = right.as_ref().ok_or_else(|| SparkError::Invalid("The terrain seam needs its stock donor".into()))?;
+                let generated = ribbon.preserve_teleporter_floors(generated, donor_space, &assembly.donor_source.preserved_path, &donor,
+                    &donor_mesh, assembly.donor_bsp_index, assembly.translation, slots[1], lowest_source - 1., &token)?;
+                combined=checked(combined.boolean_with_engine_and_token(&generated,OpType::Add,BooleanEngine::Auto,Some(&token)),"Terrain seam join")?;
             }
             for (route_index,(route, material)) in routes.iter().zip(&passage_materials).enumerate() {
             if route_index==0 && terrain_ribbon.is_some(){continue;}
@@ -1511,7 +1517,13 @@ pub fn generate_preserved_connector(
     };
     let base_landing = choose(&mut review, &base_collision, plan.base_bsp_index, start, [0.; 3])
         .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?;
-    let donor_landing = choose(&mut review, &donor_collision, 0, end, plan.translation)
+    let donor_vehicles = if donor.header.scenario_type == 1 {
+        maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?
+    } else { Vec::new() };
+    let donor_span = intact_span_before_vehicles(end, forward, plan.tunnel_width, plan.tunnel_height,
+        donor_vehicles.iter().map(|row| add(row.position.map(f64::from), plan.translation)));
+    let checker = crate::bsp_clearance::RouteChecker::for_part(&donor_collision, 0)?;
+    let donor_landing = choose_intact_landing_bounded(&checker, &mut review, end, plan.translation, forward, donor_span)
         .map_err(|error| SparkError::Invalid(format!("Donor connector landing: {error}")))?;
     let landings = [base_landing, donor_landing];
     let overlaps = [landings[0].0, landings[1].0];
@@ -1719,12 +1731,37 @@ fn intact_connector_solid(points: &[V], side: V, height: f64, sky: Option<usize>
     Ok(body)
 }
 
+// The shell continues 0.7 units beyond its flat switch overlap.
+const CONNECTOR_END_CAP: f64 = 0.7;
+
+fn intact_span_before_vehicles(
+    center: V, forward: V, width: f32, height: f32, positions: impl IntoIterator<Item = V>,
+) -> f64 {
+    let side = [-forward[1], forward[0], 0.];
+    positions.into_iter().filter_map(|point| {
+        let offset = sub(point, center);
+        let along = dot(offset, forward);
+        if along < 0. || dot(offset, side).abs() > f64::from(width) * 0.5 + 0.15
+            || !(-0.05..=(f64::from(height) + 0.05)).contains(&offset[2]) {
+            return None;
+        }
+        Some(along - CONNECTOR_END_CAP - 0.25)
+    }).fold(f64::INFINITY, f64::min)
+}
+
 fn choose_intact_landing(
     checker: &crate::bsp_clearance::RouteChecker, review: &mut BspAssembly,
     center: V, displacement: V, forward: V,
 ) -> Result<([V; 2], f64, f64)> {
+    choose_intact_landing_bounded(checker, review, center, displacement, forward, f64::INFINITY)
+}
+
+fn choose_intact_landing_bounded(
+    checker: &crate::bsp_clearance::RouteChecker, review: &mut BspAssembly,
+    center: V, displacement: V, forward: V, max_span: f64,
+) -> Result<([V; 2], f64, f64)> {
     let mut first_error = None;
-    for span in [2.3, 1.75, 1.4] {
+    for span in [2.3, 1.75, 1.4].into_iter().filter(|&span| span <= max_span) {
         let direction = mul(forward, span);
         let world = [sub(center, direction), add(center, direction)];
         let local = world.map(|point| sub(point, displacement));
@@ -1748,7 +1785,7 @@ fn choose_intact_landing(
             Err(error) => { first_error.get_or_insert(error); }
         }
     }
-    Err(first_error.unwrap())
+    Err(first_error.unwrap_or_else(|| SparkError::Invalid("Choose a landing clear of the donor’s native vehicle placements".into())))
 }
 
 fn verify_intact_switch_spacing(
@@ -1777,7 +1814,7 @@ fn intact_switch_distance(span: f64) -> f64 {
 }
 
 fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool) -> Result<Vec<V>> {
-    let outside = mul(forward, 0.7);
+    let outside = mul(forward, CONNECTOR_END_CAP);
     let slope_margin = mul(forward, 0.2);
     let start = add(overlaps[0][1], slope_margin);
     let end = sub(overlaps[1][0], slope_margin);
@@ -2694,6 +2731,9 @@ mod tests {
         let (shared, span, height) = choose_intact_landing(&short, &mut plan, center, center, forward).unwrap();
         assert_eq!((shared, span, height), ([[-1.4, 0., 0.], [1.4, 0., 0.]], 1.4, 0.));
         assert_eq!(choose_intact_landing(&wide, &mut plan, center, center, forward).unwrap().1, 2.3);
+        let stock_vehicle = add(center, mul(forward, 2.66));
+        let bound = intact_span_before_vehicles(center, forward, plan.tunnel_width, plan.tunnel_height, [stock_vehicle]);
+        assert_eq!(choose_intact_landing_bounded(&wide, &mut plan, center, center, forward, bound).unwrap().1, 1.4);
         assert!(choose_intact_landing(&outside, &mut plan, center, center, forward).is_err());
         let d = intact_switch_distance(span);
         let from = partition_switch(0, 1, [-d - 0.45, 0., 0.], forward, 1., 1.6).geometry;

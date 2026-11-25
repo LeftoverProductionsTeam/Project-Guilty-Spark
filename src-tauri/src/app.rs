@@ -1667,10 +1667,10 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
         // Self-contained caches need no shared-bank search. Check all native
         // descriptors against the preserved SHA rather than guessing from the
         // first few tags, or caching a stale negative discovery result.
-        if [5,6,7,609,13].contains(&source.cache_version)
-            && !audio::requires_external_samples(&source.preserved_path,&source.sha256).map_err(error)? {
-            return Ok(None);
-        }
+        if ![5,6,7,609,13].contains(&source.cache_version) { return Ok(None); }
+        let classic = [6,7,609].contains(&source.cache_version);
+        let witnesses = audio::external_sample_sources(&source.preserved_path, &source.sha256, if classic { 16 } else { 1 }).map_err(error)?;
+        if witnesses.is_empty() { return Ok(None); }
         let mcc=lock(&state.installation)?.mcc_path.clone();
         let binding=if source.cache_version==13 {
             let Some(root)=mcc else{return Ok(None)};
@@ -1683,7 +1683,7 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
             for (root,_) in roots.into_iter().filter(|(root,_)|root.join("sounds.map").is_file()).take(12) {
                 let Ok(binding)=core::mcc_audio::pin_classic(&root) else{continue};
                 if source.resource_directory.as_ref()==Some(&root)&&source.resource_sha256.get("sounds.map").is_some_and(|hash|Some(hash)!=binding.sha256.get("sounds.map")){continue;}
-                let matching=inspected.tags.iter().filter(|tag|tag.class=="snd!").take(8).any(|tag|audio::inspect_sound_with_bindings(&source.preserved_path,&source.sha256,tag.id,None,Some(&binding)).is_ok_and(|report|report.permutations.iter().any(|p|!p.embedded&&p.available)));
+                let matching=witnesses.iter().any(|&id|audio::inspect_sound_with_bindings(&source.preserved_path,&source.sha256,id,None,Some(&binding)).is_ok_and(|report|report.permutations.iter().any(|p|!p.embedded&&p.available)));
                 if matching{found=Some(binding);break;}
             }
             found

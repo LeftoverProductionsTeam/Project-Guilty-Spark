@@ -17,6 +17,20 @@ fn main()->Result<()>{
   println!("{}", serde_json::to_string(&receipt)?);
   return Ok(());
  }
+ if args.first().is_some_and(|arg| arg == "--ground-points") {
+  if args.len() < 5 || (args.len() - 2) % 3 != 0 {
+   return spark_core::invalid("qa_bsp_mesh --ground-points <owned.map> <x> <y> <z> [<x> <y> <z> ...]");
+  }
+  let path=Path::new(&args[1]);
+  let map=maps::inspect_map(path,path.parent())?;
+  let number = |text: &str| text.parse::<f32>()
+   .map_err(|_| spark_core::SparkError::Invalid("Ground review needs numeric coordinates".into()));
+  let points=args[2..].chunks_exact(3).map(|p| Ok([number(&p[0])?,number(&p[1])?,number(&p[2])?]))
+   .collect::<Result<Vec<_>>>()?;
+  let review=maps::bsp_geometry_review(path,&map,&points,Some(12.),None,None)?;
+  println!("{}",serde_json::json!({"sourceSha256":map.sha256,"review":review}));
+  return Ok(());
+ }
  if args.first().is_some_and(|arg| arg == "--bsp-lightmaps") {
   if args.len() != 3 { return spark_core::invalid("qa_bsp_mesh --bsp-lightmaps <owned.map> <BSP slot>"); }
   let source = Path::new(&args[1]);

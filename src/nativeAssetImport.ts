@@ -28,9 +28,20 @@ export async function prepareAssetImport(
       tagId: asset.tagId,
       existing: existing ?? null,
     });
+  const missingResources = /Extraction requires the source runtime resource|No complete compiler resource set was verified/;
   try { return await prepare(); }
   catch (error) {
-    if (!/Extraction requires the source runtime resource|No complete compiler resource set was verified/.test(String(error))) throw error;
+    if (!missingResources.test(String(error))) throw error;
+    if (asset.class === 'snd!' || asset.class === 'lsnd') {
+      const automatic = await call<OpenProject | null>('auto_connect_sound_resources', { projectId: asset.sourceProjectId }).catch(() => null);
+      const source = automatic?.project.source;
+      if (source && source.sha256 !== asset.sourceSha256)
+        throw Error('The sound source changed. Drag the asset again from the current source.');
+      if (source?.audioResources) {
+        try { return await prepare(); }
+        catch (retry) { if (!missingResources.test(String(retry))) throw retry; }
+      }
+    }
     const selected = await call<OpenProject | null>('choose_project_resources', { projectId: asset.sourceProjectId });
     if (!selected) throw error;
     if (selected.project.source?.sha256 !== asset.sourceSha256)

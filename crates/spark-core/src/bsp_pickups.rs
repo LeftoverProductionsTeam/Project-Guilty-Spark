@@ -44,6 +44,7 @@ impl PreparedPickups {
         path: &Path,
         map: &MapInspection,
         actual: &[NativeNetgamePickup],
+        verify_vehicle_home: bool,
     ) -> Result<()> {
         if actual.len() != self.base.len() + self.donor.len() {
             return invalid("Compiled scenario changed the reviewed pickup count");
@@ -75,7 +76,10 @@ impl PreparedPickups {
                 "Compiled pickup collections changed ordered items, weights or spawn timing",
             );
         }
-        if let Some(vehicles) = &self.vehicles { vehicles.verify(path, map)?; }
+        if let Some(vehicles) = &self.vehicles {
+            if verify_vehicle_home { vehicles.verify(path, map)?; }
+            else { vehicles.verify_rows(&maps::scenario_vehicles(path, map)?)?; }
+        }
         Ok(())
     }
 
@@ -86,7 +90,7 @@ impl PreparedPickups {
         actual: &[NativeNetgamePickup],
         regions: &crate::bsp_audio::PlacementRegions,
     ) -> Result<usize> {
-        self.verify_inventory(path, map, actual)?;
+        self.verify_inventory(path, map, actual, true)?;
         let donor_slot = regions.len().checked_sub(1)
             .ok_or_else(|| SparkError::Invalid("Missing compiled pickup region".into()))?;
         for &index in &self.moved_base {
@@ -127,7 +131,7 @@ pub(crate) fn verify_merged_manifest(
     };
     let planned: PreparedPickups = serde_json::from_value(receipt.clone())?;
     let actual = maps::scenario_netgame_pickups(path, map)?;
-    planned.verify_inventory(path, map, &actual)?;
+    planned.verify_inventory(path, map, &actual, true)?;
     if planned.donor_membership.len() != planned.donor.len()
         || planned.moved_base.iter().any(|&index| index >= planned.base.len())
     {
@@ -189,6 +193,7 @@ fn isolate_dependencies(
     runner: &Runner,
     workspace: &Path,
     tags: &Path,
+    namespace: &str,
 ) -> Result<(BTreeMap<String, String>, usize)> {
     let tool = |name| {
         build::tool_path(tools, name)
@@ -235,10 +240,10 @@ fn isolate_dependencies(
     crate::tag_exchange::verify_source_snapshot(source, resources)?;
 
     let dependency = tool("invader-dependency")?;
-    let closure = |path: &str, tag_root: &str, tree: &Path| {
+    let closure = |path: &str, tree: &Path| {
         let log = runner.run(
             &dependency,
-            &["-t".into(), tag_root.into(), "-r".into(), path.into()],
+            &["-t".into(), tree.to_string_lossy().into_owned(), "-r".into(), path.into()],
             workspace,
             "bsp-dependencies",
             42,
@@ -248,7 +253,7 @@ fn isolate_dependencies(
     let mut bindings = BTreeMap::new();
     let mut dependencies = BTreeSet::new();
     for root in roots {
-        let files = closure(root, "pickup-source", &extracted)?;
+        let files = closure(root, &extracted)?;
         dependencies.extend(files.iter().cloned());
         if dependencies.len() > 8192 {
             return invalid("Donor gameplay dependency closure exceeds 8192 native tags");
@@ -279,7 +284,6 @@ fn isolate_dependencies(
         candidates.insert(path.clone(), expected);
     }
 
-    let namespace = format!("gspickup_{}", &runner.id[..8]);
     let refactor = tool("invader-refactor")?;
     let mut aliases = BTreeMap::new();
     // Invader remaps exact references in the isolated donor closure. Any
@@ -346,7 +350,7 @@ fn isolate_dependencies(
     for (root, files) in bindings {
         let expected: BTreeSet<_> = files.iter().map(|path| remap(path)).collect();
         let root = remap(root);
-        if closure(&root, "tags", tags)? != expected {
+        if closure(&root, tags)? != expected {
             return invalid(format!(
                 "Namespaced donor dependency readback differed for {root}"
             ));
@@ -382,7 +386,7 @@ pub(crate) fn stage(
         return invalid(format!("Combined native pickup count {} exceeds the {limit} slots supported by cache version {cache_version}.", base_rows.len() + donor_rows.len()));
     }
     let base_collections = base_rows.iter().map(|row| row.collection.clone()).collect();
-    let mut collections =
+    let collections =
         maps::native_item_collections(&base_source.preserved_path, base, &base_collections)?;
     if donor_rows.is_empty() && !donor.objects.iter().any(|row| row.kind == "Vehicle") {
         return Ok(PreparedPickups {
@@ -410,7 +414,17 @@ pub(crate) fn stage(
         .map(|row| collision.contains_placement(row.position))
         .collect();
 
-    for row in &mut donor_rows {
+    relocate_pickups(&mut donor_rows, assembly.translation, assembly.yaw_degrees)?;
+
+    let vehicles = crate::bsp_vehicles::PreparedVehicles::from_sources(
+        project, base, assembly, donor, cache_version, |position| collision.contains_placement(position),
+    )?;
+    write_donor(&assembly.donor_source, donor, base, tools, runner, workspace, tags, cache_version,
+        &format!("gspickup_{}", &runner.id[..8]), base_rows, moved_base, donor_rows, collections, donor_membership, vehicles)
+}
+
+fn relocate_pickups(rows: &mut [NativeNetgamePickup], translation: [f64; 3], yaw: f64) -> Result<()> {
+    for row in rows {
         if row.flags & !1 != 0
             || row.spawn_types.iter().any(|&v| {
                 NATIVE_SPAWN_TYPES
@@ -424,39 +438,47 @@ pub(crate) fn stage(
         }
         let translated = bsp_assembly::transform(
             row.position.map(f64::from),
-            assembly.translation,
-            assembly.yaw_degrees,
+            translation,
+            yaw,
         );
         if translated.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
             return invalid("A donor pickup falls outside the supported world bounds");
         }
         row.position = translated.map(|v| v as f32);
-        row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
+        row.facing = bsp_assembly::transform_facing(row.facing, yaw);
     }
 
-    let mut vehicles = crate::bsp_vehicles::PreparedVehicles::from_sources(
-        project, base, assembly, donor, cache_version, |position| collision.contains_placement(position),
-    )?;
+    Ok(())
+}
+
+fn write_donor(
+    source: &Source, donor: &MapInspection, base: &MapInspection, tools: &Toolchain, runner: &Runner,
+    workspace: &Path, tags: &Path, cache_version: u32, namespace: &str, base_rows: Vec<NativeNetgamePickup>,
+    moved_base: Vec<usize>, mut donor_rows: Vec<NativeNetgamePickup>,
+    mut collections: BTreeMap<String, NativeItemCollection>, donor_membership: Vec<bool>,
+    mut vehicles: crate::bsp_vehicles::PreparedVehicles,
+) -> Result<PreparedPickups> {
     let roots = donor_rows
         .iter()
         .map(|row| format!("{}.item_collection", row.collection))
         .chain(vehicles.roots())
         .collect();
     let (aliases, total_tags) = isolate_dependencies(
-        &assembly.donor_source,
+        source,
         donor,
         &roots,
         tools,
         runner,
         workspace,
         tags,
+        namespace,
     )?;
     let donor_collections = donor_rows
         .iter()
         .map(|row| row.collection.clone())
         .collect();
     for (name, mut contents) in maps::native_item_collections(
-        &assembly.donor_source.preserved_path,
+        &source.preserved_path,
         donor,
         &donor_collections,
     )? {
@@ -506,34 +528,37 @@ pub(crate) fn stage(
             "end".into(),
         ])?;
     }
-    for (index, row) in donor_rows.iter_mut().enumerate() {
-        let from = format!("{}.item_collection", row.collection);
-        let target = aliases.get(&from).map(String::as_str).unwrap_or(&from);
-        row.collection = target.strip_suffix(".item_collection").unwrap().into();
-        let prefix = format!("netgame_equipment[{}]", base_rows.len() + index);
+    for (batch, rows) in donor_rows.chunks_mut(12).enumerate() {
         let mut args = vec![];
-        let mut set = |field: &str, value: String| {
-            args.extend(["-S".into(), format!("{prefix}.{field}"), value])
-        };
-        set("flags.levitate", (row.flags & 1).to_string());
-        for (slot, &code) in row.spawn_types.iter().enumerate() {
+        for (offset, row) in rows.iter_mut().enumerate() {
+            let index = batch * 12 + offset;
+            let from = format!("{}.item_collection", row.collection);
+            let target = aliases.get(&from).map(String::as_str).unwrap_or(&from);
+            row.collection = target.strip_suffix(".item_collection").unwrap().into();
+            let prefix = format!("netgame_equipment[{}]", base_rows.len() + index);
+            let mut set = |field: &str, value: String| {
+                args.extend(["-S".into(), format!("{prefix}.{field}"), value])
+            };
+            set("flags.levitate", (row.flags & 1).to_string());
+            for (slot, &code) in row.spawn_types.iter().enumerate() {
+                set(
+                    &format!("type_{slot}"),
+                    NATIVE_SPAWN_TYPES[code as usize].unwrap().into(),
+                );
+            }
+            set("team_index", row.team_index.to_string());
+            set("spawn_time", row.spawn_time.to_string());
             set(
-                &format!("type_{slot}"),
-                NATIVE_SPAWN_TYPES[code as usize].unwrap().into(),
+                "position",
+                row.position
+                    .iter()
+                    .map(f32::to_string)
+                    .collect::<Vec<_>>()
+                    .join(","),
             );
+            set("facing", row.facing.to_string());
+            set("item_collection", target.replace('/', "\\"));
         }
-        set("team_index", row.team_index.to_string());
-        set("spawn_time", row.spawn_time.to_string());
-        set(
-            "position",
-            row.position
-                .iter()
-                .map(f32::to_string)
-                .collect::<Vec<_>>()
-                .join(","),
-        );
-        set("facing", row.facing.to_string());
-        set("item_collection", target.replace('/', "\\"));
         run(args)?;
     }
     if count()? != base_rows.len() + donor_rows.len() {
@@ -550,4 +575,114 @@ pub(crate) fn stage(
         donor_membership,
         vehicles: Some(vehicles),
     })
+}
+
+pub(crate) struct StockRegion {
+    pub source: Source,
+    pub map: MapInspection,
+    pub translation: [f64; 3],
+    pub yaw: f64,
+    pub destination: usize,
+    pub restore_pickups: bool,
+}
+
+pub(crate) struct StockInventory {
+    staged: PreparedPickups,
+    supported: Vec<(usize, [f32; 3])>,
+    added_pickups: usize,
+    added_vehicles: usize,
+}
+
+impl StockInventory {
+    /// Replay omitted stock rows over an exact retained cache in writable native staging.
+    /// The selected recipe determines which native arrays were omitted for each donor.
+    pub(crate) fn stage(
+        path: &Path, base: &MapInspection, donors: &[StockRegion], limit: usize,
+        tools: &Toolchain, runner: &Runner, workspace: &Path,
+    ) -> Result<Self> {
+        if base.header.version != 13 || base.header.scenario_type != 1 || donors.is_empty() {
+            return invalid("Stock inventory repair needs an MCC13 multiplayer map and its donor recipe");
+        }
+        let tags = workspace.join("tags");
+        let mut pickups = maps::scenario_netgame_pickups(path, base)?;
+        let mut vehicles = maps::scenario_vehicles(path, base)?;
+        let initial = (pickups.len(), vehicles.len());
+        let mut collections = maps::native_item_collections(path, base, &pickups.iter().map(|row| row.collection.clone()).collect())?;
+        let mut supported = Vec::new();
+        let mut stock_ids = BTreeSet::new();
+        let mut plans = Vec::new();
+        let mut totals = initial;
+        for donor in donors {
+            if donor.destination >= base.mesh.parts.len() || donor.map.mesh.parts.len() != 1
+                || donor.map.header.version != 609 || donor.map.header.scenario_type != 1
+                || donor.map.sha256 != donor.source.sha256 || !stock_ids.insert(&donor.source.sha256)
+            {
+                return invalid("Stock inventory recipe contains a missing, repeated or incompatible donor");
+            }
+            let path = &donor.source.preserved_path;
+            let mut donor_pickups = if donor.restore_pickups { maps::scenario_netgame_pickups(path, &donor.map)? } else { Vec::new() };
+            let donor_vehicles = maps::scenario_vehicles(path, &donor.map)?;
+            if donor_pickups.is_empty() && donor_vehicles.is_empty() { continue; }
+            totals.0 += donor_pickups.len();
+            totals.1 += donor_vehicles.len();
+            if totals.1 > crate::bsp_vehicles::limit(13) {
+                return invalid("Stock vehicles exceed the MCC13 placement limit");
+            }
+            if totals.0 > limit {
+                return invalid(format!("Stock pickups exceed the reviewed {limit} slots"));
+            }
+            let original = crate::bsp_audio::inspect_ambience(path, &donor.map.sha256)?;
+            let collision = original.bsps.first().and_then(|part| part.listener_tree.as_ref())
+                .ok_or_else(|| SparkError::Invalid("Missing stock placement collision".into()))?;
+            let membership: Vec<_> = donor_pickups.iter().map(|row| collision.contains_placement(row.position)).collect();
+            relocate_pickups(&mut donor_pickups, donor.translation, donor.yaw)?;
+            supported.extend(donor_pickups.iter().zip(&membership)
+                .filter(|(_, inside)| **inside).map(|(row, _)| (donor.destination, row.position)));
+            let prepared_vehicles = crate::bsp_vehicles::PreparedVehicles::from_rows(
+                Vec::new(), donor_vehicles, donor.translation, donor.yaw, 13, |p| collision.contains_placement(p),
+            )?;
+            supported.extend(prepared_vehicles.supported_donor_positions().map(|point| (donor.destination, point)));
+            plans.push((donor, donor_pickups, membership, prepared_vehicles));
+        }
+        Self::verify_homes(path, base, &supported)?;
+        let mut staged = None;
+        for (donor, donor_pickups, membership, mut prepared_vehicles) in plans {
+            prepared_vehicles.set_staged_base(vehicles);
+            let namespace = format!("gspickup_{}_{}", &runner.id[..8], &donor.source.sha256[..8]);
+            let scratch = workspace.join(&namespace);
+            fs::create_dir(&scratch)?;
+            runner.emit("restore-stock-gameplay", donor.map.scenario_path.clone(), 55, "info");
+            let result = write_donor(&donor.source, &donor.map, base, tools, runner, &scratch, &tags, 13, &namespace,
+                pickups, Vec::new(), donor_pickups, collections, membership, prepared_vehicles)?;
+            pickups = result.base.iter().chain(&result.donor).cloned().collect();
+            let rows = result.vehicles.as_ref().ok_or_else(|| SparkError::Invalid("Missing reviewed vehicle inventory".into()))?;
+            vehicles = rows.rows().cloned().collect();
+            collections = result.collections.clone();
+            staged = Some(result);
+        }
+        let staged = staged.ok_or_else(|| SparkError::Invalid("Selected stock recipe has no imported gameplay rows".into()))?;
+        Ok(Self { staged, supported, added_pickups: pickups.len() - initial.0, added_vehicles: vehicles.len() - initial.1 })
+    }
+
+    pub(crate) fn verify(&self, path: &Path, map: &MapInspection) -> Result<serde_json::Value> {
+        let pickups = maps::scenario_netgame_pickups(path, map)?;
+        self.staged.verify_inventory(path, map, &pickups, false)?;
+        Self::verify_homes(path, map, &self.supported)?;
+        let vehicles = self.staged.vehicles.as_ref().expect("verified vehicle inventory").rows().count();
+        Ok(serde_json::json!({ "pickups": pickups.len(), "addedPickups": self.added_pickups,
+            "vehicles": vehicles, "addedVehicles": self.added_vehicles, "checkedNativeHomes": self.supported.len() }))
+    }
+
+    fn verify_homes(path: &Path, map: &MapInspection, supported: &[(usize, [f32; 3])]) -> Result<()> {
+        let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, supported.iter().map(|(_, p)| *p))?;
+        let lost = supported.iter().filter(|(bsp, point)| regions.unique_slot(*point) != Some(*bsp)).collect::<Vec<_>>();
+        if !lost.is_empty() {
+            let examples = lost.iter().take(4).map(|(bsp, point)| {
+                let matched: Vec<_> = (0..regions.len()).filter(|&slot| regions.contains(slot, *point)).collect();
+                format!("{point:?} expects BSP {bsp} and is inside {matched:?}")
+            }).collect::<Vec<_>>().join("; ");
+            return invalid(format!("{} stock placements lack a unique native home. {examples}", lost.len()));
+        }
+        Ok(())
+    }
 }

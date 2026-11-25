@@ -2,6 +2,7 @@
 use crate::{
     bsp_assembly::{self, BspAssembly},
     bsp_audio::PlacementRegions,
+    bsp_netgame_flags::MergedTeleporterDonor,
     build::{self, Runner, Toolchain},
     invalid,
     maps::{self, MapInspection, NativeRegionStart, NATIVE_SPAWN_TYPES},
@@ -55,27 +56,49 @@ impl PreparedStarts {
         let donor_bsp = if assembly.separate_native_bsps {
             (base_bsp_count + usize::from(assembly.preserve_donor_bsp)) as i16
         } else { 0 };
-        for row in &mut donor {
-            if row.spawn_types.iter().any(|&entry| {
-                NATIVE_SPAWN_TYPES
-                    .get(entry as usize)
-                    .copied()
-                    .flatten()
-                    .is_none()
-            }) {
-                return invalid("A donor player start has an unsupported native game type");
+        relocate_starts(&mut donor, assembly.translation, assembly.yaw_degrees, donor_bsp)?;
+        Ok(Self { base, donor, base_bsp_count })
+    }
+
+    pub(crate) fn restore_merged(
+        path: &Path, map: &MapInspection, donors: &[MergedTeleporterDonor<'_>],
+        destination_bsp: usize, limit: usize,
+    ) -> Result<Self> {
+        let base_bsp_count = map.mesh.parts.len();
+        if map.header.version != 13 || map.header.scenario_type != 1 || destination_bsp >= base_bsp_count {
+            return invalid("Select a native MCC13 multiplayer BSP to restore stock player starts");
+        }
+        let bsp = destination_bsp as i16;
+        let base = maps::scenario_region_starts(path, map)?;
+        let mut matched = vec![false; base.len()];
+        let mut donor = Vec::new();
+        for source in donors {
+            if source.map.header.version != 609 || source.map.header.scenario_type != 1 || source.map.mesh.parts.len() != 1
+                || maps::hash_file(source.path)? != source.map.sha256
+            {
+                return invalid("Stock starts require each exact single-BSP CE609 source");
             }
-            let position = bsp_assembly::transform(
-                row.position.map(f64::from),
-                assembly.translation,
-                assembly.yaw_degrees,
-            );
-            if position.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
-                return invalid("A donor player start exceeds the supported world bounds");
+            let mut rows = maps::scenario_region_starts(source.path, source.map)?;
+            if rows.iter().any(|row| !matches!(row.bsp_index, -1 | 0)) {
+                return invalid("A stock player start has an invalid BSP binding");
             }
-            row.position = position.map(|v| v as f32);
-            row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
-            row.bsp_index = donor_bsp;
+            relocate_starts(&mut rows, source.translation, source.yaw, bsp)?;
+            for row in rows {
+                if let Some(index) = base.iter().enumerate().position(|(index, old)| {
+                    !matched[index] && old.bsp_index == bsp && same_start(old, &row)
+                }) {
+                    matched[index] = true;
+                } else {
+                    donor.push(row);
+                }
+            }
+        }
+        if base.len() + donor.len() > limit {
+            return invalid(format!("Stock player starts exceed the reviewed {limit} slots"));
+        }
+        let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, donor.iter().map(|row| row.position))?;
+        if let Some(row) = donor.iter().find(|row| !regions.contains(destination_bsp, row.position)) {
+            return invalid(format!("Stock start at {:?} has no playable home in BSP {bsp}", row.position));
         }
         Ok(Self { base, donor, base_bsp_count })
     }
@@ -179,17 +202,7 @@ impl PreparedStarts {
             actual.iter().zip(self.base.iter().chain(donor)).enumerate()
         {
             let expected_bsp = if regional { expected.bsp_index.max(0) } else { expected.bsp_index };
-            let yaw = actual.facing - expected.facing;
-            if actual.bsp_index != expected_bsp
-                || actual.team_index != expected.team_index
-                || actual.spawn_types != expected.spawn_types
-                || actual
-                    .position
-                    .iter()
-                    .zip(expected.position)
-                    .any(|(a, b)| (*a - b).abs() > 0.0002)
-                || yaw.sin().atan2(yaw.cos()).abs() > 0.00002
-            {
+            if actual.bsp_index != expected_bsp || !same_start(actual, expected) {
                 return invalid(format!(
                     "Compiled player start {index} differs from its reviewed native placement"
                 ));
@@ -211,6 +224,29 @@ impl PreparedStarts {
     }
 }
 
+fn relocate_starts(rows: &mut [NativeRegionStart], translation: [f64; 3], yaw: f64, bsp: i16) -> Result<()> {
+    for row in rows {
+        if row.spawn_types.iter().any(|&entry| NATIVE_SPAWN_TYPES.get(entry as usize).copied().flatten().is_none()) {
+            return invalid("A donor player start has an unsupported native game type");
+        }
+        let position = bsp_assembly::transform(row.position.map(f64::from), translation, yaw);
+        if position.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
+            return invalid("A donor player start exceeds the supported world bounds");
+        }
+        row.position = position.map(|v| v as f32);
+        row.facing = bsp_assembly::transform_facing(row.facing, yaw);
+        row.bsp_index = bsp;
+    }
+    Ok(())
+}
+
+fn same_start(a: &NativeRegionStart, b: &NativeRegionStart) -> bool {
+    let yaw = a.facing - b.facing;
+    a.team_index == b.team_index && a.spawn_types == b.spawn_types
+        && a.position.iter().zip(b.position).all(|(x, y)| (*x - y).abs() <= 0.0002)
+        && yaw.sin().atan2(yaw.cos()).abs() <= 0.00002
+}
+
 pub(crate) fn verify_merged_manifest(
     manifest: &serde_json::Value, path: &Path, map: &MapInspection,
 ) -> Result<Option<serde_json::Value>> {
@@ -221,4 +257,82 @@ pub(crate) fn verify_merged_manifest(
     let actual = maps::scenario_region_starts(path, map)?;
     let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, actual.iter().map(|row| row.position))?;
     planned.verify(&actual, true, &regions).map(Some)
+}
+
+#[test]
+#[ignore = "Requires verified stock maps, the reviewed assembly recipe and a disposable extracted tag tree"]
+fn restore_merged_native_stock_gameplay() -> Result<()> {
+    let input = |key| std::env::var_os(key).map(std::path::PathBuf::from)
+        .ok_or_else(|| SparkError::Invalid(format!("Missing native fixture input {key}")));
+    let path = input("SPARK_RESTOCK_PARENT")?;
+    let stocks = input("SPARK_RESTOCK_STOCK")?;
+    let root = input("SPARK_RESTOCK_WORKSPACE")?;
+    let recipe: serde_json::Value = serde_json::from_slice(&std::fs::read(input("SPARK_RESTOCK_RECIPE")?)?)?;
+    let map = maps::inspect_map(&path, None)?;
+    assert_eq!(map.sha256, "33d253731ede4bdc1e7c304af31ae50fa042081368b0116e6693eaff8115b156");
+    let originals = recipe["recipe"]["inheritedConnections"].as_array().expect("reviewed world connections");
+    let mut stock_regions = Vec::new();
+    let mut worlds = 1;
+    for connection in originals.iter().chain(std::iter::once(&recipe["recipe"]["plan"])) {
+        let mut source: crate::project::Source = serde_json::from_value(connection["donorSource"].clone())?;
+        let name = source.original_path.file_name().expect("reviewed stock name");
+        source.preserved_path = stocks.join(name);
+        source.resource_directory = Some(stocks.clone());
+        let inspection = maps::inspect_map(&source.preserved_path, Some(&stocks))?;
+        assert_eq!(inspection.sha256, source.sha256);
+        let separate = connection["separateNativeBsps"] == true;
+        let intact = connection["preserveDonorBsp"] == true;
+        let destination = if separate { worlds + usize::from(intact) } else { 0 };
+        if separate { worlds = destination + 1; }
+        stock_regions.push(crate::bsp_pickups::StockRegion {
+            source, map: inspection, translation: serde_json::from_value(connection["translation"].clone())?,
+            yaw: connection["yawDegrees"].as_f64().expect("reviewed yaw"), destination, restore_pickups: !separate,
+        });
+    }
+    assert_eq!((stock_regions.len(), worlds), (18, 13));
+    let donors = stock_regions.iter().filter(|region| region.restore_pickups).map(|region| MergedTeleporterDonor {
+        path: &region.source.preserved_path, map: &region.map, translation: region.translation, yaw: region.yaw,
+    }).collect::<Vec<_>>();
+    assert_eq!(donors.len(), 11);
+    let staged = PreparedStarts::restore_merged(&path, &map, &donors, 0, 1536)?;
+    assert_eq!((staged.base.len(), staged.donor.len()), (568, 739));
+    assert!(PreparedStarts::restore_merged(&path, &map, &donors, 0, 1024).is_err());
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let runner = Runner { id: "stock-placements", project: "reviewed-megaworld", cancel: &cancel, event: &|event| {
+        if event.severity == "error" || event.phase == "restore-stock-gameplay" || event.message.trim_start().starts_with("Tag space:") { eprintln!("{}", event.message); }
+    }};
+    let tools = Toolchain { invader_directory: Some(input("SPARK_RESTOCK_INVADER")?), ..Default::default() };
+    staged.append(&map.scenario_path, &tools, &runner, &root)?;
+    let inventory = crate::bsp_pickups::StockInventory::stage(&path, &map, &stock_regions, 1024, &tools, &runner, &root)?;
+    let output = root.join("restored-stock");
+    std::fs::create_dir(&output)?;
+    let args = ["-t".into(), "tags".into(), "-g".into(), "mcc-cea".into(), "-T".into(), "67108864".into(),
+        "-m".into(), "restored-stock".into(), "--resource-usage".into(), "none".into(), map.scenario_path.clone()];
+    let tool = build::tool_path(&tools, "invader-build").expect("native compiler");
+    runner.run(&tool, &args, &root, "compile-stock-starts", 80)?;
+    let cache = output.join("gsmegaroad.map");
+    let rebuilt = maps::inspect_map(&cache, None)?;
+    assert_eq!((rebuilt.header.version, rebuilt.header.scenario_type, rebuilt.scenario_path.as_str()), (13, 1, map.scenario_path.as_str()));
+    let actual = maps::scenario_region_starts(&cache, &rebuilt)?;
+    let (_, regions) = crate::bsp_audio::inspect_placement_regions(&cache, &rebuilt.sha256, actual.iter().map(|row| row.position))?;
+    let report = staged.verify(&actual, true, &regions)?;
+    let gameplay = inventory.verify(&cache, &rebuilt)?;
+    assert_eq!((gameplay["pickups"].as_u64(), gameplay["vehicles"].as_u64()), (Some(975), Some(227)));
+    assert!(PreparedStarts::restore_merged(&cache, &rebuilt, &donors, 0, 1536)?.donor.is_empty());
+    let original_flags = maps::scenario_netgame_flags(&path, &map)?;
+    assert_eq!(serde_json::to_value(original_flags)?, serde_json::to_value(maps::scenario_netgame_flags(&cache, &rebuilt)?)?);
+    let switches = maps::scenario_bsp_transitions(&path, &map)?;
+    let restored_switches = maps::scenario_bsp_transitions(&cache, &rebuilt)?;
+    assert_eq!(switches.bsp_tag_paths, restored_switches.bsp_tag_paths);
+    assert_eq!(switches.transitions, restored_switches.transitions);
+    assert_eq!(map.mesh.positions, rebuilt.mesh.positions);
+    assert_eq!(map.mesh.indices, rebuilt.mesh.indices);
+    assert_eq!(maps::hash_file(&path)?, map.sha256);
+    let tool = build::tool_path(&tools, "invader-info").expect("native validator");
+    for key in ["crc32_mismatched", "stub_count", "is_protected"] {
+        assert_eq!(runner.run(&tool, &["-T".into(), key.into(), "restored-stock/gsmegaroad.map".into()],
+            &root, "validate-stock-starts", 90)?.trim(), "0");
+    }
+    println!("{}", serde_json::json!({"nativeStarts":report, "stockGameplay":gameplay, "parentSha256":map.sha256,"cacheSha256":rebuilt.sha256}));
+    Ok(())
 }

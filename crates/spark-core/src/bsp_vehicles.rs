@@ -31,17 +31,24 @@ impl PreparedVehicles {
         let source = project.source.as_ref()
             .ok_or_else(|| SparkError::Invalid("Missing native vehicle base source".into()))?;
         let mut base = maps::scenario_vehicles(&source.preserved_path, base)?;
-        let mut donor = maps::scenario_vehicles(&assembly.donor_source.preserved_path, donor)?;
-        let total = base.len() + donor.len();
-        let limit = limit(cache_version);
-        if !donor.is_empty() && total > limit {
-            return invalid(format!("This join needs {total} native vehicles. Cache version {cache_version} supports {limit}."));
-        }
+        let donor = maps::scenario_vehicles(&assembly.donor_source.preserved_path, donor)?;
         for (index, row) in base.iter_mut().enumerate() {
             if let Some(item) = project.scene.iter().find(|item| item.id == format!("Vehicle-{index}")) {
                 row.position = item.position;
                 row.rotation = item.rotation;
             }
+        }
+        Self::from_rows(base, donor, assembly.translation, assembly.yaw_degrees, cache_version, contains)
+    }
+
+    pub(crate) fn from_rows(
+        base: Vec<NativeVehicle>, mut donor: Vec<NativeVehicle>, translation: [f64; 3], yaw: f64,
+        cache_version: u32, contains: impl Fn([f32; 3]) -> bool,
+    ) -> Result<Self> {
+        let total = base.len() + donor.len();
+        let limit = limit(cache_version);
+        if !donor.is_empty() && total > limit {
+            return invalid(format!("This join needs {total} native vehicles. Cache version {cache_version} supports {limit}."));
         }
         let membership = donor.iter().map(|row| contains(row.position)).collect();
         for (index, row) in donor.iter_mut().enumerate() {
@@ -52,14 +59,26 @@ impl PreparedVehicles {
             {
                 return invalid(format!("Donor vehicle {} has unsupported native placement fields", index + 1));
             }
-            let position = bsp_assembly::transform(row.position.map(f64::from), assembly.translation, assembly.yaw_degrees);
+            let position = bsp_assembly::transform(row.position.map(f64::from), translation, yaw);
             if position.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
                 return invalid(format!("Donor vehicle {} falls outside the supported world bounds", index + 1));
             }
             row.position = position.map(|v| v as f32);
-            row.rotation[0] = bsp_assembly::transform_facing(row.rotation[0], assembly.yaw_degrees);
+            row.rotation[0] = bsp_assembly::transform_facing(row.rotation[0], yaw);
         }
         Ok(Self { base, donor, membership })
+    }
+
+    pub(crate) fn supported_donor_positions(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+        self.donor.iter().zip(&self.membership).filter(|(_, inside)| **inside).map(|(row, _)| row.position)
+    }
+
+    pub(crate) fn set_staged_base(&mut self, rows: Vec<NativeVehicle>) {
+        self.base = rows;
+    }
+
+    pub(crate) fn rows(&self) -> impl Iterator<Item = &NativeVehicle> {
+        self.base.iter().chain(&self.donor)
     }
 
     pub(crate) fn roots(&self) -> impl Iterator<Item = String> + '_ {
@@ -161,6 +180,16 @@ impl PreparedVehicles {
 
     pub(crate) fn verify(&self, path: &Path, map: &MapInspection) -> Result<usize> {
         let actual = maps::scenario_vehicles(path, map)?;
+        self.verify_rows(&actual)?;
+        if !self.donor.is_empty() {
+            let positions = actual[self.base.len()..].iter().map(|row| row.position);
+            let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, positions)?;
+            self.verify_membership(&actual[self.base.len()..], &regions)?;
+        }
+        Ok(self.donor.len())
+    }
+
+    pub(crate) fn verify_rows(&self, actual: &[NativeVehicle]) -> Result<()> {
         if actual.len() != self.base.len() + self.donor.len() || self.donor.len() != self.membership.len() {
             return invalid("Compiled native vehicle count differs from the reviewed inventory");
         }
@@ -177,12 +206,7 @@ impl PreparedVehicles {
                 return invalid(format!("Compiled vehicle {} differs from its reviewed native row", index + 1));
             }
         }
-        if !self.donor.is_empty() {
-            let positions = actual[self.base.len()..].iter().map(|row| row.position);
-            let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, positions)?;
-            self.verify_membership(&actual[self.base.len()..], &regions)?;
-        }
-        Ok(self.donor.len())
+        Ok(())
     }
 
     fn verify_membership(&self, donor: &[NativeVehicle], regions: &PlacementRegions) -> Result<()> {

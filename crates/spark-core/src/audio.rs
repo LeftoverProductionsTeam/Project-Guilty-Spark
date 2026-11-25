@@ -57,6 +57,12 @@ struct SoundData {
 /// answers only whether resource discovery is necessary; it does not certify
 /// sample playback, decode audio, or cache an absence after the source changes.
 pub fn requires_external_samples(path: &Path, expected_sha256: &str) -> Result<bool> {
+    Ok(!external_sample_sources(path, expected_sha256, 1)?.is_empty())
+}
+
+/// Select actual external sample descriptors to test against candidate resource banks.
+pub fn external_sample_sources(path: &Path, expected_sha256: &str, count_limit: usize) -> Result<Vec<u32>> {
+    if !(1..=32).contains(&count_limit) { return invalid("Sound resource search needs 1–32 witnesses"); }
     let (header, bytes, hash) = maps::read_cache_snapshot_shared(path)?;
     if hash != expected_sha256 {
         return invalid("Sound resource discovery source checksum changed");
@@ -86,11 +92,17 @@ pub fn requires_external_samples(path: &Path, expected_sha256: &str) -> Result<b
     if count > maps::MAX_TAGS { return invalid("Sound resource tag count exceeds limit"); }
     let table = pointer(r.u32(start)?, count * 32)?;
     let mut total = 0usize;
-    for index in 0..count {
+    let mut external = Vec::new();
+    'tags: for index in 0..count {
         let tag = table + index * 32;
         if r.fourcc(tag)? != "snd!" { continue; }
         // Indexed metadata itself needs its original resource cache.
-        if r.u32(tag + 24)? != 0 { return Ok(true); }
+        let id = r.u32(tag + 12)?;
+        if r.u32(tag + 24)? != 0 {
+            external.push(id);
+            if external.len() == count_limit { break; }
+            continue;
+        }
         let at = pointer(r.u32(tag + 20)?, 164)?;
         let pitches = r.u32(at + 152)? as usize;
         if pitches > 8 { return invalid("Sound exceeds eight pitch ranges"); }
@@ -109,13 +121,17 @@ pub fn requires_external_samples(path: &Path, expected_sha256: &str) -> Result<b
             for permutation in 0..permutations {
                 match r.u32(table + permutation * 124 + 68)? {
                     0 => (),
-                    1 => return Ok(true),
+                    1 => {
+                        external.push(id);
+                        if external.len() == count_limit { break 'tags; }
+                        continue 'tags;
+                    }
                     _ => return invalid("Unsupported sound raw-data flags"),
                 }
             }
         }
     }
-    Ok(false)
+    Ok(external)
 }
 
 fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>) -> Result<SoundData> {
@@ -789,7 +805,10 @@ mod tests {
     }
     #[test]fn shared_samples_require_kind_hash_and_exact_permutation_span(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(true);std::fs::write(&path,&bytes).unwrap();
-        let hash=crate::hex_bytes(Sha256::digest(&bytes));let resource=dir.path().join("sounds.map");let mut raw=vec![0u8;0x400];
+        let hash=crate::hex_bytes(Sha256::digest(&bytes));
+        assert_eq!(external_sample_sources(&path,&hash,16).unwrap(), [0x1234]);
+        assert!(external_sample_sources(&path,&"0".repeat(64),16).is_err());
+        let resource=dir.path().join("sounds.map");let mut raw=vec![0u8;0x400];
         let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());
         set(&mut raw,0,2);set(&mut raw,4,0x100);set(&mut raw,8,0x40);set(&mut raw,12,1);set(&mut raw,0x44,36);set(&mut raw,0x48,0x300);
         raw[0x100..0x111].copy_from_slice(b"test\\sound__0__0\0");std::fs::write(&resource,&raw).unwrap();
