@@ -4,7 +4,7 @@ Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Seventeen-region MCC13 27d8d89b passed native readback with intact Gephyrophobia. Fifteen- and sixteen-region exact handoffs remain retained. Fourteen-region 71fc1648 remains installed.
-Next action: Finish the stock Ice Fields approach from 27d8d89b and verify the tenth-commit Win64 delivery with an isolated startup smoke test and Forerunner offline gameplay evidence. Then connect Infinity. Preserve installed and retained maps.
+Next action: Reproduce the Black Echo post-insertion walking and Covenant boarding failures from the normal Windows menu on the exact reviewed pairing. Use Forerunner’s first blocked approach and craft pose to choose the authored correction. Verify the current Ice Fields build from 27d8d89b and connect Infinity once native readback passes. Preserve installed and retained maps.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

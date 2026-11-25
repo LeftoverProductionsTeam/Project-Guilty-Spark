@@ -4914,7 +4914,7 @@ test('recovered objective areas refuse stale source, duplicate names and unsuppo
  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}})));await expect(source).not.toContainText('1 native areas');
 });
 
-test('native control support copies only the reviewed ground coordinate to the placement draft',async({page})=>{
+test('native control support uses the reviewed ground and mounting offset in the placement draft',async({page})=>{
  await mockRecoveredMissionAreas(page,true);
  await mockNativePointReview(page);
  await chooseTool(page,'AI & scenario');
@@ -4929,6 +4929,19 @@ test('native control support copies only the reviewed ground coordinate to the p
  await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0',exact:true}).click();
  await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0');
  await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
+ const offset=form.getByRole('spinbutton',{name:'Origin offset from ground',exact:true});
+ await offset.fill('0.12');
+ await offset.press('Enter');
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await expect(form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.12',exact:true})).toBeEnabled();
+ await offset.fill('0.125');
+ await offset.press('Enter');
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toHaveCount(0);
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.125',exact:true}).click();
+ await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0.125');
+ await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
+ await expect(form.getByRole('spinbutton',{name:'Device position Y',exact:true})).toHaveValue('2');
  expect(await page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].position)).toEqual([1,2,3]);
  await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeEnabled();
 });
