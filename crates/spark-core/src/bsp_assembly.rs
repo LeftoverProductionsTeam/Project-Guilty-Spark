@@ -68,6 +68,8 @@ pub struct BspAssembly {
     #[serde(default, skip_serializing_if = "is_false")]
     pub preserve_donor_bsp: bool,
     #[serde(default, skip_serializing_if = "is_false")]
+    pub tunnel_bake_fill: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
     pub translation: [f64; 3],
     pub yaw_degrees: f64,
@@ -148,6 +150,9 @@ impl BspAssembly {
         if self.separate_native_bsps { self.validate_partition_route()?; }
         if self.preserve_donor_bsp && (!self.separate_native_bsps || self.yaw_degrees != 0. || !self.native_seals.is_empty()) {
             return invalid("An intact donor requires separate BSPs, translation without yaw, and no boundary seals");
+        }
+        if self.tunnel_bake_fill && (!self.preserve_donor_bsp || self.open_road) {
+            return invalid("Tunnel bake lighting requires an enclosed connector between intact BSPs");
         }
         if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
@@ -1492,6 +1497,7 @@ pub fn generate_preserved_connector(
     let mut review = plan.clone();
     review.separate_native_bsps = false;
     review.preserve_donor_bsp = false;
+    review.tunnel_bake_fill = false;
     review.base_bsp_index = 0;
 
     let common_separation = intact_common_separation(&base.mesh, base.mesh.parts.len(), &donor.mesh, 0, plan.translation, forward)?;
@@ -1804,6 +1810,7 @@ pub(crate) fn verify_intact_connector_collision(
     let mut route = plan.clone();
     route.separate_native_bsps = false;
     route.preserve_donor_bsp = false;
+    route.tunnel_bake_fill = false;
     route.base_bsp_index = 0;
     let mut samples = Vec::with_capacity(2);
     let mut max_delta: f64 = 0.;
@@ -2110,6 +2117,7 @@ pub fn plan_from_bsp(
         base_bsp_index: base_index,
         separate_native_bsps: retaining,
         preserve_donor_bsp: false,
+        tunnel_bake_fill: false,
         include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,
@@ -2912,6 +2920,10 @@ mod tests {
         restored.preserve_donor_bsp = true;
         assert!(restored.validate().unwrap_err().to_string().contains("six world units"));
         restored.tunnel_width = 6.;
+        restored.validate().unwrap();
+        restored.tunnel_bake_fill = true;
+        assert!(restored.validate().unwrap_err().to_string().contains("enclosed connector"));
+        restored.open_road = false;
         restored.validate().unwrap();
     }
     #[test]

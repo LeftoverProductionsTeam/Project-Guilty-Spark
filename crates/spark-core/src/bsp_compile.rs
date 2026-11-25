@@ -757,6 +757,47 @@ fn bake_structure_lightmaps(
     Ok(())
 }
 
+// Temporarily make the connector's private shader alias emit neutral light.
+// Restore the unmodified material before cache compilation, even on failure.
+fn bake_enclosed_connector(
+    project: &Project, tool: &Path, runner: &Runner<'_>, workspace: &Path, edit: &Path,
+    scenario: &str, bsp: &str, geometry: &AssemblyGeometry,
+) -> Result<()> {
+    let material = geometry.materials.first()
+        .filter(|material| material.source == 0 && material.shader_class.as_deref() == Some("senv"))
+        .ok_or_else(|| SparkError::Invalid("The enclosed connector has no native environment shader".into()))?;
+    let tag = format!("gsbsp_{}_0\\materials\\{}.shader_environment", &runner.id[..8], material.name);
+    let tags = workspace.join("tags");
+    let alias = tags.join(safe_relative(&tag)?);
+    reject_links(&alias)?;
+    let original = fs::read(&alias)?;
+    let before = maps::hash_file(&alias)?;
+    let run = |fields: &[&str]| {
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+        args.extend(fields.iter().map(|value| value.to_string()));
+        args.push(tag.clone());
+        runner.run(edit, &args, workspace, "tunnel-lighting", 65)
+    };
+    let value = run(&["-G", "power"])?;
+    let power = value.trim().parse::<f32>().ok().filter(|value| value.is_finite() && *value >= 0.)
+        .ok_or_else(|| SparkError::Invalid("The connector shader power is invalid".into()))?;
+    if power > 0. {
+        return bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp);
+    }
+    let bake = (|| {
+        run(&["-S", "power", "1", "-S", "color_of_emitted_light", "1,1,1"])?;
+        if run(&["-G", "power"])?.trim().parse::<f32>().ok() != Some(1.) {
+            return invalid("The tunnel lighting fill did not reach the staged shader");
+        }
+        bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp)
+    })();
+    project::atomic_write(&alias, &original, false)?;
+    if maps::hash_file(&alias)? != before {
+        return invalid("The original staged connector shader could not be restored");
+    }
+    bake
+}
+
 pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
     pub switches: Vec<bsp_assembly::PartitionSwitch>,
@@ -1125,8 +1166,12 @@ pub(crate) fn prepare_partition_structure(
             bake_only = Some((copy, file, source, before));
         }
         let scenario = bake_only.as_ref().map_or(inspection.scenario_path.as_str(), |entry| entry.0.as_str());
-        for (name, _) in &regions {
-            bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
+        for (name, geometry) in &regions {
+            if plan.tunnel_bake_fill {
+                bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)?;
+            } else {
+                bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
+            }
         }
         if let Some((_, file, source, before)) = bake_only {
             if maps::hash_file(&source)? != before { return invalid("Native lighting changed the regional gameplay scenario"); }
