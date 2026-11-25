@@ -1344,16 +1344,8 @@ pub fn generate_preserved_connector(
     review.preserve_donor_bsp = false;
     review.base_bsp_index = 0;
 
-    for direction in [forward, [0., 0., 1.], [0., 0., -1.]] {
-        let donor_near = projected_bounds(&donor.mesh, 0, plan.translation, 0., direction)?[0];
-        let base_far = (0..base.mesh.parts.len()).map(|slot|
-            projected_bounds(&base.mesh, slot, [0.; 3], 0., direction).map(|range| range[1])
-        ).collect::<Result<Vec<_>>>()?.into_iter().fold(f64::NEG_INFINITY, f64::max);
-        if donor_near - base_far >= 8. { break; }
-        if direction[2] == -1. {
-            return invalid("Intact regions need eight units of separation along the route or vertically");
-        }
-    }
+    let common_separation = intact_common_separation(&base.mesh, base.mesh.parts.len(), &donor.mesh, 0, plan.translation, forward)?;
+
 
     let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
     let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
@@ -1385,6 +1377,10 @@ pub fn generate_preserved_connector(
     let volumes = maps::scenario_volume_readback(&source.preserved_path, base)?;
     verify_intact_switch_spacing(&switches, &prior.transitions, &volumes)?;
     let points = intact_floor_points(overlaps, forward);
+    if !common_separation {
+        verify_intact_neighborhood((&base.mesh, &base_collision), (&donor.mesh, &donor_collision),
+            0, plan.translation, base.mesh.parts.len(), plan, points)?;
+    }
     review.tunnel_points = points[1..3].to_vec();
     review.validate()?;
 
@@ -1434,6 +1430,66 @@ pub fn generate_preserved_connector(
         switches,
         overlaps,
     })
+}
+
+fn intact_common_separation(
+    base: &MeshData, count: usize, donor: &MeshData, donor_slot: usize, translation: V, forward: V,
+) -> Result<bool> {
+    for direction in [forward, [0., 0., 1.], [0., 0., -1.]] {
+        let donor_near = projected_bounds(donor, donor_slot, translation, 0., direction)?[0];
+        let mut base_far = f64::NEG_INFINITY;
+        for slot in 0..count {
+            base_far = base_far.max(projected_bounds(base, slot, [0.; 3], 0., direction)?[1]);
+        }
+        if donor_near - base_far >= 8. { return Ok(true); }
+    }
+    Ok(false)
+}
+
+fn separated_bounds(left: [[f64; 2]; 3], right: [[f64; 2]; 3], clearance: f64) -> bool {
+    left.into_iter().zip(right).any(|(a, b)| b[0] - a[1] >= clearance || a[0] - b[1] >= clearance)
+}
+
+/// A region in a gap between existing BSPs can be clear on a different axis
+/// from each neighbor. Protect both render and collision bounds, then check
+/// the entire passage envelope against every nonparticipating BSP.
+fn verify_intact_neighborhood(
+    base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
+    translation: V, count: usize, plan: &BspAssembly, points: [V; 4],
+) -> Result<()> {
+    let difference = sub(plan.tunnel_points[1], plan.tunnel_points[0]);
+    let forward = mul([difference[0], difference[1], 0.], 1. / difference[0].hypot(difference[1]));
+    let axes = [forward, [-forward[1], forward[0], 0.], [0., 0., 1.]];
+    let side = mul(axes[1], f64::from(plan.tunnel_width) / 2.);
+    let height = f64::from(plan.tunnel_height);
+    let box_for = |meshes: (&MeshData, &MeshData), slot, shift| -> Result<[[f64; 2]; 3]> {
+        let mut bounds = [[0.; 2]; 3];
+        for (index, axis) in axes.into_iter().enumerate() {
+            let a = projected_bounds(meshes.0, slot, shift, 0., axis)?;
+            let b = projected_bounds(meshes.1, slot, shift, 0., axis)?;
+            bounds[index] = [a[0].min(b[0]), a[1].max(b[1])];
+        }
+        Ok(bounds)
+    };
+    let donor_bounds = box_for(donor, donor_index, translation)?;
+    let corridor = axes.map(|axis| {
+        points.into_iter().flat_map(|point| {
+            let upper = add(point, [0., 0., height]);
+            [sub(point, side), add(point, side), sub(upper, side), add(upper, side)]
+        }).map(|point| dot(point, axis)).fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| {
+            [lo.min(value), hi.max(value)]
+        })
+    });
+    for slot in 0..count {
+        let retained = box_for(base, slot, [0.; 3])?;
+        if !separated_bounds(donor_bounds, retained, 8.) {
+            return invalid(format!("The intact donor needs eight units of separation from BSP {slot}"));
+        }
+        if slot != plan.base_bsp_index && !separated_bounds(retained, corridor, 0.05) {
+            return invalid(format!("The proposed passage intersects the bounds of unrelated BSP {slot}"));
+        }
+    }
+    Ok(())
 }
 
 fn intact_connector_contains_pickup(points: [V; 4], forward: V, width: f64, height: f64, position: V) -> bool {
@@ -1590,6 +1646,13 @@ pub(crate) fn verify_intact_connector_collision(
     let delta = sub(end, start);
     let forward = mul([delta[0], delta[1], 0.], 1. / delta[0].hypot(delta[1]));
     let points = intact_floor_points(overlaps, forward);
+    // Apply the identical neighboring-region proof to the exact compiled
+    // geometry when the donor did not use a single separation plane.
+    let donor_slot = original_count + 1;
+    if !intact_common_separation(&compiled.mesh, original_count, &compiled.mesh, donor_slot, [0.; 3], forward)? {
+        verify_intact_neighborhood((&compiled.mesh, &collision), (&compiled.mesh, &collision), donor_slot,
+            [0.; 3], original_count, plan, points)?;
+    }
     route.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
     let corridor = [connector.verify(&route)?, connector.verify_return(&route)?];
     Ok(serde_json::json!({
@@ -2256,6 +2319,15 @@ mod tests {
         verify_intact_switch_spacing(&[independent], &retained, &fields).unwrap();
         let clear = partition_switch(1, 7, [4., 4., 0.], [DIAG, -DIAG, 0.], 2., 1.6);
         verify_intact_switch_spacing(&[clear], &retained, &fields).unwrap();
+    }
+
+    #[test]
+    fn intact_neighbor_separation_allows_different_axes_without_overlapping() {
+        let donor = [[-10., 10.], [-10., 10.], [-10., 10.]];
+        assert!(separated_bounds(donor, [[18., 30.], [-20., 20.], [-20., 20.]], 8.));
+        assert!(separated_bounds(donor, [[-20., 20.], [-20., 20.], [18., 30.]], 8.));
+        assert!(!separated_bounds(donor, [[17.9, 30.], [-20., 20.], [-20., 20.]], 8.));
+        assert!(!separated_bounds(donor, [[0., 20.], [0., 20.], [0., 20.]], 0.05));
     }
 
     #[test]

@@ -894,9 +894,41 @@ fn extract_intact_donor(
     Ok((root, skies))
 }
 
+const NATIVE_SKY_SLOTS: usize = 8;
+
+fn intact_sky_span(existing: &[String], used: &BTreeSet<usize>, donor_count: usize) -> Result<usize> {
+    if existing.len() > NATIVE_SKY_SLOTS || used.iter().any(|&slot| slot >= existing.len()) {
+        return invalid("Retained BSP references an invalid native sky slot");
+    }
+    if donor_count <= NATIVE_SKY_SLOTS - existing.len() {
+        return Ok(existing.len());
+    }
+    // Keep the first native reference for each sky even if no cluster uses it.
+    // Only a later, unused copy of the same sky may be overwritten.
+    let mut names = BTreeSet::new();
+    let mut available = [true; NATIVE_SKY_SLOTS];
+    for (slot, name) in existing.iter().enumerate() {
+        let name = name.replace('/', "\\").to_ascii_lowercase();
+        available[slot] = name.ends_with(".sky") && !names.insert(name) && !used.contains(&slot);
+    }
+    available.windows(donor_count).position(|span| span.iter().all(|&slot| slot))
+        .ok_or_else(|| SparkError::Invalid("The intact extension exceeds the native eight-sky budget after checking unused duplicate slots".into()))
+}
+
+#[test]
+fn intact_sky_binding_uses_only_unused_duplicate_slots_when_full() {
+    let skies = ["a.sky", "b.sky", "c.sky", "night.sky", "dusk.sky", "dusk.sky", "dusk.sky", "ice.sky"].map(str::to_owned);
+    let used = BTreeSet::from([0, 1, 2, 3, 7]);
+    assert_eq!(intact_sky_span(&skies, &used, 1).unwrap(), 5);
+    assert_eq!(intact_sky_span(&skies, &used, 2).unwrap(), 5);
+    assert!(intact_sky_span(&skies, &used, 3).is_err());
+    assert!(intact_sky_span(&skies, &BTreeSet::from([0, 1, 2, 3, 5, 6, 7]), 1).is_err());
+    assert_eq!(intact_sky_span(&skies[..6], &used.iter().copied().filter(|&n| n < 6).collect(), 1).unwrap(), 6);
+}
+
 fn bind_intact_skies(
     edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    scenario: &str, donor: &str, donor_skies: &[String],
+    scenario: &str, retained: &[String], donor: &str, donor_skies: &[String],
 ) -> Result<u8> {
     let run = |tag: &str, fields: Vec<String>| {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
@@ -905,35 +937,63 @@ fn bind_intact_skies(
         runner.run(edit, &args, workspace, "partition-environment", 57)
     };
     let base_count = run(scenario, vec!["-C".into(), "skies".into()])?.trim()
-        .parse::<usize>().ok().filter(|&count| count + donor_skies.len() <= 8)
-        .ok_or_else(|| SparkError::Invalid("The intact extension exceeds the native eight-sky scenario budget".into()))?;
-    let before = run(donor, vec!["-G".into(), "clusters[*].sky".into()])?;
-    let indices = before.lines().map(|value| {
-        value.trim().parse::<usize>().ok().filter(|&index| index == 65535 || index < donor_skies.len())
-            .ok_or_else(|| SparkError::Invalid("A native donor cluster references an invalid sky slot".into()))
-    }).collect::<Result<Vec<_>>>()?;
+        .parse::<usize>().ok().filter(|&count| count <= NATIVE_SKY_SLOTS)
+        .ok_or_else(|| SparkError::Invalid("Retained scenario exceeds the native eight-sky budget".into()))?;
+    if donor_skies.len() > NATIVE_SKY_SLOTS { return invalid("Donor exceeds the native eight-sky budget"); }
+    let read_slots = || -> Result<Vec<String>> {
+        Ok(run(scenario, vec!["-G".into(), "skies[*].sky".into()])?
+            .lines().map(str::trim).map(str::to_owned).collect())
+    };
+    let original = if base_count == 0 { Vec::new() } else { read_slots()? };
+    if original.len() != base_count { return invalid("Retained native sky slots are unreadable"); }
+    let read_clusters = |tag: &str, slot_count| -> Result<Vec<usize>> {
+        run(tag, vec!["-G".into(), "clusters[*].sky".into()])?.lines().map(|value| {
+            value.trim().parse::<usize>().ok().filter(|&index| index == 65535 || index < slot_count)
+                .ok_or_else(|| SparkError::Invalid(format!("A cluster in {tag} references an invalid sky slot")))
+        }).collect()
+    };
+    let indices = read_clusters(donor, donor_skies.len())?;
     if donor_skies.is_empty() { return Ok(0); }
-    let mut args = vec!["-I".into(), "skies".into(), donor_skies.len().to_string(), "end".into()];
+    let mut used = BTreeSet::new();
+    if base_count + donor_skies.len() > NATIVE_SKY_SLOTS {
+        for structure in retained {
+            used.extend(read_clusters(&format!("{structure}.scenario_structure_bsp"), base_count)?
+                .into_iter().filter(|&index| index != 65535));
+        }
+    }
+    let offset = intact_sky_span(&original, &used, donor_skies.len())?;
+    let append = (offset + donor_skies.len()).saturating_sub(base_count);
+    let mut expected_slots = original;
+    expected_slots.resize(base_count + append, String::new());
+    let mut args = Vec::new();
+    if append != 0 { args.extend(["-I".into(), "skies".into(), append.to_string(), "end".into()]); }
     for (index, sky) in donor_skies.iter().enumerate() {
-        args.extend(["-S".into(), format!("skies[{}].sky", base_count + index),
-            format!("gsbsp_{}_1\\{sky}", &runner.id[..8])]);
+        let slot = offset + index;
+        let sky = format!("gsbsp_{}_1\\{sky}", &runner.id[..8]);
+        expected_slots[slot] = sky.clone();
+        args.extend(["-S".into(), format!("skies[{slot}].sky"), sky]);
     }
     run(scenario, args)?;
-    if base_count != 0 {
+    let actual_slots = read_slots()?;
+    let normalize = |path: &str| path.replace('/', "\\").to_ascii_lowercase();
+    if !actual_slots.iter().map(|path| normalize(path)).eq(expected_slots.iter().map(|path| normalize(path))) {
+        return invalid("Native scenario sky slots differ from the reviewed bindings");
+    }
+    if offset != 0 {
         let mut args = Vec::new();
         for (cluster, &index) in indices.iter().enumerate().filter(|(_, i)| **i != 65535) {
-            args.extend(["-S".into(), format!("clusters[{cluster}].sky"), (base_count + index).to_string()]);
+            args.extend(["-S".into(), format!("clusters[{cluster}].sky"), (offset + index).to_string()]);
             // Bound Windows native command lines on highly partitioned donors.
             if args.len() >= 600 { run(donor, std::mem::take(&mut args))?; }
         }
         if !args.is_empty() { run(donor, args)?; }
     }
     let after = run(donor, vec!["-G".into(), "clusters[*].sky".into()])?;
-    let expected = indices.into_iter().map(|i| if i == 65535 { i } else { base_count + i }).collect::<Vec<_>>();
+    let expected = indices.into_iter().map(|i| if i == 65535 { i } else { offset + i }).collect::<Vec<_>>();
     if !after.lines().map(|s| s.trim().parse::<usize>().ok()).eq(expected.into_iter().map(Some)) {
         return invalid("Intact donor sky remap did not survive native readback");
     }
-    Ok(base_count as u8)
+    Ok(offset as u8)
 }
 
 /// Stage each native structure. Only the explicit scenario probe binds the
@@ -1002,7 +1062,7 @@ pub(crate) fn prepare_partition_structure(
         let donor_tag = format!("{donor_path}.scenario_structure_bsp");
         if bind {
             intact_sky_offset = Some(bind_intact_skies(&edit, runner, workspace, tags,
-                &format!("{}.scenario", inspection.scenario_path), &donor_tag, skies)?);
+                &format!("{}.scenario", inspection.scenario_path), &original_structures, &donor_tag, skies)?);
         }
         let file = tags.join(safe_relative(&donor_tag)?);
         retained.push((file.clone(), maps::hash_file(&file)?));
