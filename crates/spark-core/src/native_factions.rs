@@ -298,12 +298,28 @@ pub struct NativeFactionBody {
     pub permutation: i16,
     #[serde(default, skip_serializing_if = "command_append_is_false")]
     pub include_first_person_arms: bool,
+    #[serde(default, skip_serializing_if = "command_append_is_false")]
+    pub use_player_physics: bool,
 }
 
 impl NativeFactionBody {
     fn name(&self) -> String { format!("extraction_{}_body", self.faction) }
 
     pub fn arms_path(&self) -> String { arms_path(&self.biped_tag_path) }
+
+    /// Native player acceleration must be enabled on a separate faction copy.
+    pub fn playable_copy(&self) -> Result<Self> {
+        let mut body = self.clone();
+        if self.use_player_physics {
+            if is_player_copy(&self.biped_tag_path) {
+                return invalid("Choose the original biped to prepare another playable copy");
+            }
+            body.biped_tag_path = format!("{}_gs_player_{}", self.biped_tag_path.replace('\\', "/"), self.faction);
+            body.use_player_physics = false;
+            body.validate()?;
+        }
+        Ok(body)
+    }
 
     pub fn validate(&self) -> Result<()> {
         if !["unsc", "covenant"].contains(&self.faction.as_str()) || self.permutation < -1
@@ -419,7 +435,7 @@ fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option
             .ok_or_else(|| crate::SparkError::Invalid("Faction biped palette reference is null".into()))?;
         let permutation = native_index(row, "desired_permutation")?;
         let (_, first_person_arms) = arms_palette_index(fields, &biped_tag_path)?;
-        let request = NativeFactionBody { faction: faction.into(), biped_tag_path, permutation, include_first_person_arms: first_person_arms };
+        let request = NativeFactionBody { faction: faction.into(), biped_tag_path, permutation, include_first_person_arms: first_person_arms, use_player_physics: false };
         request.validate()?;
         let (position, _) = native_vector(row, "position")?;
         validate_hub_pose(&request.biped_tag_path, position, [0.; 3])?;
@@ -427,6 +443,10 @@ fn existing_body(fields: &str, names: &[String], faction: &str) -> Result<Option
             index: index as u16, name_index: name_index as u16, position, first_person_arms });
     }
     found.map(Some).ok_or_else(|| crate::SparkError::Invalid("Faction body name does not bind to a native biped".into()))
+}
+
+fn is_player_copy(path: &str) -> bool {
+    path.ends_with("_gs_player_unsc") || path.ends_with("_gs_player_covenant")
 }
 
 struct BodyLayout {
@@ -439,6 +459,7 @@ struct BodyLayout {
 
 fn body_layout(fields: &str, body: &NativeFactionBody, replace_existing: bool) -> Result<BodyLayout> {
     body.validate()?;
+    let body = body.playable_copy()?;
     let snapshots = snapshots(fields)?;
     let kit = snapshots.iter().find(|row| row.kit.faction == body.faction)
         .ok_or_else(|| crate::SparkError::Invalid("Author the matching faction terminal and equipment profile first".into()))?;
@@ -846,6 +867,13 @@ pub fn verify_cache(
     for row in expected {
         let actual = crate::maps::scenario_faction_body_readback(cache, map, &format!("{}_body", row.kit.name()))?;
         if actual != row.body { return invalid("Compiled native faction biped binding differs from source"); }
+        if let Some(body) = &actual {
+            if is_player_copy(&body.biped_tag_path)
+                && !crate::maps::compiled_biped_uses_player_physics(cache, map, &body.biped_tag_path)?
+            {
+                return invalid("Compiled playable faction biped lost its uses player physics flag");
+            }
+        }
         row.kit.validate()?;
         crate::firefight::verify_native_equipment_profile(
             &row.kit.profile,
@@ -1041,8 +1069,72 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Requires disposable tags extracted from the exact retained Black Echo cache and installed Invader"]
+    fn playable_copy_compiles_only_the_faction_body_binding_with_player_physics() {
+        use std::{path::PathBuf, process::Command};
+        let root = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let tags = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_TAGS").unwrap());
+        assert!(tags.canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));
+        let invader = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_INVADER").unwrap());
+        let source = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_CACHE").unwrap());
+        let input = crate::maps::inspect_map(&source, None).unwrap();
+        assert_eq!(input.sha256, "d113e9dbec1bae9554e7d4df3843ecc2bb6d40b4ee2c7cdf5f81831fc7b29b09");
+        let scenario = format!("{}.scenario", input.scenario_path.replace('\\', "/"));
+        let run = |tool: &str, args: &[String]| {
+            let result = Command::new(invader.join(format!("{tool}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {}", String::from_utf8_lossy(&result.stderr));
+            String::from_utf8(result.stdout).unwrap()
+        };
+        let list = |tag: &str| run("invader-edit", &["-t".into(), tags.to_string_lossy().into_owned(), "-L".into(), tag.into()]);
+        let original = list(&scenario);
+        let kit = snapshots(&original).unwrap().into_iter().find(|row| row.kit.faction == "covenant").unwrap();
+        let old = kit.body.unwrap();
+        assert!(!crate::maps::compiled_biped_uses_player_physics(&source, &input, &old.biped_tag_path).unwrap());
+        assert!(crate::maps::compiled_biped_uses_player_physics(&source, &input, "characters/cyborg/cyborg").unwrap());
+        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: old.biped_tag_path.clone(),
+            permutation: old.permutation, include_first_person_arms: old.first_person_arms, use_player_physics: true };
+        let source_tag = format!("{}.biped", body.biped_tag_path);
+        let copy = body.playable_copy().unwrap();
+        let copy_tag = format!("{}.biped", copy.biped_tag_path);
+        let old_hash = crate::maps::hash_file(&tags.join(&source_tag)).unwrap();
+        std::fs::copy(tags.join(&source_tag), tags.join(&copy_tag)).unwrap();
+        run("invader-edit", &["-t".into(), tags.to_string_lossy().into_owned(),
+            "-S".into(), "biped_flags.uses_player_physics".into(), "1".into(), copy_tag.clone()]);
+        verify_playable_biped_fields(&list(&source_tag), &list(&copy_tag)).unwrap();
+        run("invader-edit", &body_arguments(&tags, &scenario, &original, &body, true).unwrap());
+        let after = list(&scenario);
+        review_body(&original, &after, &body, true).unwrap();
+        let output = tags.parent().unwrap().join("reviewed-playable-faction");
+        std::fs::create_dir(&output).unwrap();
+        let base = scenario.strip_suffix(".scenario").unwrap();
+        run("invader-build", &["-t".into(), tags.to_string_lossy().into_owned(), "-g".into(), "gbx-custom".into(),
+            "-m".into(), output.to_string_lossy().into_owned(), "--resource-usage".into(), "none".into(), base.into()]);
+        let cache = output.join(format!("{}.map", base.rsplit('/').next().unwrap()));
+        let map = crate::maps::inspect_map(&cache, None).unwrap();
+        let expected = snapshots(&after).unwrap();
+        verify_cache(&expected, &cache, &map).unwrap();
+        let bound = crate::maps::scenario_faction_body_readback(&cache, &map, "extraction_covenant_body").unwrap().unwrap();
+        assert_eq!((bound.index, bound.name_index, bound.position, bound.permutation), (old.index, old.name_index, old.position, old.permutation));
+        assert_eq!(bound.biped_tag_path, copy.biped_tag_path);
+        assert_eq!(crate::maps::hash_file(&tags.join(source_tag)).unwrap(), old_hash);
+        assert_eq!(crate::maps::hash_file(&source).unwrap(), input.sha256);
+        let crc = run("invader-info", &["-T".into(), "crc32_mismatched".into(), cache.to_string_lossy().into_owned()]);
+        assert_eq!(crc.trim(), "0");
+        let project = crate::project::Project::new("Reviewed playable faction body");
+        let export = crate::build::MapExport {
+            project_id: project.id.clone(), build_id: uuid::Uuid::new_v4().to_string(),
+            project_fingerprint: project.fingerprint().unwrap(),
+            output: cache.clone(), sha256: map.sha256.clone(),
+            bytes: std::fs::metadata(&cache).unwrap().len(), cache_version: 609,
+            runtime_id: crate::runtime::RuntimeId::OpenCe, reused: false,
+        };
+        assert_eq!(crate::build::write_map_export_mode(&export, &project).unwrap().1, "extraction");
+        eprintln!("Faction player physics compiled readback: {} · {}", bound.biped_tag_path, map.sha256);
+    }
+
+    #[test]
     fn faction_body_uses_signed_native_selection_and_requires_a_matching_kit() {
-        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1, include_first_person_arms: false };
+        let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1, include_first_person_arms: false, use_player_physics:false };
         let operation = Operation::FactionBody { body: body.clone(), replace_existing: false, source_sha256: "a".repeat(64) };
         let serialized = serde_json::to_value(&operation).unwrap();
         assert_eq!(serialized["body"]["permutation"], -1);
@@ -1057,7 +1149,7 @@ mod tests {
     fn faction_arms_require_the_exact_carrier_model_and_each_weapon_graph_node() {
         let body = NativeFactionBody {
             faction: "covenant".into(), biped_tag_path: "owned/characters/elite".into(),
-            permutation: -1, include_first_person_arms: true,
+            permutation: -1, include_first_person_arms: true, use_player_physics:false,
         };
         let profile = kit().profile;
         let review = |weapon_node: &str, carrier_model: &str| verify_arms_source(&body, &profile, |tag| {
@@ -1121,7 +1213,7 @@ mod tests {
             faction: "covenant".into(),
             biped_tag_path: elite.clone(),
             permutation: old_body.permutation,
-            include_first_person_arms: false,
+            include_first_person_arms: false, use_player_physics:false,
         };
         assert!(body_arguments(&tags, &scenario, &before, &body, false).is_err());
         run("invader-edit", &body_arguments(&tags, &scenario, &before, &body, true).unwrap());

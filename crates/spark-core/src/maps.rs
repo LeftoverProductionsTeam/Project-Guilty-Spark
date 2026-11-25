@@ -2103,6 +2103,31 @@ pub struct BspFlightCrossing {
     pub fraction: f64,
     pub point: [f64; 3],
 }
+/// The standard CE609 biped starts with the 752-byte Unit, then a
+/// 4-byte moving turn speed followed by BipedFlags (Invader HEK definitions).
+pub fn compiled_biped_uses_player_physics(
+    path: &Path, map: &MapInspection, biped: &str,
+) -> Result<bool> {
+    if map.header.version != 609 || map.header.extended {
+        return invalid("Compiled player physics readback requires standard CE609");
+    }
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    if hash != map.sha256 || header.version != 609 {
+        return invalid("Compiled cache changed after biped inspection");
+    }
+    let mut tags = map.tags.iter().filter(|tag| tag.class == "bipd" && !tag.external
+        && tag.path.replace('\\', "/").eq_ignore_ascii_case(biped));
+    let offset = tags.next().and_then(|tag| tag.data_offset)
+        .ok_or_else(|| SparkError::Invalid("Compiled playable biped data is unavailable".into()))? as usize;
+    if tags.next().is_some() { return invalid("Compiled playable biped path is ambiguous"); }
+    let reader = Reader(&bytes);
+    let space = cache_tag_space(&reader, &header)?;
+    if offset < space.begin || offset.checked_add(760).is_none_or(|end| end > space.end) {
+        return invalid("Compiled playable biped data is outside native tag space");
+    }
+    Ok(reader.u32(offset + 756)? & 2 != 0)
+}
+
 pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]],ground_drop:Option<f32>)->Result<Vec<BspPointLocation>>{
  Ok(bsp_geometry_review(path,inspection,points,ground_drop,None,None)?.points)
 }

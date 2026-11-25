@@ -89,7 +89,7 @@ export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;
 export interface NativeDeviceGroup {index:number;name:string;initialValue:number;changeOnce:boolean;reserved:boolean}
 export interface NativeVehicleFlight {throttle:number;avoidanceDistance:number;pathfindingRadius:number}
 export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_spirit';tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
-export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean}
+export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean;usePlayerPhysics?:boolean}
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
 export interface NativeMachineSettings {

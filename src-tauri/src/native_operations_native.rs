@@ -70,6 +70,8 @@ struct Receipt {
     actor_import:Option<core::native_asset_imports::Binding>,
     #[serde(default)]
     imported_dependencies:BTreeMap<String,String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    generated_dependencies: BTreeMap<String, String>,
     tool_id: String,
     executable_sha256: String,
     before_sha256: String,
@@ -594,7 +596,7 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
             if let Some(binding) = current.iter().find(|row| row.kit.faction == kit.faction)
                 .and_then(|row| row.body.as_ref()).filter(|body| body.first_person_arms) {
                 let body = recipes::NativeFactionBody { faction:kit.faction.clone(), biped_tag_path:binding.biped_tag_path.clone(),
-                    permutation:binding.permutation, include_first_person_arms:true };
+                    permutation:binding.permutation, include_first_person_arms:true, use_player_physics:false };
                 recipes::verify_faction_arms_source(&body, &kit.profile, |tag| {
                     let file = source.tags.join(core::safe_relative(tag)?);
                     core::reject_links(&file)?;
@@ -667,6 +669,90 @@ pub(super) fn review_encounter_dependencies(state:&AppState,project:&Project,bui
     let edit=executable(state,project,"invaderNative")?;
     operation_dependencies(state,&source,operation,&edit,None).map(|_|())
 }
+fn faction_player_copy_paths(operation: &recipes::Operation) -> Reply<Vec<(String, String)>> {
+    let recipes::Operation::FactionBody { body, .. } = operation else { return Ok(vec![]) };
+    if !body.use_player_physics { return Ok(vec![]) }
+    let target = body.playable_copy().map_err(error)?;
+    let mut paths = vec![(
+        format!("{}.biped", body.biped_tag_path.replace('\\', "/")),
+        format!("{}.biped", target.biped_tag_path),
+    )];
+    if body.include_first_person_arms {
+        for extension in ["gbxmodel", "scenery"] {
+            paths.push((format!("{}.{extension}", body.arms_path()), format!("{}.{extension}", target.arms_path())));
+        }
+    }
+    Ok(paths)
+}
+
+fn stage_faction_player_copy(
+    state: &AppState, source: &Source, operation: &recipes::Operation,
+    writer: &Path, candidate: &Path, source_pins: &BTreeMap<String, String>,
+) -> Reply<(BTreeMap<String, String>, Vec<recipes::FieldDifference>)> {
+    let paths = faction_player_copy_paths(operation)?;
+    let mut generated = BTreeMap::new();
+    let mut differences = vec![];
+    for (original, revised) in paths {
+        let from = source.tags.join(core::safe_relative(&original).map_err(error)?);
+        let to = candidate.join(core::safe_relative(&revised).map_err(error)?);
+        core::reject_links(&from).map_err(error)?;
+        let bytes = bounded_read(&from, MAX_TAG)?;
+        if source_pins.get(&original) != Some(&hash_bytes(&bytes)) {
+            return Err("The reviewed faction asset changed before its playable copy was made".into());
+        }
+        fs::create_dir_all(to.parent().ok_or("Native playable copy has no parent")?).map_err(error)?;
+        project::atomic_write(&to, &bytes, false).map_err(error)?;
+
+        // Preserve the animation, collision and weapon setup on the original tags.
+        let change = if revised.ends_with(".biped") {
+            Some(("biped_flags.uses_player_physics", "1".to_owned()))
+        } else {
+            revised.strip_suffix(".scenery").map(|path| ("model", format!("{path}.gbxmodel")))
+        };
+        if let Some((key, value)) = change {
+            let tags = native_tag_parser::reader_root(candidate, &revised)?;
+            let args = |verb: &str, setting: Option<&str>| {
+                let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned(), verb.into(), key.into()];
+                args.extend(setting.map(str::to_owned));
+                args.push(revised.clone());
+                args
+            };
+            let (ok, before, problem) = run(writer, &args("-G", None))?;
+            if !ok { return Err(format!("Native copied faction tag could not be read: {problem}")); }
+            let (ok, out, problem) = run(writer, &args("-S", Some(&value)))?;
+            if !ok || out.lines().chain(problem.lines()).any(|line| line.trim().starts_with("Error:")) {
+                return Err(format!("Invader rejected the playable faction copy: {problem}"));
+            }
+            let (ok, after, problem) = run(writer, &args("-G", None))?;
+            if !ok { return Err(format!("Native playable copy readback failed: {problem}")); }
+            if !after.trim().replace('\\', "/").eq_ignore_ascii_case(&value) {
+                return Err("Native playable copy readback differs from the reviewed field".into());
+            }
+            differences.push(recipes::FieldDifference {
+                before: format!("{original} · {key} = {}", before.trim()),
+                after: format!("{revised} · {key} = {value}"),
+            });
+        }
+        let hash = maps::hash_file(&to).map_err(error)?;
+        let existing = source.tags.join(core::safe_relative(&revised).map_err(error)?);
+        core::reject_links(&existing).map_err(error)?;
+        if existing.exists() && maps::hash_file(&existing).map_err(error)? != hash {
+            return Err(format!("A different source tag already exists at {revised}. It was preserved."));
+        }
+        generated.insert(revised, hash);
+    }
+    if !generated.is_empty() {
+        // Read the tags again independently of the writer's status.
+        let recipes::Operation::FactionBody { body, .. } = operation else { unreachable!() };
+        let selected = format!("{}.biped", body.biped_tag_path.replace('\\', "/"));
+        let copied = format!("{}.biped", body.playable_copy().map_err(error)?.biped_tag_path);
+        let before = fields(state, &source.project, &source.tags, &selected)?;
+        let after = fields(state, &source.project, candidate, &copied)?;
+        recipes::verify_playable_biped_fields(&before, &after).map_err(error)?;
+    }
+    Ok((generated, differences))
+}
+
 fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply<Receipt> {
     let file = root(state, id)?.join("operation.json");
     core::reject_links(&file).map_err(error)?;
@@ -686,6 +772,10 @@ fn read_receipt(state: &AppState, id: &str, owner: &str, project: &str) -> Reply
         .validate(&receipt.class, &receipt.tag)
         .map_err(error)?;
     if let Some(source_sha256)=receipt.operation.expected_source_sha256() {if !source_sha256.eq_ignore_ascii_case(&receipt.before_sha256){return Err("Retained native operation source identity differs from its original revision".into());}}
+    let paths = faction_player_copy_paths(&receipt.operation)?;
+    if receipt.generated_dependencies.len() != paths.len() || paths.iter().any(|(_, path)| !receipt.generated_dependencies.contains_key(path)) {
+        return Err("Retained playable source copy paths differ from the reviewed body".into());
+    }
     if receipt.tool_id != receipt.operation.tool_id() {
         return Err("The native recipe identity changed".into());
     }
@@ -933,7 +1023,7 @@ pub(super) struct Preview {
     current_state: String,
 }
 fn preview_view(receipt: &Receipt, current: &str) -> Reply<Preview> {
-    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::MachineSettings{..}){"Only native machine type and transition/acceleration times may change. Accept selects a separate source revision, Save records it, and Restore selects the preceding tag. Test animation and collision in the target runtime."}else if matches!(receipt.operation,recipes::Operation::ControlSettings{..}){"Only reviewed native control type, trigger, call value, automatic activation radius and delay may differ. All placements sharing this tag are affected; scenario names, groups, flags, scripts and dependencies stay unchanged. Accept selects separate source; Save/rebuild and inspect the compiled control. Restore recovers the exact preceding tag. Mission roles and actual engine interaction require separate authoring/gameplay acceptance."}else if matches!(receipt.operation,recipes::Operation::SquadTerminals{..}){"Native squad-selection controls and optional isolated readiness gates are appended. Existing source/indices and equipment profiles stay unchanged. Accept selects a source revision; Save/rebuild independently checks names, poses, interaction and groups. A readiness gate starts zero and requires reviewed objective HaloScript. Forerunner owns membership and settlement; this does not create scoped missions or prove gameplay. Native Restore recovers the previous source."}else if matches!(receipt.operation,recipes::Operation::FactionBody{..}){"Review the faction’s dormant biped, permutation and optional first-person arms. The arms carrier adds a scenery palette entry. Save and rebuild verifies the compiled binding. Native Restore selects the previous source. Test first-person visuals, loadout and passenger animations in Forerunner."}else if matches!(receipt.operation,recipes::Operation::FactionKits{replace_existing_profiles:true,..}){"Review changes to the existing faction equipment profile. The native terminal, character, placement, and index are preserved. Accept selects a source revision. Save and Build working tag edits to verify the compiled profile. Restore selects the preceding tag. Forerunner applies the profile alongside the player's saved inventory."}else if receipt.operation.is_faction_edit(){"Native faction terminals and equipment-only profiles were appended together. Originals/indices remain; new power/position groups are isolated and repeatable. Accept selects separate source; Save/rebuild independently checks profiles, names, poses and groups. Forerunner owns faction choice, gear reservation and persistence. Native Restore is separate from project Undo; gameplay is unverified."}else if receipt.operation.is_vehicle_flight(){"Only the requested native AI throttle, avoidance and pathfinding-radius fields may differ. The named aircraft and scenario binding remain pinned. Accept selects separate source; Save/rebuild checks all three compiled values. Native Restore is separate from project Undo. Actual pilot behavior, hull clearance, landing and flight require gameplay acceptance."}else if receipt.operation.is_transport_append(){"One named aircraft and three isolated zero-initialized signals are appended. Existing palette, placements, names, groups and script indices/bodies are retained. Dependencies are pinned. Accept selects separate source; Save/rebuild independently checks compiled vehicle pose/name/tag and signal indices/flags. Restore selects the exact original scenario. Pilot, routes, boarding, flight and settlement remain separate authoring/game gates."}else if matches!(receipt.operation,recipes::Operation::CommandList{append:true,..}){"One reviewed native command list is appended. Existing lists, names, indices, AI bindings and scripts remain unchanged. Accept selects separate source; Save/rebuild verifies every compiled action and waypoint. Native Restore is separate from project Undo. A source route does not prove navigation, flight or clearance."}else if receipt.operation.is_command_edit(){"Only the selected existing command actions, parameters, references, flags and point coordinates may differ. Names, command/point indices, AI bindings and unrelated source are preserved. Accept selects separate source; Save/rebuild verifies complete compiled command data. Native Restore is distinct from project Undo. AI execution/navigation requires gameplay testing."}else if matches!(receipt.operation,recipes::Operation::PlayerStartPosition{copy_from:Some(_),..}){"One player start is appended with the selected template’s team, BSP and gametype filters. Review the new coordinates and yaw, then accept and rebuild. Restore selects the complete preceding source revision. Test safe spawning in the target runtime."}else if receipt.operation.is_player_start_edit(){"Only this existing native player start position/facing may differ. Team, BSP, gametype filters, indices, other spawns and scripts remain unchanged. Accept selects separate source; Save/restart and Build working tag edits independently checks compiled XYZ/yaw. Native Restore is separate from project Undo. A point-inside-BSP check does not prove aircraft hull clearance, safe spawning or gameplay."}else if matches!(receipt.operation,recipes::Operation::DeviceGroupAppend{..}){"One device group is appended at the next native index. Existing groups, bindings and scripts are preserved. Accept the group, then assign it in Device wiring. Save and rebuild to check the compiled group and bindings. Native Restore selects the preceding source revision."}else if matches!(receipt.operation,recipes::Operation::DeviceGroupSettings{..}){"This group keeps its name, index and bindings. Accept selects the reviewed initial value and repeat setting. Save and rebuild to verify the compiled group. Restore selects the preceding scenario source."}else if receipt.operation.is_device_edit(){"Only the reviewed pose, control or machine activation flags or device group bindings may differ. The group definitions, class, palette, names, other flags, vitality, teams and scripts remain unchanged. Accept selects separate source; Save/rebuild and independently inspect compiled placement. Native Restore is distinct from project Undo. Actual terminal use/doors/collision require gameplay acceptance."}else if matches!(receipt.operation,recipes::Operation::TriggerVolume{append:true,..}){"One dedicated oriented trigger area is appended. Existing names, indices, geometry and script references stay unchanged. Accept selects separate source; Save/rebuild checks the compiled area. Restore selects the exact preceding tag. The box is an invisible gameplay trigger, not collision or proof of a landing."}else if receipt.operation.is_trigger_edit(){"Only this oriented trigger box geometry may differ. Names, indices and script references are preserved. Preview is temporary; Accept selects a separate source revision. Save/rebuild and inspect compiled bounds; Restore selects the original source. Trigger execution needs gameplay testing."}else if receipt.operation.is_flag_edit(){"Only the reviewed native flag is appended or its pose changed. Existing names, indices and unrelated source stay intact. Accept creates a separate source revision; Save/rebuild independently checks all compiled flags. Restore selects the preceding source. A flag is a stable location, not a trigger or proof of a visible waypoint."}else if matches!(&receipt.operation,recipes::Operation::CutsceneCamera{append:true,..}){"One uniquely named native camera point is appended at the end. All original points, indices, scripts and unrelated source remain. Accept selects separate source; Save/rebuild independently checks the compiled camera inventory/pose/lens. Restore selects the complete before-edit source. Cinematic/gameplay acceptance remains separate."}else if receipt.operation.is_camera_edit(){"Only this camera pose and lens may differ. Native point names, indices, scripts and other scenario fields stay unchanged. Accept selects a source revision; Save and rebuild to apply it. Restore selects the complete before-edit source. Editor preview is not native cinematic/gameplay acceptance."}else if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
+    Ok(Preview{actor_positions:receipt.operation.actor_start_positions().map_err(error)?,id:receipt.id.clone(),tag:receipt.tag.clone(),tool_id:receipt.tool_id.clone(),before_sha256:receipt.before_sha256.clone(),after_sha256:receipt.after_sha256.clone(),changed_bytes:receipt.changed_bytes,field_changes:receipt.field_changes.clone(),current_state:if current==receipt.before_sha256{"before"}else if current==receipt.after_sha256{"after"}else{"conflict"}.into(),detail:if matches!(receipt.operation,recipes::Operation::MachineSettings{..}){"Only native machine type and transition/acceleration times may change. Accept selects a separate source revision, Save records it, and Restore selects the preceding tag. Test animation and collision in the target runtime."}else if matches!(receipt.operation,recipes::Operation::ControlSettings{..}){"Only reviewed native control type, trigger, call value, automatic activation radius and delay may differ. All placements sharing this tag are affected; scenario names, groups, flags, scripts and dependencies stay unchanged. Accept selects separate source; Save/rebuild and inspect the compiled control. Restore recovers the exact preceding tag. Mission roles and actual engine interaction require separate authoring/gameplay acceptance."}else if matches!(receipt.operation,recipes::Operation::SquadTerminals{..}){"Native squad-selection controls and optional isolated readiness gates are appended. Existing source/indices and equipment profiles stay unchanged. Accept selects a source revision; Save/rebuild independently checks names, poses, interaction and groups. A readiness gate starts zero and requires reviewed objective HaloScript. Forerunner owns membership and settlement; this does not create scoped missions or prove gameplay. Native Restore recovers the previous source."}else if matches!(&receipt.operation,recipes::Operation::FactionBody{body,..} if body.use_player_physics){"Review the dedicated biped’s native player movement flag and its faction binding. Accept and build to verify the compiled flag. The original NPC source keeps its settings. Native Restore returns to the previous faction binding."}else if matches!(receipt.operation,recipes::Operation::FactionBody{..}){"Review the faction’s dormant biped, permutation and optional first-person arms. The arms carrier adds a scenery palette entry. Save and rebuild verifies the compiled binding. Native Restore selects the previous source. Test first-person visuals, loadout and passenger animations in Forerunner."}else if matches!(receipt.operation,recipes::Operation::FactionKits{replace_existing_profiles:true,..}){"Review changes to the existing faction equipment profile. The native terminal, character, placement, and index are preserved. Accept selects a source revision. Save and Build working tag edits to verify the compiled profile. Restore selects the preceding tag. Forerunner applies the profile alongside the player's saved inventory."}else if receipt.operation.is_faction_edit(){"Native faction terminals and equipment-only profiles were appended together. Originals/indices remain; new power/position groups are isolated and repeatable. Accept selects separate source; Save/rebuild independently checks profiles, names, poses and groups. Forerunner owns faction choice, gear reservation and persistence. Native Restore is separate from project Undo; gameplay is unverified."}else if receipt.operation.is_vehicle_flight(){"Only the requested native AI throttle, avoidance and pathfinding-radius fields may differ. The named aircraft and scenario binding remain pinned. Accept selects separate source; Save/rebuild checks all three compiled values. Native Restore is separate from project Undo. Actual pilot behavior, hull clearance, landing and flight require gameplay acceptance."}else if receipt.operation.is_transport_append(){"One named aircraft and three isolated zero-initialized signals are appended. Existing palette, placements, names, groups and script indices/bodies are retained. Dependencies are pinned. Accept selects separate source; Save/rebuild independently checks compiled vehicle pose/name/tag and signal indices/flags. Restore selects the exact original scenario. Pilot, routes, boarding, flight and settlement remain separate authoring/game gates."}else if matches!(receipt.operation,recipes::Operation::CommandList{append:true,..}){"One reviewed native command list is appended. Existing lists, names, indices, AI bindings and scripts remain unchanged. Accept selects separate source; Save/rebuild verifies every compiled action and waypoint. Native Restore is separate from project Undo. A source route does not prove navigation, flight or clearance."}else if receipt.operation.is_command_edit(){"Only the selected existing command actions, parameters, references, flags and point coordinates may differ. Names, command/point indices, AI bindings and unrelated source are preserved. Accept selects separate source; Save/rebuild verifies complete compiled command data. Native Restore is distinct from project Undo. AI execution/navigation requires gameplay testing."}else if matches!(receipt.operation,recipes::Operation::PlayerStartPosition{copy_from:Some(_),..}){"One player start is appended with the selected template’s team, BSP and gametype filters. Review the new coordinates and yaw, then accept and rebuild. Restore selects the complete preceding source revision. Test safe spawning in the target runtime."}else if receipt.operation.is_player_start_edit(){"Only this existing native player start position/facing may differ. Team, BSP, gametype filters, indices, other spawns and scripts remain unchanged. Accept selects separate source; Save/restart and Build working tag edits independently checks compiled XYZ/yaw. Native Restore is separate from project Undo. A point-inside-BSP check does not prove aircraft hull clearance, safe spawning or gameplay."}else if matches!(receipt.operation,recipes::Operation::DeviceGroupAppend{..}){"One device group is appended at the next native index. Existing groups, bindings and scripts are preserved. Accept the group, then assign it in Device wiring. Save and rebuild to check the compiled group and bindings. Native Restore selects the preceding source revision."}else if matches!(receipt.operation,recipes::Operation::DeviceGroupSettings{..}){"This group keeps its name, index and bindings. Accept selects the reviewed initial value and repeat setting. Save and rebuild to verify the compiled group. Restore selects the preceding scenario source."}else if receipt.operation.is_device_edit(){"Only the reviewed pose, control or machine activation flags or device group bindings may differ. The group definitions, class, palette, names, other flags, vitality, teams and scripts remain unchanged. Accept selects separate source; Save/rebuild and independently inspect compiled placement. Native Restore is distinct from project Undo. Actual terminal use/doors/collision require gameplay acceptance."}else if matches!(receipt.operation,recipes::Operation::TriggerVolume{append:true,..}){"One dedicated oriented trigger area is appended. Existing names, indices, geometry and script references stay unchanged. Accept selects separate source; Save/rebuild checks the compiled area. Restore selects the exact preceding tag. The box is an invisible gameplay trigger, not collision or proof of a landing."}else if receipt.operation.is_trigger_edit(){"Only this oriented trigger box geometry may differ. Names, indices and script references are preserved. Preview is temporary; Accept selects a separate source revision. Save/rebuild and inspect compiled bounds; Restore selects the original source. Trigger execution needs gameplay testing."}else if receipt.operation.is_flag_edit(){"Only the reviewed native flag is appended or its pose changed. Existing names, indices and unrelated source stay intact. Accept creates a separate source revision; Save/rebuild independently checks all compiled flags. Restore selects the preceding source. A flag is a stable location, not a trigger or proof of a visible waypoint."}else if matches!(&receipt.operation,recipes::Operation::CutsceneCamera{append:true,..}){"One uniquely named native camera point is appended at the end. All original points, indices, scripts and unrelated source remain. Accept selects separate source; Save/rebuild independently checks the compiled camera inventory/pose/lens. Restore selects the complete before-edit source. Cinematic/gameplay acceptance remains separate."}else if receipt.operation.is_camera_edit(){"Only this camera pose and lens may differ. Native point names, indices, scripts and other scenario fields stay unchanged. Accept selects a source revision; Save and rebuild to apply it. Restore selects the complete before-edit source. Editor preview is not native cinematic/gameplay acceptance."}else if receipt.operation.combat_target_key().is_some(){"Only the requested native AI source fields may differ: firing XYZ/group, squad tactical bits, reviewed squad/start behavior or patrol ordering/pose/weight/waits. Accept selects separate source; Restore selects the original before-edit source. Rebuild and independently inspect compiled positions/groups/patrols. Target compilers can expand search masks; source is never normalized automatically. Navigation, cover use and gameplay remain unverified."}else if receipt.operation.is_squad_start_edit(){"Only the selected AI starting position, requested facing and optional existing command-list binding may differ in exposed native fields. Command-list contents and all other starts stay unchanged. Accept selects separate source; rebuild and read back the compiled pose. Squad/start state fields, firing positions and navigation stay unchanged. Actual spawning, command execution, facing and reachability need gameplay validation."}else if receipt.operation.is_squad_count_edit(){"Only the selected native squad difficulty counts differ in the exposed fields. Accept selects a separate source revision; Build working tag edits compiles it and checks the resulting cache counts. Source-history restoration and gameplay are separate; opaque bytes are not certified."}else if matches!(receipt.operation,recipes::Operation::HudDuplicate{..}){"One existing HUD element is appended as an exposed-field-matched copy. Original elements and indices remain in place; dependency files are pinned. Accept selects a separate native source revision. Build working tag edits, then reopen its compiled HUD to edit the new layout. Opaque cells and actual HUD/game behavior still require independent acceptance."}else if receipt.operation.is_encounter_append(){"The reviewed native encounters are appended, existing exposed scenario fields are retained, and actor references are checked. Accept to select a separate source revision, then build it. Navigation, actual spawning and gameplay remain unverified; opaque bytes are not certified."}else{"Exactly the requested exposed native field differs; opaque bytes are not certified. Accept to create a separate complete source revision. The original source/cache stay unchanged."}.into()})
 }
 #[tauri::command]
 pub(super) async fn native_operation_preview(
@@ -982,11 +1072,25 @@ pub(super) async fn native_operation_preview(
     let before_sha256=hash_bytes(&before);
     if let Some(source_sha256)=operation.expected_source_sha256() {if !source_sha256.eq_ignore_ascii_case(&before_sha256){return Err("Native source changed after selection; refresh before editing. No writer ran.".into());}}
     let id=uuid::Uuid::new_v4().to_string();let directory=root(&state,&id)?;
-    let import_lease=if let Some((selected,_))=&imported_source {
+    let player_copy_paths = faction_player_copy_paths(&operation)?;
+    let staging = if let Some((selected,_))=&imported_source {
         let inventory=core::native_asset_imports::staging_inventory(&state.root,selected).map_err(error)?;
-        let bytes=inventory.bytes.saturating_add((before.len()*2+before_fields.len()*2) as u64).saturating_add(4*1024*1024);
-        Some(core::storage::Store::for_output(&directory).map_err(error)?.reserve(&directory,Some(&source.tags),core::storage::estimate_copy(inventory.files.len()+4,bytes),core::storage::Category::Staging,"Reviewed native actor closure and encounter preview").map_err(error)?)
-    }else{None};
+        Some((inventory.files.len(), inventory.bytes, "Reviewed native actor closure and encounter preview"))
+    } else if !player_copy_paths.is_empty() {
+        // Only the chosen biped and optional two linked first-person tags.
+        Some((player_copy_paths.len(), MAX_TAG * player_copy_paths.len() as u64, "Reviewed faction player body copy"))
+    } else {
+        None
+    };
+    let import_lease = if let Some((files, dependencies, purpose)) = staging {
+        let bytes = dependencies.saturating_add((before.len()*2+before_fields.len()*2) as u64).saturating_add(4*1024*1024);
+        Some(core::storage::Store::for_output(&directory).map_err(error)?.reserve(
+            &directory, Some(&source.tags), core::storage::estimate_copy(files+4,bytes),
+            core::storage::Category::Staging, purpose,
+        ).map_err(error)?)
+    } else {
+        None
+    };
     fs::create_dir(&directory).map_err(error)?;if let Some(lease)=&import_lease{lease.mark_owned().map_err(error)?;}
     project::atomic_write(&directory.join("before.tag"),&before,false).map_err(error)?;
     let candidate=directory.join("candidate/tags");
@@ -999,6 +1103,9 @@ pub(super) async fn native_operation_preview(
         fs::create_dir_all(candidate.parent().unwrap()).map_err(error)?;
         transaction::reconcile(&BTreeMap::new(),&original,imported,&candidate,&original_files,&imported_dependencies,true,Arc::new(AtomicBool::new(false))).map_err(error)?;
     }else{fs::create_dir_all(candidate.join(&relative).parent().unwrap()).map_err(error)?;project::atomic_write(&candidate.join(&relative),&before,false).map_err(error)?;}
+    let (generated_dependencies, copy_differences) = stage_faction_player_copy(
+        &state, &source, &operation, &exe, &candidate, &source_dependencies,
+    )?;
     // The pinned Windows reader also needs an extended-length root for deep tags.
     let candidate=native_tag_parser::reader_root(&candidate,&source.tag)?;
     let failed=|ok:bool,out:&str,err:&str|!ok||out.lines().chain(err.lines()).any(|line|line.trim().to_ascii_lowercase().starts_with("error:"));
@@ -1034,13 +1141,14 @@ pub(super) async fn native_operation_preview(
     }
     check_dependency_pins(&source.tags,&source_dependencies)?;
     if maps::hash_file(&exe).map_err(error)?!=executable_sha256{return Err("Native writer changed during the preview; no source was selected".into());}
-    let after_fields=fields(&state,&source.project,&candidate,&source.tag)?;let field_changes=recipes::reviewed_difference(&before_fields,&after_fields,&operation).map_err(error)?;
+    let after_fields=fields(&state,&source.project,&candidate,&source.tag)?;let mut field_changes=recipes::reviewed_difference(&before_fields,&after_fields,&operation).map_err(error)?;
+    field_changes.extend(copy_differences);
     let after=bounded_read(&candidate.join(&relative),MAX_TAG)?;let after_sha256=hash_bytes(&after);verify_bytes(&candidate,&source.tag,&after_sha256)?;
     if maps::hash_file(&source.tags.join(&relative)).map_err(error)?!=before_sha256{return Err("Working source changed during preview. The candidate is retained; refresh before making another preview.".into());}
-    let mut expected_candidate=imported_dependencies.clone();expected_candidate.insert(source.tag.replace('\\',"/"),after_sha256.clone());
+    let mut expected_candidate=imported_dependencies.clone();expected_candidate.extend(generated_dependencies.clone());expected_candidate.insert(source.tag.replace('\\',"/"),after_sha256.clone());
     if transaction::inventory(&candidate).map_err(error)?!=expected_candidate{return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
     let changed_bytes=before.iter().zip(&after).filter(|(a,b)|a!=b).count()+before.len().abs_diff(after.len());
-    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,actor_import,imported_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields:ReviewedFields::digest(&before_fields),after_fields:ReviewedFields::digest(&after_fields),field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
+    let receipt=Receipt{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint:source.project.fingerprint().map_err(error)?,parent_build_id:source.build.id,tag:source.tag.clone(),class:source.class,operation:operation.clone(),source_dependencies,actor_import,imported_dependencies,generated_dependencies,tool_id:operation.tool_id().into(),executable_sha256,before_sha256:before_sha256.clone(),after_sha256:after_sha256.clone(),before_fields:ReviewedFields::digest(&before_fields),after_fields:ReviewedFields::digest(&after_fields),field_changes:field_changes.clone(),changed_bytes,output:format!("{stdout}{stderr}"),created_at:chrono::Utc::now().to_rfc3339()};
     let receipt_bytes=serde_json::to_vec_pretty(&receipt).map_err(error)?;
     if receipt_bytes.len()>4*1024*1024{return Err("Native preview exceeds its existing recovery receipt limit; no source was selected".into());}
     project::atomic_write(&directory.join("operation.json"),&receipt_bytes,false).map_err(error)?;
@@ -1083,6 +1191,7 @@ pub(super) async fn native_operation_accept(
     let directory=root(&state,&operation_id)?;let candidate=directory.join("candidate/tags");let before=bounded_read(&directory.join("before.tag"),MAX_TAG)?;
     if hash_bytes(&before)!=receipt.before_sha256||maps::hash_file(&candidate.join(&relative)).map_err(error)?!=receipt.after_sha256{return Err("The retained native preview or recovery bytes changed; no revision was selected".into());}
     let actual_fields=fields(&state,&project,&candidate,&receipt.tag)?;
+    check_dependency_pins(&candidate, &receipt.generated_dependencies)?;
     if !receipt.after_fields.matches(&actual_fields) { return Err("Candidate native fields no longer match the reviewed result".into()); }
     if !restore {
         let current_fields = fields(&state, &project, &current, &receipt.tag)?;
@@ -1105,8 +1214,24 @@ pub(super) async fn native_operation_accept(
         if hashes!=receipt.imported_dependencies{return Err("Imported actor changed after preview; no source revision was selected".into());}
         transaction::reconcile(&BTreeMap::new(),&current,&imported,&tags,&baseline,&hashes,true,Arc::new(AtomicBool::new(false))).map_err(error)?;hashes
     }else{if !receipt.imported_dependencies.is_empty(){return Err("Native actor provenance is missing; preserve the preview and review again".into());}transaction::fork(&current,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;BTreeMap::new()}}else{transaction::fork(&current,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?;BTreeMap::new()};
+    if !restore {
+        for (tag, hash) in &receipt.generated_dependencies {
+            let rel = core::safe_relative(tag).map_err(error)?;
+            let destination = tags.join(&rel);
+            if destination.exists() {
+                if maps::hash_file(&destination).map_err(error)? != *hash {
+                    return Err(format!("A different tag occupies the reviewed playable copy {tag}. Existing source was preserved."));
+                }
+            } else {
+                fs::create_dir_all(destination.parent().ok_or("Native playable copy has no parent")?).map_err(error)?;
+                let bytes = bounded_read(&candidate.join(&rel), MAX_TAG)?;
+                if hash_bytes(&bytes) != *hash { return Err("The retained playable copy changed".into()); }
+                project::atomic_write(&destination, &bytes, false).map_err(error)?;
+            }
+        }
+    }
     let bytes=if restore{before}else{bounded_read(&candidate.join(&relative),MAX_TAG)?};project::atomic_write(&tags.join(&relative),&bytes,false).map_err(error)?;
-    let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.extend(imported);wanted.insert(receipt.tag.replace('\\',"/"),expected_hash.clone());
+    let expected_hash=if restore{&receipt.before_sha256}else{&receipt.after_sha256};let mut wanted=baseline.clone();wanted.extend(imported);if !restore{wanted.extend(receipt.generated_dependencies.clone());}wanted.insert(receipt.tag.replace('\\',"/"),expected_hash.clone());
     if transaction::inventory(&tags).map_err(error)?!=wanted||transaction::inventory(&current).map_err(error)?!=baseline{return Err("Native source changed while staging. The staged copy is retained but was not selected.".into());}
     let staged_fields = fields(&state, &project, &tags, &receipt.tag)?;
     let expected_fields = if restore { &receipt.before_fields } else { &receipt.after_fields };

@@ -12,6 +12,31 @@ pub fn native_squad_terminal_snapshots(fields:&str)->Result<Vec<NativeSquadTermi
 pub fn verify_native_squad_terminals(expected:&[NativeSquadTerminalSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_squad_cache(expected,cache,map)}
 pub fn verify_faction_arms_source(body:&NativeFactionBody,profile:&crate::firefight::NativePlayerProfile,read:impl FnMut(&str)->Result<String>)->Result<Vec<String>>{factions::verify_arms_source(body,profile,read)}
 pub(crate) use factions::arms_path as faction_arms_path;
+pub fn verify_playable_biped_fields(before: &str, after: &str) -> Result<()> {
+    let mut found = false;
+    let before = before.lines().collect::<Vec<_>>();
+    let after = after.lines().collect::<Vec<_>>();
+    if before.len() != after.len() {
+        return invalid("Native playable copy changed the biped field inventory");
+    }
+    let flag_line = |line: &str, values: &[&str]| {
+        line.trim_start_matches(|c: char| c.is_whitespace() || "│├└─".contains(c))
+            .split_whitespace().eq(values.iter().copied())
+    };
+    for (original, copied) in before.into_iter().zip(after) {
+        if flag_line(copied, &["uses_player_physics", "(1)", "bitfield"]) {
+            if found || !(flag_line(original, &["uses_player_physics", "(0)", "bitfield"]) || original == copied) {
+                return invalid("Native playable copy has an ambiguous player physics flag");
+            }
+            found = true;
+        } else if original != copied {
+            return invalid("Native playable copy changed other exposed biped fields");
+        }
+    }
+    if !found { return invalid("Native playable copy did not enable player physics"); }
+    Ok(())
+}
+
 pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::validate_control_source(fields)}
 pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>{factions::snapshots(fields)}
 pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}
