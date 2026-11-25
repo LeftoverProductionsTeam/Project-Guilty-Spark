@@ -34,6 +34,7 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const validEquipment=(kit:Draft['profile'])=>kit.primaryWeapon.length>0&&[kit.primaryLoaded,kit.primaryReserved,kit.secondaryLoaded,kit.secondaryReserved].every(value=>Number.isInteger(value)&&value>=0&&value<=32767)&&[kit.fragmentationGrenades,kit.plasmaGrenades].every(value=>Number.isInteger(value)&&value>=0&&value<=4)&&!!(kit.secondaryWeapon||kit.secondaryLoaded===0&&kit.secondaryReserved===0);
  const included=(['unsc','covenant'] as Role[]).filter(faction=>drafts[faction].included&&!kits.some(row=>row.kit.faction===faction));
  const blocked=busy||dirty||!context.canAppendFactionKits;
+ const squadBlocked=busy||dirty||!(context.canAppendSquadTerminals??context.canAppendFactionKits);
  const sourceSha256=context.tagSha256??'';
  const hasSourceHash=/^[a-f0-9]{64}$/i.test(sourceSha256);
  const selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
@@ -55,7 +56,8 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const squadName="extraction_squad_"+String(squad.number).padStart(2,"0"),squadExists=!!context.scenarioDevices?.some(row=>row.name.toLowerCase()===squadName);
  return <><details className="native-faction-kits"><summary>Forerunner faction terminals &amp; kits</summary>
   <p className="subtle">Add a new faction terminal and starter kit, or revise the equipment on an existing faction. Forerunner handles deployment, saved loadouts and banking.</p>
-  {!context.canAppendFactionKits&&<Notice tone="info">Requires unshared CE609 solo working source, a readable Extraction hub and activation area, and existing native control/weapon dependencies.</Notice>}
+  {!context.canAppendFactionKits&&<Notice tone="info">Requires unshared CE609 solo source or MCC13 multiplayer source with both verified MegaWorld hubs and the matching native control and weapon tags.</Notice>}
+  {context.regionalFactionSource&&<p className="subtle">Place each terminal inside that faction’s named hub. Add its player body after accepting the equipment kit.</p>}
   <fieldset disabled={blocked}>
    <label>Faction kit<select aria-label="Faction kit" value={role} onChange={event=>setRole(event.target.value as Role)}><option value="unsc">UNSC</option><option value="covenant">Covenant</option></select></label>
    {existingKit?<p className="subtle">Editing the existing starter kit. The terminal placement, respawn biped and faction indices stay in place.</p>:<>
@@ -83,7 +85,7 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  <details className="native-faction-bodies"><summary>Forerunner faction player bodies</summary>
   <p className="subtle">Bind a native character to an existing faction terminal and kit. The placement stays dormant. Forerunner changes the player character when the faction is selected.</p>
   {context.factionBodyIssue&&<Notice tone="info">{context.factionBodyIssue}</Notice>}
-  {!context.canAppendFactionKits?<Notice tone="info">Requires saved CE609 solo working source and ownership of this editor window.</Notice>:kits.length===0&&<p className="subtle">Review and accept a faction terminal and kit first.</p>}
+  {!context.canAppendFactionKits?<Notice tone="info">Requires saved CE609 solo or verified MCC13 MegaWorld working source and ownership of this editor window.</Notice>:kits.length===0&&<p className="subtle">Review and accept a faction terminal and kit first.</p>}
   {kits.length>0&&<label>Faction body kit<select aria-label="Faction body kit" disabled={busy||dirty} value={selectedKit?.kit.faction??''} onChange={event=>setBody({faction:event.target.value as Role,bipedTagPath:null,permutation:null,includeFirstPersonArms:false,usePlayerPhysics:false})}>{kits.map(row=><option key={row.kit.faction} value={row.kit.faction}>{row.kit.faction==='unsc'?'UNSC':'Covenant'}{row.body?' · bound':''}</option>)}</select></label>}
   {currentBody&&<p>Current body · {currentBody.bipedTagPath} · permutation {currentBody.permutation}</p>}
   <fieldset disabled={bodyBlocked}>
@@ -103,20 +105,20 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  </details>
  <details className="native-squad-terminals"><summary>Forerunner squad terminals &amp; objective gates</summary>
   <p className="subtle">Append one native squad-selection control inside the return hub. Forerunner owns membership, six-member limits, faction compatibility and durable banking. No loadout profile or inventory writer is added.</p>
-  <fieldset disabled={blocked}>
+  <fieldset disabled={squadBlocked}>
    <label>Squad number<input aria-label="Squad terminal number" type="number" min={1} max={22} step={1} value={squad.number} onChange={event=>setSquad({...squad,number:event.target.value===''?0:Number(event.target.value)})}/></label>
    <label>Touched control tag<input aria-label="Squad control tag" list={id+'-controls'} value={squad.control} onChange={event=>setSquad({...squad,control:event.target.value})}/></label>
    <div className="native-encounter-position">{squad.position.map((value,index)=><label key={index}>World {['X','Y','Z'][index]}<input aria-label={'Squad terminal '+['X','Y','Z'][index]} type="number" step="any" value={value} onChange={event=>setSquad({...squad,position:squad.position.map((n,i)=>i===index?event.target.value:n) as Draft['position']})}/></label>)}</div>
    <div className="native-encounter-position">{squad.rotation.map((value,index)=><label key={index}>{['Yaw','Pitch','Roll'][index]} · degrees<input aria-label={'Squad terminal '+['yaw','pitch','roll'][index]} type="number" step="any" value={value} onChange={event=>setSquad({...squad,rotation:squad.rotation.map((n,i)=>i===index?event.target.value:n) as Draft['rotation']})}/></label>)}</div>
    <NativeControlGroundCheck context={context} selectionKey={JSON.stringify([squad.number,squad.rotation.slice(1)])}
-    tagPath={squad.control.trim()} position={groundPosition(squad)} upright={upright(squad)} disabled={blocked||squadExists}
+    tagPath={squad.control.trim()} position={groundPosition(squad)} upright={upright(squad)} disabled={squadBlocked||squadExists}
     onGround={point=>setSquad(current=>({...current,position:point.map(String) as Draft['position']}))}/>
    <label><input type="checkbox" checked={squad.readiness} onChange={event=>setSquad({...squad,readiness:event.target.checked})}/>Require this squad's objectives before extraction</label>
    <p className="subtle"><code>{squadName}</code>{squad.readiness&&<> · <code>{squadName}_ready</code> starts at zero. Extraction stays locked until reviewed mission HaloScript sets this group to exactly one after genuine objectives. The engine resets it for each operation.</>} Native append alone creates no mission controller.</p>
    <button type="button" disabled={!Number.isInteger(squad.number)||squad.number<1||squad.number>22||!validPose(squad)||squadExists||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>onPreview({kind:'squadTerminals',sourceSha256:context.tagSha256!,terminals:[{number:squad.number,controlTagPath:squad.control.trim(),position:squad.position.map(Number) as NativeFactionKit['position'],rotationRadians:squad.rotation.map(value=>Number(value)*Math.PI/180) as NativeFactionKit['rotationRadians'],readiness:squad.readiness}]})}>Preview squad terminal &amp; gate</button>
   </fieldset>
   {squadExists&&<Notice tone="info">This native squad number already exists. Select its existing control to edit the pose; choose an unused number to append another.</Notice>}
-  {!context.canAppendFactionKits&&<p className="subtle">Requires unshared standard CE609 solo source, readable hub/activation volumes and an existing touched-by-player control dependency.</p>}
+  {!(context.canAppendSquadTerminals??context.canAppendFactionKits)&&<p className="subtle">Requires unshared standard CE609 solo source, readable hub/activation volumes and an existing touched-by-player control dependency.</p>}
   <p className="subtle">Review → Accept → Save → Build working tag edits. Existing native device editing moves an accepted terminal. Restore before-edit tag recovers the complete preceding source; project Undo does not reverse native revisions. Native feature discovery must admit the selected Forerunner build. Player selection, objectives and extraction require gameplay testing.</p>
  </details></>;
 }

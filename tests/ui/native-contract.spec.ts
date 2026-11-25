@@ -6110,6 +6110,28 @@ test('native faction kits and bodies preserve reviewed profiles, poses and sourc
 });
 
 
+test('verified MegaWorld hubs enable faction kits while squad authoring stays solo scoped',async({page})=>{
+ await mockNativeHubSource(page);
+ await page.evaluate(()=>{
+  const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   const result=await original(command,args);
+   return command==='native_tag_context'?{...result,sourceTarget:'mcc-cea',regionalFactionSource:true,canAppendSquadTerminals:false}:result;
+  };
+ });
+ await openFixture(page);await chooseTool(page,'AI & scenario');
+ const panel=page.locator('.scenario-page .native-tag-operations');
+ if(await panel.getAttribute('open')===null){await revealPagedControl(panel.locator(':scope > summary'));await panel.locator(':scope > summary').click();}
+ const kits=panel.locator('.native-faction-kits');
+ await revealPagedControl(kits.locator('> summary'));await kits.locator('> summary').click();
+ await expect(kits).toContainText('inside that faction’s named hub');
+ await expect(kits.getByRole('combobox',{name:'Faction kit',exact:true})).toBeEnabled();
+ const squad=panel.locator('.native-squad-terminals');
+ await revealPagedControl(squad.locator('> summary'));await squad.locator('> summary').click();
+ await expect(squad.getByRole('spinbutton',{name:'Squad terminal number',exact:true})).toBeDisabled();
+});
+
+
 // Native source revision mock; actual native append/compile is checked separately.
 test('append native camera points from empty source through review restore and exact pose controls',async({page},testInfo)=>{
  await mockDesktop(page);await page.evaluate(()=>{const w=window as any,m=w.__sparkMock,invoke=w.__TAURI_INTERNALS__.invoke;m.cameraSha='a'.repeat(64);m.appendCameras=[];m.cameraPreviews=[];m.cameraReceipts={};m.projects.a.project.builds=[{id:'camera-source',timestamp:'',status:'validated',target:'gbx-custom',output:'owned.map',sha256:'c'.repeat(64),message:'Synthetic source'}];

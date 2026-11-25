@@ -160,12 +160,9 @@ fn control_layout(
         }
     }
     let volumes = scenario_volume_choices(fields)?;
-    let hub = unique_volume(&volumes, "extraction_return")?;
-    let field = unique_volume(&volumes, "extraction_zone")?;
+    let regional = if added_profiles > 0 { regional_faction_hubs(&volumes)? } else { None };
     for kit in kits {
-        if !hub.contains(kit.position) || field.contains(kit.position) {
-            return invalid("Hub terminals must be inside the hub and outside activation");
-        }
+        validate_terminal_point(&volumes, regional, &kit.name, kit.position)?;
     }
     Ok((
         names.len(),
@@ -860,10 +857,18 @@ pub fn verify_cache(
     cache: &Path,
     map: &crate::maps::MapInspection,
 ) -> Result<()> {
-    if expected.len() > 2 || map.header.scenario_type != 0 || map.header.version != 609 {
-        return invalid("Faction kits need native CE609 solo output");
+    let edition = (map.header.version, map.header.scenario_type);
+    if expected.len() > 2 || map.header.extended || !matches!(edition, (609, 0) | (13, 1)) {
+        return invalid("Faction kits need standard CE609 solo or reviewed MCC13 multiplayer output");
     }
     let read = crate::maps::scenario_logic_readback(cache, map)?;
+    let regional = regional_faction_hubs(&read.volumes)?;
+    let ownership = if edition == (13, 1) {
+        if regional.is_none() { return invalid("MCC13 faction kits require both native MegaWorld hubs"); }
+        megaworld_hub_starts(cache, map)?
+    } else {
+        None
+    };
     for row in expected {
         let actual = crate::maps::scenario_faction_body_readback(cache, map, &format!("{}_body", row.kit.name()))?;
         if actual != row.body { return invalid("Compiled native faction biped binding differs from source"); }
@@ -934,10 +939,20 @@ pub fn verify_cache(
                 return invalid("Compiled faction group startup/flags differ from reviewed source");
             }
         }
-        let hub = unique_volume(&read.volumes, "extraction_return")?;
-        let field = unique_volume(&read.volumes, "extraction_zone")?;
-        if !hub.contains(row.kit.position) || field.contains(row.kit.position) {
-            return invalid("Compiled faction terminal is outside its safe hub");
+        validate_terminal_point(&read.volumes, regional, &row.kit.name(), row.kit.position)?;
+        if let Some(ownership) = &ownership {
+            let faction = faction_index(&row.kit.name())?;
+            let bsp = ownership[faction].bsp_index;
+            let mut points = vec![devices[0].position];
+            if let Some(body) = &actual { points.push(body.position); }
+            for location in crate::maps::bsp_point_locations(cache, map, &points, None)? {
+                if location.bsps != [bsp] {
+                    return invalid(format!("{} player body or terminal is outside its owning BSP {bsp}", row.kit.name()));
+                }
+            }
+            if devices[0].interaction_disabled != Some(false) {
+                return invalid("Compiled MegaWorld faction terminal must allow native interaction");
+            }
         }
     }
     Ok(())
@@ -961,6 +976,49 @@ pub fn validate_control_source(fields: &str) -> Result<()> {
 }
 
 pub const MEGAWORLD_HUBS: [&str; 2] = ["extraction_unsc_hub", "extraction_covenant_hub"];
+type FactionHubs<'a> = [&'a crate::maps::ScenarioLogicVolumeGeometry; 2];
+
+fn faction_index(name: &str) -> Result<usize> {
+    match name {
+        "extraction_unsc" => Ok(0),
+        "extraction_covenant" => Ok(1),
+        _ => invalid("Choose the native UNSC or Covenant faction"),
+    }
+}
+
+fn regional_faction_hubs(volumes: &[crate::maps::ScenarioLogicVolume]) -> Result<Option<FactionHubs<'_>>> {
+    if !volumes.iter().any(|row| MEGAWORLD_HUBS.iter().any(|name| row.name.eq_ignore_ascii_case(name))) {
+        return Ok(None);
+    }
+    let [unsc, covenant] = MEGAWORLD_HUBS;
+    let hubs = [unique_volume(volumes, unsc)?, unique_volume(volumes, covenant)?];
+    if hubs[0].intersects(hubs[1]) { return invalid("MegaWorld faction hubs overlap"); }
+    Ok(Some(hubs))
+}
+
+fn validate_terminal_point(
+    volumes: &[crate::maps::ScenarioLogicVolume],
+    regional: Option<FactionHubs<'_>>,
+    name: &str,
+    position: [f32; 3],
+) -> Result<()> {
+    if let Some(hubs) = regional {
+        let faction = faction_index(name)?;
+        if !hubs[faction].contains(position) || hubs[1 - faction].contains(position) {
+            return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
+        }
+        for field in ["extraction_pelican_zone", "extraction_spirit_zone"] {
+            if volumes.iter().any(|v| v.name.eq_ignore_ascii_case(field))
+                && unique_volume(volumes, field)?.contains(position) {
+                return invalid(format!("{name} overlaps the field transfer volume {field}"));
+            }
+        }
+    } else if !unique_volume(volumes, "extraction_return")?.contains(position)
+        || unique_volume(volumes, "extraction_zone")?.contains(position) {
+        return invalid("Hub terminals must be inside the hub and outside activation");
+    }
+    Ok(())
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -969,6 +1027,8 @@ pub struct MegaWorldHubStarts {
     pub volume_index: usize,
     pub bsp_index: u16,
     pub start_indices: Vec<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terminal_index: Option<usize>,
 }
 
 /// Read the faction starts from the exact MCC13 cache. Stock starts outside
@@ -980,14 +1040,7 @@ pub fn megaworld_hub_starts(
         return Ok(None);
     }
     let volumes = crate::maps::scenario_volume_readback(path, map)?;
-    if !volumes.iter().any(|row| MEGAWORLD_HUBS.iter().any(|name| row.name.eq_ignore_ascii_case(name))) {
-        return Ok(None);
-    }
-    let [unsc, covenant] = MEGAWORLD_HUBS;
-    let hubs = [unique_volume(&volumes, unsc)?, unique_volume(&volumes, covenant)?];
-    if hubs[0].intersects(hubs[1]) {
-        return invalid("MegaWorld faction hubs overlap");
-    }
+    let Some(hubs) = regional_faction_hubs(&volumes)? else { return Ok(None) };
     let mut starts = [vec![], vec![]];
     let mut points = Vec::new();
     for (index, start) in crate::maps::scenario_region_starts(path, map)?.into_iter().enumerate() {
@@ -1002,6 +1055,7 @@ pub fn megaworld_hub_starts(
         return invalid("Each MegaWorld faction hub needs at least one contained native player start");
     }
     let locations = crate::maps::bsp_point_locations(path, map, &points, None)?;
+    let logic = crate::maps::scenario_logic_readback(path, map)?;
     let review = |faction: usize| -> Result<MegaWorldHubStarts> {
         let name = MEGAWORLD_HUBS[faction];
         let mut owner = None;
@@ -1020,8 +1074,29 @@ pub fn megaworld_hub_starts(
         }
         let volume_index = volumes.iter().position(|row| row.name == name)
             .ok_or_else(|| crate::SparkError::Invalid(format!("Missing native MegaWorld hub {name}")))?;
+        let bsp = owner.unwrap();
+        let terminal_name = name.strip_suffix("_hub").unwrap();
+        let mut names = logic.names.iter().enumerate().filter(|(_, row)| row.name.eq_ignore_ascii_case(terminal_name));
+        let terminal_index = if let Some((name_index, row)) = names.next() {
+            if row.name != terminal_name || row.object_type != 8 || row.object_index < 0 || names.next().is_some() {
+                return invalid(format!("Invalid or duplicate native terminal {terminal_name}"));
+            }
+            let mut devices = logic.devices.iter().filter(|device| device.class == "ctrl"
+                && device.name_index as usize == name_index && device.index == row.object_index as usize);
+            let terminal = devices.next()
+                .ok_or_else(|| crate::SparkError::Invalid(format!("Missing native terminal {terminal_name}")))?;
+            if devices.next().is_some() || terminal.interaction_disabled != Some(false) {
+                return invalid(format!("Native terminal {terminal_name} has an invalid interaction binding"));
+            }
+            validate_terminal_point(&volumes, Some(hubs), terminal_name, terminal.position)?;
+            let membership = crate::maps::bsp_point_locations(path, map, &[terminal.position], None)?;
+            if membership[0].bsps != [bsp] {
+                return invalid(format!("Native terminal {terminal_name} is outside BSP {bsp}"));
+            }
+            Some(terminal.index)
+        } else { None };
         Ok(MegaWorldHubStarts {
-            name: name.to_owned(), volume_index, bsp_index: owner.unwrap(),
+            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index,
             start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
         })
     };
@@ -1297,6 +1372,243 @@ mod tests {
             "hubs": hubs,
         })).unwrap(), false).unwrap();
         eprintln!("Nineteen-region faction hub readback: {} · {:?}", map.sha256, hubs);
+    }
+
+    #[test]
+    #[ignore = "Requires isolated native tags for the exact 19-region hubs and the verified Be Native assets"]
+    fn megaworld_faction_terminals_and_player_bodies_compile() {
+        use std::path::PathBuf;
+        let work = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let tags = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_TAGS").unwrap());
+        let be_tags = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_BE_TAGS").unwrap());
+        let invader = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_INVADER").unwrap());
+        let world = PathBuf::from(std::env::var_os("SPARK_NATIVE_MEGAWORLD_CACHE").unwrap());
+        let be = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_CACHE").unwrap());
+        assert!(tags.canonicalize().unwrap().starts_with(work.canonicalize().unwrap()));
+        let world_map = crate::maps::inspect_map(&world, None).unwrap();
+        let be_map = crate::maps::inspect_map(&be, None).unwrap();
+        assert_eq!(world_map.sha256, "ddf7e4cb8aadf81da90ef7a44452bd4fbd879fffdcc77bab3474c028fc55d094");
+        assert_eq!(be_map.sha256, "78ddeb4836784622425060401e877bd53a0ccfd1243acc8ceca4a8b7d75035d5");
+        let run = |tool: &str, args: &[String]| {
+            let result = std::process::Command::new(invader.join(format!("{tool}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {}", String::from_utf8_lossy(&result.stderr).chars().take(2500).collect::<String>());
+            String::from_utf8(result.stdout).unwrap()
+        };
+        let list = |root: &Path, tag: &str| run("invader-edit", &["-t".into(), root.to_string_lossy().into_owned(), "-L".into(), tag.into()]);
+        let scenario = format!("{}.scenario", world_map.scenario_path.replace('\\', "/"));
+        let mut before = list(&tags, &scenario);
+        let be_fields = list(&be_tags, &format!("{}.scenario", be_map.scenario_path));
+        let be_kits = snapshots(&be_fields).unwrap();
+        let parents = megaworld_hub_starts(&world, &world_map).unwrap().unwrap();
+        let starts = crate::maps::scenario_region_starts(&world, &world_map).unwrap();
+        let expected_bsps = [0u16, 10];
+        let sha = || crate::maps::hash_file(&tags.join(&scenario)).unwrap();
+        let orient = |[x, y, z]: [f32; 3], half: f32, under: f32, height: f32| crate::maps::ScenarioLogicVolumeGeometry {
+            forward: [1.,0.,0.], up: [0.,0.,1.],
+            corner: [x-half, y-half, z-under], dimensions: [2.*half, 2.*half, height],
+        };
+        let original_volumes = crate::maps::scenario_volume_readback(&world, &world_map).unwrap();
+        let pads: [(&str, u16, [f32; 3]); 4] = [
+            ("pelican_return", 0, [55.361767, 34.424126, -21.07504]),
+            ("extraction_pelican_zone", 0, [75.36177, 34.424126, -21.07504]),
+            ("spirit_return", 10, [1315.9579, 567.08417, -15.704296]),
+            ("extraction_spirit_zone", 10, [1390.3234, 523.0836, -15.770383]),
+        ];
+        let mut kits = Vec::new();
+        let mut anchors = Vec::new();
+        for (index, faction) in ["unsc", "covenant"].into_iter().enumerate() {
+            let source = be_kits.iter().find(|row| row.kit.faction == faction).unwrap();
+            let mut kit = source.kit.clone();
+            let control = be_map.tags.iter().find(|tag| tag.class == "ctrl"
+                && tag.path.replace('\\', "/")==kit.control_tag_path).unwrap();
+            let (_, mesh) = crate::render::preview_owned_object_model(&be, &be_map.sha256, &be_map, control.id).unwrap();
+            let offset = crate::render::upright_model_base_offset(&mesh).unwrap();
+            let bsp = expected_bsps[index];
+            let home = pads[index*2].2;
+            let mut choices = if index == 0 { parents[0].start_indices.clone() } else {
+                starts.iter().enumerate().filter_map(|(row, start)| (start.bsp_index == bsp as i16).then_some(row)).collect()
+            };
+            choices.sort_by(|left, right| {
+                let distance = |row: usize| (starts[row].position[0]-home[0]).hypot(starts[row].position[1]-home[1]);
+                distance(*left).total_cmp(&distance(*right))
+            });
+            // Anchor a hub only where the actual start and a separate terminal
+            // footprint can both use the same native region.
+            let points = choices.iter().flat_map(|row| {
+                let [x,y,z] = starts[*row].position;
+                [[x,y,z+0.05], [x-0.95,y+0.95,z+1.5], [x+0.95,y+0.95,z+1.5],
+                    [x-0.95,y-0.95,z+1.5], [x+0.95,y-0.95,z+1.5]]
+            }).collect::<Vec<_>>();
+            let reviewed = crate::maps::bsp_point_locations(&world, &world_map, &points, Some(2.)).unwrap();
+            let (anchor, position) = choices.iter().copied().zip(reviewed.chunks_exact(5)).find_map(|(row, samples)| {
+                let start = &samples[0];
+                if start.bsps != [bsp] || !start.supports.iter().any(|floor| floor.bsp == bsp) { return None; }
+                let hub = if index == 0 {
+                    original_volumes[parents[0].volume_index].geometry.clone().unwrap()
+                } else {
+                    orient(starts[row].position, 1.4, 0.25, 2.5)
+                };
+                samples[1..].iter().find_map(|sample| {
+                    if sample.bsps != [bsp] { return None; }
+                    let ground = sample.ground.iter().find(|item| item.bsp == bsp)?;
+                    let point = [sample.point[0], sample.point[1], ground.z + offset];
+                    let clear = starts.iter().filter(|start| start.bsp_index == bsp as i16)
+                        .all(|start| (start.position[0]-point[0]).hypot(start.position[1]-point[1]) >= 0.75);
+                    (clear && hub.contains(point)).then_some((row, point))
+                })
+            }).unwrap_or_else(|| panic!("No supported {faction} start and terminal footprint in BSP {bsp}"));
+            kit.position = position;
+            kit.rotation_radians = [starts[anchor].facing, 0., 0.];
+            anchors.push(anchor);
+            kits.push(kit);
+        }
+        let covenant = orient(starts[anchors[1]].position, 1.4, 0.25, 2.5);
+        let mut authored = vec![(parents[1].volume_index, MEGAWORLD_HUBS[1], covenant.clone(), false)];
+        for (index, (name, _, center)) in pads.iter().enumerate() {
+            authored.push((original_volumes.len()+index, name, orient(*center, 1.8, 0.15, 4.), true));
+        }
+        for (index, name, geometry, append) in &authored {
+            let operation = Operation::TriggerVolume { append: *append, index: *index as u16,
+                name: name.to_string(), geometry: geometry.clone(), source_sha256: sha() };
+            run("invader-edit", &operation.arguments_with_fields(&tags, "scnr", &scenario, &before).unwrap());
+            let next = list(&tags, &scenario);
+            reviewed_difference(&before, &next, &operation).unwrap();
+            before = next;
+        }
+        let append = Operation::FactionKits { kits, replace_existing_profiles: false, source_sha256: sha() };
+        run("invader-edit", &append.arguments_with_fields(&tags, "scnr", &scenario, &before).unwrap());
+        let mut source = list(&tags, &scenario);
+        reviewed_difference(&before, &source, &append).unwrap();
+        for (faction, biped) in [
+            ("unsc", "characters/cyborg_mp/cyborg_mp"),
+            ("covenant", "gs_assets_04f1039aa23e4ef98e06328f629bf34a/characters/elite/elite_gs_player_covenant"),
+        ] {
+            let recipe = Operation::FactionBody {
+                body: NativeFactionBody { faction: faction.into(), biped_tag_path: biped.into(),
+                    permutation: -1, include_first_person_arms: false, use_player_physics: false },
+                replace_existing: false, source_sha256: sha(),
+            };
+            run("invader-edit", &recipe.arguments_with_fields(&tags, "scnr", &scenario, &source).unwrap());
+            let edited = list(&tags, &scenario);
+            reviewed_difference(&source, &edited, &recipe).unwrap();
+            source = edited;
+        }
+        let output = tags.parent().unwrap().join("reviewed-world-factions");
+        std::fs::create_dir(&output).unwrap();
+        run("invader-build", &["-t".into(), tags.to_string_lossy().into_owned(), "-g".into(), "mcc-cea".into(),
+            "-T".into(), "67108864".into(), "-m".into(), output.to_string_lossy().into_owned(),
+            "--resource-usage".into(), "none".into(), scenario.strip_suffix(".scenario").unwrap().into()]);
+        let cache = output.join("gsmegaroad.map");
+        let built = crate::maps::inspect_map(&cache, None).unwrap();
+        let bindings = snapshots(&source).unwrap();
+        let hubs = megaworld_hub_starts(&cache, &built).unwrap().unwrap();
+        assert_eq!(hubs.each_ref().map(|hub| hub.bsp_index), expected_bsps);
+        let final_volumes = crate::maps::scenario_volume_readback(&cache, &built).unwrap();
+        assert_eq!(final_volumes.len(), original_volumes.len() + 4);
+        for (row, old) in original_volumes.iter().enumerate().filter(|(i, _)| *i != parents[1].volume_index) {
+            assert_eq!(&final_volumes[row], old);
+        }
+        for (index, name, geometry, _) in &authored {
+            let compiled = &final_volumes[*index];
+            assert_eq!(compiled.name, *name);
+            assert!(volume_geometry_close(compiled.geometry.as_ref().unwrap(), geometry));
+        }
+        let review_points = pads.map(|(_, _, [x,y,z])| [x,y,z+0.25]);
+        let reviewed = crate::maps::bsp_point_locations(&cache, &built, &review_points, Some(2.)).unwrap();
+        for ((_, bsp, _), location) in pads.iter().zip(&reviewed) {
+            assert_eq!(location.bsps, [*bsp]);
+            assert!(location.ground.iter().any(|ground| ground.bsp == *bsp));
+        }
+        let active_starts = crate::maps::scenario_region_starts(&cache, &built).unwrap();
+        assert_eq!(active_starts.len(), starts.len());
+        assert!(starts.iter().zip(active_starts).all(|(a,b)| (a.position, a.facing, a.bsp_index, a.team_index, a.spawn_types)
+            == (b.position, b.facing, b.bsp_index, b.team_index, b.spawn_types)));
+        verify_cache(&bindings, &cache, &built).unwrap();
+        assert_eq!(bindings.len(), 2);
+        let crc = run("invader-info", &["-T".into(), "crc32_mismatched".into(), cache.to_string_lossy().into_owned()]);
+        assert_eq!(crc.trim(), "0");
+        let original_switches = crate::maps::scenario_bsp_transitions(&world, &world_map).unwrap();
+        let actual_switches = crate::maps::scenario_bsp_transitions(&cache, &built).unwrap();
+        assert_eq!(original_switches.bsp_tag_paths, actual_switches.bsp_tag_paths);
+        assert_eq!(serde_json::to_value(&original_switches.transitions).unwrap(), serde_json::to_value(&actual_switches.transitions).unwrap());
+        assert_eq!(world_map.mesh.indices, built.mesh.indices);
+        assert_eq!(world_map.mesh.positions, built.mesh.positions);
+        assert_eq!(crate::maps::hash_file(&world).unwrap(), world_map.sha256);
+        assert_eq!(crate::maps::hash_file(&be).unwrap(), be_map.sha256);
+        crate::project::atomic_write(&output.join("faction-review.json"), &serde_json::to_vec_pretty(&serde_json::json!({
+            "sourceSha256": world_map.sha256, "assetSourceSha256": be_map.sha256,
+            "cacheSha256": built.sha256, "cacheVersion": built.header.version, "scenarioType": built.header.scenario_type,
+            "extractionPlayable": false, "hubs": hubs, "factions": bindings, "transferSites": pads,
+        })).unwrap(), false).unwrap();
+        eprintln!("Nineteen-region native faction controls and bodies: {}", built.sha256);
+    }
+
+    #[test]
+    #[ignore = "Read-only survey of the verified retained MegaWorld faction cache"]
+    fn megaworld_faction_aircraft_sites_have_playable_support() {
+        let path = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_MEGAWORLD_CACHE").unwrap());
+        let map = crate::maps::inspect_map(&path, None).unwrap();
+        assert_eq!(map.sha256, "aa75da0f92a350919d287be6e7247025dfc7f400b4afc081f4a4388ac254e734");
+        let hubs = megaworld_hub_starts(&path, &map).unwrap().unwrap();
+        let logic = crate::maps::scenario_logic_readback(&path, &map).unwrap();
+        let starts = crate::maps::scenario_region_starts(&path, &map).unwrap();
+        let hub_volumes = regional_faction_hubs(&logic.volumes).unwrap().unwrap();
+        let surveyed = hubs.iter().map(|hub| {
+            let index = hub.terminal_index.expect("Reviewed native terminal");
+            let terminal = logic.devices.iter().find(|device| device.class == "ctrl" && device.index == index).unwrap();
+            (hub.bsp_index, terminal.position, hub.name.as_str())
+        }).chain([(10, starts[426].position, "Ice Fields alternative")]);
+        for (bsp, anchor, label) in surveyed {
+            let mut selected = Vec::new();
+            for distances in [[6., 9., 12., 15.], [24., 32., 42., 56.]] {
+                let mut centers = distances.into_iter().flat_map(|distance| (0..16).map(move |direction| {
+                    let angle = direction as f32 * std::f32::consts::TAU / 16.;
+                    [anchor[0] + distance * angle.cos(),
+                        anchor[1] + distance * angle.sin(), anchor[2] + 5.]
+                })).collect::<Vec<_>>();
+                if bsp == 10 && distances[0] >= 24. {
+                    // Follow Ice Fields' native elevations across the whole
+                    // region. A ring at the hub's height misses lower terrain.
+                    centers.extend(starts.iter().filter(|start| start.bsp_index == 10)
+                        .flat_map(|start| [[-5.,0.], [5.,0.], [0.,-5.], [0.,5.]]
+                            .map(|[x, y]| [start.position[0]+x, start.position[1]+y, start.position[2]+5.]))
+                        .filter(|point| (point[0]-anchor[0]).hypot(point[1]-anchor[1]) >= 24.));
+                }
+                let mut sites = Vec::new();
+                for group in centers.chunks(100) {
+                    let samples = group.iter().flat_map(|[x,y,z]| {
+                    [-1.8, 0., 1.8].into_iter().flat_map(move |dx| {
+                        [-1.8, 0., 1.8].map(|dy| [x+dx, y+dy, *z])
+                    })
+                }).collect::<Vec<_>>();
+                let read = crate::maps::bsp_point_locations(&path, &map, &samples, Some(12.)).unwrap();
+                let expected_bsp = bsp;
+                sites.extend(group.iter().copied().zip(read.chunks_exact(9)).filter_map(|([x,y,_], rows)| {
+                    let mut heights = Vec::new();
+                    for row in rows {
+                        if row.bsps != [expected_bsp] { return None; }
+                        heights.push(row.ground.iter().find(|ground| ground.bsp == expected_bsp)?.z);
+                    }
+                    let low = heights.iter().copied().fold(f32::INFINITY, f32::min);
+                    let high = heights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                    let point = [x,y,heights[4]];
+                    if high-low > 0.12 || hub_volumes.iter().any(|h| h.contains(point))
+                        || starts.iter().any(|start| start.bsp_index == expected_bsp as i16
+                            && (start.position[0]-x).hypot(start.position[1]-y) < 3.0)
+                    {
+                        return None;
+                    }
+                    Some((point, high-low))
+                    }));
+                }
+                selected.push(sites.first().copied());
+            }
+            eprintln!("{label}, BSP {bsp}, candidate home and field centers with floor relief: {selected:?}");
+            if bsp != 6 {
+                assert!(selected.iter().all(Option::is_some), "{label} needs a supported home and field survey site");
+            }
+        }
+        assert_eq!(crate::maps::hash_file(&path).unwrap(), map.sha256);
     }
 
     #[test]

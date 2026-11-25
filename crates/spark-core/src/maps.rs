@@ -2103,16 +2103,16 @@ pub struct BspFlightCrossing {
     pub fraction: f64,
     pub point: [f64; 3],
 }
-/// The standard CE609 biped starts with the 752-byte Unit, then a
+/// The native CE609 and MCC13 biped starts with the 752-byte Unit, then a
 /// 4-byte moving turn speed followed by BipedFlags (Invader HEK definitions).
 pub fn compiled_biped_uses_player_physics(
     path: &Path, map: &MapInspection, biped: &str,
 ) -> Result<bool> {
-    if map.header.version != 609 || map.header.extended {
-        return invalid("Compiled player physics readback requires standard CE609");
+    if !matches!(map.header.version, 609 | 13) || map.header.extended {
+        return invalid("Compiled player physics readback requires standard CE609 or MCC13");
     }
     let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
-    if hash != map.sha256 || header.version != 609 {
+    if hash != map.sha256 || header.version != map.header.version {
         return invalid("Compiled cache changed after biped inspection");
     }
     let mut tags = map.tags.iter().filter(|tag| tag.class == "bipd" && !tag.external

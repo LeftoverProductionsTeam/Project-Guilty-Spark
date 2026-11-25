@@ -134,7 +134,7 @@ export interface NativeTagContext {
   actorVariants?:string[];
   canAppendEncounter?:boolean;
   canAppendTransport?:boolean;vehicleSources?:string[];
-  canAppendFactionKits?:boolean;controlSources?:string[];weaponSources?:string[];bipedSources?:string[];
+  canAppendFactionKits?:boolean;canAppendSquadTerminals?:boolean;regionalFactionSource?:boolean;controlSources?:string[];weaponSources?:string[];bipedSources?:string[];
   factionKits?:{kit:NativeFactionKit;body?:{bipedTagPath:string;permutation:number;firstPersonArms?:boolean}|null}[];factionBodyIssue?:string|null;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];

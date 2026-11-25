@@ -248,7 +248,7 @@ pub(super) struct Context {
     actor_variants:Vec<String>,
     can_append_encounter:bool,
     can_append_transport:bool,vehicle_sources:Vec<String>,
-    can_append_faction_kits:bool,control_sources:Vec<String>,weapon_sources:Vec<String>,biped_sources:Vec<String>,
+    can_append_faction_kits:bool,can_append_squad_terminals:bool,regional_faction_source:bool,control_sources:Vec<String>,weapon_sources:Vec<String>,biped_sources:Vec<String>,
     faction_kits:Vec<recipes::NativeFactionSnapshot>,faction_body_issue:Option<String>,
     scenario_squads:Vec<recipes::ScenarioSquadChoice>,
     scenario_start_squads:Vec<recipes::ScenarioSquadChoice>,
@@ -525,6 +525,18 @@ fn checked_actor_import(state:&AppState,source:&Source,operation:&recipes::Opera
     let tags=core::native_asset_imports::checked_actor_source(&state.root,&selected,binding).map_err(error)?;
     Ok((selected,tags))
 }
+fn regional_faction_source(source: &Source) -> Reply<bool> {
+    if source.class != "scnr" || source.build.target != "mcc-cea" { return Ok(false); }
+    let output = source.build.output.as_ref().ok_or("Validated parent output is missing")?;
+    let header = maps::inspect_header(output).map_err(error)?;
+    if header.version != 13 || header.scenario_type != 1 || header.extended { return Ok(false); }
+    let map = maps::inspect_map(output, None).map_err(error)?;
+    if source.build.sha256.as_deref() != Some(map.sha256.as_str()) {
+        return Err("The MCC13 faction source changed after validation".into());
+    }
+    Ok(recipes::megaworld_hub_starts(output, &map).map_err(error)?.is_some())
+}
+
 fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Operation,edit:&Path,actor_import:Option<(&core::native_asset_imports::Binding,&Path)>)->Reply<BTreeMap<String,String>> {
     if matches!(operation,recipes::Operation::HudDuplicate{..}) {
         studio_native_source::require_unshared(state,&source.project.id)?;
@@ -556,6 +568,8 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         return Ok(BTreeMap::from([(tag,before)]));
     }
     if !operation.is_encounter_append()&&!operation.is_transport_append()&&!operation.is_faction_edit(){return Ok(BTreeMap::new());}
+    let regional = matches!(operation, recipes::Operation::FactionBody { .. } | recipes::Operation::FactionKits { .. })
+        && regional_faction_source(source)?;
     let mut reviewed_arms = BTreeMap::new();
     let roots=if let recipes::Operation::AppendTransport{transport,..}=operation{
         if source.build.target!="gbx-custom"{return Err("Native transport append currently requires reviewed CE609 solo source".into());}
@@ -564,7 +578,7 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     }else if let recipes::Operation::SquadTerminals{terminals,..}=operation{
         if source.build.target!="gbx-custom"{return Err("Native squad terminals require CE609 solo source".into());}let mut roots=vec![];for terminal in terminals{let tag=format!("{}.device_control",terminal.control_tag_path);recipes::validate_faction_control_source(&fields(state,&source.project,&source.tags,&tag)?).map_err(error)?;roots.push((tag,"ctrl"));}roots
     }else if let recipes::Operation::FactionBody{body,..}=operation{
-        if source.build.target!="gbx-custom"{return Err("Faction player bodies require reviewed CE609 solo source".into());}
+        if source.build.target!="gbx-custom" && !regional{return Err("Faction bodies require reviewed CE609 solo or MCC13 multiplayer source with verified MegaWorld hubs".into());}
         let mut roots = vec![(format!("{}.biped", body.biped_tag_path.replace('\\', "/")), "bipd")];
         if body.include_first_person_arms {
             let scenario = fields(state, &source.project, &source.tags, &source.tag)?;
@@ -581,7 +595,7 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         }
         roots
     }else if let recipes::Operation::FactionKits{kits,replace_existing_profiles,..}=operation{
-        if source.build.target!="gbx-custom"{return Err("Forerunner faction kits require reviewed CE609 solo source".into());}
+        if source.build.target!="gbx-custom" && !regional{return Err("Faction kits require reviewed CE609 solo or MCC13 multiplayer source with verified MegaWorld hubs".into());}
         let current = if *replace_existing_profiles {
             recipes::native_faction_snapshots(&fields(state,&source.project,&source.tags,&source.tag)?).map_err(error)?
         } else { vec![] };
@@ -609,9 +623,12 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     }else{operation.encounter_appends().map_err(error)?.into_iter().map(|entry|(format!("{}.actor_variant",entry.actor_path.replace('\\',"/")),"actv")).collect()};
     studio_native_source::require_unshared(state,&source.project.id)?;
     let output=source.build.output.as_ref().ok_or("Validated parent output is missing")?;
-    if maps::inspect_header(output).map_err(error)?.scenario_type!=0{return Err("Native encounter append currently requires a reviewed singleplayer scenario. Multiplayer AI needs its engine-specific adapter.".into());}
+    let expected_type = if regional { "multiplayer" } else { "singleplayer" };
+    if maps::inspect_header(output).map_err(error)?.scenario_type != u16::from(regional) {
+        return Err(format!("This native edit requires a reviewed {expected_type} scenario."));
+    }
     let(ok,value,stderr)=run(edit,&["-t".into(),source.tags.to_string_lossy().into_owned(),"-G".into(),"type".into(),source.tag.clone()])?;
-    if !ok||value.trim()!="singleplayer"{return Err(format!("Working scenario is not a readable singleplayer source: {stderr}"));}
+    if !ok||value.trim()!=expected_type{return Err(format!("Working scenario is not a readable {expected_type} source: {stderr}"));}
     let dependency=executable(state,&source.project,"invaderDependency")?;
     let dependency_hash=maps::hash_file(&dependency).map_err(error)?;
     let mut pins=BTreeMap::new();let mut actors=std::collections::BTreeSet::new();
@@ -797,7 +814,11 @@ pub(super) async fn native_tag_context(
         if maps::hash_file(&context_file).map_err(error)?!=context_sha256{return Err("Native source changed during inspection; refresh before editing".into());}
         let mut actor_variants=vec![];let mut vehicle_sources=vec![];let mut control_sources=vec![];let mut weapon_sources=vec![];let mut biped_sources=vec![];
         let can_append_encounter=source.class=="scnr"&&maps::inspect_header(source.build.output.as_ref().ok_or("Validated output is missing")?).map_err(error)?.scenario_type==0;
-        if can_append_encounter {
+        let (regional_faction_source, regional_issue) = match regional_faction_source(&source) {
+            Ok(chosen) => (chosen, None),
+            Err(issue) => (false, Some(issue)),
+        };
+        if can_append_encounter || regional_faction_source {
             let inspection=if source.project.source.is_some(){inspect(&state,&source.project)?}else{Arc::new(maps::inspect_map(source.build.output.as_ref().unwrap(),None).map_err(error)?)};
             for tag in inspection.tags.iter().filter(|tag|tag.class=="actv") {
                 if let Ok(relative)=core::safe_relative(&format!("{}.actor_variant",tag.path.replace('\\',"/"))) {
@@ -891,9 +912,12 @@ pub(super) async fn native_tag_context(
             }
         }
         let can_append_encounter=can_append_encounter&&edit_issue.is_none()&&studio_native_source::require_unshared(&state,&source.project.id).is_ok();
-        let (faction_kits,faction_body_issue)=if source.class=="scnr"&&source.build.target=="gbx-custom" {
+        let can_append_squad_terminals = can_append_encounter && source.build.target=="gbx-custom";
+        let can_append_faction_kits = can_append_squad_terminals || regional_faction_source
+            && edit_issue.is_none() && studio_native_source::require_unshared(&state, &source.project.id).is_ok();
+        let (faction_kits,faction_body_issue)=if source.class=="scnr"&&(source.build.target=="gbx-custom" || regional_faction_source) {
             match recipes::native_faction_snapshots(&values){Ok(kits)=>(kits,None),Err(issue)=>(vec![],Some(error(issue)))}
-        }else{(vec![],None)};
+        }else{(vec![],regional_issue)};
         let (firefight_plan,firefight_plan_issue)=if can_append_encounter {
             match recipes::saved_firefight_encounters(&source.project,source.build.sha256.as_deref().unwrap_or(""),&values){Ok(plan)=>(Some(plan),None),Err(issue)=>(None,Some(error(issue)))}
         }else{(None,None)};
@@ -907,7 +931,7 @@ pub(super) async fn native_tag_context(
             tags_directory: source.tags,
             tag_sha256:hash,
             actor_variants,
-            can_append_faction_kits:can_append_encounter&&source.build.target=="gbx-custom",control_sources,weapon_sources,biped_sources,faction_kits,faction_body_issue,can_append_transport:can_append_encounter&&source.build.target=="gbx-custom",vehicle_sources,can_append_encounter,
+            can_append_faction_kits,can_append_squad_terminals,regional_faction_source,control_sources,weapon_sources,biped_sources,faction_kits,faction_body_issue,can_append_transport:can_append_encounter&&source.build.target=="gbx-custom",vehicle_sources,can_append_encounter,
             vehicle_flight,vehicle_flight_issue,
             control_settings,control_settings_issue,control_requires_player_activation,machine_settings,machine_settings_issue,
             bounding_radius: radius,

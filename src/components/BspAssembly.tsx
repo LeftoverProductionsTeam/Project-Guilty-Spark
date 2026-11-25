@@ -18,7 +18,7 @@ import { useWorkspaceActivity } from './WorkspaceActivity';
 import { volumeCenter } from '../nativeTriggerVolume';
 import type { NativeVolumeGeometry } from '../nativeOperations';
 interface NativeBspTransitions {
-  extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[] }[];
+  extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[]; terminalIndex?: number }[];
   extractionHubIssue?: string;
   cacheSha256: string;
   bspCount: number;
@@ -55,7 +55,7 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
       {report.extractionHubIssue && <p role="alert" className="bsp-error">{report.extractionHubIssue}</p>}
       {!!report.extractionHubStarts?.length && <ul aria-label="Extraction faction hub starts">
         {report.extractionHubStarts.map(hub => <li key={hub.name}>
-          <strong>{hub.name}</strong> · volume {hub.volumeIndex} · BSP {hub.bspIndex} · starts {hub.startIndices.join(', ')}
+          <strong>{hub.name}</strong> · volume {hub.volumeIndex} · BSP {hub.bspIndex} · starts {hub.startIndices.join(', ')}{hub.terminalIndex===undefined ? '' : ' · terminal '+hub.terminalIndex}
           <button type="button" disabled={hub.bspIndex>=partCount} onClick={()=>viewBsp(hub.bspIndex)}>View hub BSP {hub.bspIndex}</button>
         </li>)}
       </ul>}
