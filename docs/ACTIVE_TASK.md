@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The wider Timberland–Sidewinder route compiled as CE609 345afa4e and passed independent readback of six lightmap pages, water and light-panel materials. The 19-region MCC13 f0835f5e and installed 14-region 71fc1648 remain the separate preserved baselines.
-Next action: Use the read-only CE609 candidate under ridge-native-shared-bank-rszFdH/ready to test water, light panels and two-way walking/Warthog traversal in-game. Verify Damnation arrival, regional teleporters and floating pickups while extending the physical overworld to all nineteen regions. Preserve Zombie/Firefight and Black Echo hover work.
+Latest verified revision: CE609 90bcc029 baked the terrain UV correction. Overlay 6d2b7145 preserved its exact BSP and lightmap. Two Forerunner peers walked the road in opposite directions with ordinary replayed controls at 2521 x 1051. The owner screenshot still fails visual acceptance.
+Next action: Reproduce and isolate the owner screenshot’s black faces at the reported viewpoint and cache. Use the exact two-region playback and native captures in wide-ridge-uv-lanes-IWzbVd/ready as controls. Verify Warthog and ridge gameplay, regional teleporters, Damnation arrival and pickups before promoting any nineteen-region replacement. Preserve previous-good, Zombie/Firefight and Black Echo work.
 
 Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
 

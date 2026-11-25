@@ -6,9 +6,10 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertQaOutputPath } from './native-qa-storage.mjs';
 const [toolPath, inputPath, outputPath, ...options] = process.argv.slice(2);
-if (!toolPath || !inputPath || !outputPath) throw Error('prepare-megaworld-walkthrough <Invader> <accepted-pair-cache-or-tags> <fresh-output> [native-dependency-tag-roots...] OR <Invader> <validated-native-job> <fresh-output> --drive <compiled.gsproject>');
+if (!toolPath || !inputPath || !outputPath) throw Error('prepare-megaworld-walkthrough <Invader> <accepted-pair-cache-or-tags> <fresh-output> [native-dependency-tag-roots...] OR <Invader> <validated-job-or-handoff> <fresh-output> --drive <compiled.gsproject> [--banks <CE-maps-directory>]');
 const driving = options[0] === '--drive';
-if (driving && options.length !== 2) throw Error('--drive requires one compiled connection project.');
+if (driving && !(options.length === 2 || (options.length === 4 && options[2] === '--banks'))) throw Error('--drive requires one compiled connection project.');
+const bankRoot = driving && options.length === 4 ? path.resolve(options[3]) : null;
 const toolFolder = path.resolve(toolPath);
 const input = (await fs.realpath(inputPath)).replace(/^\\\\\?\\(?=[a-z]:\\)/i,'');
 const outputFolder = await assertQaOutputPath(outputPath);
@@ -57,23 +58,41 @@ async function readTrial() {
   const project = JSON.parse(await fs.readFile(path.resolve(options[1]),'utf8'));
   const {build,routes} = receipt;
   const projectBuild = project.builds?.find(row => row.id === build?.id);
-  const cache = path.join(input,'output','timberland.map');
+  const retained = bankRoot !== null;
+  const cache = retained ? path.join(input,'timberland.map') : path.join(input,'output','timberland.map');
+  const plan = project.bspAssembly;
+  const reviewedRoutes = ['Primary connection', ...(plan?.infantryTunnel ? ['Infantry tunnel'] : []), 'High-ground route'];
   if (receipt.schemaVersion !== 1 || !receipt.originalHashesVerified || receipt.residentBsps !== 1 ||
       build?.target !== 'gbx-custom' || build.status !== 'validated' || !/^[0-9a-f]{64}$/.test(build.sha256) ||
       projectBuild?.sha256 !== build.sha256 || projectBuild.projectFingerprint !== build.projectFingerprint ||
-      routes?.cacheSha256 !== build.sha256 || routes.routeClearance?.[0]?.length !== 3) {
-    throw Error('Select the exact validated three-route CE job and its compiled project.');
+      routes?.cacheSha256 !== build.sha256 ||
+      JSON.stringify(routes.routeClearance?.[0]?.map(route => route.label)) !== JSON.stringify(reviewedRoutes)) {
+    throw Error('Select a validated CE connection with a reviewed road and ridge and its compiled project.');
   }
-  const [recorded,actual] = await Promise.all([fs.stat(build.output),fs.stat(cache)]);
-  if (recorded.dev !== actual.dev || recorded.ino !== actual.ino || await hash(cache) !== build.sha256) {
-    throw Error('The validated CE cache changed.');
+  if (await hash(cache) !== build.sha256) throw Error('The validated CE cache changed.');
+  if (retained) {
+    report.resourceBanks = {};
+    for (const name of ['bitmaps.map','sounds.map','loc.map']) {
+      const expected = project.source?.resourceSha256?.[name];
+      if (!/^[0-9a-f]{64}$/.test(expected ?? '') || plan?.donorSource?.resourceSha256?.[name] !== expected ||
+          await hash(path.join(bankRoot, name)) !== expected) {
+        throw Error('The retained CE cache needs its exact source resource bank '+name+'.');
+      }
+      report.resourceBanks[name] = {path:path.join(bankRoot,name),sha256:expected};
+    }
+    sourceTags = path.join(outputFolder,'recovered-source');
+    await fs.mkdir(sourceTags);
+    await run('invader-extract',['-t',sourceTags,'-m',bankRoot,cache],'recover-reviewed-native-source');
+  } else {
+    const [recorded,actual] = await Promise.all([fs.stat(build.output),fs.stat(cache)]);
+    if (recorded.dev !== actual.dev || recorded.ino !== actual.ino) throw Error('The validated native job path changed.');
+    sourceTags = path.join(input,'tags');
   }
-  const plan = project.bspAssembly;
   const points = plan?.tunnelPoints;
-  if (!plan?.terrainSeam || !plan.openRoad || !plan.infantryTunnel || !plan.highGround || plan.tunnelWidth < 6 ||
+  if (!plan?.terrainSeam || !plan.openRoad || !plan.highGround || plan.tunnelWidth < 6 ||
       plan.tunnelWidth !== routes.routeClearance[0][0].width || !Array.isArray(points) || points.length !== 2 ||
       points.some(point => !Array.isArray(point) || point.length !== 3 || point.some(value => !Number.isFinite(value)))) {
-    throw Error('The Warthog trial requires a reviewed straight primary road at least six units wide, plus the cave and ridge.');
+    throw Error('The Warthog trial requires a reviewed straight primary road at least six units wide and an authored ridge.');
   }
   const [start,end] = points;
   const length = Math.hypot(end[0]-start[0],end[1]-start[1]);
@@ -84,13 +103,13 @@ async function readTrial() {
   const yaw = Math.atan2(direction[1],direction[0]);
   const pose = (distance,lateral) => [start[0]+distance*direction[0]-lateral*direction[1],
     start[1]+distance*direction[1]+lateral*direction[0],start[2]+(end[2]-start[2])*distance/length];
-  sourceTags = path.join(input,'tags');
   const [reference] = await query(sourceTags,scenario,get('structure_bsps[0].structure_bsp'),'source-bsp');
   structure = reference?.replaceAll('\\','/');
   if (!/^levels\/spark\/assembly_[0-9a-f]+\/connected\.scenario_structure_bsp$/.test(structure)) throw Error('Validated source has no safe connected BSP path.');
   report.sourceCache = {path:cache,sha256:build.sha256};
   report.sourceTags = sourceTags;
   report.mode = 'warthog';
+  report.routes = reviewedRoutes;
   return {pose,yaw,length};
 }
 
@@ -164,7 +183,9 @@ try {
     const row = Math.floor(index/2);
     const side = index % 2;
     const depth = 5.5+(row % 9)*0.7;
-    const position = trial ? trial.pose(side ? trial.length-depth : depth, (Math.floor(row/9)-1.5)*0.65)
+    // Opposing starts use separate lanes so two players can test the crossing simultaneously.
+    const lane = (side ? 0.95 : -0.95) + (Math.floor(row/9)-1.5)*0.35;
+    const position = trial ? trial.pose(side ? trial.length-depth : depth, lane)
       : [40.811767578125 + (index % 16)*0.8,34.44912338256836 + Math.floor(index/16)*0.2-0.4,-20.875042829581236];
     const facing = trial ? trial.yaw+(side ? 0 : Math.PI) : 0;
     starts.push({position,facing});
@@ -224,11 +245,24 @@ try {
       throw Error('The walkthrough overlay changed the native BSP.');
     }
     report.bspByteIdentical = true;
+    if (bankRoot) {
+      const [lightmap] = await query(sourceBsp,structure,get('lightmaps_bitmap'),'source-lightmap-reference');
+      if (!/^levels[\\/]spark[\\/]assembly_[0-9a-f]+[\\/]connected\.bitmap$/.test(lightmap)) {
+        throw Error('The retained connection has no reviewed baked lightmap bitmap.');
+      }
+      const original = await hash(path.join(sourceTags,lightmap));
+      await run('invader-extract',['-t',trialBsp,'-s',lightmap,cache],'extract-trial-lightmap');
+      if (await hash(path.join(trialBsp,lightmap)) !== original) throw Error('The walkthrough overlay changed the baked lightmap bitmap.');
+      report.lightmapByteIdentical = true;
+    }
     report.vehicleMetadataFields = vehicleProperties.slice(3);
     report.vehiclesVerified = vehicles;
   }
   for (const [name,original] of Object.entries(preserved)) if(await hash(path.join(sourceTags,name))!==original) throw Error(`Original source changed: ${name}`);
   if (report.sourceCache && await hash(report.sourceCache.path) !== report.sourceCache.sha256) throw Error('Accepted cache changed during walkthrough preparation.');
+  for (const {path:bank,sha256} of Object.values(report.resourceBanks ?? {})) {
+    if (await hash(bank) !== sha256) throw Error('A source resource bank changed during walkthrough preparation.');
+  }
   report.nativeCompiled = true; report.complete = true; report.startsVerified = count;
   report.guidance = trial
     ? 'Start beside a Warthog at one end of the road. Drive across, turn around and drive back. Check road approaches, vehicle clearance and collision in both directions.'

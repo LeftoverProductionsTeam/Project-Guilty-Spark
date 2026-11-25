@@ -443,6 +443,17 @@ fn bary(p: V, t: &RenderTri) -> Option<[f64; 3]> {
     let w = (aa * dot(c, b) - ab * dot(c, a)) / denominator;
     Some([1. - v - w, v, w])
 }
+fn nearest_terrain_chart(charts: &[RenderTri], center: V, surface_normal: V) -> Option<&RenderTri> {
+    charts.iter()
+        .filter(|chart| chart.n[2].abs() >= 0.55 && (surface_normal[2].abs() < 0.5 || dot(surface_normal, chart.n).abs() > 0.8))
+        .filter_map(|chart| {
+            let delta = sub(center, mul(add(add(chart.p[0], chart.p[1]), chart.p[2]), 1. / 3.));
+            bary(center, chart).map(|_| (dot(delta, delta), chart))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, chart)| chart)
+}
+
 fn source_solid(
     i: &MapInspection,
     mesh: &MeshData,
@@ -451,6 +462,7 @@ fn source_solid(
     source: usize,
     translation: V,
     yaw: f64,
+    terrain_shader: Option<&str>,
     materials: &mut Vec<AssemblyMaterial>,
     fallbacks: &mut usize,
 ) -> Result<Manifold> {
@@ -501,10 +513,8 @@ fn source_solid(
             return invalid("A BSP collision shader has no indexed source tag");
         }
         let center = mul(add(add(p[0], p[1]), p[2]), 1. / 3.);
-        let chosen = face
-            .shader
-            .and_then(|id| renders.get(render_aliases.get(&id).unwrap_or(&id)))
-            .and_then(|rows| {
+        let render_charts = face.shader.and_then(|id| renders.get(render_aliases.get(&id).unwrap_or(&id)));
+        let chosen = render_charts.and_then(|rows| {
                 rows.iter()
                     .filter(|t| {
                         dot(n, t.n).abs() > 0.99 && dot(sub(center, t.p[0]), t.n).abs() < 0.025
@@ -524,7 +534,18 @@ fn source_solid(
                     .min_by(|a, b| a.1.total_cmp(&b.1))
                     .map(|v| v.0)
             });
-        if chosen.is_none() && face.shader.is_some() {
+        // An unmatched collision triangle on the selected landscape shader
+        // still needs the source UV scale. A unit chart repeats the whole
+        // original terrain image across newly exposed pieces of the slope.
+        let terrain_chart = if chosen.is_none() && terrain_shader.is_some_and(|expected| {
+            materials[slot].shader_path.as_ref().is_some_and(|path|
+                path.replace('\\', "/").eq_ignore_ascii_case(&expected.replace('\\', "/")))
+        }) {
+            render_charts.and_then(|charts| nearest_terrain_chart(charts, center, n))
+        } else {
+            None
+        };
+        if chosen.is_none() && terrain_chart.is_none() && face.shader.is_some() {
             *fallbacks += 1;
         }
         let first = gl.num_vert() as u64;
@@ -535,7 +556,10 @@ fn source_solid(
                         std::array::from_fn::<_, 2, _>(|k| (0..3).map(|j| b[j] * t.uv[j][k]).sum())
                     })
                 })
-                .unwrap_or_else(|| planar_uv(point, n));
+                .map_or_else(
+                    || terrain_chart.map_or_else(|| Ok(planar_uv(point, n)), |chart| terrain::ridge_uv(point, n, chart)),
+                    Ok,
+                )?;
             let world = transform(point, translation, yaw);
             validate_native_bsp_point(world)?;
             gl.vert_properties.extend(world);
@@ -767,6 +791,7 @@ fn generate_end(
         0,
         [0.; 3],
         0.,
+        assembly.terrain_seam.as_ref().map(|seam| seam.base_shader_path.as_str()),
         &mut materials,
         &mut generated_uv_faces,
     )).transpose()?;
@@ -778,6 +803,7 @@ fn generate_end(
         1,
         assembly.translation.map(f64::from),
         assembly.yaw_degrees as f64,
+        assembly.terrain_seam.as_ref().map(|seam| seam.donor_shader_path.as_str()),
         &mut materials,
         &mut generated_uv_faces,
     )).transpose()?;
@@ -2774,6 +2800,27 @@ mod tests {
         faces[0].flags = 0;
         faces[0].shader = None;
         assert!(verify_entrance(&mesh, &faces, 0, [0.; 3], 0., [0.5, 0.5, 0.]).is_err());
+    }
+    #[test]
+    fn exposed_ground_uses_the_nearest_compatible_source_chart() {
+        let chart = |x| RenderTri {
+            p: [[x, 0., 0.], [x + 10., 0., 0.], [x, 10., 0.]],
+            uv: [[0.4, 0.4], [0.5, 0.4], [0.4, 0.5]],
+            n: [0., 0., 1.],
+        };
+        let charts = [chart(-15.), chart(30.)];
+        let normal = [0., 0., 1.];
+        let p = [34., 2., 0.15];
+        let picked = nearest_terrain_chart(&charts, p, normal).unwrap();
+        assert_eq!(picked.p[0], [30., 0., 0.]);
+        let uv = terrain::ridge_uv(p, normal, picked).unwrap();
+        assert!((uv[0] - 0.44).abs() < 1e-9);
+        assert!((uv[1] - 0.42).abs() < 1e-9);
+        let cliff = nearest_terrain_chart(&charts, p, [1., 0., 0.]).unwrap();
+        assert_eq!(cliff.p[0], [30., 0., 0.]);
+        let cliff_uv = terrain::ridge_uv(p, [1., 0., 0.], cliff).unwrap();
+        assert!((cliff_uv[0] - 0.4015).abs() < 1e-9);
+        assert!((cliff_uv[1] - 0.42).abs() < 1e-9);
     }
     #[test]
     fn connection_material_prefers_real_tiling_structure_over_whole_map_ground() {
