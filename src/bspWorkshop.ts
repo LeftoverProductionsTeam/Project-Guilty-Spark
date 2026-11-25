@@ -476,7 +476,7 @@ function primitiveWorkshopBrushes(b: ForgeBrush): BspBrush[] {
       );
     return [{ ...mesh, name: b.name, position: [...b.position] as Vec3, rotation: [...b.rotation] as Vec3 }];
 }
-export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs' | 'sphere' | 'sphereCut';
+export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs' | 'sphere' | 'sphereCut' | 'boxCut';
 
 const sphereRadius = 3;
 function sphereBrush(id: string, position: Vec3, material: string, role: 'space' | 'cut'): BspBrush {
@@ -506,13 +506,19 @@ function sphereBrush(id: string, position: Vec3, material: string, role: 'space'
 }
 export function placeWorkshopPrimitive(doc:QuickForgeDocument,kind:WorkshopPrimitive,point:Vec3,materialId:string) {
   if(!doc.workshop||doc.native)throw Error('Open editable Workshop source before placing geometry.');
-  if(!['room','box','wall','ramp','stairs','sphere','sphereCut'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
+  if(!['room','box','wall','ramp','stairs','sphere','sphereCut','boxCut'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
   if(!doc.materials.some(material=>material.id===materialId))throw Error('Select a source material first');
   let brushes: BspBrush[];
   if (kind==='sphere' || kind==='sphereCut') {
     const cave=sphereBrush(crypto.randomUUID(),point,materialId,kind==='sphereCut'?'cut':'space');
     cave.name=nextWorkshopName(doc.workshop.brushes,cave.name);
     brushes=[cave];
+  } else if (kind==='boxCut') {
+    const halfSize = [2, 1.5, 1.5];
+    const lo = point.map((value, axis) => value - halfSize[axis]) as Vec3;
+    const hi = point.map((value, axis) => value + halfSize[axis]) as Vec3;
+    const cut = boxBrush(crypto.randomUUID(), 'cut', lo, hi, materialId);
+    brushes = [{...cut, name: nextWorkshopName(doc.workshop.brushes, 'Box cut'), worldUv: true}];
   } else {
     const primitive=createBrush(kind as BrushKind,point,materialId);
     primitive.name=nextWorkshopName(doc.workshop.brushes,primitive.name);

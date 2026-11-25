@@ -960,6 +960,74 @@ pub fn validate_control_source(fields: &str) -> Result<()> {
     Ok(())
 }
 
+pub const MEGAWORLD_HUBS: [&str; 2] = ["extraction_unsc_hub", "extraction_covenant_hub"];
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MegaWorldHubStarts {
+    pub name: String,
+    pub volume_index: usize,
+    pub bsp_index: u16,
+    pub start_indices: Vec<usize>,
+}
+
+/// Read the faction starts from the exact MCC13 cache. Stock starts outside
+/// the paired hubs stay ordinary multiplayer starts.
+pub fn megaworld_hub_starts(
+    path: &Path, map: &crate::maps::MapInspection,
+) -> Result<Option<[MegaWorldHubStarts; 2]>> {
+    if map.header.version != 13 || map.header.scenario_type != 1 || map.header.extended {
+        return Ok(None);
+    }
+    let volumes = crate::maps::scenario_volume_readback(path, map)?;
+    if !volumes.iter().any(|row| MEGAWORLD_HUBS.iter().any(|name| row.name.eq_ignore_ascii_case(name))) {
+        return Ok(None);
+    }
+    let [unsc, covenant] = MEGAWORLD_HUBS;
+    let hubs = [unique_volume(&volumes, unsc)?, unique_volume(&volumes, covenant)?];
+    if hubs[0].intersects(hubs[1]) {
+        return invalid("MegaWorld faction hubs overlap");
+    }
+    let mut starts = [vec![], vec![]];
+    let mut points = Vec::new();
+    for (index, start) in crate::maps::scenario_region_starts(path, map)?.into_iter().enumerate() {
+        if let Some(faction) = hubs.iter().position(|geometry| geometry.contains(start.position)) {
+            starts[faction].push((index, start.bsp_index, points.len()));
+            let mut standing = start.position;
+            standing[2] += 0.05;
+            points.push(standing);
+        }
+    }
+    if starts.iter().any(Vec::is_empty) {
+        return invalid("Each MegaWorld faction hub needs at least one contained native player start");
+    }
+    let locations = crate::maps::bsp_point_locations(path, map, &points, None)?;
+    let review = |faction: usize| -> Result<MegaWorldHubStarts> {
+        let name = MEGAWORLD_HUBS[faction];
+        let mut owner = None;
+        for (row, declared, point) in &starts[faction] {
+            let location = &locations[*point];
+            let [bsp] = location.bsps.as_slice() else {
+                return invalid(format!("MegaWorld hub {name} start {row} has ambiguous or missing BSP ownership"));
+            };
+            if *declared >= 0 && u16::try_from(*declared).ok() != Some(*bsp)
+                || !location.supports.iter().any(|support| support.bsp == *bsp)
+                || owner.is_some_and(|other| other != *bsp)
+            {
+                return invalid(format!("MegaWorld hub {name} start {row} has no consistent native BSP floor"));
+            }
+            owner = Some(*bsp);
+        }
+        let volume_index = volumes.iter().position(|row| row.name == name)
+            .ok_or_else(|| crate::SparkError::Invalid(format!("Missing native MegaWorld hub {name}")))?;
+        Ok(MegaWorldHubStarts {
+            name: name.to_owned(), volume_index, bsp_index: owner.unwrap(),
+            start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
+        })
+    };
+    Ok(Some([review(0)?, review(1)?]))
+}
+
 fn unique_volume<'a>(
     volumes: &'a [crate::maps::ScenarioLogicVolume],
     name: &str,
@@ -1130,6 +1198,105 @@ mod tests {
         };
         assert_eq!(crate::build::write_map_export_mode(&export, &project).unwrap().1, "extraction");
         eprintln!("Faction player physics compiled readback: {} · {}", bound.biped_tag_path, map.sha256);
+    }
+
+    #[test]
+    #[ignore = "Requires the explicitly selected retained nineteen-region cache, disposable extraction, and Invader"]
+    fn megaworld_faction_hubs_compile_without_moving_stock_starts_or_bsps() {
+        let work = std::path::PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let tags = std::path::PathBuf::from(std::env::var_os("SPARK_FACTION_QA_TAGS").unwrap());
+        let invader = std::path::PathBuf::from(std::env::var_os("SPARK_FACTION_QA_INVADER").unwrap());
+        let baseline = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_MEGAWORLD_CACHE").unwrap());
+        assert!(tags.canonicalize().unwrap().starts_with(work.canonicalize().unwrap()));
+        let input = crate::maps::inspect_map(&baseline, None).unwrap();
+        assert_eq!(input.sha256, "456db7543ba50947e89af894785221957b648b75f9915fe82071e2bb302d2ca9");
+        assert!(megaworld_hub_starts(&baseline, &input).unwrap().is_none());
+        let arrivals = crate::maps::scenario_region_starts(&baseline, &input).unwrap();
+        assert_eq!(arrivals.len(), 563);
+        let scenario = format!("{}.scenario", input.scenario_path.replace('\\', "/"));
+        let scenario_file = tags.join(crate::safe_relative(&scenario).unwrap());
+        let run = |tool: &str, args: &[String]| {
+            let result = std::process::Command::new(invader.join(format!("{tool}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {}", String::from_utf8_lossy(&result.stderr).chars().take(3000).collect::<String>());
+            String::from_utf8(result.stdout).unwrap()
+        };
+        let fields = || run("invader-edit", &["-t".into(), tags.to_string_lossy().into_owned(), "-L".into(), scenario.clone()]);
+        let before = fields();
+        let original_volumes = scenario_volume_choices(&before).unwrap();
+        let desired = [(0u16, 0usize), (6, 229)];
+        let points = desired.map(|(_, index)| {
+            let mut point = arrivals[index].position;
+            point[2] += 0.05;
+            point
+        });
+        let owners = crate::maps::bsp_point_locations(&baseline, &input, &points, None).unwrap();
+        for ((expected, _), point) in desired.iter().zip(&owners) {
+            assert_eq!(point.bsps, vec![*expected], "{point:?}");
+            assert!(point.supports.iter().any(|floor| floor.bsp == *expected), "{point:?}");
+        }
+
+        for (faction, (expected_bsp, row)) in desired.into_iter().enumerate() {
+            let start = &arrivals[row];
+            assert_eq!(start.bsp_index as u16, expected_bsp);
+            let [x, y, z] = start.position;
+            let previous = fields();
+            let operation = Operation::TriggerVolume {
+                append: true,
+                index: (original_volumes.len() + faction) as u16,
+                name: MEGAWORLD_HUBS[faction].into(),
+                geometry: crate::maps::ScenarioLogicVolumeGeometry {
+                    forward: [1., 0., 0.], up: [0., 0., 1.],
+                    corner: [x - 1.4, y - 1.4, z - 0.25], dimensions: [2.8, 2.8, 2.5],
+                },
+                source_sha256: crate::maps::hash_file(&scenario_file).unwrap(),
+            };
+            run("invader-edit", &operation.arguments_with_fields(&tags, "scnr", &scenario, &previous).unwrap());
+            reviewed_difference(&previous, &fields(), &operation).unwrap();
+        }
+        let output = tags.parent().unwrap().join("reviewed-world-hubs");
+        std::fs::create_dir(&output).unwrap();
+        run("invader-build", &["-t".into(), tags.to_string_lossy().into_owned(), "-g".into(), "mcc-cea".into(),
+            "-T".into(), "67108864".into(), "-m".into(), output.to_string_lossy().into_owned(),
+            "--resource-usage".into(), "none".into(), scenario.strip_suffix(".scenario").unwrap().into()]);
+        let cache = output.join("gsmegaroad.map");
+        let map = crate::maps::inspect_map(&cache, None).unwrap();
+        assert_eq!((map.header.version, map.header.scenario_type), (13, 1));
+        let actual_arrivals = crate::maps::scenario_region_starts(&cache, &map).unwrap();
+        assert_eq!(actual_arrivals.len(), arrivals.len());
+        for (old, new) in arrivals.iter().zip(&actual_arrivals) {
+            assert_eq!((old.position, old.facing, old.bsp_index, old.team_index, old.spawn_types),
+                (new.position, new.facing, new.bsp_index, new.team_index, new.spawn_types));
+        }
+        assert_eq!(map.mesh.indices, input.mesh.indices);
+        assert_eq!(map.mesh.positions, input.mesh.positions);
+        let old_switches = crate::maps::scenario_bsp_transitions(&baseline, &input).unwrap();
+        let new_switches = crate::maps::scenario_bsp_transitions(&cache, &map).unwrap();
+        assert_eq!(old_switches.bsp_tag_paths, new_switches.bsp_tag_paths);
+        assert_eq!(serde_json::to_value(&old_switches.transitions).unwrap(), serde_json::to_value(&new_switches.transitions).unwrap());
+        let volumes = crate::maps::scenario_volume_readback(&cache, &map).unwrap();
+        assert_eq!(volumes.len(), original_volumes.len() + 2);
+        let original_compiled_volumes = crate::maps::scenario_volume_readback(&baseline, &input).unwrap();
+        assert_eq!(&volumes[..original_volumes.len()], original_compiled_volumes.as_slice());
+        let hubs = megaworld_hub_starts(&cache, &map).unwrap().unwrap();
+        for (hub, (bsp, row)) in hubs.iter().zip(desired) {
+            assert_eq!(hub.bsp_index, bsp);
+            assert!(hub.start_indices.contains(&row));
+        }
+        let crc = run("invader-info", &["-T".into(), "crc32_mismatched".into(), cache.to_string_lossy().into_owned()]);
+        assert_eq!(crc.trim(), "0");
+        assert_eq!(crate::maps::hash_file(&baseline).unwrap(), input.sha256);
+        crate::project::atomic_write(&output.join("hub-review.json"), &serde_json::to_vec_pretty(&serde_json::json!({
+            "sourceSha256": input.sha256,
+            "cacheSha256": map.sha256,
+            "cacheVersion": map.header.version,
+            "scenarioType": map.header.scenario_type,
+            "preservedNativeStarts": actual_arrivals.len(),
+            "preservedBspCount": new_switches.bsp_count,
+            "preservedSwitchCount": new_switches.transitions.len(),
+            "extractionPlayable": false,
+            "hubs": hubs,
+        })).unwrap(), false).unwrap();
+        eprintln!("Nineteen-region faction hub readback: {} · {:?}", map.sha256, hubs);
     }
 
     #[test]

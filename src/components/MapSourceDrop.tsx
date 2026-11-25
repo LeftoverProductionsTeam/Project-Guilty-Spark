@@ -15,31 +15,33 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
   onImported: (entries: LibraryEntry[], sourceSlot?: number) => string | void;
 }) {
   const target = useRef<HTMLDivElement>(null);
-  const importing = useRef(false);
+  const imports = useRef<Promise<void>>(Promise.resolve());
+  const pending = useRef(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const current = useRef({ disabled, onImported, viewport });
   current.current = { disabled, onImported, viewport };
 
   const mounted = useRef(false);
-  const importSources = useCallback(async (paths?: string[], sourceSlot?: number) => {
-    if (importing.current || current.current.disabled) return;
-    setMessage('');
-    importing.current = true;
+  const importSources = useCallback((paths?: string[], sourceSlot?: number) => {
+    if (current.current.disabled) return;
+    if (pending.current++ === 0) setMessage('');
     setBusy(true);
-    try {
-      const result = await call<MapSourceImport>('import_map_sources', { paths, single });
-      if (!mounted.current) return;
-      const note = !result.entries.length ? undefined : current.current.disabled
-        ? 'Source maps added to the library.' : current.current.onImported(result.entries, sourceSlot);
-      const failures = result.failures.map(({ path, message }) => path.split(/[\\/]/).at(-1) + ' · ' + message);
-      setMessage([note, ...failures].filter(Boolean).join('\n'));
-    } catch (error) {
-      if (mounted.current) setMessage(String(error));
-    } finally {
-      importing.current = false;
-      if (mounted.current) setBusy(false);
-    }
+    imports.current = imports.current.then(async () => {
+      try {
+        const result = await call<MapSourceImport>('import_map_sources', { paths, single });
+        if (!mounted.current) return;
+        const note = !result.entries.length ? undefined : current.current.disabled
+          ? 'Source maps added to the library.' : current.current.onImported(result.entries, sourceSlot);
+        const failures = result.failures.map(({ path, message }) => path.split(/[\\\\/]/).at(-1) + ' · ' + message);
+        setMessage(previous => [previous, note, ...failures].filter(Boolean).join('\n'));
+      } catch (error) {
+        if (mounted.current) setMessage(previous => [previous, String(error)].filter(Boolean).join('\n'));
+      } finally {
+        pending.current--;
+        if (mounted.current && pending.current === 0) setBusy(false);
+      }
+    });
   }, [single]);
 
   useEffect(() => {

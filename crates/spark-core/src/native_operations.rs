@@ -38,6 +38,7 @@ pub fn verify_playable_biped_fields(before: &str, after: &str) -> Result<()> {
 }
 
 pub fn validate_faction_control_source(fields:&str)->Result<()>{factions::validate_control_source(fields)}
+pub use factions::{megaworld_hub_starts, MegaWorldHubStarts};
 pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>{factions::snapshots(fields)}
 pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}
 pub fn verify_native_faction_kits(expected:&[NativeFactionSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_cache(expected,cache,map)}

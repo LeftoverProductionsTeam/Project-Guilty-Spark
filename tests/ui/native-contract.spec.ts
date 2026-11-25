@@ -3425,6 +3425,11 @@ test('BSP Shapes drops editable source stairs and preserves one-action Undo and 
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.at(-1)?.role)).toBe('cut');
  await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');
  await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
+ await workshop.locator('.bsp-shape-toolbar summary').click();
+ await workshop.getByRole('button',{name:'Place BSP box cut',exact:true}).click();
+ await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue('Box cut 1');
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.at(-1))).toMatchObject({role:'cut',name:'Box cut 1'});
 });
 
 
@@ -7299,6 +7304,7 @@ test('creator intact BSP preview preserves both sources and reports only connect
       };
       if (command === 'inspect_native_bsp_transitions') return {
         cacheSha256:base.inspection.sha256,bspCount:2,bspTagPaths:['levels/base','levels/other'],
+        extractionHubStarts:[{name:'extraction_unsc_hub',volumeIndex:4,bspIndex:0,startIndices:[0,2]},{name:'extraction_covenant_hub',volumeIndex:5,bspIndex:1,startIndices:[1]}],
         transitions:[
           {sourceBsp:0,destinationBsp:1,triggerIndex:2,triggerName:'bsp0,1',arrivalMarker:0,
             geometry:{forward:[1,0,0],up:[0,0,1],corner:[1,2,3],dimensions:[2,4,6]}},
@@ -7332,6 +7338,9 @@ test('creator intact BSP preview preserves both sources and reports only connect
   const switches=assembly.getByRole('list',{name:'Compiled BSP switches',exact:true,includeHidden:true});
   await expect(switches).toContainText('Center 2.00 / 4.00 / 6.00');
   await expect(switches).toContainText('Arrival marker 0');
+  const hubs=assembly.getByRole('list',{name:'Extraction faction hub starts',exact:true,includeHidden:true});
+  await expect(hubs).toContainText('extraction_unsc_hub · volume 4 · BSP 0 · starts 0, 2');
+  await expect(hubs).toContainText('extraction_covenant_hub · volume 5 · BSP 1 · starts 1');
   const filter=assembly.getByRole('combobox',{name:'Filter switches by source BSP',exact:true,includeHidden:true});
   await revealPagedControl(filter);await filter.selectOption('0');
   await expect(switches.getByRole('listitem',{includeHidden:true})).toHaveCount(1);

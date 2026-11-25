@@ -583,6 +583,35 @@ mod tests {
         assert!(reopened.validate().is_err());
     }
     #[test]
+    #[ignore = "Read-only survey of the exact retained Derelict connector after the Forerunner approach test"]
+    fn derelict_native_approach_capsule_survey() {
+        let path = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_DERELICT_CACHE").unwrap());
+        let map = crate::maps::inspect_map(&path, None).unwrap();
+        assert_eq!(map.sha256, "cec966dc2c258bc37e2756c078fc8507d83bb6bb71c9bc3e4db1a27d52dc7df8");
+        let (mesh, _) = crate::maps::collision_source(&path, &map).unwrap();
+        let center = [784.9712407987176, 104.96808922299356, -31.898722330729164];
+        let near = |along, side| add(center, [along * 0.707106781 - side * 0.707106781, along * 0.707106781 + side * 0.707106781, 0.]);
+        for slot in [2usize, 3] {
+            let checker = RouteChecker::for_part(&mesh, slot).unwrap();
+            let mut scratch = vec![];
+            let sweep = |name, start: V, end: V, checker: &RouteChecker, scratch: &mut Vec<usize>| {
+                let hits = [0.20, 0.36, 0.52].map(|height| {
+                    checker.index.blocking_triangle(add(start, [0., 0., height]), add(end, [0., 0., height]), 0.18, scratch)
+                });
+                eprintln!("Derelict BSP {slot} {name}: {hits:?}");
+            };
+            sweep("center", near(-2.3, 0.), near(2.3, 0.), &checker, &mut scratch);
+            sweep("near right edge", near(-2.3, -0.8), near(2.3, -0.8), &checker, &mut scratch);
+            sweep("near left edge", near(-2.3, 0.8), near(2.3, 0.8), &checker, &mut scratch);
+            for (name, stop) in [("actual center approach stop", [784.721, 103.587, -31.899]),
+                ("actual offset approach stop", [783.435, 104.353, -31.899])] {
+                sweep(name, stop, add(stop, [0.5, 0.5, 0.]), &checker, &mut scratch);
+            }
+        }
+        assert_eq!(crate::maps::hash_file(&path).unwrap(), map.sha256);
+    }
+
+    #[test]
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {
         assert!(verify_route(&corridor(2., 0.65), &plan()).is_err());
         assert!(verify_route(&corridor(0.30, 1.6), &plan()).is_err());

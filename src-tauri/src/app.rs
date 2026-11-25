@@ -637,7 +637,7 @@ async fn open_bsp_assembly_donor(
 #[tauri::command]
 async fn inspect_native_bsp_transitions(
     app: tauri::AppHandle, project_id: String, source_sha256: String,
-) -> Reply<maps::NativeBspTransitions> {
+) -> Reply<serde_json::Value> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
@@ -646,7 +646,14 @@ async fn inspect_native_bsp_transitions(
             return Err("The source map changed. Reopen its native BSP transition report.".into());
         }
         let map = inspect(&state, &project)?;
-        maps::scenario_bsp_transitions(&source.preserved_path, &map).map_err(error)
+        let transitions = maps::scenario_bsp_transitions(&source.preserved_path, &map).map_err(error)?;
+        let mut report = serde_json::to_value(transitions).map_err(error)?;
+        match core::native_operations::megaworld_hub_starts(&source.preserved_path, &map) {
+            Ok(Some(hubs)) => { report["extractionHubStarts"] = serde_json::to_value(hubs).map_err(error)?; },
+            Err(problem) => { report["extractionHubIssue"] = serde_json::json!(problem.to_string()); },
+            Ok(None) => {},
+        }
+        Ok(report)
     }).await.map_err(error)?
 }
 

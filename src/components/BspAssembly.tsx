@@ -18,6 +18,8 @@ import { useWorkspaceActivity } from './WorkspaceActivity';
 import { volumeCenter } from '../nativeTriggerVolume';
 import type { NativeVolumeGeometry } from '../nativeOperations';
 interface NativeBspTransitions {
+  extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[] }[];
+  extractionHubIssue?: string;
   cacheSha256: string;
   bspCount: number;
   bspTagPaths?: string[];
@@ -50,6 +52,13 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
     {error && <p role="alert" className="bsp-error">{error}</p>}
     {report && <details open>
       <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
+      {report.extractionHubIssue && <p role="alert" className="bsp-error">{report.extractionHubIssue}</p>}
+      {!!report.extractionHubStarts?.length && <ul aria-label="Extraction faction hub starts">
+        {report.extractionHubStarts.map(hub => <li key={hub.name}>
+          <strong>{hub.name}</strong> · volume {hub.volumeIndex} · BSP {hub.bspIndex} · starts {hub.startIndices.join(', ')}
+          <button type="button" disabled={hub.bspIndex>=partCount} onClick={()=>viewBsp(hub.bspIndex)}>View hub BSP {hub.bspIndex}</button>
+        </li>)}
+      </ul>}
       {!!report.bspTagPaths?.length && <ol start={0} aria-label="Native structure tags">{report.bspTagPaths.map((path, index) => <li key={index}><code className="path-text" title={path}>{path}</code></li>)}</ol>}
       {report.transitions.length > 0 && <label>Filter switches by source BSP
         <select value={sourceFilter} onChange={event => setSourceFilter(Number(event.target.value))}>

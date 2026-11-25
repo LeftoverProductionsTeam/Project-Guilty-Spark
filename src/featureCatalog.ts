@@ -335,7 +335,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     false,
     [
       'Choose New QuickForge map in the Level Editor.',
-      'Add brushes, starts and objectives, then inspect the walk collision preview. In BSP Workshop, place Shapes → Sphere cave into an editable room wall, or place Sphere cut inside a solid wall to carve through it. Use Scale to resize either 3-unit-radius brush. In BSP Assembly, choose Arch through both sides and edit the route points, Arch radius, and Clear height before native preview.',
+      'Add brushes, starts and objectives, then inspect the walk collision preview. In BSP Workshop, place Shapes → Sphere cave into an editable room wall, or place Sphere cut or Box cut inside a solid wall to carve an opening. Use Scale to resize it. In BSP Assembly, choose Arch through both sides and edit the route points, Arch radius, and Clear height before native preview.',
       'For an imported map, open Connect another map’s BSP; plan with a donor, apply the draft, then check source clearance.',
       'Rotate around tunnel entrance keeps the tunnel mouth fixed; Return to current draft and Reset draft preserve a clear editing path.',
       'Drop .map files onto the viewport to open Construction and add them to the donor menu. Pick a donor for each connection. On a compiled MCC13 world you can extend, choose Visible BSP before dropping to connect from that region. Use Browse for donor map to keep the Construction selection. You can save a connection draft from the compiled maps first, then use Browse donor tags in the draft to connect editable dependencies for the build.',

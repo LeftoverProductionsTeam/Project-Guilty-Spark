@@ -55,6 +55,17 @@ import type { BspBrush, BspTool, BspView, WorkshopSelection, WorkshopPrimitive }
 import type { ForgeMesh, GeometryReport, QuickForgeDocument } from '../forge';
 import type { Vec3, OpenProject } from '../types';
 import '../bspWorkshop.css';
+
+const WORKSHOP_SHAPES: readonly [WorkshopPrimitive, string, string, string?][] = [
+  ['room','Room','Place BSP room'],
+  ['box','Box','Place BSP box'],
+  ['wall','Wall','Place BSP wall'],
+  ['ramp','Ramp','Place BSP ramp'],
+  ['stairs','Stairs','Place BSP stairs'],
+  ['sphere','Sphere cave','Place BSP sphere','Add a 3-unit-radius spherical room. Move it into an editable room wall to open it. Use Scale to change the size.'],
+  ['sphereCut','Sphere cut','Place BSP sphere cut','Carve a round opening through solid brushes inside an editable room. Scale adjusts the radius.'],
+  ['boxCut','Box cut','Place BSP box cut','Carve a rectangular opening through solid brushes inside an editable room. Scale adjusts width, depth and height.'],
+];
 interface Props {
   atlasLayout?: import('../megaworldLayout').MegaworldLayout | null;
   onAtlasLayout: (layout: import('../megaworldLayout').MegaworldLayout, description:string) => void;
@@ -934,7 +945,18 @@ export default function BspWorkshop(props: Props) {
       )}
       {retainedDraftNotice}
       <div className="bsp-shape-toolbar">
-        <details ref={shapeMenu}><summary>Shapes ▾</summary><div role="group" aria-label="Drop-in BSP shapes">{(['room','box','wall','ramp','stairs','sphere','sphereCut'] as WorkshopPrimitive[]).map(kind=><button key={kind} disabled={disabled} aria-label={kind==='sphereCut'?'Place BSP sphere cut':'Place BSP '+kind} title={kind==='sphereCut'?'Carve a sphere out of solid brushes inside an editable room. Move it into a wall, then adjust its radius with Scale.':kind==='sphere'?'Add a 3-unit-radius spherical cave. Move it into an editable room wall to carve an opening. Resize it with Scale.':'Click to add at the origin, or drag into a 3D or orthographic view. Select the volume to resize, reshape, name and assign materials.'} onPointerDown={event=>{shapeDrop.begin({key:kind},event);}} onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>{kind==='sphereCut'?'Sphere cut':kind==='sphere'?'Sphere cave':kind[0].toUpperCase()+kind.slice(1)}</button>)}</div></details>
+        <details ref={shapeMenu}>
+          <summary>Shapes ▾</summary>
+          <div role="group" aria-label="Drop-in BSP shapes">
+            {WORKSHOP_SHAPES.map(([kind, label, accessibleLabel, title]) => (
+              <button key={kind} disabled={disabled} aria-label={accessibleLabel} title={title ?? 'Click to add at the origin, or drag into a 3D or orthographic view. Use Move and Scale to position and resize.'}
+                onPointerDown={event=>{shapeDrop.begin({key:kind},event);}}
+                onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </details>
         <small>Drop a shape → select its volume or face → drag an axis or edit Properties. Rooms are playable air; walls, ramps and stairs are solid.</small>
       </div>
       {shapeDrop.dragging&&<div className="viewport-asset-drop-hint">Drop shape into a BSP view</div>}
