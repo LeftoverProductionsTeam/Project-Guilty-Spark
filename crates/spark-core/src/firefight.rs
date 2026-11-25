@@ -1234,7 +1234,7 @@ pub fn native_hud_messages(config:&FirefightConfig)->Result<Vec<NativeRoundHudMe
     if config.native_hud_messages!=Some(true){return Ok(vec![]);}
     validate_native_round_rules(config)?;
     let mut messages=vec![];
-    for(name,text)in[("gs_ff_ready","Firefight: prepare for combat. One life."),("gs_ff_victory","Victory! Pause menu: restart to replay, or quit to leave."),("gs_ff_no_player","Round stopped: no living player. Pause to restart or quit."),("gs_ff_spawn_failed","Round stopped: enemy wave not ready. Pause to restart or quit."),("gs_ff_defeated","Defeat. Pause menu: restart to replay, or quit to leave."),("gs_ff_timed_out","Round stopped: wave time limit reached. Pause to restart or quit.")]{messages.push(NativeRoundHudMessage{name:name.into(),text:text.into()});}
+    for(name,text)in[("gs_ff_ready","Firefight: prepare for combat. One life."),("gs_ff_victory","Victory! Pause menu: restart to replay, or quit to leave."),("gs_ff_no_player","Round stopped: no living player. Pause to restart or quit."),("gs_ff_spawn_failed","Round stopped: enemy wave not ready. Pause to restart or quit."),("gs_ff_defeated","Defeat. Pause menu: restart to replay, or quit to leave."),("gs_ff_timed_out","Wave timed out. Pause to restart.")]{messages.push(NativeRoundHudMessage{name:name.into(),text:text.into()});}
     let mut scores=vec![0u64];let mut score=0u64;
     for round in 0..config.rounds{
         messages.push(NativeRoundHudMessage{name:format!("gs_ff_round_{}",round+1),text:format!("Round {} of {}",round+1,config.rounds)});

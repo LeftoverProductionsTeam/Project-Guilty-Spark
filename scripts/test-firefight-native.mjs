@@ -17,6 +17,7 @@ const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
 const nativeRoundHud=process.env.SPARK_NATIVE_FIREFIGHT_HUD==='1';
+const nativeRoundFacing=process.env.SPARK_NATIVE_FIREFIGHT_FACING==='1'?-135:null;
 const ceMissionReview=process.env.SPARK_NATIVE_CE_MISSION_REVIEW==='1';
 const ceMissionHudReview=process.env.SPARK_NATIVE_CE_MISSION_HUD_REVIEW==='1';
 const cePatrolReview=process.env.SPARK_NATIVE_CE_MISSION_PATROL_REVIEW==='1';
@@ -638,6 +639,13 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
    await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(60);
    await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
+   if(nativeRoundFacing!==null){
+    const facing=page.getByRole('spinbutton',{name:'AI zone 1 facing (degrees)',exact:true});
+    await revealPagedControl(facing);await facing.fill(String(nativeRoundFacing));await facing.press('Tab');
+    await expect.poll(async()=>(await state(id)).project.firefight.spawnZones[0].facingDegrees).toBe(nativeRoundFacing);
+    await page.keyboard.press('Control+z');await expect(facing).toHaveValue('0');
+    await page.keyboard.press('Control+y');await expect(facing).toHaveValue(String(nativeRoundFacing));
+   }
    if(nativeRoundHud){
     const hud=page.getByRole('checkbox',{name:'Native Firefight HUD messages',exact:true});
     await revealPagedControl(hud);await hud.check();
@@ -657,7 +665,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await page.screenshot({path:path.join(output,'firefight-prepared.png')});
    await close();await start();
    await chooseTool(page,'Map library');await open(title);
-   await expect.poll(source).toBe(expected);const rules=(await state(id)).project.firefight;expect(rules.playerCount).toBe(1);expect(rules.teamLives).toBe(1);expect(rules.waves).toEqual(p.firefight.waves);expect(rules.spawnZones).toEqual(p.firefight.spawnZones);
+   await expect.poll(source).toBe(expected);const rules=(await state(id)).project.firefight;expect(rules.playerCount).toBe(1);expect(rules.teamLives).toBe(1);expect(rules.waves).toEqual(p.firefight.waves);expect(rules.spawnZones).toEqual(nativeRoundFacing===null?p.firefight.spawnZones:[{...p.firefight.spawnZones[0],facingDegrees:nativeRoundFacing}]);
    if(nativeRoundHud)expect(rules.nativeHudMessages).toBe(true);
    report.savedRestart=true;report.savedProjectReopenedThroughLibrary=true;
    await chooseTool(page,'Level editor');
@@ -700,7 +708,7 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    expect(profileCount).toBe(1);expect(playerProfiles[0]).toMatchObject({name:'gs_firefight_start',primaryWeapon:'weapons\\pistol\\pistol.weapon',primaryLoaded:12,primaryReserved:72,secondaryLoaded:0,secondaryReserved:0});
    expect(Number(await field('player_starting_profile[0].starting_health_modifier'))).toBe(1);
    expect(Number(await field('player_starting_profile[0].starting_shield_modifier'))).toBe(1);
-   const nativeCounts=[],nativePositions=[];
+   const nativeCounts=[],nativePositions=[],nativeFacings=[];
    for(let i=0;i<2;i++){
     const prefix='encounters['+i+']';
     expect(Number(await field(prefix+'.flags.not_initially_created'))).toBe(1);
@@ -714,11 +722,14 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
       const position=(await field(prefix+'.squads[0].starting_locations['+j+'].position')).split(',').map(Number);
       const expected=i===0?[4,3,0.1]:[3.625+j*0.75,2.625,0.1];
       expect(position).toHaveLength(3);position.forEach((value,k)=>expect(value).toBeCloseTo(expected[k],5));nativePositions.push(position);
+      const facing=Number(await field(prefix+'.squads[0].starting_locations['+j+'].facing'));
+      const angleError=((facing-(nativeRoundFacing??0)+540)%360)-180;
+      expect(angleError).toBeCloseTo(0,3);nativeFacings.push(facing);
     }
    }
    expect((await field('actor_palette[0].reference')).replaceAll('\\','/')).toBe('characters/grunt/grunt minor plasma pistol.actor_variant');
    const [opened]=await call('import_paths',{paths:[map]});expect(opened.inspection.header.scenarioType).toBe(0);expect(opened.inspection.encounters.map(e=>e.name)).toEqual(['gs_w01_g01','gs_w02_g01']);
-   report.independentReadback={nativeCounts,nativePositions,scenarioSha256:await hash(path.join(readback,scenario+'.scenario')),text,cacheSha256:await hash(map),encounters:opened.inspection.encounters,scripts:opened.inspection.scripts,originalSdkUnchanged:true};
+   report.independentReadback={nativeCounts,nativePositions,nativeFacings,scenarioSha256:await hash(path.join(readback,scenario+'.scenario')),text,cacheSha256:await hash(map),encounters:opened.inspection.encounters,scripts:opened.inspection.scripts,originalSdkUnchanged:true};
    // The actual stale-rules guard must retain the previous-good compiled cache.
    await chooseTool(page,'Firefight rules');const rulesTitle=page.getByRole('textbox',{name:'Rules title',exact:true});await rulesTitle.fill('Changed after prepare');await rulesTitle.press('Tab');await save(id);
    await chooseTool(page,'Level editor');await button.click();

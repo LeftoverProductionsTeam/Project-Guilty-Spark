@@ -68,7 +68,7 @@ export function nativeFirefightHudMessages(config:FirefightConfig):NativeFirefig
     {name:'gs_ff_no_player',text:'Round stopped: no living player. Pause to restart or quit.'},
     {name:'gs_ff_spawn_failed',text:'Round stopped: enemy wave not ready. Pause to restart or quit.'},
     {name:'gs_ff_defeated',text:'Defeat. Pause menu: restart to replay, or quit to leave.'},
-    {name:'gs_ff_timed_out',text:'Round stopped: wave time limit reached. Pause to restart or quit.'},
+    {name:'gs_ff_timed_out',text:'Wave timed out. Pause to restart.'},
   ];
   const enemies=new Map(config.enemies.map(enemy=>[enemy.id,enemy]));
   const scores=new Set<number>([0]);let score=0;

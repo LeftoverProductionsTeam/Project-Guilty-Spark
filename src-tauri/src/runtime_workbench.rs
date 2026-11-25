@@ -1191,8 +1191,18 @@ fn firefight_source_plan(state:&AppState,project:&Project,context:&SourceContext
         let sha=maps::hash_file(&string).map_err(error)?;
         core::working_tags::prepare_hud_append(project.firefight.as_ref().unwrap(),&context.tags,&fields,context.generated_firefight.as_ref().and_then(|generated|generated.hud.as_ref()),&sha).map_err(error)?
     }else{None};
-    let groups=operation.encounter_appends().map_err(error)?.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>().map_err(error)?;
-    let previous_groups=context.generated_firefight.as_ref().map(|previous|previous.operation.encounter_appends().and_then(|entries|entries.into_iter().map(|entry|entry.positions().map(|positions|core::firefight::NativeRoundEncounter{name:entry.name,actor_path:entry.actor_path,positions})).collect::<core::Result<Vec<_>>>())).transpose().map_err(error)?.unwrap_or_default();
+    let summarize_groups = |operation: &core::native_operations::Operation| -> core::Result<Vec<_>> {
+        operation.encounter_appends()?.into_iter().map(|entry| {
+            let positions = entry.positions()?;
+            let facing_radians = entry.grid.and_then(|grid| grid.facing_radians).unwrap_or_default();
+            Ok(core::firefight::NativeRoundEncounter {
+                name: entry.name, actor_path: entry.actor_path, positions, facing_radians,
+            })
+        }).collect()
+    };
+    let groups = summarize_groups(&operation).map_err(error)?;
+    let previous_groups = context.generated_firefight.as_ref()
+        .map(|previous| summarize_groups(&previous.operation)).transpose().map_err(error)?.unwrap_or_default();
     let player_profile=if apply_player_loadout {
         let profile=project.firefight.as_ref().and_then(|rules|rules.native_player_profile.as_ref()).ok_or("Configure and save Player loadout in Firefight before applying it")?;
         for weapon in std::iter::once(&profile.primary_weapon).chain(profile.secondary_weapon.iter()) {

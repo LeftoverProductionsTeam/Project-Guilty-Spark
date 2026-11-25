@@ -65,7 +65,8 @@ describe('opt-in native Firefight round source',()=>{
   it('keeps the authored preparation, spawn timeout and wave deadline in the native controller',()=>{
     const rules={...nativeRoundFixture(),nativeHudMessages:true,preparationMs:2000,countdownMs:3000,
       spawnTimeoutMs:9000,stuckTimeoutMs:120000};
-    const source=exportHaloCeFirefightRound(rules).content;
+    const {content:source,hudMessages}=exportHaloCeFirefightRound(rules);
+    expect(hudMessages).toContainEqual({name:'gs_ff_timed_out',text:'Wave timed out. Pause to restart.'});
     expect(source).toContain('(sleep_until (<= (unit_get_health gs_ff_player) 0) 1 150)');
     expect(source).toContain('(sleep_until (or (= (ai_living_count gs_w01_g01) 2) (<= (unit_get_health gs_ff_player) 0)) 1 270)');
     expect(source).toContain('(sleep_until (or (= (ai_living_count gs_w01_g01) 0) (<= (unit_get_health gs_ff_player) 0)) 1 3600)');

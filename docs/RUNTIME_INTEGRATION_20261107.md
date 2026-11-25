@@ -3394,3 +3394,9 @@ Windows Build & Playtest validated and exported both exact caches with separate 
 ### Native AI facing for Firefight zones
 
 Firefight rules now author an initial facing for each spawn zone. Level Editor shows the heading over the zone and recovered source review lists it with the group grid. Both the fresh native build and the preserving source append write the reviewed facing through the existing scenario fields. Compiled verification checks the angle alongside the existing layout. Older projects omit the new value and keep zero. TypeScript, the keyboard/Undo/Redo/Save browser journey, and 15 focused Rust tests passed. A new native cache and in-game heading still require source-matched validation; the existing HUD candidates are unchanged.
+
+### Firefight victory, restart and short timeout prompt
+
+Forerunner Win64 c9831b1d348e9a5f5c26d0bec4468276fde9ecf3677ceae535b2efbe95d83efe loaded the exact MCC13 8bc1c9df export offline. Scripted input through ordinary controls cleared both authored waves, displayed Victory and score 300, and restarted the same map with the original loadout and a new Wave 1. Its separate no-fire CE609 77681074 run timed out, cleaned up the actor by tick 1890 and showed score 0, with the long HUD line clipped in 4:3. Both runtime logs identify the authored wave owner. SHA-256 matched both staged caches and the runtime executable. Human and co-op acceptance remain open.
+
+Spark shortened the timeout HUD message to “Wave timed out. Pause to restart.” in the frontend and native authoring paths. The first source-matched Windows build caught two recovered-source review callers still constructing the old encounter summary. Both now carry the reviewed facing using the same summary mapping. Windows cargo check, script syntax and 28 focused controller tests passed. The native workflow now independently queries each authored start heading. The old gameplay receipts apply to the preceding caches.
