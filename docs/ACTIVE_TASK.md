@@ -20,6 +20,8 @@ Operation110, M1–M6 and all 475 requirement IDs remain active. Preserve Master
 
 ## Verified milestones
 
+25 Nov Black Echo delivered Win64 cf6a00e0 and CE609 d113e9db were hash-checked and played from disposable copies. A fresh profile keeping classic settings lacked an Extraction entry. With Forerunner menus enabled, actual mouse input opened Extraction → Play Solo → Be Native [CE] → Normal and spawned in the offline native hub. No map rename, console, test startup or account was used. Both processes exited cleanly, staging was disposed and installed hashes matched. Full flights, banking, repeat deployment and LAN on the delivered pair remain open. Spark's native terminal placement now offers an explicit raised collision probe for buried origins, verified in the editor browser workflow. The test map has not been edited.
+
 18Nov independent map Save: reproduced a second tab remaining dirty after native acknowledgement while the first map waited. Each map now processes its own Save receipts. The second tab saves and closes independently, then reopens with its saved value. Browser7, focused frontend19 and TypeScript pass. The Save-before-open guard and native history checks still apply.
 
 18Nov Workshop Save: reproduced one stale Save request when the pending first edit failed validation. Save now reports the rejection and retains the export on the first-time Workshop screen. Browser5, focused frontend29 and TypeScript passed. The recovery download contained the four-brush draft at 800 × 600. Native desktop failure-path validation and original Save37944 remain open.

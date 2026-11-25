@@ -247,7 +247,11 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
     if startup!=stage.forerunner_startup{return Err("Forerunner startup contract changed after staging; no process was launched".into());}
     apply_forerunner_startup(&mut command,startup)?;
     command.env("HALO_EXTRACTION",if stage.forerunner_extraction{"true"}else{"false"});
-    if stage.forerunner_extraction{command.env("HALO_NET_COOP_SCRIPT_ADAPTATIONS","false");}
+    if stage.forerunner_extraction {
+        // A fresh private profile can otherwise use the classic menu, which has no Extraction entry.
+        command.env("HALO_MENUS", "chupathingy")
+            .env("HALO_NET_COOP_SCRIPT_ADAPTATIONS", "false");
+    }
     if runtime::forerunner_registration_machine(reg,&original.executable_sha256).map_err(error)?==Some(0x014c){command.env("HALO_RENDERER","gl");}
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());Ok(command)
 }
