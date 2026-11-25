@@ -773,6 +773,45 @@ export default function World({
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
   const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
+  const sourceSha=inspection?.sha256;
+  const bspCount=inspection?.mesh.parts?.length??0;
+  const canReadRegions=native&&!!sourceSha&&bspCount>1&&bspCount<=16&&
+    (inspection?.header.version===609||inspection?.header.version===13);
+  const regionKey=canReadRegions?project.id+'@'+sourceSha:'';
+  const [regionPlacements,setRegionPlacements]=useState<{
+    key:string;memberships:Record<string,number>|null;
+  }>();
+  useEffect(()=>{
+    if(!regionKey)return;
+    let active=true;
+    void call<{cacheSha256:string;bspCount:number;memberships:Record<string,number>}>(
+      'inspect_native_bsp_placements',{projectId:project.id,sourceSha256:sourceSha}
+    ).then(report=>{
+      if(report.cacheSha256!==sourceSha||report.bspCount!==bspCount||!report.memberships||
+        !Object.values(report.memberships).every(mask=>Number.isInteger(mask)&&mask>=0&&mask<2**bspCount)){
+        throw Error('Regional placement report differs from the opened source');
+      }
+      if(active)setRegionPlacements({key:regionKey,memberships:report.memberships});
+    }).catch(()=>{if(active)setRegionPlacements({key:regionKey,memberships:null});});
+    return()=>{active=false;};
+  },[regionKey,project.id,sourceSha,bspCount]);
+  const regionView=!!regionKey&&bsp>=0&&bsp<bspCount&&!cinematic&&!pickTarget;
+  const regionReport=regionView&&regionPlacements?.key===regionKey?regionPlacements:undefined;
+  const originals=useMemo(()=>new Map(inspection?.objects.map(object=>[object.id,object])),[inspection]);
+  const viewportProject=useMemo(()=>{
+    const memberships=regionReport?.memberships;
+    if(!memberships)return renderProject;
+    const scene=renderProject.scene.filter(object=>{
+      if(object===sourceDevice||object.sourceOffset==null)return true;
+      const original=originals.get(object.id);
+      // Moved drafts need a new native readback before they can be scoped.
+      if(original?.sourceOffset!==object.sourceOffset||
+        !original.position.every((value,index)=>value===object.position[index]))return true;
+      const mask=memberships[String(object.sourceOffset)];
+      return mask===undefined||(mask&(1<<bsp))!==0;
+    });
+    return {...renderProject,scene};
+  },[bsp,originals,regionReport,renderProject,sourceDevice]);
   const [compiledSwitch, setCompiledSwitch] = useMapState<NativeBspSwitchPreview|null>(project.id,NATIVE_BSP_SWITCH_PREVIEW,()=>null);
   const visibleSwitch = !cinematic && !pickTarget && !xrActive && compiledSwitch?.cacheSha256 === inspection?.sha256
     && compiledSwitch?.sourceBsp === bsp ? compiledSwitch : null;
@@ -1678,7 +1717,7 @@ export default function World({
                 <GpuLightmapRenderer onRenderer={setGpuDraftRenderer}/>
                 <Scene
                   {...{
-                    project:renderProject,
+                    project:viewportProject,
                     sourceScope:nativeSourceScope,transformLocked:!!nativeSourceScope&&(!nativeDeviceReady||nativeDevice?.locked||mode==='scale'),
                     assetMeshes,
                     selected,
@@ -1869,7 +1908,10 @@ export default function World({
           {project.bspAssembly&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'Source regions · Preview the connection in Construction')}</span>}
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
-          <span>{project.scene.length} objects</span>
+          <span aria-label="Viewport object count">{viewportProject.scene.length} objects</span>
+          {regionView&&!regionReport?.memberships&&<span role="status">
+            {regionReport?'Placement regions unavailable · showing all objects':'Reading placement regions…'}
+          </span>}
           {!!inspection?.decals?.length && <span>{inspection.decals.length} authored decals</span>}
           <span>Halo coordinates · Z up</span>
           <ViewportPerformance projectId={project.id} />

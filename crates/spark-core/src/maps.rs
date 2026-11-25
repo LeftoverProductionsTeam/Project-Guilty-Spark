@@ -1984,13 +1984,22 @@ pub struct BspPointLocation {pub point:[f32;3],pub bsps:Vec<u16>,pub near_partit
 #[serde(rename_all="camelCase")]
 pub struct BspPointSupport {pub bsp:u16,pub z:f32}
 fn collision_leaf_at(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut usize)->Result<(bool,bool)>{
+ let (leaf,near)=collision_leaf_index(r,space,root,point,budget)?;
+ Ok((leaf.is_some(),near))
+}
+
+fn collision_leaf_index(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut usize)->Result<(Option<usize>,bool)>{
  let(nodes,n)=space.block(r,root,12,262144)?;let(planes,pn)=space.block(r,root+12,16,262144)?;let(_,leaves)=space.block(r,root+24,8,262144)?;
  if n==0||pn==0||leaves==0{return invalid("Compiled BSP has no usable partition tree");}
  let mut child=0u32;let mut near=false;
  for _ in 0..=n.min(4096){
   if *budget==0{return invalid("Native BSP point review exceeds its traversal budget");}*budget-=1;
-  if child==u32::MAX{return Ok((false,near));}
-  if child&0x80000000!=0{if (child&0x7fffffff) as usize>=leaves{return invalid("Compiled BSP leaf index is invalid");}return Ok((true,near));}
+  if child==u32::MAX{return Ok((None,near));}
+  if child&0x80000000!=0{
+   let index=(child&0x7fffffff) as usize;
+   if index>=leaves{return invalid("Compiled BSP leaf index is invalid");}
+   return Ok((Some(index),near));
+  }
   let index=child as usize;if index>=n{return invalid("Compiled BSP node index is invalid");}let node=nodes+index*12;let plane=r.u32(node)? as usize;
   if plane>=pn{return invalid("Compiled BSP partition plane index is invalid");}
   let at=planes+plane*16;let normal=vec3(r,at)?;let distance=r.f32(at+12)?;
@@ -2001,6 +2010,70 @@ fn collision_leaf_at(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&mut
  }
  invalid("Compiled BSP tree is cyclic or exceeds the supported traversal depth")
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeBspPlacements {
+    pub cache_sha256: String,
+    pub bsp_count: usize,
+    pub memberships: std::collections::BTreeMap<usize, u16>,
+}
+
+/// Index original scenario positions for viewport isolation using the native
+/// collision leaf and its structure cluster. A placement can belong to several
+/// overlapping BSPs. Zero means no cluster admitted its origin.
+pub fn native_bsp_placements(path:&Path, inspection:&MapInspection) -> Result<NativeBspPlacements> {
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    if hash != inspection.sha256 || !matches!(header.version, 609 | 13) {
+        return invalid("BSP placement review needs the same compiled CE or MCC source");
+    }
+    let reader = Reader(&bytes);
+    let space = cache_tag_space(&reader, &header)?;
+    let mut scenarios = inspection.tags.iter().filter(|tag| tag.class=="scnr" && tag.path==inspection.scenario_path);
+    let scenario = scenarios.next().and_then(|tag| tag.data_offset)
+        .ok_or_else(|| SparkError::Invalid("Compiled scenario data is unavailable".into()))? as usize;
+    if scenarios.next().is_some() { return invalid("Compiled scenario is ambiguous"); }
+    let (table, bsp_count) = space.block(&reader, scenario+0x5a4, 32, 16)?;
+    if bsp_count < 2 || bsp_count != inspection.mesh.parts.len() {
+        return invalid("Native placement regions require all compiled BSPs");
+    }
+
+    let placements: Vec<_> = inspection.objects.iter().filter_map(|object| {
+        object.source_offset.map(|offset| (offset, object.position))
+    }).filter(|(_,position)| position.iter().all(|value| value.is_finite() && value.abs() <= 1e6)).collect();
+    if placements.len() > 32_768 { return invalid("Native placement review exceeds its object budget"); }
+    let mut memberships: std::collections::BTreeMap<_,_> = placements.iter().map(|(offset,_)| (*offset,0u16)).collect();
+    if memberships.len()!=placements.len() { return invalid("Native placements contain duplicate offsets"); }
+    let mut budget = 12_000_000;
+    for index in 0..bsp_count {
+        let entry = table + index*32;
+        let begin = reader.u32(entry)? as usize;
+        let size = reader.u32(entry+4)? as usize;
+        reader.bytes(begin, size)?;
+        if size < 24 { return invalid("Compiled BSP region is too small"); }
+        let region = Space { begin, end:begin+size, address:reader.u32(entry+8)? };
+        let bsp = region.pointer(reader.u32(begin)?,648)?;
+        let (tree, trees) = region.block(&reader,bsp+0xb0,96,16)?;
+        if trees != 1 { return invalid("BSP placement review requires one native collision tree"); }
+        let (leaves, leaf_count) = region.block(&reader,bsp+0xe0,16,262_144)?;
+        let (_, clusters) = region.block(&reader,bsp+0x134,104,8192)?;
+
+        let in_cluster = |point, budget: &mut usize| -> Result<bool> {
+            let (leaf,_) = collision_leaf_index(&reader,&region,tree,point,budget)?;
+            let Some(leaf) = leaf.filter(|&leaf| leaf < leaf_count) else { return Ok(false) };
+            let cluster = reader.u16(leaves+leaf*16+8)? as i16;
+            Ok(cluster >= 0 && (cluster as usize) < clusters)
+        };
+        for &(offset, position) in &placements {
+            let mut above = position;
+            above[2] += 0.05;
+            if in_cluster(position,&mut budget)? || in_cluster(above,&mut budget)? {
+                *memberships.get_mut(&offset).expect("placement membership initialized") |= 1u16 << index;
+            }
+        }
+    }
+    Ok(NativeBspPlacements { cache_sha256: hash, bsp_count, memberships })
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BspGeometryReview {

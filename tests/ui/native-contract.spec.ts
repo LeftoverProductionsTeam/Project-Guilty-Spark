@@ -7047,10 +7047,19 @@ test('creator intact BSP preview preserves both sources and reports only connect
       { name: 'Base region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
       { name: 'Other region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
     ];
+    base.inspection.objects = [0,1,2,3,4].map(i=>({
+      id:'scenery-'+i,name:'Tree '+i,kind:'Scenery',tagId:null,position:[i,0,0],
+      rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:10+i,rotationOffset:null,assetId:null,
+    }));
+    base.project.scene = structuredClone(base.inspection.objects);
+    base.project.scene[4].position = [4,2,0];
     const plan = await original('plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
     base.project.bspAssembly = { ...plan, separateNativeBsps: true };
     base.project.inheritedBspConnections = [base.project.bspAssembly];
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'inspect_native_bsp_placements') return {
+        cacheSha256:base.inspection.sha256,bspCount:2,memberships:{10:1,11:2,12:2,13:0,14:1},
+      };
       if (command === 'inspect_native_bsp_transitions') return {
         cacheSha256:base.inspection.sha256,bspCount:2,bspTagPaths:['levels/base','levels/other'],
         transitions:[
@@ -7092,7 +7101,16 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await expect(page.getByRole('button',{name:'Hide switch volume',exact:true})).toHaveCount(0);
   const destination=switches.getByRole('button',{name:'View destination BSP 1',exact:true,includeHidden:true});
   await revealPagedControl(destination);await destination.click();
-  await expect(page.getByRole('combobox',{name:'Visible BSP',exact:true})).toHaveValue('1');
+  const bspView=page.getByRole('combobox',{name:'Visible BSP',exact:true});
+  const objectCount=page.getByLabel('Viewport object count');
+  await expect(bspView).toHaveValue('1');
+  await expect(objectCount).toHaveText('3 objects');
+  await bspView.selectOption('0');
+  await expect(objectCount).toHaveText('2 objects');
+  await bspView.selectOption('-1');
+  await expect(objectCount).toHaveText('5 objects');
+  await bspView.selectOption('1');
+  await expect(objectCount).toHaveText('3 objects');
   await expect(assembly.getByRole('combobox',{name:'Connect from BSP',exact:true,includeHidden:true})).toHaveValue('0');
   await (await constructionControl(page, 'button', 'Pick donor landing')).click();
   await expect(page.getByText('Click the landing floor on the donor region.', { exact: false })).toBeVisible();

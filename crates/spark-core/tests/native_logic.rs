@@ -11,6 +11,15 @@ fn retained_megaworld_switch_report_matches_native_volumes() {
     let volumes = maps::scenario_volume_readback(&path, &map).unwrap();
     assert_eq!(report.bsp_count, 13);
     assert_eq!(report.transitions.len(), 24);
+    let placements = maps::native_bsp_placements(&path, &map).unwrap();
+    assert_eq!(placements.bsp_count, 13);
+    assert_eq!(placements.cache_sha256, map.sha256);
+    assert!(placements.memberships.values().all(|mask| *mask < (1 << 13)));
+    let region_count = |index: u16| placements.memberships.values().filter(|mask| **mask & (1 << index) != 0).count();
+    assert!(region_count(0) > 100);
+    assert!(region_count(12) > 0);
+    assert!(region_count(11) < region_count(12));
+    println!("Regional placement counts: {:?}", (0..13).map(region_count).collect::<Vec<_>>());
     for switch in report.transitions {
         let volume = &volumes[switch.trigger_index];
         assert_eq!(switch.trigger_name, volume.name);
