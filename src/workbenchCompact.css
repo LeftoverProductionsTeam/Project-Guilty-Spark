@@ -503,10 +503,10 @@ html[data-gs-reduced-motion=true] .gs-spark-emblem{transition:none;}@media(prefe
 .application.gs-drawers>.gs-navigation-drawer .sidebar-bottom{margin:0;padding:3px 0 0;}
 .application.gs-drawers>.gs-navigation-drawer .gs-nav-heading{padding:1px 7px 5px;}
 .application .gs-tools-menu .gs-page-body{display:block;}
-.application .gs-tools-menu .gs-page-body>section{display:block;padding:3px 0;border-bottom:1px solid var(--line);}
+.application .gs-tools-menu .gs-page-body>section{display:block;padding:2px 0;border-bottom:1px solid var(--line);}
 .application .gs-tools-menu .gs-page-body>section:last-child{border-bottom:0;}
 .application .gs-tools-menu .gs-page-body>section>strong{display:block;font-size:9px;padding:2px 7px;}
-.application .gs-tools-menu [role^=menuitem]{display:flex;align-items:center;gap:7px;width:100%;min-height:25px;padding:3px 7px;text-align:left;}
+.application .gs-tools-menu [role^=menuitem]{display:flex;align-items:center;gap:6px;width:100%;min-height:24px;padding:2px 7px;text-align:left;}
 
 .application .mission-source-review .mission-review-gameplay {margin:6px 0;min-width:0;}
 .application .mission-source-review [data-changed] {border-inline-start:2px solid var(--accent);padding-inline-start:6px;}

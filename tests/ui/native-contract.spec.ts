@@ -3699,11 +3699,14 @@ test('compact first-run workspace keeps the complete setup reachable by scrollin
 
 
 
-for(const width of [800,1280])test('Level editor Tools menu commands receive clicks at '+width,async({page})=>{
- await page.setViewportSize({width,height:600});await mockDesktop(page);
+for(const [width,height] of [[800,400],[800,600],[1280,600]])test('Level editor Tools menu commands receive clicks at '+width+'x'+height,async({page})=>{
+ await page.setViewportSize({width,height});await mockDesktop(page);
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  await page.getByLabel('More workspace drawers',{exact:true}).click();
  await auditPagedSurface(page.locator('[data-surface="tools-menu"]'));
+ const menu=page.getByRole('menu',{name:'Workspace drawers',exact:true});
+ const box=await menu.boundingBox();
+ expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(height);
  await page.keyboard.press('Escape');await openDrawer(page,'Inspector');
  await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
 });

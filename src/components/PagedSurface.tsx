@@ -14,7 +14,7 @@ function materialized(node:HTMLElement){
  }
  return true;
 }
-const atomic='button,a[href],input,select,textarea,summary,label,fieldset,.field-row,.setting-row,tr,[draggable="true"]';
+const atomic='button,a[href],input,select,textarea,summary,label,fieldset,.field-row,.setting-row,tr,[draggable="true"],[data-gs-menu-heading]';
 function controlRange(node:HTMLElement,content:HTMLElement,height:number){
  const bounds=content.getBoundingClientRect();let rect=node.getBoundingClientRect(),top=rect.top,bottom=rect.bottom;
  for(let parent=node.parentElement;parent&&parent!==content;parent=parent.parentElement)if(parent.matches(atomic)){
@@ -42,7 +42,11 @@ export default function PagedSurface({children,label,name,scope='global',fill=fa
    if(!rect.width||!outer.height)return;
    const bounds=content.getBoundingClientRect();
    const nodes=[...content.querySelectorAll<HTMLElement>(atomic)];
-   const ranges=nodes.filter(materialized).map(node=>{const r=node.getBoundingClientRect();return {top:r.top-bounds.top,bottom:r.bottom-bounds.top,width:r.width};}).filter(r=>r.width>0);
+   const ranges=nodes.filter(materialized).map(node=>{
+    const r=node.getBoundingClientRect();
+    const first=node.hasAttribute('data-gs-menu-heading')?node.nextElementSibling?.getBoundingClientRect():undefined;
+    return {top:r.top-bounds.top,bottom:Math.max(r.bottom,first?.bottom??r.bottom)-bounds.top,width:r.width};
+   }).filter(r=>r.width>0);
    const total=Math.ceil(ranges.reduce((n,r)=>Math.max(n,r.bottom),Math.max(content.scrollHeight,bounds.height)));
    const visibility=nodes.map(node=>materialized(node)?'1':'0').join('');
    const room=Math.max(40,Math.floor(fill?outer.bottom-rect.top:Math.min(maxHeight,window.innerHeight-rect.top-reserveBottom)));
