@@ -25,7 +25,7 @@ export interface OwnedModelView {
   extraTextures: Record<string, THREE.Texture>;
   shaderMetadata: Record<number, ShaderPreview>;
 }
-export interface OwnedSourceMesh {project:Project;inspection:MapInspection;mesh:MeshData;tagId:number;bsp?:boolean;}
+export interface OwnedSourceMesh {project:Project;inspection:MapInspection;mesh:MeshData;tagId:number;bsp?:boolean;additionalShaderIds?:readonly number[];}
 interface ModelResponse {
   sourceSha256: string;
   resourceSha256: string | null;
@@ -51,7 +51,7 @@ export function useOwnedForgeModels(
   const seeded=new Map(sourceMeshes.map(value=>[forgeModelKey({sourceProjectId:value.project.id,sourceSha256:value.inspection.sha256,tagId:value.tagId}),value]));
   const sources:OwnedModelIdentity[]=[...new Map([...placements,...sourceMeshes.map(value=>({sourceProjectId:value.project.id,sourceSha256:value.inspection.sha256,tagId:value.tagId}))].map(p=>[forgeModelKey(p),p])).values()];
   const resourceIdentity=useTextureResourceScopes(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]));
-  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,p.modelVariant??'',resourceScopes[p.sourceProjectId??'']??'',seeded.has(forgeModelKey(p))]));
+  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,p.modelVariant??'',resourceScopes[p.sourceProjectId??'']??'',seeded.has(forgeModelKey(p)),seeded.get(forgeModelKey(p))?.additionalShaderIds??[]]));
   useEffect(() => {
     let live=true,textureBytes=0,geometryBytes=0;
     const pool=new Map<string,THREE.Texture>(),loaded:Record<string,OwnedModelView>={},errors:Record<string,string>={};
@@ -77,7 +77,7 @@ export function useOwnedForgeModels(
           loaded[key]=view;
           setModels({...loaded});
           const tasks:{shader:number;bitmap:number;role:string;imageIndex:number;key?:string}[]=[];
-          const usedShaders=new Set(result.mesh.materialRanges?.map(range=>range.shaderTagId)??[]);
+          const usedShaders=new Set([...(result.mesh.materialRanges?.map(range=>range.shaderTagId)??[]),...(seed?.additionalShaderIds??[])]);
           for (const tag of result.tags.filter(
             (t) => usedShaders.has(t.id) && t.shaderPreview && (t.primaryBitmapStatus === 'resolved'||t.primaryBitmapStatus==='not-required'&&glassWithoutDiffuse(t.shaderPreview)),
           )) {
@@ -173,7 +173,7 @@ export function useOwnedForgeModels(
           view.shaderTextures={...view.shaderTextures};
           view.extraTextures={...view.extraTextures};
           view.shaderMetadata={...view.shaderMetadata};
-          const absent=[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id]));
+          const absent=[...usedShaders].filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id]));
           if(absent.length){
             const names=absent.slice(0,3).map(id=>result.tags.find(tag=>tag.id===id)?.path??`datum ${id}`).join(', ');
             const message=`${absent.length} native material(s) unavailable: ${names}. This preview is incomplete.`;

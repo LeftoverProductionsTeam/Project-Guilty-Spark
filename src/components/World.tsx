@@ -696,7 +696,17 @@ export default function World({
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
   const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.preview?.assembly??project.bspAssembly;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
-  const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes,assembly?.surfaces);
+  const joinedBaseMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===0)?.mesh;
+  const joinedDonorMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===1)?.mesh;
+  const assemblySurfaces=useMemo(()=>{
+    if(!assembly||!joinedDonorMesh?.materialRanges?.length)return assembly?.surfaces;
+    const [terrain,...scenery]=assembly.surfaces;
+    const regionShaders=new Set(terrain.mesh.materialRanges?.map(range=>range.shaderTagId));
+    const additionalShaderIds=[...new Set(joinedDonorMesh.materialRanges.map(range=>range.shaderTagId))]
+      .filter(id=>!regionShaders.has(id)).sort((a,b)=>a-b);
+    return additionalShaderIds.length?[{...terrain,additionalShaderIds},...scenery]:assembly.surfaces;
+  },[assembly,joinedDonorMesh]);
+  const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes,assemblySurfaces);
   const assemblyTerrainKey=assembly?forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId}):'';
   async function dropAsset(key: string, position: Vec3, replaceId?: string | null):Promise<boolean> {
     if(!activity.active||!library||library.busy||assetBusy)return false;
@@ -855,7 +865,10 @@ export default function World({
   const [gpuDraftRenderer,setGpuDraftRenderer]=useState<THREE.WebGLRenderer|null>(null);
   const gpuDraftReservedBytes=useRef(0);
   const [detailTextures, setExtraTextures] = useState<Record<string, THREE.Texture>>({});
-  const materialModels=useMemo(()=>sceneModelMeshes(inspection,project.scene),[inspection,project.scene]);
+  const materialModels=useMemo(()=>{
+    const models=sceneModelMeshes(inspection,project.scene);
+    return joinedBaseMesh?[...models,joinedBaseMesh]:models;
+  },[inspection,project.scene,joinedBaseMesh]);
   const materialShaderIds=useMemo(()=>new Set([
     ...(inspection?.renderMesh?.materialRanges??[]),...materialModels.flatMap(mesh=>mesh.materialRanges??[]),
     ...(sourceAppearance?.skyMesh?.materialRanges??[]),
