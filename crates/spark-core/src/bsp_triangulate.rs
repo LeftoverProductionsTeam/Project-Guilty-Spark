@@ -1,5 +1,6 @@
 //! Improve coplanar diagonals before Halo Tool's float importer discards
-//! needle triangles. Positions, material boundaries and affine UVs stay fixed.
+//! needle triangles. For generated terrain, also weld tiny intersection
+//! edges while protecting stock vertices, planes and affine UV charts.
 use manifold_rust::types::MeshGL64;
 use std::collections::BTreeMap;
 type V = [f64; 3];
@@ -132,6 +133,151 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
     refine_generated_faces(m, maximum, generated_material, f64::INFINITY)
 }
 
+
+/// Weld sub-centimetre slivers left where generated outdoor solids intersect.
+/// Stock vertices are fixed. A Boolean cut in a stock face may slide within
+/// its original plane and UV chart, even when it meets multiple materials.
+pub(crate) fn weld_terrain_slivers(mesh: &mut MeshGL64, materials: &[usize], stock_points: &[V]) -> usize {
+    const MAX_EDGE: f64 = 0.012;
+    const MAX_ALTITUDE: f64 = 0.01;
+    const MAX_WELDS: usize = 32;
+    let generated = |face: usize| materials.iter().any(|&id| mesh.face_id[face] == id as u64);
+    let key = |mesh: &MeshGL64, id| at(mesh, id).map(|coordinate| {
+        if coordinate == 0. { 0 } else { coordinate.to_bits() }
+    });
+    let mut candidates = BTreeMap::new();
+    for (index, ids) in mesh.tri_verts.chunks_exact(3).enumerate() {
+        if !generated(index) {
+            continue;
+        }
+        let lengths = [0, 1, 2].map(|i| {
+            let edge = sub(at(mesh, ids[i]), at(mesh, ids[(i + 1) % 3]));
+            dot(edge, edge).sqrt()
+        });
+        let shortest = (0..3).min_by(|&a, &b| lengths[a].total_cmp(&lengths[b])).unwrap();
+        let longest = lengths.into_iter().fold(0., f64::max);
+        let quality = face(mesh, [ids[0], ids[1], ids[2]]).1;
+        if lengths[shortest] <= MAX_EDGE && quality < 0.03 && quality * longest < MAX_ALTITUDE {
+            let a = key(mesh, ids[shortest]);
+            let b = key(mesh, ids[(shortest + 1) % 3]);
+            if a != b {
+                candidates.insert((a.min(b), a.max(b)), ());
+            }
+        }
+    }
+    let mut welds = 0;
+    for (a, b) in candidates.into_keys().take(64) {
+        if welds == MAX_WELDS {
+            break;
+        }
+        if weld_terrain_edge(mesh, a, b, materials, stock_points)
+            || weld_terrain_edge(mesh, b, a, materials, stock_points)
+        {
+            welds += 1;
+        }
+    }
+    welds
+}
+
+fn weld_terrain_edge(
+    mesh: &mut MeshGL64,
+    from: [u64; 3],
+    to: [u64; 3],
+    materials: &[usize],
+    stock_points: &[V],
+) -> bool {
+    const SOURCE_PLANE_PRECISION: f64 = 0.00001;
+    let key = |id| at(mesh, id).map(|value| if value == 0. { 0 } else { value.to_bits() });
+    let width = mesh.num_prop as usize;
+    let mut incident = Vec::new();
+    let mut targets = BTreeMap::<u64, Vec<u64>>::new();
+    let mut removed = 0;
+    for (i, ids) in mesh.tri_verts.chunks_exact(3).enumerate() {
+        let positions = [key(ids[0]), key(ids[1]), key(ids[2])];
+        let material = mesh.face_id[i];
+        if let Some(j) = positions.iter().position(|p| *p == to) {
+            targets.entry(material).or_default().push(ids[j]);
+        }
+        if let Some(j) = positions.iter().position(|p| *p == from) {
+            let stock = !materials.contains(&(material as usize));
+            let erase = positions.contains(&to);
+            removed += usize::from(erase);
+            incident.push((i, j, erase, stock));
+        }
+    }
+    if removed != 2 {
+        return false;
+    }
+    if incident.iter().any(|&(_, _, _, stock)| stock) {
+        let position = from.map(f64::from_bits);
+        if stock_points.iter().any(|p| {
+            let delta = sub(*p, position);
+            dot(delta, delta) <= SOURCE_PLANE_PRECISION * SOURCE_PLANE_PRECISION
+        }) {
+            return false;
+        }
+    }
+    let mut changes = BTreeMap::new();
+    for (index, corner, erase, stock) in incident {
+        if erase {
+            changes.insert(index, None);
+            continue;
+        }
+        let start = index * 3;
+        let ids = [mesh.tri_verts[start], mesh.tri_verts[start + 1], mesh.tri_verts[start + 2]];
+        let property_distance = |target: u64| (3..width).map(|k| {
+            (mesh.vert_properties[target as usize * width + k]
+                - mesh.vert_properties[ids[corner] as usize * width + k]).abs()
+        }).fold(0., f64::max);
+        let Some(target) = targets.get(&mesh.face_id[index]).and_then(|options| {
+            options.iter().copied().min_by(|&a, &b| property_distance(a).total_cmp(&property_distance(b)))
+        }) else { return false; };
+        if property_distance(target) > 0.025 {
+            return false;
+        }
+        let mut welded = ids;
+        welded[corner] = target;
+        let (normal, _) = face(mesh, ids);
+        if stock && (dot(normal, sub(at(mesh, target), at(mesh, ids[corner]))).abs() > SOURCE_PLANE_PRECISION
+            || !affine(mesh, ids, target, 0.000002))
+        {
+            return false;
+        }
+        let (new_normal, quality) = face(mesh, welded);
+        if quality < 1e-5 || dot(normal, new_normal) < 0.98 {
+            return false;
+        }
+        changes.insert(index, Some(welded));
+    }
+
+    let mut result = MeshGL64 { num_prop: mesh.num_prop, ..Default::default() };
+    let mut compact = BTreeMap::new();
+    for (i, ids) in mesh.tri_verts.chunks_exact(3).enumerate() {
+        let welded = match changes.get(&i) {
+            Some(Some(ids)) => *ids,
+            Some(None) => continue,
+            None => [ids[0], ids[1], ids[2]],
+        };
+        for id in welded {
+            let compact_id = *compact.entry(id).or_insert_with(|| {
+                let new_id = result.num_vert() as u64;
+                let start = id as usize * width;
+                result.vert_properties.extend_from_slice(&mesh.vert_properties[start..start + width]);
+                new_id
+            });
+            result.tri_verts.push(compact_id);
+        }
+        result.face_id.push(mesh.face_id[i]);
+    }
+    result.merge();
+    let section = manifold_rust::manifold::Manifold::from_mesh_gl64(&result);
+    if section.status() != manifold_rust::types::Error::NoError || section.is_empty() {
+        return false;
+    }
+    *mesh = result;
+    true
+}
+
 /// Keep long standalone connector charts within the native baker's working
 /// span; the collision layer is emitted from the original manifold.
 pub(crate) fn refine_connector_charts(m: &mut MeshGL64, maximum: usize) -> crate::Result<usize> {
@@ -216,6 +362,40 @@ mod tests {
         assert_eq!(input.vert_properties, authored);
         assert_eq!(input.face_id, [65, 65]);
         assert!(input.tri_verts.chunks_exact(3).all(|t| face(&input, [t[0], t[1], t[2]]).1 > 0.08));
+    }
+
+
+    #[test]
+    fn welds_generated_edge_even_at_a_protected_anchor() {
+        let points = [
+            [1., 0., 0.], [1., 0.005, 0.], [1., 1., 0.],
+            [-1., 1., 0.], [-1., -1., 0.], [1., -1., 0.],
+            [0., 0., 1.], [0., 0., -1.],
+        ];
+        let mut mesh = MeshGL64 { num_prop: 5, ..Default::default() };
+        for p in points {
+            mesh.vert_properties.extend(p);
+            mesh.vert_properties.extend([p[0], p[1]]);
+        }
+        for i in 0..6 {
+            let next = (i + 1) % 6;
+            mesh.tri_verts.extend([6, i, next, 7, next, i]);
+            mesh.face_id.extend([17, 17]);
+        }
+        // This face owns the anchor, but not the disposable generated endpoint.
+        mesh.face_id[10] = 29;
+        let stock = [6, 5, 0].map(|id| at(&mesh, id));
+        let faces = mesh.num_tri();
+        // An authored short edge may never collapse across a stock face.
+        mesh.face_id[2] = 29;
+        assert_eq!(weld_terrain_slivers(&mut mesh, &[17], &points), 0);
+        // A generated intersection borrowed by a stock plane may slide along
+        // that plane as long as the original anchor and UV chart stay fixed.
+        assert_eq!(weld_terrain_slivers(&mut mesh, &[17], &[points[0]]), 1);
+        assert_eq!(mesh.num_tri(), faces - 2);
+        let (tri, _) = mesh.tri_verts.chunks_exact(3).zip(&mesh.face_id)
+            .filter(|(_, slot)| **slot == 29).last().unwrap();
+        assert_eq!([tri[0], tri[1], tri[2]].map(|id| at(&mesh, id)), stock);
     }
 
     fn needle() -> MeshGL64 {

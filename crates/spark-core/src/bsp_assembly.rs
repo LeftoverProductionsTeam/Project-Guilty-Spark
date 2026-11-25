@@ -897,6 +897,19 @@ fn generate_end(
         return invalid("Boolean lost source material or vertex-property provenance");
     }
     crate::bsp_triangulate::improve(&mut gl);
+    if let Some(terrain_slots) = terrain_materials {
+        let mut generated = terrain_slots.to_vec();
+        if assembly.high_ground.is_some() {
+            generated.push(passage_materials[1 + usize::from(assembly.infantry_tunnel.is_some())]);
+        }
+        let stock_points = base_mesh.positions.chunks_exact(3)
+            .map(|p| [p[0].into(), p[1].into(), p[2].into()])
+            .chain(donor_mesh.positions.chunks_exact(3).map(|p| {
+                transform([p[0].into(), p[1].into(), p[2].into()], assembly.translation, assembly.yaw_degrees)
+            }))
+            .collect::<Vec<_>>();
+        crate::bsp_triangulate::weld_terrain_slivers(&mut gl, &generated, &stock_points);
+    }
     for material in passage_materials.iter().copied().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
     // The base half does not contain the donor boundary to be sealed.
