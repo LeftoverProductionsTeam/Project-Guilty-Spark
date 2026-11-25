@@ -13,7 +13,7 @@ export interface BspFace {
 export interface BspBrush {
   id: string;
   name: string;
-  role: 'space' | 'solid';
+  role: 'space' | 'solid' | 'cut';
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
@@ -476,10 +476,10 @@ function primitiveWorkshopBrushes(b: ForgeBrush): BspBrush[] {
       );
     return [{ ...mesh, name: b.name, position: [...b.position] as Vec3, rotation: [...b.rotation] as Vec3 }];
 }
-export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs' | 'sphere';
+export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs' | 'sphere' | 'sphereCut';
 
 const sphereRadius = 3;
-function sphereCave(id: string, position: Vec3, material: string): BspBrush {
+function sphereBrush(id: string, position: Vec3, material: string, role: 'space' | 'cut'): BspBrush {
   const sides = 12;
   const vertices: Vec3[] = [[0, 0, -sphereRadius]];
   for (const latitude of [-Math.PI/4, 0, Math.PI/4]) {
@@ -501,16 +501,16 @@ function sphereCave(id: string, position: Vec3, material: string): BspBrush {
     }
     addFace([top,1+2*sides+i,1+2*sides+next]);
   }
-  return {id,name:'Sphere cave',role:'space',position:[...position],rotation:[0,0,0],scale:[1,1,1],
+  return {id,name:role==='cut'?'Sphere cut':'Sphere cave',role,position:[...position],rotation:[0,0,0],scale:[1,1,1],
     worldUv:true,vertices,faces};
 }
 export function placeWorkshopPrimitive(doc:QuickForgeDocument,kind:WorkshopPrimitive,point:Vec3,materialId:string) {
   if(!doc.workshop||doc.native)throw Error('Open editable Workshop source before placing geometry.');
-  if(!['room','box','wall','ramp','stairs','sphere'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
+  if(!['room','box','wall','ramp','stairs','sphere','sphereCut'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
   if(!doc.materials.some(material=>material.id===materialId))throw Error('Select a source material first');
   let brushes: BspBrush[];
-  if (kind==='sphere') {
-    const cave=sphereCave(crypto.randomUUID(),point,materialId);
+  if (kind==='sphere' || kind==='sphereCut') {
+    const cave=sphereBrush(crypto.randomUUID(),point,materialId,kind==='sphereCut'?'cut':'space');
     cave.name=nextWorkshopName(doc.workshop.brushes,cave.name);
     brushes=[cave];
   } else {
@@ -547,6 +547,7 @@ export function pointInsideWorkshop(source: BspWorkshopSource, point: Vec3): boo
   };
   return (
     source.brushes.some((b) => b.role === 'space' && inside(b, true)) &&
-    !source.brushes.some((b) => b.role === 'solid' && inside(b, false))
+    (!source.brushes.some((b) => b.role === 'solid' && inside(b, false)) ||
+      source.brushes.some((b) => b.role === 'cut' && inside(b, true)))
   );
 }

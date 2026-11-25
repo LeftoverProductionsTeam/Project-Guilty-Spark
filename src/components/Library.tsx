@@ -80,7 +80,7 @@ export default function Library({
               <Plus size={15} />
               New workspace
             </button>
-            <button className="primary" onClick={onImport} disabled={busy}>
+            <button className="primary" onClick={onImport} disabled={busy} title="Choose multiple maps or archives, or drop them into Spark.">
               <Upload size={15} />
               {busy ? 'Inspecting…' : 'Import map or archive'}
             </button>

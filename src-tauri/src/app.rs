@@ -217,6 +217,8 @@ struct ImportFailure {
 #[serde(rename_all = "camelCase")]
 struct ImportReport {
     projects: Vec<OpenProject>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    library_project_ids: Vec<String>,
     failures: Vec<ImportFailure>,
 }
 // Existing native integrations retain their array/error interface. The studio
@@ -227,10 +229,18 @@ enum ImportResponse {
     Report(ImportReport),
     Projects(Vec<OpenProject>),
 }
-fn collect_imports(paths: Vec<PathBuf>, mut import: impl FnMut(&Path) -> Reply<Vec<OpenProject>>) -> ImportReport {
+fn collect_imports(
+    paths: Vec<PathBuf>,
+    library_only: bool,
+    mut import: impl FnMut(&Path) -> Reply<Vec<OpenProject>>,
+) -> ImportReport {
     let mut report = ImportReport::default();
+    let mut seen = std::collections::HashSet::new();
     for path in paths {
         match import(&path) {
+            Ok(projects) if library_only => report.library_project_ids.extend(
+                projects.into_iter().map(|open| open.project.id).filter(|id| seen.insert(id.clone())),
+            ),
             Ok(projects) => report.projects.extend(projects),
             Err(message) => report.failures.push(ImportFailure { path, message }),
         }
@@ -254,7 +264,7 @@ mod import_batch_tests {
         let good=root.path().join("valid.gsproject");let bad=root.path().join("broken.gsproject");
         project::save_project(&good,&Project::new("Batch source")).unwrap();fs::write(&bad,b"invalid descriptor").unwrap();
         let paths=vec![bad.clone(),good.clone(),root.path().join("missing.gsproject")];
-        let report=collect_imports(paths,|path|library.import_project(path).map(|project|vec![OpenProject{project,inspection:None}]).map_err(error));
+        let report=collect_imports(paths,false,|path|library.import_project(path).map(|project|vec![OpenProject{project,inspection:None}]).map_err(error));
         assert_eq!(report.projects.len(),1);assert_eq!(report.projects[0].project.title,"Batch source");
         assert_eq!(report.failures.len(),2);assert_eq!(report.failures[0].path,bad);
         assert!(report.failures.iter().all(|failure|!failure.message.is_empty()));
@@ -264,11 +274,33 @@ mod import_batch_tests {
         assert_eq!(project::load_project(&good).unwrap().title,"Batch source");
     }
     #[test]
+    fn large_batches_retain_library_ids_and_individual_rejections() {
+        let root = tempfile::tempdir().unwrap();
+        let library = Library::open(&root.path().join("library")).unwrap();
+        let mut paths = Vec::new();
+        for index in 0..24 {
+            let title = format!("Source {index}");
+            let path = root.path().join(format!("{title}.gsproject"));
+            project::save_project(&path, &Project::new(&title)).unwrap();
+            paths.push(path);
+        }
+        let rejected = root.path().join("bad.gsproject");
+        paths.insert(4, rejected.clone());
+        let report = collect_imports(paths, true, |path| {
+            library.import_project(path).map(|project| vec![OpenProject { project, inspection: None }]).map_err(error)
+        });
+        assert!(report.projects.is_empty());
+        assert_eq!(report.library_project_ids.len(), 24);
+        assert_eq!(library.list().unwrap().len(), 24);
+        assert_eq!(report.failures.len(), 1);
+        assert_eq!(report.failures[0].path, rejected);
+    }
+    #[test]
     fn rejected_and_cancelled_batches_and_existing_array_interface_are_unambiguous() {
-        let report=collect_imports(vec![PathBuf::from("missing.map")],|_|Err("Missing original".into()));
+        let report=collect_imports(vec![PathBuf::from("missing.map")],false,|_|Err("Missing original".into()));
         let json=serde_json::to_value(import_response(report,true).unwrap()).unwrap();
         assert!(json["projects"].as_array().unwrap().is_empty());assert_eq!(json["failures"][0]["message"],"Missing original");
-        let rejected=collect_imports(vec![PathBuf::from("missing.map")],|_|Err("Missing original".into()));
+        let rejected=collect_imports(vec![PathBuf::from("missing.map")],false,|_|Err("Missing original".into()));
         assert!(import_response(rejected,false).is_err());
         assert_eq!(serde_json::to_value(import_response(ImportReport::default(),false).unwrap()).unwrap(),serde_json::json!([]));
         let cancelled=serde_json::to_value(import_response(ImportReport::default(),true).unwrap()).unwrap();
@@ -1133,7 +1165,7 @@ async fn firefight_validate(app:tauri::AppHandle,config:firefight::FirefightConf
 async fn firefight_preview(config:firefight::FirefightConfig,completed_waves:u16)->Reply<firefight::SimulationReport> {
     tauri::async_runtime::spawn_blocking(move||firefight::preview(&config,completed_waves).map_err(error)).await.map_err(error)?
 }
-fn import_one(state: &AppState, path: &Path) -> Reply<OpenProject> {
+fn import_one(state: &AppState, path: &Path, open_in_editor: bool) -> Reply<OpenProject> {
     let ext = path
         .extension()
         .unwrap_or_default()
@@ -1142,18 +1174,24 @@ fn import_one(state: &AppState, path: &Path) -> Reply<OpenProject> {
     let settings = lock(&state.settings)?.clone();
     let (p, i) = if ext == "gsproject" {
         let p = lock(&state.library)?.import_project(path).map_err(error)?;
-        let i = if p.source.is_some() {
+        let i = if open_in_editor && p.source.is_some() {
             Some((*inspect(state, &p)?).clone())
         } else {
             None
         };
         (p, i)
     } else if ext == "map" || ext == "yelo" {
-        let (p, i) = lock(&state.library)?
-            .import_map(path, settings.resource_directory.as_deref())
-            .map_err(error)?;
-        lock(&state.inspections)?.insert(p.id.clone(), Arc::new(i.clone()));
-        (p, Some(i))
+        let resources = settings.resource_directory.as_deref();
+        if open_in_editor {
+            let (p, i) = lock(&state.library)?.import_map(path, resources).map_err(error)?;
+            lock(&state.inspections)?.insert(p.id.clone(), Arc::new(i.clone()));
+            (p, Some(i))
+        } else {
+            let library = lock(&state.library)?;
+            let (p, i) = library.import_asset_source(path, resources).map_err(error)?;
+            library.save_asset_source_reference(&p, &i).map_err(error)?;
+            (p, None)
+        }
     } else {
         return Err("Choose a .map, .yelo or .gsproject file. OBJ meshes are imported from the Asset Workshop.".into());
     };
@@ -1163,11 +1201,14 @@ fn import_one(state: &AppState, path: &Path) -> Reply<OpenProject> {
     })
 }
 fn import_file(state: &AppState, path: &Path) -> Reply<Vec<OpenProject>> {
+    import_file_for_library(state, path, true)
+}
+fn import_file_for_library(state: &AppState, path: &Path, open_in_editor: bool) -> Reply<Vec<OpenProject>> {
     if !path
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
     {
-        return import_one(state, path).map(|p| vec![p]);
+        return import_one(state, path, open_in_editor).map(|p| vec![p]);
     }
     let mut imported = archive::import_archive(path, &state.root).map_err(error)?;
     let mut opened = vec![];
@@ -1196,10 +1237,12 @@ fn import_file(state: &AppState, path: &Path) -> Reply<Vec<OpenProject>> {
                     }
                 }
                 lock(&state.library)?.save(&p, Some(&i)).map_err(error)?;
-                lock(&state.inspections)?.insert(p.id.clone(), Arc::new(i.clone()));
+                if open_in_editor {
+                    lock(&state.inspections)?.insert(p.id.clone(), Arc::new(i.clone()));
+                }
                 opened.push(OpenProject {
                     project: p,
-                    inspection: Some(i),
+                    inspection: open_in_editor.then_some(i),
                 });
             }
             Err(e) => diagnostics.push(format!("{}: {e}", candidate.entry_path)),
@@ -1229,12 +1272,15 @@ fn import_file(state: &AppState, path: &Path) -> Reply<Vec<OpenProject>> {
 }
 #[tauri::command]
 async fn import_paths(app: tauri::AppHandle, paths: Vec<PathBuf>, include_report: Option<bool>) -> Reply<ImportResponse> {
-    if paths.len() > 16 {
-        return Err("Import at most 16 files at a time".into());
-    }
+    let include_report = include_report.unwrap_or(false);
+    // Large selections fill the library without loading every layout into an editor tab.
+    let library_only = include_report && paths.len() > 4;
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        import_response(collect_imports(paths, |path| import_file(&state, path)), include_report.unwrap_or(false))
+        let report = collect_imports(paths, library_only, |path| {
+            import_file_for_library(&state, path, !library_only)
+        });
+        import_response(report, include_report)
     })
     .await
     .map_err(error)?
@@ -1271,36 +1317,35 @@ async fn import_map_sources(app: tauri::AppHandle, paths: Option<Vec<PathBuf>>, 
             dialog.pick_files().await.unwrap_or_default().into_iter().map(|file| file.path().to_owned()).collect()
         }
     };
-    let maximum = if single { 1 } else { 16 };
-    if paths.len() > maximum {
-        return Err(format!("Choose at most {maximum} map files at a time"));
-    }
     if paths.is_empty() {
         return Ok(serde_json::json!({"entries": [], "failures": []}));
     }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let settings = lock(&state.settings)?.clone();
-        let library = lock(&state.library)?;
-        let mut imported = std::collections::HashSet::new();
+        let mut imported = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         let mut failures = Vec::new();
         for path in paths {
             let result = (|| {
                 if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("map") || ext.eq_ignore_ascii_case("yelo")) {
                     return Err("Choose a Halo .map or .yelo file".into());
                 }
+                let library = lock(&state.library)?;
                 let (project, inspection) = library.import_asset_source(&path, settings.resource_directory.as_deref()).map_err(error)?;
                 library.save_asset_source_reference(&project, &inspection).map_err(error)?;
-                imported.insert(project.id);
+                if seen.insert(project.id.clone()) {
+                    imported.push(project.id);
+                }
                 Ok(())
             })();
             if let Err(message) = result {
                 failures.push(ImportFailure { path, message });
             }
         }
-        let entries: Vec<_> = library.list().map_err(error)?.into_iter()
-            .filter(|entry| imported.contains(&entry.id)).collect();
-        drop(library);
+        let mut by_id: std::collections::HashMap<_, _> = lock(&state.library)?.list().map_err(error)?
+            .into_iter().map(|entry| (entry.id.clone(), entry)).collect();
+        let entries: Vec<_> = imported.into_iter().filter_map(|id| by_id.remove(&id)).collect();
         if !entries.is_empty() { let _ = app.emit("spark:library-changed", ()); }
         Ok(serde_json::json!({"entries": entries, "failures": failures}))
     }).await.map_err(error)?

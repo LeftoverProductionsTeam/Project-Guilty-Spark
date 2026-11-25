@@ -244,6 +244,8 @@ export default function App() {
   },[]);
   const [newTitle, setNewTitle] = useState('Untitled workshop');
   const [dragging, setDragging] = useState(false);
+  const [mapImportStatus, setMapImportStatus] = useState<string>();
+  const mapImports = useRef<Promise<void>>(Promise.resolve());
   const [help, setHelp] = useState(false);
   const [showFinder, setShowFinder] = useState(false);
   useEffect(()=>{if(native)document.documentElement.dataset.gsNativeFrame='true';},[]);
@@ -775,8 +777,9 @@ export default function App() {
           setDragging(false);
           const animations=payload.paths.filter(path=>/\.(jma|jmm|jmo|jmr|jmt|jmz|fbx|model_animations)$/i.test(path));
           const assets=payload.paths.filter(path=>/\.(obj|wav|ogg)$/i.test(path));
-          if(assets.length){if(assets.length!==payload.paths.length){notice('Drop maps/animations and custom assets separately.','info');return;}if(assets.length>16){notice('Import at most 16 custom files per drop.','error');return;}const event=new CustomEvent('guilty-spark-asset-file-drop',{cancelable:true,detail:{paths:assets,x:payload.position.x/window.devicePixelRatio,y:payload.position.y/window.devicePixelRatio}});window.dispatchEvent(event);if(!event.defaultPrevented)void importDroppedAssets(assets);}
-          else if(animations.length)void importAnimations(animations);
+          const containsMap = payload.paths.some(path => /\.(map|yelo|gsproject|zip)$/i.test(path));
+          if(assets.length&&!containsMap){if(assets.length!==payload.paths.length){notice('Drop maps/animations and custom assets separately.','info');return;}if(assets.length>16){notice('Import at most 16 custom files per drop.','error');return;}const event=new CustomEvent('guilty-spark-asset-file-drop',{cancelable:true,detail:{paths:assets,x:payload.position.x/window.devicePixelRatio,y:payload.position.y/window.devicePixelRatio}});window.dispatchEvent(event);if(!event.defaultPrevented)void importDroppedAssets(assets);}
+          else if(animations.length&&!containsMap)void importAnimations(animations);
           else {
             const event = new CustomEvent('guilty-spark-map-source-drop', {
               cancelable: true,
@@ -878,34 +881,51 @@ export default function App() {
     if(native&&!windowHistories.current.writable(projectId))return;
     flushSync(()=>dispatchDocument({type:'history',id:projectId,action:{type:'forge-defaults',projectId,materials}}));
   }
-  async function importFiles(paths?: string[], destination?: 'build') {
+  function importFiles(paths?: string[], destination?: 'build') {
+    const next = mapImports.current.then(() => runMapImport(paths, destination));
+    mapImports.current = next.catch(() => {});
+    return next;
+  }
+  async function runMapImport(paths?: string[], destination?: 'build') {
     setBusy(true);
+    setMapImportStatus(paths ? 'Importing '+paths.length+' files…' : 'Importing maps or archives…');
     try {
       if (historyRef.current.dirty) await save();
       const result = await call<ImportReport | OpenProject[]>(
         paths ? 'import_paths' : 'import_dialog',
         paths ? { paths, includeReport: true } : { includeReport: true },
       );
-      // Arrays remain valid for existing/offline integrations. The native
-      // studio receives both outcomes without losing successful documents.
-      const { projects: imported, failures } = Array.isArray(result) ? { projects: result, failures: [] } : result;
-      if (imported.length) {
-        for(const open of imported)await load(open);
-        dispatchDocument({type:'select',id:imported[0].project.id});
-        setWorkspace(destination && imported[0].project.source ? destination : imported[0].project.quickForge ? 'quickforge' : imported[0].inspection?.header.scenarioType===2 ? 'tags' : imported[0].inspection?.mesh.positions.length ? 'world' : 'tags');
-        notice(
-          `${imported.length} project${imported.length === 1 ? '' : 's'} imported. Source data preserved.${destination && imported[0].project.source ? ' Review the MCC conversion checks and prepare the installed tools.' : ''}`,
-          'success',
-        );
-        await refresh();
+      const report: ImportReport = Array.isArray(result) ? { projects: result, failures: [] } : result;
+      const { projects: imported, libraryProjectIds = [], failures } = report;
+      const count = imported.length + libraryProjectIds.length;
+      let first = imported[0];
+      if (!first && destination && libraryProjectIds.length) {
+        first = await call<OpenProject>('open_project', { id: libraryProjectIds[0] });
       }
+      for (const open of imported.length ? imported : first ? [first] : []) {
+        if (!documentsRef.current.documents.some(d => d.id === open.project.id)) await load(open, undefined, false);
+      }
+      if (first) {
+        dispatchDocument({type:'select',id:first.project.id});
+        setWorkspace(destination && first.project.source ? destination : first.project.quickForge ? 'quickforge' : first.inspection?.header.scenarioType===2 ? 'tags' : first.inspection?.mesh.positions.length ? 'world' : 'tags');
+      } else if (libraryProjectIds.length) {
+        setWorkspace('library');
+      }
+      if (count) await refresh();
+      const summary = count ? count + ' project' + (count === 1 ? '' : 's') +
+        (libraryProjectIds.length ? ' available in the Map Library.' : failures.length ? ' opened.' : ' imported. Source data preserved.') : '';
       if (failures.length) {
-        notice(`${imported.length ? `${imported.length} project${imported.length === 1 ? '' : 's'} opened. ` : ''}${failures.length} file${failures.length === 1 ? '' : 's'} could not be opened.\n${failures.map(failure => `${failure.path.split(/[\\/]/).pop()}: ${failure.message}`).join('\n')}`, 'error');
+        const failureDetails = failures.map(failure => failure.path.split(/[\\/]/).pop() + ': ' + failure.message).join('\n');
+        notice((summary ? summary+' ' : '') + failures.length + ' file' + (failures.length === 1 ? '' : 's')+
+          ' could not be opened.\n'+failureDetails, 'error');
+      } else if (count) {
+        notice(summary + (destination && first?.project.source ? ' Review the MCC conversion checks and prepare the installed tools.' : ''), 'success');
       }
     } catch (e) {
       notice(String(e), 'error');
       await refresh().catch(() => {});
     } finally {
+      setMapImportStatus(undefined);
       setBusy(false);
     }
   }
@@ -2014,9 +2034,9 @@ export default function App() {
             }}
           />}
           {busy && (
-            <div className="busy-indicator">
+            <div className="busy-indicator" role="status">
               <LoaderCircle className="spin" size={17} />
-              Processing source data…
+              {mapImportStatus ?? 'Processing source data…'}
             </div>
           )}
           {toast && <Toast {...toast} onClose={() => setToast(null)} />}

@@ -150,7 +150,7 @@ function BrushOutline({
         side={THREE.DoubleSide}
       />
       <Edges
-        color={preview ? '#ffc96b' : active ? '#a3ffe3' : brush.role === 'space' ? '#708db0' : '#daaa78'}
+        color={preview ? '#ffc96b' : active ? '#a3ffe3' : brush.role === 'space' ? '#708db0' : brush.role === 'cut' ? '#b49ce6' : '#daaa78'}
         threshold={15}
       />
     </mesh>
@@ -934,7 +934,7 @@ export default function BspWorkshop(props: Props) {
       )}
       {retainedDraftNotice}
       <div className="bsp-shape-toolbar">
-        <details ref={shapeMenu}><summary>Shapes ▾</summary><div role="group" aria-label="Drop-in BSP shapes">{(['room','box','wall','ramp','stairs','sphere'] as WorkshopPrimitive[]).map(kind=><button key={kind} disabled={disabled} aria-label={'Place BSP '+kind} title={kind==='sphere'?'Add a 3-unit-radius spherical cave. Move it into an editable room wall to carve an opening. Resize it with Scale.':'Click to add at the origin, or drag into a 3D or orthographic view. Select the volume to resize, reshape, name and assign materials.'} onPointerDown={event=>{shapeDrop.begin({key:kind},event);}} onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>{kind==='sphere'?'Sphere cave':kind[0].toUpperCase()+kind.slice(1)}</button>)}</div></details>
+        <details ref={shapeMenu}><summary>Shapes ▾</summary><div role="group" aria-label="Drop-in BSP shapes">{(['room','box','wall','ramp','stairs','sphere','sphereCut'] as WorkshopPrimitive[]).map(kind=><button key={kind} disabled={disabled} aria-label={kind==='sphereCut'?'Place BSP sphere cut':'Place BSP '+kind} title={kind==='sphereCut'?'Carve a sphere out of solid brushes inside an editable room. Move it into a wall, then adjust its radius with Scale.':kind==='sphere'?'Add a 3-unit-radius spherical cave. Move it into an editable room wall to carve an opening. Resize it with Scale.':'Click to add at the origin, or drag into a 3D or orthographic view. Select the volume to resize, reshape, name and assign materials.'} onPointerDown={event=>{shapeDrop.begin({key:kind},event);}} onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>{kind==='sphereCut'?'Sphere cut':kind==='sphere'?'Sphere cave':kind[0].toUpperCase()+kind.slice(1)}</button>)}</div></details>
         <small>Drop a shape → select its volume or face → drag an axis or edit Properties. Rooms are playable air; walls, ramps and stairs are solid.</small>
       </div>
       {shapeDrop.dragging&&<div className="viewport-asset-drop-hint">Drop shape into a BSP view</div>}
@@ -1112,10 +1112,10 @@ export default function BspWorkshop(props: Props) {
               <button
                 key={b.id}
                 className={brush?.id === b.id ? 'selected' : ''}
-                title={`${b.name} · ${b.role === 'space' ? 'Playable room / passage' : 'Solid geometry'}. Select to rename or reshape.`}
+                title={`${b.name} · ${b.role === 'space' ? 'Playable room / passage' : b.role === 'cut' ? 'Cut through solid brushes' : 'Solid geometry'}. Select to rename or reshape.`}
                 onClick={() => setSelection({ brushId: b.id })}
               >
-                {b.role === 'space' ? '◇' : '◆'} {b.name}
+                {b.role === 'space' ? '◇' : b.role === 'cut' ? '◌' : '◆'} {b.name}
               </button>
             ))}
           </div>

@@ -2151,6 +2151,46 @@ test('mixed native imports open the valid map and report the rejected file',asyn
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((row:any)=>row.command==='compatibility'&&row.args.id==='b')).toBe(true);
 });
 
+test('large Explorer drops keep every valid map in the library without opening its viewport',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Map library');
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    const imported:any[]=[];w.__droppedBatches=[];
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='import_paths'){
+        w.__droppedBatches.push(args.paths);
+        if(w.__droppedBatches.length===1)await new Promise<void>(resolve=>{w.__finishLargeDrop=resolve;});
+        else await new Promise<void>(resolve=>{w.__finishQueuedDrop=resolve;});
+        const data=await original('bootstrap',{});
+        const files=args.paths.filter((path:string)=>path.endsWith('.map'));
+        for(const path of files){
+          const name=path.split('/').at(-1)!.slice(0,-4);
+          imported.push({...data.entries[0],id:name,title:name});
+        }
+        return {projects:[],libraryProjectIds:files.map((path:string)=>path.split('/').at(-1)!.slice(0,-4)),
+          failures:args.paths.filter((path:string)=>!path.endsWith('.map')).map((path:string)=>({path,message:'Unsupported selection'}))};
+      }
+      const result=await original(command,args);
+      return command==='bootstrap'?{...result,entries:[...imported,...result.entries]}:result;
+    };
+    const files=Array.from({length:19},(_,i)=>'C:/owned/Bulk map '+(i+1)+'.map');
+    void w.__sparkMock.emit('tauri://drag-drop',{paths:[...files,'C:/owned/extra.obj'],position:{x:20,y:700}});
+  });
+  await expect(page.getByText('Importing 20 files…',{exact:true})).toBeVisible();
+  await page.evaluate(()=>void (window as any).__sparkMock.emit('tauri://drag-drop',{paths:['C:/owned/Final queued map.map'],position:{x:20,y:700}}));
+  expect(await page.evaluate(()=>(window as any).__droppedBatches.length)).toBe(1);
+  await page.evaluate(()=>(window as any).__finishLargeDrop());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__droppedBatches.length)).toBe(2);
+  await page.getByPlaceholder('Search your library…',{exact:true}).fill('Bulk map 19');
+  await expect(page.getByRole('heading',{name:'Bulk map 19',exact:true})).toBeVisible();
+  await expect(page.getByText(/extra\.obj: Unsupported selection/)).toBeVisible();
+  await page.evaluate(()=>(window as any).__finishQueuedDrop());
+  await page.getByPlaceholder('Search your library…',{exact:true}).fill('Final queued map');
+  await expect(page.getByRole('heading',{name:'Final queued map',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='open_project'&&call.args.id==='Bulk map 19'))).toBe(false);
+});
+
 test('an entirely rejected native batch leaves the current project available',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('42');await velocity.press('Enter');
@@ -3376,6 +3416,13 @@ test('BSP Shapes drops editable source stairs and preserves one-action Undo and 
  await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue('Sphere cave 1');
  await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.at(-1)?.vertices.length)).toBe(38);
+ await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');
+ await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
+ await workshop.locator('.bsp-shape-toolbar summary').click();
+ await workshop.getByRole('button',{name:'Place BSP sphere cut',exact:true}).click();
+ await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue('Sphere cut 1');
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.at(-1)?.role)).toBe('cut');
  await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');
  await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
 });
@@ -7075,7 +7122,9 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
       w.__sourceDropArgs = args;
       const data = await original('bootstrap', {});
       const entries = data.entries.filter((entry: any) => entry.id === 'c');
-      const result = {entries: extendsWorld ? entries.map((entry:any) => ({...entry,id:'dropped-ce-donor',version:609})) : entries, failures: []};
+      const donors = extendsWorld ? entries.map((entry:any) => ({...entry,id:'dropped-ce-donor',version:609})) : entries;
+      if (args.paths.length > 1) donors.push({...donors[0],id:'second-dropped-donor',title:'Another imported donor'});
+      const result = {entries: donors, failures: []};
       return extendsWorld ? new Promise(resolve => {w.__finishDonorDrop=()=>resolve(result);}) : result;
     };
   }, extendsWorld);
@@ -7093,16 +7142,17 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
     if(!await panel.isVisible())await openDrawer(page,'Construction');
     await revealPagedControl(assembly.locator('summary').first());
     await assembly.locator('summary').first().click();
-    drop=assembly.getByText('Drop a donor map here',{exact:true});
+    drop=assembly.getByText('Drop donor maps here',{exact:true});
     await revealPagedControl(drop);
   }
+  const paths = origin === 'drawer' ? ['C:/owned/donor.map','C:/owned/extra-donor.map'] : ['C:/owned/donor.map'];
   await drop.scrollIntoViewIfNeeded();
-  expect(await drop.evaluate((element) => {
+  expect(await drop.evaluate((element, paths) => {
     const box = element.getBoundingClientRect();
     return !window.dispatchEvent(new CustomEvent('guilty-spark-map-source-drop', {
-      cancelable: true, detail: { paths: ['C:/owned/donor.map'], x: box.x + box.width / 2, y: box.y + box.height / 2 },
+      cancelable: true, detail: { paths, x: box.x + box.width / 2, y: box.y + box.height / 2 },
     }));
-  })).toBe(true);
+  }, paths)).toBe(true);
   await expect(panel).toBeVisible();
   if(extendsWorld){
     await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishDonorDrop)).toBe('function');
@@ -7110,7 +7160,10 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
     await page.evaluate(()=>(window as any).__finishDonorDrop());
   }
   await expect(assembly.getByRole('combobox', { name: 'BSP donor map', exact: true, includeHidden: true })).toHaveValue(extendsWorld?'dropped-ce-donor':'c');
-  expect(await page.evaluate(() => (window as any).__sourceDropArgs)).toEqual({ paths: ['C:/owned/donor.map'], single: true });
+  expect(await page.evaluate(() => (window as any).__sourceDropArgs)).toEqual({ paths, single: true });
+  if (paths.length > 1) {
+    await expect(assembly.getByRole('combobox',{name:'BSP donor map',exact:true,includeHidden:true}).locator('option[value="second-dropped-donor"]')).toHaveCount(1);
+  }
   await expect(page.getByRole('tab', { name: 'Synthetic baseline', exact: true })).toHaveAttribute('aria-selected', 'true');
   const plan=await constructionControl(page,'button','Plan connected tunnel');
   await expect(plan).toBeEnabled();

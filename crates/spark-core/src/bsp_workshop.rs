@@ -171,7 +171,7 @@ pub fn validate_source(doc: &QuickForgeDocument) -> Result<()> {
             || b.name.is_empty()
             || b.name.len() > 100
             || b.name.chars().any(char::is_control)
-            || !["space", "solid"].contains(&b.role.as_str())
+            || !["space", "solid", "cut"].contains(&b.role.as_str())
             || b.vertices.len() < 4
             || b.vertices.len() > 128
             || b.faces.len() < 4
@@ -398,8 +398,25 @@ fn mesh_uncached(doc: &QuickForgeDocument) -> Result<ForgeMesh> {
         });
     }
     let mut space = space.unwrap();
+    let mut cuts: Option<Manifold> = None;
+    for b in w.brushes.iter().filter(|b| b.role == "cut") {
+        let next = solid(b, &mut slots)?;
+        cuts = Some(match cuts {
+            None => next,
+            Some(m) => checked(m.boolean(&next, OpType::Add))?,
+        });
+    }
     for b in w.brushes.iter().filter(|b| b.role == "solid") {
-        space = checked(space.boolean(&solid(b, &mut slots)?, OpType::Subtract))?;
+        let mut obstacle = solid(b, &mut slots)?;
+        // Cut only the obstacle. The playable room boundary still clips the result.
+        if let Some(cuts) = &cuts {
+            obstacle = obstacle.boolean(cuts, OpType::Subtract);
+            if obstacle.status() == Error::NoError && obstacle.is_empty() {
+                continue;
+            }
+            obstacle = checked(obstacle)?;
+        }
+        space = checked(space.boolean(&obstacle, OpType::Subtract))?;
     }
     let gl = space.get_mesh_gl64(-1);
     if gl.num_prop != 5 || gl.face_id.len() != gl.num_tri() {
@@ -533,11 +550,15 @@ pub fn report(doc: &QuickForgeDocument) -> Result<GeometryReport> {
             .iter()
             .filter(|b| b.role == "space")
             .any(|b| inside(b, p, -0.01))
-            && !w
+            && (!w
                 .brushes
                 .iter()
                 .filter(|b| b.role == "solid")
                 .any(|b| inside(b, p, 0.3))
+                || w.brushes
+                    .iter()
+                    .filter(|b| b.role == "cut")
+                    .any(|b| inside(b, p, -0.3)))
     };
     for s in &doc.spawns {
         let p = s.position.map(f64::from);

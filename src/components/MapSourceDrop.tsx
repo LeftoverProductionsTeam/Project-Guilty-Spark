@@ -68,8 +68,8 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
   }, [importSources]);
 
   if (!native) return null;
-  return <div ref={target} className="map-source-drop">
-    <span>{single ? 'Drop a donor map here' : 'Drop map files here'}</span>
+  return <div ref={target} className="map-source-drop" title={single ? 'Drop multiple maps to add them to the donor menu. Choose one for each connection.' : 'Drop a selection of maps to add them to the library.'}>
+    <span>{single ? 'Drop donor maps here' : 'Drop map files here'}</span>
     <button type="button" disabled={disabled || busy} onClick={() => void importSources()}>{busy ? 'Importing…' : single ? 'Browse for donor map' : 'Browse for map files'}</button>
     {message && <p role="status">{message}</p>}
   </div>;

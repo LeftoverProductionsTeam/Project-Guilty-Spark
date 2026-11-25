@@ -209,6 +209,19 @@ it('drop-in Workshop stairs preserve material density, have eight finite solid t
   expect(()=>placeWorkshopPrimitive(doc,'wall',[0,0,0],'missing')).toThrow(/material/);
 });
 
+it('sphere cut opens a solid wall while respecting the existing room boundary',()=>{
+  const room=boxBrush('room','space',[-6,-6,0],[6,6,4],'metal');
+  const wall=boxBrush('wall','solid',[-0.5,-4,0],[0.5,4,4],'metal');
+  const doc={workshop:{schemaVersion:1,brushes:[room,wall],portals:[]},
+    materials:[{id:'metal'}],geometry:[]} as unknown as QuickForgeDocument;
+  const result=placeWorkshopPrimitive(doc,'sphereCut',[0,0,1],'metal').document.workshop!;
+  expect(result.brushes[2].role).toBe('cut');
+  expect(pointInsideWorkshop(doc.workshop!,[0,0,1])).toBe(false);
+  expect(pointInsideWorkshop(result,[0,0,1])).toBe(true);
+  expect(pointInsideWorkshop(result,[0,3.5,1])).toBe(false);
+  expect(pointInsideWorkshop(result,[0,0,-1])).toBe(false);
+});
+
 it('sphere cave extends playable space through a room wall with closed convex source',()=>{
   const doc={workshop:{schemaVersion:1,brushes:[boxBrush('room','space',[-6,-6,-4],[6,6,4],'metal')],portals:[]},
     materials:[{id:'metal'}],geometry:[]} as unknown as QuickForgeDocument;

@@ -178,11 +178,11 @@ export default function BspAssembly({
   const [pickingLanding, setPickingLanding] = useMapState<'connector'|'ridge'|null>(project.id, 'bsp.pickingLanding', null);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
-  const [importedDonor, setImportedDonor] = useState<LibraryEntry>();
+  const [importedDonors, setImportedDonors] = useState<LibraryEntry[]>([]);
   const admitsDonor = (entry: LibraryEntry) => entry.id !== project.id && entry.sha256 !== sourceSha256
     && !!entry.sha256 && (canExtend ? entry.version === 609 : [6, 7, 13, 609].includes(entry.version ?? 0));
-  const donors = importedDonor && !entries.some(entry => entry.id === importedDonor.id)
-    ? [...entries, importedDonor] : entries;
+  const libraryIds = new Set(entries.map(entry => entry.id));
+  const donors = [...entries, ...importedDonors.filter(entry => !libraryIds.has(entry.id))];
   const candidates = donors.filter(admitsDonor);
   const [open, setOpen] = useMapState(project.id, 'bsp.open', false),
     [donor, setDonor] = useMapState(
@@ -379,15 +379,17 @@ export default function BspAssembly({
       </summary>
       {(!nativePartitioned || canExtend) && (
         <MapSourceDrop single disabled={busy || !active}
-          viewport={active ? {projectId: project.id, sourceSlot: canExtend ? viewedBsp : undefined, reveal: () => {setOpen(true);revealPanel('construction');}} : undefined} onImported={([entry], sourceSlot) => {
-          if (!admitsDonor(entry)) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
-          setImportedDonor(entry);
+          viewport={active ? {projectId: project.id, sourceSlot: canExtend ? viewedBsp : undefined, reveal: () => {setOpen(true);revealPanel('construction');}} : undefined} onImported={(rows, sourceSlot) => {
+          const compatible = rows.filter(admitsDonor);
+          const entry = compatible[0];
+          if (!entry) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
+          setImportedDonors(old => [...new Map([...old, ...compatible].map(donor => [donor.id, donor])).values()]);
           const selectedRegion = canExtend && sourceSlot !== undefined ? baseParts[sourceSlot] : undefined;
           if (selectedRegion && sourceSlot !== undefined) setBaseIndex(sourceSlot);
           setDonor(entry.id);
           setIndex(0);
           setError('');
-          return entry.title + (selectedRegion ? ' selected for '+selectedRegion.name+'.' : ' selected.') + ' Choose its BSP section and plan the connection.';
+          return entry.title + (selectedRegion ? ' selected for '+selectedRegion.name+'.' : ' selected.') + (compatible.length > 1 ? ' '+(compatible.length-1)+' more donors are available in the menu.' : '') + ' Choose its BSP section and plan the connection.';
         }} />
       )}
       {open && (

@@ -182,6 +182,45 @@ fn sky_seals_world_and_disconnected_drafts_never_export_as_valid_structure() {
     assert!(q::export_jms(&d).is_err());
 }
 #[test]
+fn sphere_cut_opens_overlapping_solids_and_preserves_room_shell() {
+    let mut doc = w::example().unwrap();
+    doc.spawns[0].position = [4., 0., 0.5];
+    let brushes = &mut doc.workshop.as_mut().unwrap().brushes;
+    brushes.extend([
+        w::box_brush("wall-one", "solid", [3.75, -5., -1.], [4.25, 5., 4.5], "surface"),
+        w::box_brush("wall-two", "solid", [3.5, -0.5, 0.], [4.5, 0.5, 1.7], "surface"),
+    ]);
+    assert!(q::validate(&doc).unwrap().issues.iter().any(|i| i.code == "WORKSHOP_SPAWN_CLEARANCE"));
+
+    // A low-poly spherical cut with outward source windings. It removes the
+    // small enclosed blocker and opens the wider wall at Z 0.
+    let mut cut = w::box_brush("sphere-cut", "cut", [-1., -1., -1.], [1., 1., 1.], "surface");
+    cut.position = [4., 0., 1.];
+    cut.vertices = vec![[0., 0., -3.], [3., 0., 0.], [0., 3., 0.], [-3., 0., 0.], [0., -3., 0.], [0., 0., 3.]];
+    let face = cut.faces[0].clone();
+    cut.faces.clear();
+    for i in 0..4 {
+        let current = i + 1;
+        let next = (i + 1) % 4 + 1;
+        for vertices in [[0, next, current], [5, current, next]] {
+            let mut triangle = face.clone();
+            triangle.id = format!("cut-{}", cut.faces.len());
+            triangle.vertices = vertices.to_vec();
+            cut.faces.push(triangle);
+        }
+    }
+    doc.workshop.as_mut().unwrap().brushes.push(cut);
+    let report = q::validate(&doc).unwrap();
+    assert!(report.valid, "{:?}", report.issues);
+    let mesh = q::preview_mesh(&doc).unwrap();
+    assert!(mesh.parts.iter().any(|p| p.brush_id == "sphere-cut" && p.face_id.is_some()));
+    assert!(mesh.parts.iter().any(|p| p.brush_id == "wall-one"));
+    assert!(!mesh.parts.iter().any(|p| p.brush_id == "wall-two"));
+    assert!(mesh.positions.chunks_exact(3).all(|p| p[2] >= 0.));
+    assert!(q::export_jms(&doc).unwrap().starts_with("8200\n"));
+}
+
+#[test]
 fn workshop_keeps_existing_scenario_and_spawn_guards() {
     let mut d = w::example().unwrap();
     d.game_mode = "ctf".into();

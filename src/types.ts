@@ -385,6 +385,7 @@ export interface OpenProject {
 }
 export interface ImportReport {
   projects: OpenProject[];
+  libraryProjectIds?: string[];
   failures: { path: string; message: string }[];
 }
 export interface CompatibilityReport {
