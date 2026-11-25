@@ -2055,8 +2055,8 @@ async fn preview_custom_sound(app:tauri::AppHandle,project_id:String,asset_id:St
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::custom_sounds::preview(&lib,&project_id,&asset_id,&sha256).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
-async fn inspect_map_ambience(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_audio::Inspection>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Choose a preserved map to inspect its ambience")?;core::bsp_audio::inspect_ambience(&source.preserved_path,&source.sha256).map_err(error)}).await.map_err(error)?
+async fn inspect_map_ambience(app:tauri::AppHandle,project_id:String,bsp_index:Option<usize>)->Reply<core::bsp_audio::Inspection>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Choose a preserved map to inspect its ambience")?;core::bsp_audio::inspect_ambience_for_bsp(&source.preserved_path,&source.sha256,bsp_index).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
 async fn import_animation_sources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,paths:Option<Vec<PathBuf>>)->Reply<Vec<core::animations::AnimationAsset>>{

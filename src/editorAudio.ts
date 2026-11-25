@@ -75,6 +75,9 @@ export class EditorAudioSession {
   private placed: SoundEmitter[] = [];
   private background: SoundEmitter[] = [];
   private metadata: Ambience | null = null;
+  private ambienceKey = '';
+  private ambienceRevision = 0;
+  private ambienceFailure = '';
   private backgroundKey = '';
   private sourceKey = '';
   private placedKey = '';
@@ -199,31 +202,42 @@ export class EditorAudioSession {
       this.failures.clear();
       this.failedClips.clear();
       this.paused = false;
-      const inspection = configuration.inspection,
-        project = configuration.project,
-        revision = this.sourceRevision;
-      if (
-        native &&
-        project.source &&
-        inspection?.sha256 === project.source.sha256 &&
-        inspection.tags.some((tag) => tag.class === 'sbsp')
-      )
-        void call<Ambience>('inspect_map_ambience', { projectId: project.id })
+    }
+    const { inspection, project, bspIndex } = configuration;
+    const bsp = bspIndex < 0 ? undefined : bspIndex;
+    const canInspect = native && project.source && inspection?.sha256 === project.source.sha256
+      && inspection.tags.some((tag) => tag.class === 'sbsp');
+    const ambienceKey = canInspect ? JSON.stringify([key, bsp]) : '';
+    if (ambienceKey !== this.ambienceKey) {
+      this.ambienceKey = ambienceKey;
+      const revision = ++this.ambienceRevision;
+      this.backgroundRevision++;
+      this.metadata = null;
+      this.background = [];
+      this.backgroundRequest = null;
+      this.backgroundKey = '';
+      this.failures.delete(this.backgroundFailure);
+      this.failures.delete(this.ambienceFailure);
+      this.backgroundFailure = '';
+      this.ambienceFailure = '';
+      if (canInspect)
+        void call<Ambience>('inspect_map_ambience', { projectId: project.id, ...(bsp === undefined ? {} : { bspIndex: bsp }) })
           .then((metadata) => {
-            if (this.closed || revision !== this.sourceRevision) return;
-            if (metadata.sourceSha256 !== project.source!.sha256 || metadata.bsps.length > 16)
-              throw Error('Map ambience source identity changed.');
+            if (this.closed || revision !== this.ambienceRevision) return;
+            if (metadata.sourceSha256 !== project.source!.sha256 || metadata.bsps.length > 16
+              || (bsp !== undefined && (metadata.bsps.length !== 1 || metadata.bsps[0].index !== bsp)))
+              throw Error('Map ambience belongs to a different source or BSP.');
             this.metadata = metadata;
             void this.synchronize();
           })
           .catch((reason) => {
-            if (!this.closed && revision === this.sourceRevision) {
-              this.failures.add(`Background ambience: ${String(reason)}`);
+            if (!this.closed && revision === this.ambienceRevision) {
+              this.ambienceFailure = `Background ambience: ${String(reason)}`;
+              this.failures.add(this.ambienceFailure);
               this.publish();
             }
           });
     }
-    const inspection = configuration.inspection;
     const placedKey = JSON.stringify(
       configuration.project.scene
         .filter((object) => inspection?.tags.some((tag) => tag.id === object.tagId && tag.class === 'ssce'))

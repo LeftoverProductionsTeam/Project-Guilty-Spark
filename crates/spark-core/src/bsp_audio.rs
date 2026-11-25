@@ -150,11 +150,15 @@ fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspectio
     read_with_listener(header, bytes, sha, ListenerReadback::None)
 }
 pub fn inspect_ambience(path: &Path, expected: &str) -> Result<Inspection> {
+    inspect_ambience_for_bsp(path, expected, None)
+}
+
+pub fn inspect_ambience_for_bsp(path: &Path, expected: &str, bsp_index: Option<usize>) -> Result<Inspection> {
     let (header, bytes, sha) = maps::read_cache_snapshot(path)?;
     if sha != expected {
         return invalid("Map ambience source changed");
     }
-    read_with_listener(&header, &bytes, sha, ListenerReadback::Ambience)
+    read_with_listener(&header, &bytes, sha, bsp_index.map_or(ListenerReadback::Ambience, ListenerReadback::Region))
 }
 /// Placement admission uses the same validated collision trees as ambience.
 // Process each resident BSP once, retaining only a mask for each exact point.
@@ -219,6 +223,7 @@ pub(crate) fn inspect_placement_regions(
 enum ListenerReadback<'a> {
     None,
     Ambience,
+    Region(usize),
     Placement(&'a mut PlacementRegions),
 }
 
@@ -293,6 +298,7 @@ fn read_with_listener(
     let (mut total_clusters, mut total_subclusters) = (0, 0);
     let (mut total_nodes, mut total_planes, mut total_leaves) = (0, 0, 0);
     for index in 0..bsp_count {
+        if matches!(listener, ListenerReadback::Region(selected) if selected != index) { continue; }
         let row = refs + index * 32;
         let path = dependency(row + 16, "sbsp")?
             .ok_or_else(|| SparkError::Invalid("Scenario BSP audio reference is null".into()))?;
@@ -403,7 +409,7 @@ fn read_with_listener(
                     total_planes += plane_count;
                     total_leaves += leaf_count;
                     if total_nodes > 131072 || total_planes > 65536 || total_leaves > 65536 {
-                        return invalid("Map ambience listener geometry exceeds its total budget");
+                        return invalid("Choose an individual BSP to preview this map’s ambience. Its full listener geometry exceeds the overview budget.");
                     }
                 }
                 if node_count == 0 || collision_leaf_count != leaf_count {
@@ -470,6 +476,9 @@ fn read_with_listener(
             pas_sha256: data_hash(root + 0x214)?,
             listener_tree,
         });
+    }
+    if matches!(listener, ListenerReadback::Region(_)) && bsps.is_empty() {
+        return invalid("Choose an existing BSP for map ambience");
     }
     Ok(Inspection {
         source_sha256: sha,
@@ -1382,6 +1391,10 @@ mod tests {
         half(&mut bytes, 0x2b18, 1);
         let report = read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Ambience).unwrap();
         let tree = report.bsps[0].listener_tree.as_ref().unwrap();
+        let region = read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Region(0)).unwrap();
+        assert_eq!(region.bsps.len(), 1);
+        assert_eq!(region.bsps[0].listener_tree.as_ref().unwrap().nodes, tree.nodes);
+        assert!(read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Region(1)).is_err());
         assert_eq!(tree.leaf_clusters, vec![Some(0), Some(1)]);
         assert_eq!(tree.nodes, vec![[0, 0x80000000, 0x80000001]]);
         let points = [[-1., 0., 0.], [1., 0., 0.]];

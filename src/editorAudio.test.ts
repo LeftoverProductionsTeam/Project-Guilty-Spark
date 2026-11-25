@@ -282,13 +282,15 @@ it('discards a failed background request after the selected BSP changes',async()
   config.project.source={sha256:hash} as Project['source'];
   const inspection={sha256:hash,tags:[{id:1,class:'sbsp'},{id:10,class:'lsnd',path:'sound/actual'}]} as never;
   let reject!:(error:Error)=>void;
-  hooks.ipc.mockImplementation((command)=>command==='inspect_map_ambience'?Promise.resolve({sourceSha256:hash,
-    bsps:[{index:0,tagPath:'levels/test',backgroundPalette:[{tagPath:'sound/actual'}],clusters:[{index:0,background:0}]}]}):
+  hooks.ipc.mockImplementation((command,args)=>command==='inspect_map_ambience'?Promise.resolve({sourceSha256:hash,
+    bsps:[{index:args.bspIndex,tagPath:'levels/test',backgroundPalette:[{tagPath:'sound/actual'}],clusters:[{index:0,background:args.bspIndex===0?0:null}]}]}):
     new Promise((_resolve,fail)=>{reject=fail;}));
   const session=new EditorAudioSession(projectId);session.connect();session.update({...config,inspection});
   await flush();expect(reject).toBeTypeOf('function');
   session.update({...config,inspection,bspIndex:1});
   reject(Error('Old background resource is unavailable'));await flush();
+  expect(hooks.ipc).toHaveBeenCalledWith('inspect_map_ambience',{projectId,bspIndex:0});
+  expect(hooks.ipc).toHaveBeenCalledWith('inspect_map_ambience',{projectId,bspIndex:1});
   expect(session.getSnapshot().detail).not.toContain('Old background');
   expect(session.getSnapshot().voices).toBe(0);
   await expect(session.assignedAmbience()).rejects.toThrow(/No unique BSP/);
