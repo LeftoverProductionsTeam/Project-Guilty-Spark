@@ -413,7 +413,13 @@ it('authors personal native flag guidance with body-change and settlement cleanu
  expect(output.content).toContain('(set gs_sq01_nav_members (forerunner_squad_01_players))');
  const callback=output.content.slice(output.content.indexOf('(script continuous forerunner_squad_01_complete'));expect(callback.indexOf('(set gs_sq01_nav_stage 0)')).toBeLessThan(callback.indexOf('(set gs_sq01_settled_2 true)'));
  expect(exportHaloCeMission(JSON.parse(JSON.stringify(studio)),{forerunner:true})).toEqual(output);
- studio.missions.forEach(beat=>delete beat.squadNumber);expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/squad scope/);
+ studio.missions.forEach(beat=>delete beat.squadNumber);
+ const shared=exportHaloCeMission(studio,{forerunner:true});
+ expect(shared.content).toContain('(set gs_nav_members (players))');
+ expect(shared.content).not.toMatch(/forerunner_squad_|gs_running|gs_aborted/);
+ const wake=shared.content.slice(shared.content.indexOf('(script dormant forerunner_extraction_complete'),shared.content.indexOf('(script static void gs_nav_hide'));
+ expect(wake).toMatch(/set gs_nav_stage 0[\s\S]*set gs_settled_2 true/);
+ expect(()=>exportHaloCeMission(studio)).toThrow(/Forerunner mission export/);
  studio.missions[0].guidance!.flag='bad ) (quit';expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow();
 });
 

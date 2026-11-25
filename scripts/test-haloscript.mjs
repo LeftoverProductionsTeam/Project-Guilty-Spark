@@ -216,6 +216,25 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   for(const [i,name]of encounters.entries())args.push('-S','encounters['+i+'].name',name);
   for(const [i,name]of devices.entries())args.push('-S','object_names['+(i+2)+'].name',name,'-S','controls['+i+'].name',String(i+2));
   await run('invader-edit',['-n',...args,scenario]);
+  const shared=emptyCreatorStudio();
+  shared.missions=[
+   {id:'deploy',title:'Deploy',objective:'Report to the field terminal',trigger:'deviceActivated',triggerRef:'extraction_deploy',encounterName:'',guidance:{object:'extraction_deploy',height:0.35}},
+   {id:'return',title:'Return',objective:'Extract and bank gear',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',guidance:{object:'extraction_activate',height:0.35}},
+  ];
+  await fs.mkdir(path.join(tags,'globals'));
+  await fs.mkdir(path.join(tags,'ui'));
+  await run('invader-edit',['-N','-I','waypoint_arrows','1','end','-S','waypoint_arrows[0].name','default','ui/test.hud_globals']);
+  await run('invader-edit',['-N','-I','interface_bitmaps','1','end','-S','interface_bitmaps[0].hud_globals','ui/test.hud_globals','globals/globals.globals']);
+  const mission=exportHaloCeMission(shared,{forerunner:true});
+  const missionFile=path.join(data,'scripts',mission.filename);
+  await fs.writeFile(missionFile,mission.content);
+  await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  const missionNames=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
+  assert.deepEqual(new Set(missionNames),new Set(['forerunner_extraction_complete','gs_nav_hide','gs_nav_show','gs_nav_update','gs_guard','gs_mission']));
+  const missionGlobals=(await run('invader-edit',['-G','globals[*].name',scenario])).split(/\r?\n/);
+  for(const name of ['gs_nav_members','gs_nav_previous','gs_nav_stage','gs_settled_2'])assert.ok(missionGlobals.includes(name),name);
+  await fs.unlink(missionFile);
+  console.log('PASS: shared mission object guidance native CE compile and independent script/global readback');
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');
   const results=[];
   for(const [returnAfterInsertion,holdParkedPilot,checkPlayerSeats,emptyRoute] of [[false,false,false],[true,false,false],[false,true,false],[true,true,false],[true,true,true],[true,true,true,true]]){
