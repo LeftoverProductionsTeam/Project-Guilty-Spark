@@ -751,12 +751,12 @@ mod tests {
     #[test]
     fn native_gameplay_counts_use_distinct_bounded_scenario_arrays() {
         let mut bytes = vec![0u8; 8192];
-        for (block, count, start) in [(0x354, 3u32, 0x600u32), (0x384, 5, 0x800), (0x378, 9, 0x1000)] {
+        for (block, count, start) in [(0x354, 3u32, 0x600u32), (0x384, 5, 0x800), (0x378, 9, 0x1000), (0x240, 7, 0x1600)] {
             bytes[block..block + 4].copy_from_slice(&count.to_le_bytes());
             bytes[block + 4..block + 8].copy_from_slice(&start.to_le_bytes());
         }
         let space = Space { begin: 0, end: bytes.len(), address: 0 };
-        assert_eq!(native_gameplay_counts(&Reader(&bytes), &space, 0).unwrap(), [3, 5, 9]);
+        assert_eq!(native_gameplay_counts(&Reader(&bytes), &space, 0).unwrap(), [3, 5, 9, 7]);
         bytes[0x37c..0x380].copy_from_slice(&8000u32.to_le_bytes());
         assert!(native_gameplay_counts(&Reader(&bytes), &space, 0).is_err());
     }
