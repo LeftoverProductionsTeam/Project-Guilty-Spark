@@ -893,32 +893,7 @@ fn generate_end(
         *value = f64::from(*value as f32);
     }
     crate::bsp_triangulate::improve_native_render(&mut gl);
-    for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
-        let slot = gl.face_id[face] as usize;
-        if slot >= materials.len() {
-            return invalid("Boolean material provenance is invalid");
-        }
-        if materials[slot].shader_path.is_none() || materials[slot].flags & 2 != 0 {
-            continue;
-        }
-        let first = mesh.positions.len() / 3;
-        let order = [ids[0], ids[2], ids[1]];
-        let points: [V; 3] = std::array::from_fn(|n| {
-            std::array::from_fn(|k| gl.vert_properties[order[n] as usize * 5 + k])
-        });
-        let n = normal(points[0], points[1], points[2]);
-        for (v, p) in points.iter().enumerate() {
-            mesh.positions.extend(p.map(|x| x as f32));
-            mesh.normals.extend(n.map(|x| x as f32));
-            mesh.uvs.extend([
-                gl.vert_properties[order[v] as usize * 5 + 3] as f32,
-                gl.vert_properties[order[v] as usize * 5 + 4] as f32,
-            ]);
-        }
-        mesh.indices
-            .extend([first as u32, first as u32 + 1, first as u32 + 2]);
-        triangle_materials.push(slot);
-    }
+    append_render_faces(&gl, &materials, &mut mesh, &mut triangle_materials)?;
     mesh.parts.push(maps::MeshPart {
         name: "Connected world".into(),
         index_start: 0,
@@ -945,6 +920,41 @@ fn generate_end(
     };
     Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials}, overlap_floor))
 }
+fn append_render_faces(
+    gl: &MeshGL64,
+    materials: &[AssemblyMaterial],
+    mesh: &mut MeshData,
+    slots: &mut Vec<usize>,
+) -> Result<()> {
+    for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
+        let slot = gl.face_id[face] as usize;
+        if slot >= materials.len() {
+            return invalid("Boolean material provenance is invalid");
+        }
+        if materials[slot].shader_path.is_none() || materials[slot].flags & 2 != 0 {
+            continue;
+        }
+        let first = mesh.positions.len() / 3;
+        let order = [ids[0], ids[2], ids[1]];
+        let points: [V; 3] = std::array::from_fn(|n| {
+            std::array::from_fn(|k| gl.vert_properties[order[n] as usize * 5 + k])
+        });
+        let n = normal(points[0], points[1], points[2]);
+        for (v, p) in points.iter().enumerate() {
+            mesh.positions.extend(p.map(|x| x as f32));
+            mesh.normals.extend(n.map(|x| x as f32));
+            mesh.uvs.extend([
+                gl.vert_properties[order[v] as usize * 5 + 3] as f32,
+                gl.vert_properties[order[v] as usize * 5 + 4] as f32,
+            ]);
+        }
+        mesh.indices
+            .extend([first as u32, first as u32 + 1, first as u32 + 2]);
+        slots.push(slot);
+    }
+    Ok(())
+}
+
 // Automatic cuts may span a change of grade along the same horizontal run.
 // Keep authored segment identities intact, and never join around an XY bend.
 fn portal_spans(route:&BspAssembly)->Vec<(usize,usize)>{
@@ -1270,6 +1280,110 @@ pub fn generate_partitioned_project(
         overlap, overlap_samples, max_floor_delta,
     })
 }
+/// Build the only new geometry in an intact partition connection. Landings
+/// stay level across the switch footprints and the native parent BSPs are
+/// consulted as collision inputs only.
+pub fn generate_preserved_connector(
+    project: &Project, base: &MapInspection, cancel: &AtomicBool,
+) -> Result<AssemblyGeometry> {
+    let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a BSP connection first".into()))?;
+    let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
+    plan.validate()?;
+    if !plan.separate_native_bsps || !can_extend_partitions(project, base) || base.mesh.parts.len() > 14
+        || source.sha256 != base.sha256 || maps::hash_file(&source.preserved_path)? != base.sha256
+        || plan.donor_source.cache_version != 609 || plan.yaw_degrees != 0. || !plan.native_seals.is_empty() {
+        return invalid("An intact connector needs a retained MCC13 parent with two free BSP slots, one standard CE donor, translation without yaw and no source seal edits");
+    }
+    let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
+    if donor.sha256 != plan.donor_source.sha256 || donor.header.extended || donor.header.version != 609
+        || donor.header.scenario_type != 1 || donor.mesh.parts.len() != 1 {
+        return invalid("The exact standard single-BSP Custom Edition multiplayer donor is required");
+    }
+    let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
+    let delta = sub(end, start);
+    let length = delta[0].hypot(delta[1]);
+    let forward = [delta[0] / length, delta[1] / length, 0.];
+    let side = mul([-forward[1], forward[0], 0.], f64::from(plan.tunnel_width) / 2.);
+    let offset = |center, distance| add(center, mul(forward, distance));
+    let overlap = |center| [offset(center, -2.3), offset(center, 2.3)];
+    let points = [offset(start, -3.0), offset(start, 2.5), offset(end, -2.5), offset(end, 3.0)];
+    let mut review = plan.clone();
+    review.separate_native_bsps = false;
+    review.base_bsp_index = 0;
+    review.tunnel_points = points[1..3].to_vec();
+    review.validate()?;
+
+    for direction in [forward, [0., 0., 1.], [0., 0., -1.]] {
+        let donor_near = projected_bounds(&donor.mesh, 0, plan.translation, 0., direction)?[0];
+        let base_far = (0..base.mesh.parts.len()).map(|slot|
+            projected_bounds(&base.mesh, slot, [0.; 3], 0., direction).map(|range| range[1])
+        ).collect::<Result<Vec<_>>>()?.into_iter().fold(f64::NEG_INFINITY, f64::max);
+        if donor_near - base_far >= 8. { break; }
+        if direction[2] == -1. {
+            return invalid("Intact regions need eight units of separation along the route or vertically");
+        }
+    }
+
+    let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
+    let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
+    let mut landings = Vec::with_capacity(2);
+    for (label, mesh, part, center, displacement) in [
+        ("Retained", &base_collision, plan.base_bsp_index, start, [0.; 3]),
+        ("Donor", &donor_collision, 0, end, plan.translation),
+    ] {
+        let result = (|| {
+            let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, part)?;
+            let landing = overlap(center).map(|point| sub(point, displacement));
+            review.tunnel_points = landing.to_vec();
+            checker.verify(&review)?;
+            checker.verify_return(&review)?;
+            let profile = checker.floor_profile(landing)?;
+            let difference = profile.into_iter().map(|z| (z + displacement[2] - center[2]).abs()).fold(0., f64::max);
+            if difference > 0.02 {
+                return invalid(format!("Floor differs from the level connector by {difference:.3} units"));
+            }
+            Ok(difference)
+        })();
+        landings.push(result.map_err(|error| SparkError::Invalid(format!("{label} connector landing: {error}")))?);
+    }
+
+    let height = f64::from(plan.tunnel_height);
+    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, None));
+    let mut body = solids.next().unwrap()?;
+    for solid in solids {
+        if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
+        body = checked(body.boolean_with_engine_and_token(&solid?, OpType::Add, BooleanEngine::Auto, None), "Intact BSP connector")?;
+    }
+    let render = body.get_mesh_gl64(-1);
+    let mut materials = vec![AssemblyMaterial {
+        name: format!("gsconnector{}x", &base.sha256[..8]),
+        source: 0, shader_path: Some(plan.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
+        flags: 0, collision_only: false,
+    }];
+    let (mut mesh, mut triangle_materials) = collision_layer(&render, &mut materials)?;
+    for point in mesh.positions.chunks_exact(3) {
+        validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
+    }
+    review.tunnel_points = vec![overlap(start)[0], points[1], points[2], overlap(end)[1]];
+    let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
+    let route_clearance = checker.verify_details(&review)?;
+    checker.verify_return(&review)?;
+    for landing in [start, end] {
+        if checker.floor_profile(overlap(landing))?.into_iter().any(|z| (z - landing[2]).abs() > 0.02) {
+            return invalid("Connector surface does not match a reviewed landing");
+        }
+    }
+    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials)?;
+    mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
+    let report = AssemblyReport {
+        input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
+        generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
+        portal_count: 0, route_clearance, donor_scenery: 0,
+        warnings: vec![format!("Shared level floor differs by at most {:.3} units across both landings. Donor extraction, scenario binding and runtime travel are separate checks.", landings[0].max(landings[1]))],
+    };
+    Ok(AssemblyGeometry { mesh, materials, triangle_materials, report })
+}
+
 pub(crate) fn verify_bound_partition_collision(
     cache: &Path, map: &MapInspection, plan: &BspAssembly, inherited: &[BspAssembly], overlap: [V; 2], original_count: usize,
 ) -> Result<serde_json::Value> {

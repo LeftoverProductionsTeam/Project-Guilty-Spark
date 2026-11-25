@@ -594,7 +594,7 @@ async fn inspect_native_bsp_transitions(
 }
 
 #[tauri::command]
-async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>,native_bsp_index:Option<usize>)->Reply<serde_json::Value>{
+async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>,native_bsp_index:Option<usize>,intact_connector:Option<bool>)->Reply<serde_json::Value>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if let Some(draft)=draft {
             let saved=p.bsp_assembly.as_ref().ok_or("Apply the donor identity before previewing seam drafts")?;
@@ -603,7 +603,10 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         }
         let i=inspect(&state,&p)?;
         let cancel = AtomicBool::new(false);
-        let (geometry, partition_report) = if p.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
+        let preserve_donor = intact_connector.unwrap_or(false);
+        let (geometry, partition_report) = if preserve_donor {
+            (core::bsp_assembly::generate_preserved_connector(&p, &i, &cancel).map_err(error)?, None)
+        } else if p.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
             let selected = native_bsp_index.unwrap_or(0);
             if selected > 1 { return Err("Choose native BSP 0 or 1".into()); }
             let parts = core::bsp_assembly::generate_partitioned_project(&p, &i, &cancel).map_err(error)?;
@@ -630,7 +633,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
                     }
                 }
             }
-            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
         }
         Ok(result)
     }).await.map_err(error)?
@@ -1191,6 +1194,55 @@ async fn download_and_import_maps(app:tauri::AppHandle,id:String)->Reply<Vec<Ope
             Ok(opened)=>{state.map_downloads.mark_imported(&id,opened.iter().map(|p|p.project.id.clone()).collect()).map_err(error)?;let _=app.emit("spark:library-changed",());Ok(opened)},
             Err(reason)=>{let _=state.map_downloads.mark_import_failed(&id);Err(reason)}
         }
+    }).await.map_err(error)?
+}
+/// Import source-only library entries for in-place creator workflows.
+#[tauri::command]
+async fn import_map_sources(app: tauri::AppHandle, paths: Option<Vec<PathBuf>>, single: bool) -> Reply<serde_json::Value> {
+    let paths = if let Some(paths) = paths {
+        paths
+    } else {
+        let dialog = rfd::AsyncFileDialog::new()
+            .set_title(if single { "Choose a donor map" } else { "Add maps to the batch" })
+            .add_filter("Halo map files", &["map", "yelo"]);
+        if single {
+            dialog.pick_file().await.into_iter().map(|file| file.path().to_owned()).collect()
+        } else {
+            dialog.pick_files().await.unwrap_or_default().into_iter().map(|file| file.path().to_owned()).collect()
+        }
+    };
+    let maximum = if single { 1 } else { 16 };
+    if paths.len() > maximum {
+        return Err(format!("Choose at most {maximum} map files at a time"));
+    }
+    if paths.is_empty() {
+        return Ok(serde_json::json!({"entries": [], "failures": []}));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let settings = lock(&state.settings)?.clone();
+        let library = lock(&state.library)?;
+        let mut imported = std::collections::HashSet::new();
+        let mut failures = Vec::new();
+        for path in paths {
+            let result = (|| {
+                if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("map") || ext.eq_ignore_ascii_case("yelo")) {
+                    return Err("Choose a Halo .map or .yelo file".into());
+                }
+                let (project, inspection) = library.import_asset_source(&path, settings.resource_directory.as_deref()).map_err(error)?;
+                library.save_asset_source_reference(&project, &inspection).map_err(error)?;
+                imported.insert(project.id);
+                Ok(())
+            })();
+            if let Err(message) = result {
+                failures.push(ImportFailure { path, message });
+            }
+        }
+        let entries: Vec<_> = library.list().map_err(error)?.into_iter()
+            .filter(|entry| imported.contains(&entry.id)).collect();
+        drop(library);
+        if !entries.is_empty() { let _ = app.emit("spark:library-changed", ()); }
+        Ok(serde_json::json!({"entries": entries, "failures": failures}))
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -3697,6 +3749,7 @@ pub fn run() {
             import_paths,
             open_built_map,
             import_dialog,
+            import_map_sources,
             save_project,
             update_project,
             list_project_snapshots,

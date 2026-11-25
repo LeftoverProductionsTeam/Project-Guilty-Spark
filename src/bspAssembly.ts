@@ -56,7 +56,7 @@ export interface AssemblyReport {
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];
   warnings: string[];
-  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;surfaces:{source:number;mesh:import('./types').MeshData}[]};
+  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;surfaces:{source:number;mesh:import('./types').MeshData}[]};
 }
 /** Semantic identity across IPC object-key ordering and old omitted options. */
 export function assemblySignature(plan: BspAssembly | null): string {

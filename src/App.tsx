@@ -777,7 +777,14 @@ export default function App() {
           const assets=payload.paths.filter(path=>/\.(obj|wav|ogg)$/i.test(path));
           if(assets.length){if(assets.length!==payload.paths.length){notice('Drop maps/animations and custom assets separately.','info');return;}if(assets.length>16){notice('Import at most 16 custom files per drop.','error');return;}const event=new CustomEvent('guilty-spark-asset-file-drop',{cancelable:true,detail:{paths:assets,x:payload.position.x/window.devicePixelRatio,y:payload.position.y/window.devicePixelRatio}});window.dispatchEvent(event);if(!event.defaultPrevented)void importDroppedAssets(assets);}
           else if(animations.length)void importAnimations(animations);
-          else void importFiles(payload.paths);
+          else {
+            const event = new CustomEvent('guilty-spark-map-source-drop', {
+              cancelable: true,
+              detail: { paths: payload.paths, x: payload.position.x / window.devicePixelRatio, y: payload.position.y / window.devicePixelRatio },
+            });
+            window.dispatchEvent(event);
+            if (!event.defaultPrevented) void importFiles(payload.paths);
+          }
         }
       }),
     );

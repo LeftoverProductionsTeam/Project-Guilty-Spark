@@ -6734,3 +6734,116 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   await panel.getByRole('button',{name:'Export Forge layout copy'}).click();
   expect(await fs.readFile((await (await returnedDownload).path())!)).toEqual(revised);
 });
+
+test('creator map-source drop selects the donor without switching projects', async ({ page }) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command !== 'import_map_sources') return original(command, args);
+      w.__sourceDropArgs = args;
+      const data = await original('bootstrap', {});
+      return { entries: data.entries.filter((entry: any) => entry.id === 'c'), failures: [] };
+    };
+  });
+  await chooseTool(page, 'Level editor');
+  if (!await page.getByRole('region', { name: 'Construction panel', exact: true }).isVisible()) await openDrawer(page, 'Construction');
+  const assembly = page.locator('.bsp-assembly:visible');
+  await revealPagedControl(assembly.locator('summary').first());
+  await assembly.locator('summary').first().click();
+  const drop = assembly.getByText('Drop a donor map here', { exact: true });
+  await revealPagedControl(drop);
+  await drop.scrollIntoViewIfNeeded();
+  expect(await drop.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return !window.dispatchEvent(new CustomEvent('guilty-spark-map-source-drop', {
+      cancelable: true, detail: { paths: ['C:/owned/donor.map'], x: box.x + box.width / 2, y: box.y + box.height / 2 },
+    }));
+  })).toBe(true);
+  await expect(assembly.getByRole('combobox', { name: 'BSP donor map', exact: true, includeHidden: true })).toHaveValue('c');
+  expect(await page.evaluate(() => (window as any).__sourceDropArgs)).toEqual({ paths: ['C:/owned/donor.map'], single: true });
+  await expect(page.getByRole('tab', { name: 'Synthetic baseline', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(await constructionControl(page, 'button', 'Plan connected tunnel')).toBeEnabled();
+});
+
+test('creator batch import seeds a reviewed selection and changing the value retires the review', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    const template = { class: 'proj', path: 'weapons/projectile', field: 'velocity', label: 'Velocity', kind: 'float', unit: 'units/s' };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const ids = ['imported-a', 'imported-b'];
+      if (command === 'import_map_sources') {
+        const data = await original('bootstrap', {});
+        return { entries: data.entries.filter((entry: any) => ['a', 'b'].includes(entry.id)).map((entry: any) => ({ ...entry, id: 'imported-' + entry.id, version: 609 })), failures: [] };
+      }
+      if (command === 'search_batch_fields') return { fields: [{ ...template, matchingProjectIds: ids }], unreadableMaps: [], totalMatches: 1 };
+      if (command === 'preview_numeric_batch') {
+        w.__batchReviewArgs = args;
+        return { reviewSha256: 'f'.repeat(64), recoverable: false, rows: ids.map((projectId, index) => ({
+          projectId, issue: null, edit: { before: 10 + index, after: args.rule.value, unit: 'units/s', sourceSha256: 'e'.repeat(64), cacheVersion: 609 },
+        })) };
+      }
+      return original(command, args);
+    };
+  });
+  await chooseTool(page, 'Map library');
+  const batch = page.locator('.multi-map-batch');
+  await batch.getByText('Multi Map Batch Editing', { exact: true }).click();
+  await expect(batch.getByRole('button', { name: 'Find fields and check selected maps' })).toBeDisabled();
+  await batch.getByRole('button', { name: 'Browse for map files' }).press('Enter');
+  await expect(batch.getByText('1. Source maps · 2 selected', { exact: true })).toBeVisible();
+  await batch.getByRole('textbox', { name: 'Tag or field' }).fill('Velocity');
+  await batch.getByRole('button', { name: 'Find fields and check selected maps' }).click();
+  await batch.getByRole('combobox', { name: 'Numeric tag field' }).selectOption({ index: 1 });
+  await batch.getByRole('spinbutton', { name: 'New value' }).fill('20');
+  await batch.getByRole('button', { name: 'Review every map' }).click();
+  await expect(batch.getByRole('list', { name: 'Per-map review' })).toContainText('11 → 20');
+  expect(await page.evaluate(() => (window as any).__batchReviewArgs.ids)).toEqual(['imported-a', 'imported-b']);
+  await expect(batch.getByRole('button', { name: 'Build and verify batch' })).toBeEnabled();
+  await batch.getByRole('spinbutton', { name: 'New value' }).fill('21');
+  await expect(batch.getByRole('button', { name: 'Build and verify batch' })).toHaveCount(0);
+});
+
+test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(async () => {
+    const w = window as any, mock = w.__sparkMock, original = w.__TAURI_INTERNALS__.invoke;
+    const base = mock.projects.a;
+    const donor = mock.projects.b;
+    donor.project.source.cacheVersion = 609;
+    donor.inspection.header.version = 609;
+    base.project.source.cacheVersion = 13;
+    base.inspection.header.version = 13;
+    base.inspection.mesh.parts = [
+      { name: 'Base region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
+      { name: 'Other region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
+    ];
+    const plan = await original('plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
+    base.project.bspAssembly = { ...plan, separateNativeBsps: true };
+    base.project.inheritedBspConnections = [base.project.bspAssembly];
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command !== 'preview_bsp_assembly' || !args.intactConnector) return original(command, args);
+      w.__intactPreviewArgs = args;
+      return {
+        inputTriangles: 0, outputTriangles: 56, connectorTriangles: 28, generatedUvFaces: 28,
+        portalCount: 0, walkSamples: 2046, warnings: [],
+        viewport: { projectId: 'a', sourceSha256: base.inspection.sha256, donorSha256: donor.inspection.sha256,
+          assembly: args.draft, retainsBase: true, retainsDonor: true, surfaces: [] },
+      };
+    };
+  });
+  await openFixture(page);
+  await chooseTool(page, 'Level editor');
+  if (!await page.getByRole('region', { name: 'Construction panel', exact: true }).isVisible()) await openDrawer(page, 'Construction');
+  const assembly = page.locator('.bsp-assembly:visible');
+  await revealPagedControl(assembly.locator('summary').first());
+  await assembly.locator('summary').first().click();
+  await (await constructionControl(page, 'button', 'Pick donor landing')).click();
+  await expect(page.getByText('Click the landing floor on the donor region.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel landing selection', exact: true }).click();
+  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await expect(assembly.getByLabel('Connector triangle budget')).toContainText('28 triangles · connector export: 56');
+  expect(await page.evaluate(() => (window as any).__intactPreviewArgs.intactConnector)).toBe(true);
+});

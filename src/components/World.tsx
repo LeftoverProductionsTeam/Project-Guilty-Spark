@@ -482,8 +482,8 @@ function Scene({
       {assembly&&project.bspAssembly&&(()=>{
         const plan=joinedPreview?.assembly??project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         return <group name="gs-assembly-donor" userData={{assetSurface:true}} position={plan.translation} rotation={[0,0,plan.yawDegrees*Math.PI/180]}>
-          {!joinedPreview&&<Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures} onSurfaceClick={!cinematic&&onPickSurface&&pickTarget==='donor'?(triangle,point)=>{const pick=nativeEdgePick(assembly.terrain,source.inspection!.sha256,triangle,donorPoint(point,plan,true));if(pick)onPickSurface(pick);}:undefined}/>}
-          {!joinedPreview&&!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
+          {(!joinedPreview||joinedPreview.retainsDonor)&&<Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures} onSurfaceClick={!cinematic&&onPickSurface&&pickTarget==='donor'?(triangle,point)=>{const pick=nativeEdgePick(assembly.terrain,source.inspection!.sha256,triangle,donorPoint(point,plan,true));if(pick)onPickSurface(pick);}:undefined}/>}
+          {(!joinedPreview||joinedPreview.retainsDonor)&&!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
           {assembly.scenery.map(object=>{const model=ownedModels[forgeModelKey({...identity,tagId:object.tagId!})];return <group key={object.id} position={object.position} rotation={[object.rotation[2],object.rotation[1],object.rotation[0],'ZYX']} scale={object.scale}><ObjectVisual greenScreen={greenScreen} object={object} asset={model?.mesh??source.inspection?.modelMeshes?.[object.tagId!]} selected={false} size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?model?.shaderTextures:EMPTY_SHADER_TEXTURES} shaderMetadata={model?.shaderMetadata} extraTextures={model?.extraTextures}/></group>;})}
         </group>;
       })()}
@@ -629,6 +629,7 @@ export default function World({
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [surfacePick,setSurfacePick]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const [pickTarget,setPickTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
+  const [pickingLanding, setPickingLanding] = useMapState(project.id, 'bsp.pickingLanding', false);
   const activity=useWorkspaceActivity();
   const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
@@ -1762,7 +1763,7 @@ export default function World({
               <button onClick={() => setSelected(null)}>Deselect object</button>
             </div>
           )}
-          {pickTarget&&<div className="viewport-object-actions" role="status">Click an edge on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>setPickTarget(null)}>Cancel edge selection</button></div>}
+          {pickTarget&&<div className="viewport-object-actions" role="status">Click {pickingLanding?'the landing floor':'an edge'} on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>{setPickTarget(null);setPickingLanding(false);}}>{pickingLanding?'Cancel landing selection':'Cancel edge selection'}</button></div>}
           {!pickTarget&&!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
             <strong>BSP {surfacePick.bspIndex+1} · landscape</strong>
             <button onClick={()=>openObjectTag(surfacePick.shaderTagId)}>Surface shader</button>

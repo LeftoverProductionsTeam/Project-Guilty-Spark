@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { call, native } from '../api';
 import type { LibraryEntry } from '../types';
+import MapSourceDrop from './MapSourceDrop';
 
 type Field = { class: string; path: string; field: string; label: string; kind: string; unit: string; matchingProjectIds: string[] };
 type FieldSearch = { fields: Field[]; unreadableMaps: { projectId: string; problem: string }[]; totalMatches: number };
@@ -9,7 +10,14 @@ type Preview = { rows: { projectId: string; edit: Edit | null; problem: string |
 type Outcome = { batchId: string; published: boolean; recoverable: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
 
 export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entries: LibraryEntry[]; onOpenMccTools: () => void }) {
-  const savedMaps = entries.filter((entry) => entry.version != null && !entry.sessionOnly);
+  const [importedMaps, setImportedMaps] = useState<LibraryEntry[]>([]);
+  const mapsById = new Map(entries.map(entry => [entry.id, entry]));
+  for (const entry of importedMaps) {
+    if (!mapsById.has(entry.id) || mapsById.get(entry.id)?.sessionOnly) mapsById.set(entry.id, entry);
+  }
+  const maps = [...mapsById.values()];
+  const supportsBatch = (entry: LibraryEntry) => (entry.version === 609 || entry.version === 13) && !entry.sessionOnly;
+  const savedMaps = maps.filter(supportsBatch);
   const [selected, setSelected] = useState<string[]>([]);
   const ids = selected.filter((id) => savedMaps.some((entry) => entry.id === id));
   const [mapQuery, setMapQuery] = useState('');
@@ -23,19 +31,23 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   const [pending, setPending] = useState(false);
   const [job, setJob] = useState<string>();
   const [cancelRequested, setCancelRequested] = useState(false);
-  const title = (id: string) => entries.find((entry) => entry.id === id)?.title ?? id;
+  const title = (id: string) => maps.find((entry) => entry.id === id)?.title ?? id;
   const rule = field && { class: field.class, path: field.path, field: field.field, value: Number(value) };
   const filtered = savedMaps.filter((entry) => `${entry.title} ${entry.engine}`.toLowerCase().includes(mapQuery.toLowerCase()));
   const unreadable = search?.unreadableMaps.filter((map) => ids.includes(map.projectId)) ?? [];
   const compatible = field ? ids.filter((id) => field.matchingProjectIds.includes(id)) : [];
   const missing = field ? ids.filter((id) => !compatible.includes(id) && !unreadable.some((map) => map.projectId === id)) : [];
   const canReview = !!rule && !!value.trim() && Number.isFinite(rule.value);
+  const additions = filtered.filter(entry => !ids.includes(entry.id)).map(entry => entry.id);
+  const campaign = savedMaps.filter(entry => entry.scenarioType === 0).map(entry => entry.id);
 
   function select(next: string[]) {
     setSelected(next);
     setSearch(undefined);
     setField(undefined);
     setPreview(undefined);
+    setOutcome(undefined);
+    setProblem('');
   }
 
   async function perform(action: () => Promise<void>) {
@@ -63,7 +75,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   return (
     <details className="panel multi-map-batch">
       <summary>Multi Map Batch Editing</summary>
-      <p>Review one numeric tag change across saved imported maps and build a separate set of MCC map files.</p>
+      <p>Choose maps, review one shared numeric tag edit and build separate MCC map files.</p>
       {!native ? <p>Batch review and compilation are available in the desktop app.</p> : (
         <>
           <button type="button" disabled={pending || Boolean(job)} onClick={() => {
@@ -72,31 +84,47 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
             onOpenMccTools();
           }}>MCC editing tools</button>
           <fieldset disabled={pending || Boolean(job)}>
-            <legend>Source maps · {ids.length} selected</legend>
+            <legend>1. Source maps · {ids.length} selected</legend>
+            <MapSourceDrop disabled={pending || Boolean(job)} onImported={rows => {
+              const eligible = rows.filter(supportsBatch);
+              const combined = [...new Set([...ids, ...eligible.map(entry => entry.id)])];
+              setImportedMaps(old => [...new Map([...old, ...rows].map(entry => [entry.id, entry])).values()]);
+              select(combined.slice(0, 32));
+              const excluded = rows.length - eligible.length;
+              return [
+                excluded ? excluded + ' imported source(s) are outside the supported CE609 and MCC13 batch formats.' : '',
+                combined.length > 32 ? 'The first 32 maps are selected. Clear other selections to include the remaining maps.' : '',
+              ].filter(Boolean).join(' ');
+            }} />
             <label>Find saved maps <input value={mapQuery} onChange={(event) => setMapQuery(event.target.value)} /></label>
-            <button type="button" disabled={!savedMaps.some((entry) => entry.scenarioType === 0)} onClick={() => select(savedMaps.filter((entry) => entry.scenarioType === 0).map((entry) => entry.id))}>
+            <button type="button" disabled={!additions.length || ids.length >= 32} onClick={() => select([...ids, ...additions].slice(0, 32))}>
+              Add visible maps
+            </button>
+            <button type="button" disabled={!campaign.length || campaign.length > 32} onClick={() => select(campaign)}>
               Select saved solo maps
             </button>
             <button type="button" disabled={!ids.length} onClick={() => select([])}>Clear selection</button>
-            {ids.length > 32 && <p role="alert">Choose at most 32 maps for one batch.</p>}
+            {ids.length === 32 && <p role="status">32-map limit reached. Clear a selection to add another map.</p>}
+            {ids.length < 2 && <p>Select at least two saved CE609 or MCC13 maps.</p>}
             <div className="batch-map-list">
               {filtered.map((entry) => (
                 <label key={entry.id}>
-                  <input type="checkbox" checked={ids.includes(entry.id)} onChange={(event) => select(event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))} />
+                  <input type="checkbox" checked={ids.includes(entry.id)} disabled={ids.length >= 32 && !ids.includes(entry.id)} onChange={(event) => select(event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))} />
                   <span>{entry.title} · cache {entry.version}</span>
                 </label>
               ))}
               {!filtered.length && <p>No matching saved maps.</p>}
             </div>
           </fieldset>
-          <fieldset disabled={pending || Boolean(job)}>
-            <legend>Numeric tag edit</legend>
+          <fieldset disabled={ids.length < 2 || pending || Boolean(job)}>
+            <legend>2. Shared numeric tag edit</legend>
             <form onSubmit={(event) => {
               event.preventDefault();
               if (!ids.length || ids.length > 32) return;
               setSearch(undefined);
               setField(undefined);
               setPreview(undefined);
+              setOutcome(undefined);
               void perform(async () => {
                 setSearch(await call<FieldSearch>('search_batch_fields', { ids, query }));
               });
@@ -109,6 +137,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
               <select aria-label="Numeric tag field" value={field ? JSON.stringify(field) : ''} onChange={(event) => {
                 setField(search.fields.find((match) => JSON.stringify(match) === event.target.value));
                 setPreview(undefined);
+                setOutcome(undefined);
               }}>
                 <option value="">Choose a field</option>
                 {search.fields.map((match) => {
@@ -125,9 +154,10 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
             )}
             {unreadable.map((map) => <p key={map.projectId} role="status">{title(map.projectId)} · {map.problem}</p>)}
             {missing.length > 0 && <p>Missing or incompatible field in {missing.map(title).join(', ')}.</p>}
-            <label>New value <input type="number" step="any" value={value} onChange={(event) => {
+            <label>New value <input type="number" step="any" value={value} disabled={!field} onChange={(event) => {
               setValue(event.target.value);
               setPreview(undefined);
+              setOutcome(undefined);
             }} /></label>
             <button type="button" disabled={!canReview || ids.length < 2 || ids.length > 32}
               onClick={() => review(ids)}>Review every map</button>
@@ -137,7 +167,8 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
             )}
           </fieldset>
           {preview && (
-            <>
+            <fieldset>
+              <legend>3. Review and build</legend>
               <ul aria-label="Per-map review">
                 {preview.rows.map(({ projectId, edit, problem: issue }) => (
                   <li key={projectId}><strong>{title(projectId)}</strong>{edit
@@ -160,7 +191,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
                   }
                 });
               }}>{preview.recoverable ? 'Resume and verify batch' : 'Build and verify batch'}</button>
-            </>
+            </fieldset>
           )}
           {job && <button type="button" disabled={cancelRequested} onClick={() => {
             setCancelRequested(true);

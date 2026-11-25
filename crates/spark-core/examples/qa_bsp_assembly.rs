@@ -67,6 +67,19 @@ fn main() -> Result<()> {
         }));
         return Ok(());
     }
+    if a.len() == 4 && a[1] == "--export-intact-connector" {
+        let p = spark_core::project::load_project(Path::new(&a[2]))?;
+        let source = p.source.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("No preserved base map".into()))?;
+        let base = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
+        let connector = bsp_assembly::generate_preserved_connector(&p, &base, &AtomicBool::new(false))?;
+        let output = Path::new(&a[3]);
+        spark_core::reject_links(output)?;
+        fs::create_dir(output)?;
+        fs::write(output.join("connector.jms"), bsp_assembly::export_jms(&connector)?)?;
+        fs::write(output.join("connector-materials.json"), serde_json::to_vec(&connector.materials)?)?;
+        println!("{}", serde_json::to_string(&connector.report)?);
+        return Ok(());
+    }
     if a.len() == 4 && a[1] == "--export-partitions" {
         let p = spark_core::project::load_project(Path::new(&a[2]))?;
         let source = p.source.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("No preserved base map".into()))?;

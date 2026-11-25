@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
-import {selectedSeamEdge} from '../seamEdges';
+import {donorPoint, selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
 import { runtimeProfileLabel } from '../runtimeWorkbench';
@@ -12,6 +12,7 @@ import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
+import MapSourceDrop from './MapSourceDrop';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 interface NativeBspTransitions {
   cacheSha256: string;
@@ -147,11 +148,15 @@ export default function BspAssembly({
   const [sealLift, setSealLift] = useMapState(project.id, 'bsp.nativeSealLift', 0);
   const [nativeBspIndex, setNativeBspIndex] = useMapState(project.id, 'bsp.nativePartitionPreview', 0);
   const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
+  const [pickingLanding, setPickingLanding] = useMapState(project.id, 'bsp.pickingLanding', false);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
-  const candidates = entries.filter(
-    (e) => e.id !== project.id && e.sha256 && (canExtend ? e.version === 609 : [6, 7, 13, 609].includes(e.version ?? 0)),
-  );
+  const [importedDonor, setImportedDonor] = useState<LibraryEntry>();
+  const admitsDonor = (entry: LibraryEntry) => entry.id !== project.id && entry.sha256 !== sourceSha256
+    && !!entry.sha256 && (canExtend ? entry.version === 609 : [6, 7, 13, 609].includes(entry.version ?? 0));
+  const donors = importedDonor && !entries.some(entry => entry.id === importedDonor.id)
+    ? [...entries, importedDonor] : entries;
+  const candidates = donors.filter(admitsDonor);
   const [open, setOpen] = useMapState(project.id, 'bsp.open', false),
     [donor, setDonor] = useMapState(
       project.id,
@@ -258,6 +263,10 @@ export default function BspAssembly({
     });
   }
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
+  const savedPlan = project.bspAssembly;
+  const donorPositionApplied = !!draft && !!savedPlan && draft.donorProjectId === savedPlan.donorProjectId
+    && draft.donorBspIndex === savedPlan.donorBspIndex && draft.yawDegrees === savedPlan.yawDegrees
+    && draft.translation.every((axis, index) => axis === savedPlan.translation[index]);
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
@@ -281,22 +290,33 @@ export default function BspAssembly({
   }
   useEffect(()=>{
     if(!edgeTarget||!draft||!pickedSurface)return;
-    const hash=edgeTarget==='base'?project.source?.sha256:draft.donorSource.sha256,bsp=edgeTarget==='base'?0:draft.donorBspIndex;
+    const base = edgeTarget === 'base';
+    const hash = base ? project.source?.sha256 : draft.donorSource.sha256;
+    const bsp = base ? draft.baseBspIndex ?? 0 : draft.donorBspIndex;
+    if (pickingLanding) {
+      if (pickedSurface.sourceHash !== hash || pickedSurface.bspIndex !== bsp) return;
+      const point = base ? pickedSurface.point : donorPoint(pickedSurface.point, draft);
+      update({ tunnelPoints: draft.tunnelPoints.map((old, index) => index === (base ? 0 : 1) ? point : old) });
+      setEdgeTarget(null);
+      setPickingLanding(false);
+      setPickedSurface(null);
+      return;
+    }
     const edge=hash?selectedSeamEdge(pickedSurface,hash,bsp):null;if(!edge)return;
     setEdgePicks(previous=>({...previous,[edgeTarget]:edge}));setEdgeTarget(edgeTarget==='base'?'donor':null);setPickedSurface(null);
-  },[pickedSurface,edgeTarget,project.source?.sha256,draft?.donorSource.sha256,draft?.donorBspIndex]);
-  async function previewDraft(value:Plan|null=draftNow.current){
+  },[pickedSurface,edgeTarget,pickingLanding,project.source?.sha256,draft?.donorSource.sha256,draft?.donorBspIndex,draft?.baseBspIndex]);
+  async function previewDraft(value:Plan|null=draftNow.current, intactConnector = false){
     if(!value||!project.bspAssembly||busy)return;
     await perform(async current=>{
       const signature=assemblySignature(value);
-      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined});
+      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector ? { intactConnector: true } : {})});
       if(current()&&latest.current.signature===signature){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
   function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
   }
-  function armEdge(target:'base'|'donor'){setPickedSurface(null);setEdgeTarget(target);}
+  function armEdge(target:'base'|'donor', landing = false){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
       <div className="bsp-vector">
@@ -324,7 +344,7 @@ export default function BspAssembly({
       </summary>
       {open && (
         <div className="bsp-assembly-body">
-          {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · full source: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
+          {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!}/>}
@@ -341,6 +361,14 @@ export default function BspAssembly({
               {' '}connections alongside the new route.
             </p>
           )}
+          <MapSourceDrop single disabled={busy || !active} onImported={([entry]) => {
+            if (!admitsDonor(entry)) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
+            setImportedDonor(entry);
+            setDonor(entry.id);
+            setIndex(0);
+            setError('');
+            return entry.title + ' selected. Choose its BSP section and plan the connection.';
+          }} />
           <div className="bsp-actions">
             {canExtend && <label>Connect from BSP
               <select value={baseIndex} onChange={event => {
@@ -680,6 +708,15 @@ export default function BspAssembly({
                   onChange={event => update({ separateNativeBsps: event.target.checked })} /> Separate native BSPs</label>
                 {draft.separateNativeBsps && <>
                   <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
+                  {canExtend && baseParts.length <= 14 && <div>
+                    <button type="button" disabled={busy || !native || !project.bspAssembly || !selectionMatches || draft.yawDegrees !== 0}
+                      onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
+                    <div className="bsp-actions">
+                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', true); }}>Pick current BSP landing</button>
+                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', true)}>Pick donor landing</button>
+                    </div>
+                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. The preview keeps both original BSPs visible. Building with the intact donor is still pending.</p>
+                  </div>}
                   {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
                     onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
                     <option value={0}>BSP 0 · Current region</option>
