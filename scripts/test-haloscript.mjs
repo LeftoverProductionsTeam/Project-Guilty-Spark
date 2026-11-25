@@ -252,6 +252,16 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   const earlyTypes=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
   assert.equal(earlyTypes[earlyNames.indexOf('gs_optional_contracts')],'dormant');
   console.log('PASS: native early evacuation and independent optional script type readback');
+  // Native author-provided hooks use the existing Forerunner operation interface.
+  await fs.writeFile(missionFile,'(script continuous forerunner_squad_01_begin (sleep -1) (sleep 1))\n(script continuous forerunner_squad_01_aborted (sleep -1) (sleep 1))\n');
+  await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  const callbacks=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
+  const kinds=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
+  const returns=(await run('invader-edit',['-G','scripts[*].return_type',scenario])).split(/\r?\n/);
+  assert.deepEqual(callbacks,['forerunner_squad_01_begin','forerunner_squad_01_aborted']);
+  assert.deepEqual(kinds,['continuous','continuous']);
+  assert.deepEqual(returns,['void','void']);
+  console.log('PASS: native per-squad deployment and abort callback signatures');
   await fs.unlink(missionFile);
   console.log('PASS: shared mission object guidance native CE compile and independent script/global readback');
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');

@@ -430,6 +430,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
 /// A recovered native mission may lack Studio metadata. Admit the existing
 /// engine mode from its compiled callback/markers, never from a project label.
 pub const SQUAD_OBJECTIVES_FEATURE:&str="extraction.squad_objectives.v1";
+pub const SQUAD_BEGIN_FEATURE:&str="extraction.squad_begin.v1";
 pub const FACTION_LANDING_ZONES_FEATURE: &str = "extraction.faction_landing_zones.v1";
 pub const PELICAN_RETURN_PAD_FEATURE: &str = "extraction.pelican_return_pad.v1";
 /// Native interface names from the reviewed Forerunner contract. This detects
@@ -441,14 +442,30 @@ fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>>
     if !(1..=22).contains(&number){return invalid("Native squad binding exceeds the reviewed Forerunner 01–22 interface range; this is not player-scale acceptance");}
     Ok(Some(number))
 }
+fn squad_callbacks(scripts:&[crate::maps::Script], suffix:&str)->Result<std::collections::BTreeSet<u8>> {
+    let mut callbacks=std::collections::BTreeSet::new();
+    for script in scripts {
+        if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_",suffix)? {
+            // CE types 1 and 2 are dormant and continuous. Both have void return type (4).
+            if !matches!(script.script_type,1|2)||script.return_type!=4||!callbacks.insert(number){
+                return invalid(format!("Native squad {suffix} callbacks require unique dormant or continuous void declarations"));
+            }
+        }
+    }
+    Ok(callbacks)
+}
 pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps::MapInspection)->Result<Option<Vec<String>>> {
     let callbacks=map.scripts.iter().filter(|s|s.name=="forerunner_extraction_complete").collect::<Vec<_>>();
     let mut queries=std::collections::BTreeSet::new();
     for script in &map.scripts{if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_","_players")?{
         if script.script_type!=3||script.return_type!=23||!queries.insert(number){return invalid("Native squad player queries require unique static object_list declarations");}
     }}
+    let begins=squad_callbacks(&map.scripts,"_begin")?;
+    let settled=squad_callbacks(&map.scripts,"_complete")?;
+    let aborted=squad_callbacks(&map.scripts,"_aborted")?;
+    let has_squad_scripts=![&queries,&begins,&settled,&aborted].iter().all(|rows|rows.is_empty());
     if map.header.version!=609||map.header.scenario_type!=0||map.header.extended{
-        if callbacks.is_empty()&&queries.is_empty(){return Ok(None);}
+        if callbacks.is_empty()&&!has_squad_scripts{return Ok(None);}
         return invalid("Forerunner Extraction requires a standard native CE609 solo map");
     }
     if !callbacks.is_empty()&&(callbacks.len()!=1||callbacks[0].script_type!=1){return invalid("Forerunner settled Extraction requires one dormant completion callback");}
@@ -461,13 +478,13 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
     for (index,name) in markers.names.iter().enumerate(){if let Some(number)=squad_interface_number(&name.name,"extraction_squad_","")?{
         if name.object_type!=8||name.object_index<0||!terminals.insert(number)||markers.devices.iter().filter(|device|device.class=="ctrl"&&device.index==name.object_index as usize&&device.name_index==index as i16).count()!=1{return invalid("Native squad terminals require unique live control bindings");}
     }}
-    let mut settled=std::collections::BTreeSet::new();
-    for script in &map.scripts{if let Some(number)=squad_interface_number(&script.name,"forerunner_squad_","_complete")?{if !settled.insert(number){return invalid("Native squad completion callbacks must be unique");}}}
-    let squad=!queries.is_empty()||!ready.is_empty()||!terminals.is_empty()||!settled.is_empty();
+    if !begins.is_subset(&terminals)||!aborted.is_subset(&terminals){return invalid("Native squad begin and abort callbacks require their matching numbered hub terminal");}
+    let squad=has_squad_scripts||!ready.is_empty()||!terminals.is_empty();
     if callbacks.is_empty()&&!squad{return Ok(None);}
     let faction_landing_zones = crate::native_logic::validate_compiled_extraction_layout(map, &markers)?;
     let mut features = Vec::new();
     if squad { features.push(SQUAD_OBJECTIVES_FEATURE.into()); }
+    if !begins.is_empty() { features.push(SQUAD_BEGIN_FEATURE.into()); }
     if faction_landing_zones { features.push(FACTION_LANDING_ZONES_FEATURE.into()); }
     if markers.volumes.iter().any(|volume| volume.name == "pelican_return") {
         features.push(PELICAN_RETURN_PAD_FEATURE.into());
@@ -1163,6 +1180,18 @@ mod tests {
         let binding=recovered_mission_binding(&project,&source(true)).unwrap().unwrap();
         assert_eq!(binding.missions[0].guidance.as_ref().unwrap().target(),Some("extraction_deploy"));
         assert!(recovered_mission_binding(&project,&source(false)).unwrap_err().to_string().contains("Forerunner"));
+    }
+
+    #[test]
+    fn detects_only_supported_native_squad_callback_signatures(){
+        let script=|name:&str,script_type,return_type|crate::maps::Script{name:name.into(),script_type,return_type};
+        let valid=vec![script("forerunner_squad_01_begin",2,4),script("forerunner_squad_22_begin",1,4),script("forerunner_squad_01_aborted",2,4)];
+        assert_eq!(squad_callbacks(&valid,"_begin").unwrap(),[1,22].into_iter().collect());
+        assert_eq!(squad_callbacks(&valid,"_aborted").unwrap(),[1].into_iter().collect());
+        for bad in [script("forerunner_squad_01_begin",3,4),script("forerunner_squad_01_begin",2,5),script("forerunner_squad_23_begin",2,4)]{
+            assert!(squad_callbacks(&[bad],"_begin").is_err());
+        }
+        assert!(squad_callbacks(&[valid[0].clone(),valid[0].clone()],"_begin").is_err());
     }
 
     #[test]
