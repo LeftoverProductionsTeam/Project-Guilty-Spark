@@ -592,10 +592,13 @@ pub fn validate_extraction_layout(doc:&QuickForgeDocument,activation_powered:boo
     let zone=|name:&str|->Result<&Trigger>{let found=logic.triggers.iter().filter(|t|trigger_name(t)==name).collect::<Vec<_>>();if found.len()!=1{return invalid(format!("Extraction needs one named {name} volume"));}Ok(found[0])};
     let hub=zone("extraction_return")?;let field=zone("extraction_zone")?;
     let inside=|point:[f32;3],volume:&Trigger|trigger_geometry(volume).is_ok_and(|geometry|geometry.contains(point));
-    for(name,powered)in[("extraction_deploy",true),("extraction_activate",activation_powered)] {
-        let rows=logic.devices.iter().filter(|d|d.native_name.as_deref()==Some(name)).collect::<Vec<_>>();if rows.len()!=1||rows[0].powered!=powered||!rows[0].initial_position.is_finite()||!(0. ..0.5).contains(&rows[0].initial_position){return invalid("Extraction native control power/position is incomplete");}
+    for(name,powered)in[("extraction_deploy",true),("extraction_activate",activation_powered),("extraction_loadout",true),("extraction_debrief",true)] {
+        let rows=logic.devices.iter().filter(|d|d.native_name.as_deref()==Some(name)).collect::<Vec<_>>();
+        if rows.is_empty() && matches!(name, "extraction_loadout" | "extraction_debrief") { continue; }
+        if rows.len()!=1||rows[0].powered!=powered||!rows[0].initial_position.is_finite()||!(0. ..0.5).contains(&rows[0].initial_position){return invalid("Extraction native control power/position is incomplete");}
         let placements=doc.placements.iter().filter(|p|p.id==rows[0].placement_id&&p.tag_class=="ctrl").collect::<Vec<_>>();if placements.len()!=1{return invalid("Extraction needs one native control placement per binding");}let p=placements[0].position;
-        if name=="extraction_deploy"&&(!inside(p,hub)||inside(p,field))||name=="extraction_activate"&&!inside(p,field){return invalid("Extraction controls are outside their native hub/activation areas");}
+        let valid = if name == "extraction_activate" { inside(p, field) } else { inside(p, hub) && !inside(p, field) };
+        if !valid { return invalid(format!("Extraction control {name} is outside its required hub or activation area")); }
     }
     if doc.spawns.is_empty()||doc.spawns.iter().any(|spawn|!inside(spawn.position,hub)||inside(spawn.position,field)){return invalid("Every selectable native player start must be inside the safe hub and outside activation, including hidden or filtered starts");}
     Ok(())
@@ -689,6 +692,14 @@ pub fn validate_compiled_extraction_layout(map: &crate::maps::MapInspection, rea
     let in_field = |point| field_zones.iter().any(|field| field.contains(point));
     if !hub.contains(deploy) || in_field(deploy) {
         return invalid("Compiled Extraction deployment control must be inside the hub and outside field zones");
+    }
+    for name in ["extraction_loadout", "extraction_debrief"] {
+        if has_name(name) {
+            let point = control(name)?;
+            if !hub.contains(point) || in_field(point) {
+                return invalid(format!("Compiled Extraction control {name} must be inside the safe hub and outside field zones"));
+            }
+        }
     }
     let mut starts = map.objects.iter().filter(|object| object.kind == "Player spawn").peekable();
     if starts.peek().is_none() || starts.any(|spawn| !hub.contains(spawn.position) || in_field(spawn.position)) {
@@ -951,7 +962,7 @@ pub(crate) fn compile(
             .position(|p| p.id == binding.placement_id).unwrap();
         let position_group = linked_position_group(binding, &controls, signal_count);
         if placement.tag_class == "ctrl" && (position_group >= 0 ||
-            matches!(binding.native_name.as_deref(), Some("extraction_deploy" | "extraction_activate"))) {
+            matches!(binding.native_name.as_deref(), Some("extraction_deploy" | "extraction_activate" | "extraction_loadout" | "extraction_debrief"))) {
             let actual = runner.run(edit, &["-t".into(), tags.clone(), "-G".into(), "triggers_when".into(),
                 format!("{}.device_control", placement.tag_path)], workspace, "logic-control-readback", 72)?;
             if actual.trim().replace('_', " ") != "touched by player" {

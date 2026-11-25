@@ -760,6 +760,25 @@ mod test_fixture;
 mod tests {
     #[test]
     #[ignore = "Requires an explicitly selected owned CE609 Black Echo pad candidate"]
+    fn compiled_extraction_loadout_must_be_usable_from_the_hub() {
+        let cache = std::path::PathBuf::from(
+            std::env::var_os("SPARK_NATIVE_PELICAN_PAD_MAP").expect("Select the owned compiled Black Echo fixture"),
+        );
+        let map = crate::maps::inspect_map(&cache, None).unwrap();
+        let mut markers = crate::maps::scenario_logic_readback(&cache, &map).unwrap();
+        crate::native_logic::validate_compiled_extraction_layout(&map, &markers).unwrap();
+        let control_index = markers.names.iter().position(|name| name.name == "extraction_loadout").unwrap();
+        let activation_index = markers.names.iter().position(|name| name.name == "extraction_activate").unwrap();
+        let field = markers.devices.iter().find(|control| control.name_index == activation_index as i16).unwrap().position;
+        let loadout = markers.devices.iter_mut().find(|control| control.name_index == control_index as i16).unwrap();
+        loadout.position = field;
+        let error = crate::native_logic::validate_compiled_extraction_layout(&map, &markers).unwrap_err();
+        assert!(error.to_string().contains("extraction_loadout must be inside the safe hub"));
+        assert_eq!(crate::maps::hash_file(&cache).unwrap(), map.sha256);
+    }
+
+    #[test]
+    #[ignore = "Requires an explicitly selected owned CE609 Black Echo pad candidate"]
     fn compiled_pelican_return_pad_requires_explicit_runtime_support() {
         let cache = std::path::PathBuf::from(
             std::env::var_os("SPARK_NATIVE_PELICAN_PAD_MAP").expect("Select the owned compiled pad fixture"),

@@ -261,6 +261,24 @@ it('reports missing Extraction starts and does not call unknown hub bindings saf
  expect(extractionLayout(doc).playerStarts.safe).toBeNull();
 });
 
+it('validates optional loadout and debrief controls inside the safe hub',()=>{
+ const doc=extractionSource();
+ const [deploy]=doc.placements;
+ const loadout={...deploy,id:'loadout',position:[1,0,0] as typeof deploy.position};
+ const debrief={...deploy,id:'debrief',position:[-1,0,0] as typeof deploy.position};
+ doc.placements.push(loadout,debrief);
+ doc.logic!.devices.push(
+  {placementId:'loadout',nativeName:'extraction_loadout',powered:true,initialPosition:0},
+  {placementId:'debrief',nativeName:'extraction_debrief',powered:true,initialPosition:0},
+ );
+ expect(extractionLayout(doc)).toMatchObject({loadout,debrief,issues:[]});
+ doc.logic!.devices.at(-1)!.powered=false;
+ loadout.position=[20,0,0];
+ const review=extractionLayout(doc);
+ expect(review.issues.map(issue=>issue.objectId)).toEqual(['debrief','loadout']);
+ expect(review.bindings).toBe(4);
+});
+
 it('retains the same safe-hub checks while mission objectives gate activation power',()=>{const doc=extractionSource();doc.logic!.devices[1].powered=false;expect(extractionLayout(doc,{activationPowered:false}).issues).toEqual([]);expect(extractionLayout(doc).issues.some(i=>i.message.includes('power'))).toBe(true);doc.spawns[0].position=[20,0,0];expect(extractionLayout(doc,{activationPowered:false}).issues.some(i=>i.objectId==='safe')).toBe(true);});
 
 

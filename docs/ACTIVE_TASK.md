@@ -4,7 +4,7 @@ Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Fourteen-region MCC13 71fc1648 remains playable. Death Island compiled five BSPs and 4,728 tags (18.11 of 64 MiB), but independent validation refused donor pickup 16 at the connector landing. Scratch retired. Earlier lit probe and exact hashes remain in MEGAWORLD_SEAM_ROUTES_20261108.
-Next action: Reproduce Black Echo normal-menu admission, physical terminal Use and both aircraft on the exact installed d113e9db map with Forerunner, then resume the Death Island overlap. Existing 14-region handoff stays in place. See RUNTIME_INTEGRATION_20261107. Include offline gameplay in every ten-commit delivery, with private LAN and optional Delta tracked independently.
+Next action: Verify the Forerunner Play Solo menu fix, physical terminal Use and both aircraft on exact installed d113e9db. Spark now reviews loadout and debrief hub controls. Resume the Death Island pickup overlap after the immediate playable-build blockers. Preserve the 14-region handoff. Include offline gameplay in each ten-commit delivery. Keep LAN and Delta acceptance separate.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

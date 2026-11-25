@@ -189,13 +189,14 @@ export default function LogicEvents({
           {(node?.type==='trigger'||controlSelected)&&<div className="button-row" aria-label="Forerunner native Extraction marker roles">
             {(node?.type==='trigger'?
               [['extraction_zone','Activation zone'],['extraction_return','Safe return zone']]:
-              [['extraction_deploy','Deploy terminal'],['extraction_activate','Activate terminal']]).map(([name,label])=>
+              [['extraction_deploy','Deploy terminal'],['extraction_activate','Activate terminal'],
+                ['extraction_loadout','Loadout terminal'],['extraction_debrief','Debrief terminal']]).map(([name,label])=>
               <button key={name} disabled={node?.value.locked||nativeBindingName===name}
                 title={'Bind the standard native name '+name+'; this does not enable the runtime mode.'}
                 onClick={()=>applyNativeBinding(name)}>{label}</button>)}
           </div>}
           {nativeBindingName.startsWith('extraction_')&&<p className="forge-hint">Place the deploy terminal inside the safe return volume, outside activation.
-            Place the activation terminal inside its zone. Keep a physical route between both areas; no raid timer or teleport is authored here.</p>}
+            Place the activation terminal inside its zone. Place optional loadout and debrief terminals inside the safe hub, on a walkable approach.</p>}
           {extraction.present&&<details className="forge-details">
             <summary>Extraction layout · {extraction.bindings}/4 native bindings</summary>
             <p className="forge-hint">Hub starts: {extraction.playerStarts.safe==null?'Unavailable until both zones are bound':extraction.playerStarts.safe+' / '+extraction.playerStarts.total+' inside the hub and outside activation'}.
@@ -210,8 +211,9 @@ export default function LogicEvents({
             </div>
             <div className="button-row">
               {([['Deploy terminal',extraction.deploy],['Activate terminal',extraction.activate],
+                ['Loadout terminal',extraction.loadout],['Debrief terminal',extraction.debrief],
                 ['Activation zone',extraction.activation],['Return zone',extraction.returnZone]] as const)
-                .map(([label,value])=>value&&<button key={label} onClick={()=>onSelect(value.id)}
+                .map(([label,value])=>value&&<button key={label} aria-label={'Select '+label.toLowerCase()} onClick={()=>onSelect(value.id)}
                   title={'Select the authored '+label.toLowerCase()+' in this project'}>{label}</button>)}
             </div>
             <ul className="forge-hint">{extraction.issues.map((issue,i)=><li key={i}>

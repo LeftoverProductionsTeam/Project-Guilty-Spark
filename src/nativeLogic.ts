@@ -141,6 +141,8 @@ export function extractionLayout(doc:QuickForgeDocument,options:{activationPower
     return values.length===1?values[0]:undefined;
   };
   const deploy=terminal('extraction_deploy','Deployment'),activate=terminal('extraction_activate','Activation',options.activationPowered??true);
+  const loadout=logic?.devices.some(d=>d.nativeName==='extraction_loadout')?terminal('extraction_loadout','Loadout'):undefined;
+  const debrief=logic?.devices.some(d=>d.nativeName==='extraction_debrief')?terminal('extraction_debrief','Debrief'):undefined;
   const activation=zone('extraction_zone','Activation area'),returnZone=zone('extraction_return','Safe return area');
   const inside=(point:Vec3,volume:LogicTrigger)=>{
     if(point.some(v=>!Number.isFinite(v))||volume.position.some(v=>!Number.isFinite(v))||
@@ -156,6 +158,10 @@ export function extractionLayout(doc:QuickForgeDocument,options:{activationPower
     issues.push({message:'Deployment terminal must be outside the activation volume.',objectId:deploy.id});
   if(activate&&activation&&!inside(activate.position,activation))
     issues.push({message:'Activation terminal origin is outside its activation volume.',objectId:activate.id});
+  for(const [label,control] of [['Loadout',loadout],['Debrief',debrief]] as const){
+    if(control&&((returnZone&&!inside(control.position,returnZone))||(activation&&inside(control.position,activation))))
+      issues.push({message:label+' terminal must be inside the safe hub and outside activation.',objectId:control.id});
+  }
   if(returnZone&&activation) {
     const c=Math.cos(returnZone.rotation[2]),s=Math.sin(returnZone.rotation[2]);
     const corners=[-1,1].flatMap(x=>[-1,1].flatMap(y=>[-1,1].map(z=>[
@@ -188,7 +194,7 @@ export function extractionLayout(doc:QuickForgeDocument,options:{activationPower
   const present=[...(logic?.devices??[]),...(logic?.triggers??[])].some(t=>t.nativeName?.startsWith('extraction_'));
   const playerStarts={total:doc.spawns.length,safe:returnZone&&activation
     ?doc.spawns.filter(spawn=>inside(spawn.position,returnZone)&&!inside(spawn.position,activation)).length:null};
-  return {present,bindings,deploy,activate,activation,returnZone,playerStarts,issues};
+  return {present,bindings,deploy,activate,loadout,debrief,activation,returnZone,playerStarts,issues};
 }
 
 /** Create just the missing standard volume, through the existing authoring
