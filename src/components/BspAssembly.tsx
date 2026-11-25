@@ -4,7 +4,7 @@ import { useMapState } from '../mapSession';
 import {donorPoint, selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
-import { runtimeProfileLabel } from '../runtimeWorkbench';
+import { reviewedMcc13Target, runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
 import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
@@ -85,10 +85,11 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
   </section>;
 }
 
-function NativeGameplayBudget({ budget, cacheTarget, separate }: {
+function NativeGameplayBudget({ budget, cacheTarget, separate, profileId }: {
   budget: NonNullable<AssemblyReport['nativeGameplayBudget']>;
   cacheTarget: 'CE609' | 'MCC13' | undefined;
   separate: boolean;
+  profileId?: string | null;
 }) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
   useEffect(() => {
@@ -98,19 +99,22 @@ function NativeGameplayBudget({ budget, cacheTarget, separate }: {
       .then(rows => { if (active) setProfiles(rows ?? []); })
       .catch(() => {}); // The native schema budget stays visible when profiles are unavailable.
     return () => { active = false; };
-  }, []);
+  }, [profileId]);
   const regional = budget.mcc13RegionalFlags;
   const mcc = cacheTarget === 'MCC13';
+  const selected = mcc ? profiles.find(profile => profile.id === profileId) : undefined;
+  const target = selected ? reviewedMcc13Target(selected) : undefined;
+  const limitFor = (value: number | undefined, fallback: number, cap: number) => Math.min(value ?? fallback, cap);
   const flags = mcc ? regional ?? budget.netgameFlags : budget.netgameFlags;
   const starts = mcc ? budget.mcc13RegionalStarts ?? budget.playerStarts : budget.playerStarts;
   const items = mcc ? budget.mcc13RegionalEquipment ?? budget.netgameEquipment : budget.netgameEquipment;
   const classic = cacheTarget === 'CE609';
   const vehicles = mcc ? budget.mcc13Vehicles : budget.vehicles;
   const rows = [
-    { label: 'Player starts', ...starts, donor: classic && separate ? 0 : starts.donor },
-    { label: 'Multiplayer item placements', ...items },
+    { label: 'Player starts', ...starts, limit: limitFor(target?.max_player_starts, starts.limit, 1536), donor: classic && separate ? 0 : starts.donor },
+    { label: 'Multiplayer item placements', ...items, limit: limitFor(target?.max_netgame_equipment, items.limit, 1024) },
     ...(vehicles ? [{ label: 'Native vehicle placements', ...vehicles }] : []),
-    ...(separate ? [{ label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor }] : []),
+    ...(separate ? [{ label: 'Multiplayer flags and teleporter endpoints', ...flags, limit: limitFor(target?.max_netgame_flags, flags.limit, flags.limit), donor: classic ? 0 : flags.donor }] : []),
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
     <summary>Native gameplay placement limits{cacheTarget ? ' · ' + cacheTarget : ''}</summary>
@@ -124,12 +128,12 @@ function NativeGameplayBudget({ budget, cacheTarget, separate }: {
         </li>;
       })}
     </ul>
+    {selected && target && <p>{runtimeProfileLabel(selected)} · Rechecked before compilation</p>}
     {regional && <>
       {separate && cacheTarget !== 'MCC13' && <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>}
-      {profiles.map(profile => {
-        const capabilities = profile.reviewedCompanion?.capabilities;
-        const target = capabilities?.map_targets?.find(row => row.cache_version === 13 && row.invader_engine === 'mcc-cea');
-        if (!target || (target.required_feature && !capabilities?.native_features?.includes(target.required_feature))) return null;
+      {profiles.filter(profile => profile.id !== selected?.id).map(profile => {
+        const target = reviewedMcc13Target(profile);
+        if (!target) return null;
         const reviewed = [
           { label: 'Starts', count: budget.mcc13RegionalStarts, limit: target.max_player_starts },
           { label: 'Pickups', count: budget.mcc13RegionalEquipment, limit: target.max_netgame_equipment },
@@ -140,7 +144,7 @@ function NativeGameplayBudget({ budget, cacheTarget, separate }: {
           <p>{runtimeProfileLabel(profile)} · Saved runtime review</p>
           <ul>{reviewed.map(({ label, count, limit }) => {
             if (!count || limit == null) return null;
-            const effective = Math.min(count.limit, limit);
+            const effective = limitFor(limit, count.limit, label === 'Starts' ? 1536 : label === 'Pickups' ? 1024 : count.limit);
             const total = count.existing + count.donor;
             return <li key={label}>{label} · {total} / {effective}
               {total > effective && <strong> · {total - effective} over the build or runtime limit</strong>}
@@ -930,7 +934,7 @@ export default function BspAssembly({
                   )}
                   {!!report.intactSwitches?.length && <p>Planned native switches: {report.intactSwitches.join(' · ')}</p>}
                   {report.nativePartitions && <p>BSP {report.nativePartitions.selected} · {report.nativePartitions.overlapSamples} shared corridor-floor samples · Largest floor difference {report.nativePartitions.maxFloorDelta.toFixed(4)} world units.</p>}
-                  {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget}
+                  {report.nativeGameplayBudget && <NativeGameplayBudget profileId={project.megaworldRuntimeRegistrationId} budget={report.nativeGameplayBudget}
                     separate={!!draft.separateNativeBsps}
                     cacheTarget={(draft.separateNativeBsps && canExtend) || buildRuntime === 'mccSteam' ? 'MCC13'
                       : (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}

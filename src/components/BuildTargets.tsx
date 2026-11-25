@@ -1,10 +1,10 @@
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import CeSourceRecovery from './CeSourceRecovery';
-import { runtimeNames } from '../runtimeWorkbench';
-import { useState } from 'react';
+import { runtimeNames, runtimeProfileLabel, reviewedMcc13Target } from '../runtimeWorkbench';
+import { useEffect, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
-import type { EngineBuildTarget, Project, RuntimeId, Settings } from '../types';
+import type { EngineBuildTarget, Project, RuntimeId, RuntimeRegistration, Settings } from '../types';
 export default function BuildTargets({
   project,
   onChange,
@@ -19,6 +19,17 @@ export default function BuildTargets({
   const [error, setError] = useState('');
   const [newRuntime, setNewRuntime] = useState<RuntimeId>(defaults?.preferredHalo ?? PREFERRED_RUNTIME);
   const [open, setOpen] = useMapState(project.id, 'tools.targetsOpen', false);
+  const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
+  const selectedProfileId = project.megaworldRuntimeRegistrationId ?? "";
+  const connectedWorld = Boolean(project.bspAssembly);
+  useEffect(() => {
+    if (!native || !connectedWorld || !open) return;
+    let active = true;
+    void call<RuntimeRegistration[]>("list_runtime_registrations").then(rows => {
+      if (active) setProfiles(rows.filter(profile => reviewedMcc13Target(profile)));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [connectedWorld, open]);
   const targets = project.buildTargets ?? [];
   const active = targets.find((t) => t.id === project.activeBuildTarget);
   const connectedCe = Boolean(project.bspAssembly && project.source?.cacheVersion === 609);
@@ -100,6 +111,16 @@ export default function BuildTargets({
           kit for either build. The build result reports actual tag usage.</p>
       )}
       {canCopyToMcc && <button type="button" onClick={addConnectedMccTarget}>Add MCC13 target with these tags</button>}
+      {connectedWorld && active?.runtimeId === "mccSteam" && <label>
+        Tested runtime limits
+        <select value={selectedProfileId} onChange={event => onChange({ ...project, megaworldRuntimeRegistrationId: event.target.value || null })}>
+          <option value="">Default MCC13 bounds</option>
+          {profiles.map(profile => <option key={profile.id} value={profile.id}>{runtimeProfileLabel(profile)}</option>)}
+          {selectedProfileId && !profiles.some(profile => profile.id === selectedProfileId) &&
+            <option value={selectedProfileId}>Reconnect selected Forerunner profile</option>}
+        </select>
+        {!profiles.length && <small>Connect and review a Forerunner build in Games &amp; tools to use its advertised limits.</small>}
+      </label>}
       {project.bspAssembly && project.source?.cacheVersion === 13 && (
         <p>Keep the matching build tags to extend this MCC13 world. To continue the 23 MiB CE609
           edition, open its saved CE project.</p>

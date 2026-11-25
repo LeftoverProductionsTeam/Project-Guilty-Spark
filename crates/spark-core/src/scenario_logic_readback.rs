@@ -150,6 +150,14 @@ pub(crate) fn netgame_equipment_limit(cache_version: u32) -> usize {
     if cache_version == 13 { MCC13_NETGAME_EQUIPMENT_LIMIT } else { NETGAME_EQUIPMENT_LIMIT }
 }
 
+/// Independently exercised expanded MCC13 bounds. Importing a cache does not select these for export.
+pub(crate) fn player_start_read_limit(version: u32) -> usize {
+    if version == 13 { 1536 } else { PLAYER_START_LIMIT }
+}
+pub(crate) fn netgame_equipment_read_limit(version: u32) -> usize {
+    if version == 13 { 1024 } else { NETGAME_EQUIPMENT_LIMIT }
+}
+
 // Standard HEK scenario reflexives. Extra BSP references share these arrays.
 fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 4]> {
     Ok([
@@ -198,7 +206,7 @@ pub(crate) struct NativeNetgamePickup {
 
 pub(crate) fn scenario_netgame_pickups(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeNetgamePickup>> {
     with_scenario(path, inspection, |reader, space, scenario| {
-        let (start, count) = space.block(reader, scenario + 0x384, 144, netgame_equipment_limit(inspection.header.version))?;
+        let (start, count) = space.block(reader, scenario + 0x384, 144, netgame_equipment_read_limit(inspection.header.version))?;
         (0..count).map(|index| {
             let row = start + index * 144;
             let id = reader.u32(row + 92)?;
@@ -308,7 +316,7 @@ pub(crate) struct NativeRegionStart {
 
 pub(crate) fn scenario_region_starts(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeRegionStart>> {
     with_scenario(path, inspection, |reader, space, scenario| {
-        let (start, count) = space.block(reader, scenario + 0x354, 52, player_start_limit(inspection.header.version))?;
+        let (start, count) = space.block(reader, scenario + 0x354, 52, player_start_read_limit(inspection.header.version))?;
         (0..count).map(|index| {
             let row = start + index * 52;
             let position = vec3(reader, row)?;

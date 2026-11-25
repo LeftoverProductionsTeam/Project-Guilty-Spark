@@ -68,12 +68,13 @@ impl PreparedFlags {
         base_map: &MapInspection,
         assembly: &BspAssembly,
         donor_map: &MapInspection,
+        limit: usize,
     ) -> Result<Self> {
         let base = maps::scenario_netgame_flags(&base_source.preserved_path, base_map)?;
         let mut donor =
             maps::scenario_netgame_flags(&assembly.donor_source.preserved_path, donor_map)?;
-        if base.len() + donor.len() > maps::MCC13_REGIONAL_FLAG_LIMIT {
-            return invalid("Combined multiplayer flags exceed the reviewed MCC13 regional limit");
+        if base.len() + donor.len() > limit {
+            return invalid(format!("Combined multiplayer flags exceed the {limit} slots for the selected target"));
         }
         for row in &mut donor {
             if row.weapon_group.is_some()
@@ -158,6 +159,8 @@ impl PreparedFlags {
         }
         Ok(Self { base, donor, original_teleporter_homes, merged_home: Some(destination_bsp) })
     }
+
+    pub(crate) fn total_count(&self) -> usize { self.base.len() + self.donor.len() }
 
     pub(crate) fn added(&self) -> usize { self.donor.len() }
 

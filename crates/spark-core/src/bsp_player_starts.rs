@@ -26,7 +26,7 @@ impl PreparedStarts {
         base: &MapInspection,
         assembly: &BspAssembly,
         donor: &MapInspection,
-        cache_version: u32,
+        limit: usize,
     ) -> Result<Self> {
         let source = project
             .source
@@ -35,9 +35,8 @@ impl PreparedStarts {
         let base_map_bsp_count = base.mesh.parts.len();
         let mut base = maps::scenario_region_starts(&source.preserved_path, base)?;
         let mut donor = maps::scenario_region_starts(&assembly.donor_source.preserved_path, donor)?;
-        let limit = maps::player_start_limit(cache_version);
         if base.len() + donor.len() > limit {
-            return invalid(format!("Combined player start count {} exceeds the {limit} slots supported by cache version {cache_version}.", base.len() + donor.len()));
+            return invalid(format!("Combined player start count {} exceeds the {limit} slots for the selected target.", base.len() + donor.len()));
         }
         let base_bsp_count = base_map_bsp_count;
         if base.iter().any(|row| !(0..base_bsp_count as i16).contains(&row.bsp_index)

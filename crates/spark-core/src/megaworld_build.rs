@@ -23,6 +23,47 @@ const MCC: CacheTarget = CacheTarget {
     tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
 };
 
+#[derive(Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameplayLimits {
+    pub(crate) starts: usize,
+    pub(crate) pickups: usize,
+    pub(crate) flags: usize,
+}
+
+impl GameplayLimits {
+    pub(crate) fn native(version: u32) -> Self {
+        Self {
+            starts: maps::player_start_limit(version),
+            pickups: maps::netgame_equipment_limit(version),
+            flags: if version == 13 { maps::MCC13_REGIONAL_FLAG_LIMIT } else { maps::CLASSIC_NETGAME_FLAG_LIMIT },
+        }
+    }
+
+    fn partition(version: u32) -> Self {
+        // The classic build retains only base flags; probes still review the donor list for MCC.
+        Self { flags: maps::MCC13_REGIONAL_FLAG_LIMIT, ..Self::native(version) }
+    }
+
+    pub fn for_review(review: &crate::runtime::CompanionReview) -> Result<Self> {
+        const FEATURE: &str = "maps.mcc13_tag_space_64m.v1";
+        let capabilities = &review.capabilities;
+        capabilities.validate()?;
+        let target = capabilities.map_targets.iter().find(|row| {
+            row.cache_version == MCC.version && row.invader_engine == MCC.engine && row.tag_space_bytes == MCC.tag_capacity
+                && row.required_feature.as_deref() == Some(FEATURE)
+                && capabilities.native_features.iter().any(|name| name == FEATURE)
+        }).ok_or_else(|| SparkError::Invalid("This Forerunner profile does not advertise native 64 MiB MCC13 support".into()))?;
+        let native = Self::native(MCC.version);
+        let bound = |value: Option<u16>, fallback: usize, verified: usize| value.map_or(fallback, usize::from).min(verified);
+        Ok(Self {
+            starts: bound(target.max_player_starts, native.starts, maps::player_start_read_limit(MCC.version)),
+            pickups: bound(target.max_netgame_equipment, native.pickups, maps::netgame_equipment_read_limit(MCC.version)),
+            flags: bound(target.max_netgame_flags, native.flags, native.flags),
+        })
+    }
+}
+
 fn cache_target(project: &Project) -> Option<CacheTarget> {
     project.bsp_assembly.as_ref()?;
     let profile = project.build_targets.iter().find(|t| Some(&t.id) == project.active_build_target.as_ref())?;
@@ -37,6 +78,10 @@ fn cache_target(project: &Project) -> Option<CacheTarget> {
 
 pub fn selected(project: &Project) -> bool {
     cache_target(project).is_some()
+}
+
+pub fn needs_runtime_review(project: &Project) -> bool {
+    cache_target(project).is_some_and(|target| target.version == 13) && project.megaworld_runtime_registration_id.is_some()
 }
 
 pub fn compatibility(project: &Project, inspection: &MapInspection) -> build::CompatibilityReport {
@@ -204,7 +249,7 @@ fn partition_preview(
         let edit = build::tool_path(&tools, "invader-edit").unwrap();
         crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
     }
-    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version)?;
+    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version, GameplayLimits::partition(cache_target(project).unwrap().version))?;
     let receipt = if bind {
         let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
         serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
@@ -409,9 +454,19 @@ fn verify_retained_collision(source_path: &Path, source: &MapInspection, output_
 }
 
 pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
+    run_with_reviewed_runtime(project, inspection, jobs, id, cancel, event, None)
+}
+
+pub fn run_with_reviewed_runtime(
+    project: &Project, inspection: &MapInspection, jobs: &Path, id: &str, cancel: Arc<AtomicBool>,
+    event: impl Fn(JobEvent) + Send + Sync, review: Option<&crate::runtime::CompanionReview>,
+) -> Result<BuildRecord> {
     uuid::Uuid::parse_str(id).map_err(|_|SparkError::Invalid("Invalid build identity".into()))?;
     let tools=preflight(project,inspection)?;let started=Instant::now();
     let target = cache_target(project).expect("preflight checked the connected-region target");
+    let limits = if needs_runtime_review(project) {
+        GameplayLimits::for_review(review.ok_or_else(|| SparkError::Invalid("Review the selected Forerunner profile before building".into()))?)?
+    } else { GameplayLimits::native(target.version) };
     let source=project.source.as_ref().unwrap();let plan=project.bsp_assembly.as_ref().unwrap();
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("An original region changed after planning");}}
     crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);
@@ -442,7 +497,8 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
         project::atomic_write(&dir.join("authored-scenario.json"),&serde_json::to_vec_pretty(&authored)?,false)?;
     if plan.separate_native_bsps {
         let parts = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &dir, &tags,
-            crate::bsp_compile::PartitionStage::Lighting, target.version)?;
+            crate::bsp_compile::PartitionStage::Lighting, target.version,
+            if target.version == 609 { GameplayLimits::partition(target.version) } else { limits })?;
         let cache = build_partition_cache(project, inspection, &parts, &tools, &runner, &dir, &tags, &dir.join("output"), target, true)?;
         if cancel.load(Ordering::Relaxed) { return invalid("Build cancelled"); }
         if crate::tool_transaction::inventory(base_tags)? != hashes {
@@ -464,6 +520,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
         let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
         let receipt = serde_json::json!({"schemaVersion": 1, "build": record, "compiledTagHashes": compiled_tag_hashes,
             "residentBsps": inspection.mesh.parts.len() + 1, "partitions": parts.receipt, "cache": cache.receipt, "detailSources": detail,
+            "gameplayLimits": limits, "reviewedForerunnerSha256": review.map(|review| &review.executable_sha256),
             "authoredScenario": authored, "originalHashesVerified": true, "gameplayVerified": false, "streaming": false});
         project::atomic_write(&dir.join("megaworld-receipt.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
         project::atomic_write(&dir.join("receipt.json"), &serde_json::to_vec_pretty(&record)?, false)?;
@@ -472,7 +529,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
         return Ok(record);
     }
     let import_hashes=crate::native_asset_imports::stage(import_root,project,&tags)?;
-    crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags,target.version)?;
+    crate::bsp_compile::prepare_native_with_limits(project,inspection,&tools,&runner,&dir,&tags,target.version,limits)?;
     // Donor scenery keeps its stable native array slots. Append authored rows
     // afterward through the existing Invader schema, never cache offsets.
     crate::native_asset_imports::append_scenario(project,inspection,&tags,&edit,&dir,&runner)?;
@@ -527,7 +584,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     );
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:target.engine.into(),output:Some(file),sha256:Some(sha),message,project_fingerprint:project.fingerprint()?};
     let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
-    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":if target.version == 609 { tag_space } else { None },"compilerTagSpace":tag_space,"tagMemory":memory,"visibility":visibility,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
+    project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"ceTagSpace":if target.version == 609 { tag_space } else { None },"compilerTagSpace":tag_space,"tagMemory":memory,"visibility":visibility,"compiledTagHashes":compiled_tag_hashes,"detailSources":detail,"gameplayLimits":limits,"reviewedForerunnerSha256":review.map(|review| &review.executable_sha256),"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"authoredScenario":authored,"originalPlacementsVerified":inspection.objects.len(),"importedPlacementsVerified":additions,"importedTagFiles":import_hashes.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
     storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","Native compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)

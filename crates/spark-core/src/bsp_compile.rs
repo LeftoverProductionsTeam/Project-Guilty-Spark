@@ -1041,7 +1041,7 @@ fn bind_intact_skies(
 /// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
-    runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32,
+    runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32, limits: crate::megaworld_build::GameplayLimits,
 ) -> Result<PreparedPartitions> {
     let bind = stage != PartitionStage::Structure;
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
@@ -1110,16 +1110,16 @@ pub(crate) fn prepare_partition_structure(
         structure_tags.push(donor_path);
     }
     let netgame_flags = if bind {
-        Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
+        Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor, limits.flags)?)
     } else { None };
     let player_starts = if bind {
-        Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor, cache_version)?)
+        Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor, limits.starts)?)
     } else { None };
     let pickups = if bind {
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
-            project, inspection, plan, &donor, tools, runner, workspace, tags, cache_version,
+            project, inspection, plan, &donor, tools, runner, workspace, tags, cache_version, limits.pickups,
         )?)
     } else { None };
     if stage == PartitionStage::Lighting {
@@ -1223,9 +1223,15 @@ pub fn prepare_native(
     tags: &Path,
     cache_version: u32,
 ) -> Result<()> {
-    let Some(assembly) = &project.bsp_assembly else {
-        return Ok(());
-    };
+    prepare_native_with_limits(project, inspection, tools, runner, workspace, tags, cache_version,
+        crate::megaworld_build::GameplayLimits::native(cache_version))
+}
+
+pub(crate) fn prepare_native_with_limits(
+    project: &Project, inspection: &MapInspection, tools: &Toolchain, runner: &Runner,
+    workspace: &Path, tags: &Path, cache_version: u32, limits: crate::megaworld_build::GameplayLimits,
+) -> Result<()> {
+    let Some(assembly) = &project.bsp_assembly else { return Ok(()); };
     assembly.validate()?;
     if assembly.separate_native_bsps {
         return invalid("Use the BSP Assembly connected-region build for separate native BSPs");
@@ -1252,8 +1258,8 @@ pub fn prepare_native(
             &base_source.preserved_path, inspection, &assembly.donor_source.preserved_path, &donor,
         )?;
         let counts = [
-            ("native item placements", budget.netgame_equipment, maps::netgame_equipment_limit(cache_version)),
-            ("native player starts", budget.player_starts, maps::player_start_limit(cache_version)),
+            ("native item placements", budget.netgame_equipment, limits.pickups),
+            ("native player starts", budget.player_starts, limits.starts),
             ("native vehicle placements", budget.vehicles, crate::bsp_vehicles::limit(cache_version)),
         ];
         for (kind, count, limit) in counts {
@@ -1264,7 +1270,7 @@ pub fn prepare_native(
         }
     }
     let restored_starts = import_gameplay.then(|| crate::bsp_player_starts::PreparedStarts::from_sources(
-        project, inspection, assembly, &donor, cache_version,
+        project, inspection, assembly, &donor, limits.starts,
     )).transpose()?;
     let restored_teleporters = crate::bsp_netgame_flags::PreparedFlags::from_merged_teleporters(
         &base_source.preserved_path, inspection, 0, &[crate::bsp_netgame_flags::MergedTeleporterDonor {
@@ -1272,6 +1278,9 @@ pub fn prepare_native(
             translation: assembly.translation, yaw: assembly.yaw_degrees,
         }], cache_version,
     )?;
+    if restored_teleporters.total_count() > limits.flags {
+        return invalid(format!("Combined teleporter markers exceed the {} slots for the selected target", limits.flags));
+    }
     let geometry = bsp_assembly::generate_project(project, inspection, runner.cancel)?;
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
@@ -1357,7 +1366,7 @@ pub fn prepare_native(
     }
     restored_teleporters.append(&inspection.scenario_path, tools, runner, workspace)?;
     let restored_pickups = import_gameplay.then(|| crate::bsp_pickups::stage(
-        project, inspection, assembly, &donor, tools, runner, workspace, tags, cache_version,
+        project, inspection, assembly, &donor, tools, runner, workspace, tags, cache_version, limits.pickups,
     )).transpose()?;
     let restored_flags = restore_collision_flags(&geometry, &edit, runner, workspace, tags, &bsp)?;
     project::atomic_write(

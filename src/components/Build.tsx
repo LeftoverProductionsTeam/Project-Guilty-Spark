@@ -108,7 +108,7 @@ export default function Build({
     return () => {
       cancelled = true;
     };
-  }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,dirty, data.settings, epoch]);
+  }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,project.megaworldRuntimeRegistrationId,dirty, data.settings, epoch]);
   const separateBsps = project.bspAssembly?.separateNativeBsps === true;
   const targetName=ceTarget?(target!.runtimeId==='chupathingyCe'?'Chupathingy':'Custom Edition'):'MCC';
   const projectLogs = logs.filter((l) => l.projectId === project.id);

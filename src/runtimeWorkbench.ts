@@ -95,6 +95,14 @@ export function runtimeProfileName(profile:RuntimeRegistration):string {
  if(profile.runtimeId!=='openCe')return runtimeNames[profile.runtimeId];
  return /forerunner/i.test(identity)?'Forerunner':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames.openCe;
 }
+export function reviewedMcc13Target(profile: RuntimeRegistration) {
+  const feature = "maps.mcc13_tag_space_64m.v1";
+  const caps = profile.reviewedCompanion?.capabilities;
+  return caps?.native_features?.includes(feature) ? caps.map_targets?.find(row =>
+    row.cache_version === 13 && row.invader_engine === "mcc-cea" &&
+    row.tag_space_bytes === 64 * 1024 * 1024 && row.required_feature === feature) : undefined;
+}
+
 export function runtimeProfileLabel(profile:RuntimeRegistration):string {
  return runtimeProfileName(profile)+' · '+profile.root.replaceAll('\\','/').split('/').filter(Boolean).at(-1);
 }

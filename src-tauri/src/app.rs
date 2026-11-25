@@ -1913,6 +1913,18 @@ fn refresh_installation(app: tauri::AppHandle, state: State<AppState>) -> Reply<
     configure(&app, &state, settings)?;
     bootstrap_state(&state)
 }
+fn megaworld_runtime_review(state: &AppState, project: &project::Project) -> Reply<Option<runtime::CompanionReview>> {
+    if !core::megaworld_build::needs_runtime_review(project) { return Ok(None); }
+    let requested = project.megaworld_runtime_registration_id.as_deref();
+    let registrations: Vec<runtime::RuntimeRegistration> = lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+    let registration = registrations.into_iter().find(|row| Some(row.id.as_str()) == requested)
+        .ok_or_else(|| "Reconnect the Forerunner profile selected for this MegaWorld project.".to_string())?;
+    let review = registration.reviewed_companion.ok_or_else(|| "Review the selected Forerunner executable in Games & tools.".to_string())?;
+    runtime_connections::verify_companion_review(&registration.executable, &review)?;
+    core::megaworld_build::GameplayLimits::for_review(&review).map_err(error)?;
+    Ok(Some(review))
+}
+
 #[tauri::command]
 async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::CompatibilityReport> {
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
@@ -1921,6 +1933,10 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
         let origin_issue=asset_import_native::guard_import_sources(&state,&p).err();
         if core::megaworld_build::selected(&p) {
             let mut report = core::megaworld_build::compatibility(&p, &i);
+            if let Err(reason) = megaworld_runtime_review(&state, &p) {
+                report.blockers.push(reason);
+                report.ready = false;
+            }
             if let Some(reason) = origin_issue {
                 report.blockers.push(reason);
                 report.ready = false;
@@ -1983,6 +1999,7 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
         let report = build::compatibility(&project, &inspection, &tools);
         if !report.ready {return Err(report.blockers.join("\n"));}
     }
+    let megaworld_review = megaworld_runtime_review(&state, &project)?;
     let job_id = uuid::Uuid::new_v4().to_string();
     let cancel = Arc::new(AtomicBool::new(false));
     let mut running = lock(&state.jobs)?;
@@ -1996,7 +2013,7 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let jobs = state.root.join("jobs");
     let returned = job_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let record = if core::megaworld_build::selected(&project){core::megaworld_build::run(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e))}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
+        let record = if core::megaworld_build::selected(&project){core::megaworld_build::run_with_reviewed_runtime(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e),megaworld_review.as_ref())}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
         let state = app.state::<AppState>();
         match record {
             Ok(record) => {

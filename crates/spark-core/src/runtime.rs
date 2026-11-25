@@ -268,6 +268,37 @@ pub struct CapabilityEvidence {
         assert!(forerunner_solo_startup_selector(&"0".repeat(64),"be_native").is_err());
     }
     fn reviewed_capabilities()->CompanionCapabilities {serde_json::from_value(serde_json::json!({"schema":"spark-forerunner.runtime-capabilities","contract_version":1,"engine":"Forerunner","build":{"upstream_version":"local-dev","commit":"review-fixture","platform":"Windows","architecture":"x64"},"simulation_hz":30,"network":{"advertised_version":45,"native_layout_version":44},"operations":["runtime.discover"],"process_entrypoints":["--help"],"startup_map":{"setting":"game.start_map","environment":"HALO_START_MAP","selector":"basename@ce","cache_version":609,"scenario_type":"solo","profile":"native-menu-create-or-existing","fresh_start":true,"network_host":false},"upstream_projects":["OpenCE"]})).unwrap()}
+    #[test]
+    fn megaworld_limits_require_the_reviewed_mcc_target_and_clamp_to_native_bounds() {
+        use crate::megaworld_build::GameplayLimits;
+        let mut review = CompanionReview {
+            executable_sha256: "a".repeat(64),
+            dependency_sha256: "b".repeat(64),
+            capabilities: reviewed_capabilities(),
+        };
+        assert!(GameplayLimits::for_review(&review).is_err());
+        let feature = "maps.mcc13_tag_space_64m.v1".to_string();
+        review.capabilities.map_targets.push(CompanionMapTarget {
+            cache_version: 13, tag_space_bytes: 64 * 1024 * 1024,
+            invader_engine: "mcc-cea".into(), required_feature: Some(feature.clone()), is_default: false,
+            max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
+        });
+        assert!(GameplayLimits::for_review(&review).is_err());
+        review.capabilities.native_features.push(feature);
+        let defaults = GameplayLimits::for_review(&review).unwrap();
+        assert_eq!((defaults.starts, defaults.pickups), (1024, 512));
+        review.capabilities.map_targets[0].max_player_starts = Some(1536);
+        review.capabilities.map_targets[0].max_netgame_equipment = Some(1024);
+        let expanded = GameplayLimits::for_review(&review).unwrap();
+        assert_eq!((expanded.starts, expanded.pickups), (1536, 1024));
+        review.capabilities.map_targets[0].max_player_starts = Some(1024);
+        review.capabilities.map_targets[0].max_netgame_equipment = Some(2048);
+        let clamped = GameplayLimits::for_review(&review).unwrap();
+        assert_eq!((clamped.starts, clamped.pickups), (1024, 1024));
+        let classic = GameplayLimits::native(609);
+        assert_eq!((classic.starts, classic.pickups), (256, 200));
+    }
+
     #[test]fn reviewed_profiles_retain_exact_identity_without_expanding_builtin_pins(){
         let mut registration:RuntimeRegistration=serde_json::from_value(serde_json::json!({"id":"local","runtimeId":"openCe","root":"owned","executable":"owned/halo.exe","dataRoot":null,"version":null,"networkVersion":null})).unwrap();
         assert!(serde_json::to_value(&registration).unwrap().get("reviewedCompanion").is_none());let sha="a".repeat(64);assert_eq!(forerunner_windows_machine(&sha),None);

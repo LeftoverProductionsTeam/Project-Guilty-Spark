@@ -270,6 +270,7 @@ export interface Project {
   nativeLighting?: import("./environment").NativeLighting | null;
   buildTargets?: EngineBuildTarget[];
   activeBuildTarget?: string | null;
+  megaworldRuntimeRegistrationId?: string | null;
   quickForge?: QuickForgeDocument | null;
   firefight?: FirefightConfig | null;
   studio?: CreatorStudioDocument | null;

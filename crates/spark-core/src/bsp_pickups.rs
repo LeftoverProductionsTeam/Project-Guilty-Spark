@@ -365,6 +365,7 @@ pub(crate) fn stage(
     workspace: &Path,
     tags: &Path,
     cache_version: u32,
+    limit: usize,
 ) -> Result<PreparedPickups> {
     if donor.mesh.parts.len() != 1 || assembly.donor_bsp_index != 0 {
         return invalid(
@@ -377,7 +378,6 @@ pub(crate) fn stage(
     let moved_base = crate::bsp_compile::apply_expected_pickup_poses(project, base, &mut base_rows)?;
     let mut donor_rows =
         maps::scenario_netgame_pickups(&assembly.donor_source.preserved_path, donor)?;
-    let limit = maps::netgame_equipment_limit(cache_version);
     if base_rows.len() + donor_rows.len() > limit {
         return invalid(format!("Combined native pickup count {} exceeds the {limit} slots supported by cache version {cache_version}.", base_rows.len() + donor_rows.len()));
     }

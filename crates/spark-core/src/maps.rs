@@ -4,9 +4,9 @@
 mod scenario_logic_readback;
 pub(crate) use scenario_logic_readback::NAMED_OBJECT_BLOCKS;
 pub use scenario_logic_readback::scenario_gameplay_merge_budget;
-pub(crate) use scenario_logic_readback::{native_item_collections, netgame_equipment_limit, scenario_netgame_flags, scenario_netgame_pickups,
+pub(crate) use scenario_logic_readback::{native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
     NativeItemCollection, NativeNetgameFlag, NativeNetgamePickup, CLASSIC_NETGAME_FLAG_LIMIT, MCC13_REGIONAL_FLAG_LIMIT, NETGAME_EQUIPMENT_LIMIT};
-pub(crate) use scenario_logic_readback::{scenario_vehicles, NativeVehicle, player_start_limit, scenario_region_starts, NativeRegionStart, NATIVE_SPAWN_TYPES, PLAYER_START_LIMIT};
+pub(crate) use scenario_logic_readback::{scenario_vehicles, NativeVehicle, player_start_limit, player_start_read_limit, scenario_region_starts, NativeRegionStart, NATIVE_SPAWN_TYPES, PLAYER_START_LIMIT};
 pub use scenario_logic_readback::{native_bsp_switch_name, scenario_bsp_tag_paths, scenario_bsp_transitions, NativeBspTransition, NativeBspTransitions, scenario_recording_readback, NativeScenarioRecording};
 pub use scenario_logic_readback::{scenario_placement_readback,scenario_weapon_readback,scenario_faction_body_readback,ScenarioLogicWeapon,scenario_command_readback,scenario_volume_readback,scenario_camera_readback,NativeCameraPoint,scenario_flag_readback,NativeCutsceneFlag,scenario_named_object_readback,NativeNamedObject,scenario_global_readback,NativeScriptGlobal,scenario_logic_readback,ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicGroup,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
 use crate::{binary::Reader, invalid, Result, SparkError};
@@ -1159,7 +1159,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
     let mut encounters = vec![];
     // Multiplayer pickups live in a different scenario block from ordinary
     // placed equipment. Each references an item collection, not a model.
-    match space.block(&r, scenario_at + 0x384, 144, netgame_equipment_limit(header.version)) {
+    match space.block(&r, scenario_at + 0x384, 144, netgame_equipment_read_limit(header.version)) {
         Ok((table,count))=>for index in 0..count {
             let row=table+index*144;let datum=r.u32(row+92)?;
             let Some(collection)=tags.iter().find(|t|t.id==datum&&t.class=="itmc")else{continue};

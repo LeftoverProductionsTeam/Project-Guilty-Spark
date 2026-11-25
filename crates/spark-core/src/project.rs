@@ -203,6 +203,8 @@ pub struct Project {
     pub build_targets:Vec<EngineBuildTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub active_build_target:Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub megaworld_runtime_registration_id: Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub world_environment:Option<crate::quickforge::EditorEnvironment>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -251,6 +253,7 @@ impl Project {
             scenario_script_draft:None,
             forge_sidecar:None,
             build_targets:vec![],active_build_target:None,
+            megaworld_runtime_registration_id:None,
             world_environment:None,
             native_lighting:None,
             source_scene_version:1,
@@ -301,6 +304,9 @@ impl Project {
         if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery"|"mcc-multiplayer-ui")){return invalid("Unknown map conversion profile");}
         if let Some(environment)=&self.world_environment {environment.validate()?;}
         if let Some(lighting)=&self.native_lighting {lighting.validate()?;if self.quick_forge.is_some()||self.bsp_assembly.is_none(){return invalid("Imported-map lighting currently requires an editable BSP assembly and its native rebuild");}}
+        if self.megaworld_runtime_registration_id.as_deref().is_some_and(|id| !crate::runtime::version_token(id)) {
+            return invalid("Invalid MegaWorld Forerunner profile ID");
+        }
         if self.build_targets.len()>16 {return invalid("At most 16 engine build targets per project");}
         let mut target_ids=std::collections::HashSet::new();
         for target in &self.build_targets {
