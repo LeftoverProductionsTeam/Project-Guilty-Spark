@@ -16,6 +16,7 @@ import {sameCinematicData} from '../src/haloScript.ts';
 const [appArg,outputArg,kitArg,archiveArg,invaderArg]=process.argv.slice(2);
 if(!invaderArg)throw Error('test-firefight-native <source-matched app> <fresh output> <owned H1A kit> <owned SDK archive> <Invader>');
 const app=path.resolve(appArg),output=path.resolve(outputArg),kit=path.resolve(kitArg),archive=path.resolve(archiveArg),invader=path.resolve(invaderArg);
+const nativeRoundHud=process.env.SPARK_NATIVE_FIREFIGHT_HUD==='1';
 const ceMissionReview=process.env.SPARK_NATIVE_CE_MISSION_REVIEW==='1';
 const ceMissionHudReview=process.env.SPARK_NATIVE_CE_MISSION_HUD_REVIEW==='1';
 const cePatrolReview=process.env.SPARK_NATIVE_CE_MISSION_PATROL_REVIEW==='1';
@@ -637,16 +638,27 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
    await page.keyboard.press('Control+z');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(60);
    await page.keyboard.press('Control+y');await expect.poll(async()=>(await state(id)).project.firefight.nativePlayerProfile.primaryReserved).toBe(72);
-   await prepare().click();await expect(page.getByRole('status').filter({hasText:'Native solo source attached'})).toBeVisible();
+   if(nativeRoundHud){
+    const hud=page.getByRole('checkbox',{name:'Native Firefight HUD messages',exact:true});
+    await revealPagedControl(hud);await hud.check();
+    await expect.poll(async()=>(await state(id)).project.firefight.nativeHudMessages).toBe(true);
+   }
+   await revealPagedControl(prepare());await prepare().click();await expect(page.getByRole('status').filter({hasText:'Native solo source attached'})).toBeVisible();
    const source=async()=>(await state(id)).project?.quickForge.logic?.handwrittenSources?.find(source=>source.filename==='gs_firefight.hsc')?.content;
    await expect.poll(source).toContain('(script startup gs_ff_bootstrap');
-   const expected=await source();await page.keyboard.press('Control+z');await expect.poll(source).toBeUndefined();
+   const expected=await source();
+   if(nativeRoundHud){
+    expect(expected).toContain('(hud_set_help_text gs_ff_timed_out)');
+    expect(expected).toContain('(hud_set_help_text gs_ff_victory)');
+   }
+   await page.keyboard.press('Control+z');await expect.poll(source).toBeUndefined();
    await page.keyboard.press('Control+y');await expect.poll(source).toBe(expected);await save(id);
    report.preparation={realUi:true,undo:true,redo:true,sourceSha256:crypto.createHash('sha256').update(expected).digest('hex'),scriptBytes:Buffer.byteLength(expected)};
    await page.screenshot({path:path.join(output,'firefight-prepared.png')});
    await close();await start();
    await chooseTool(page,'Map library');await open(title);
    await expect.poll(source).toBe(expected);const rules=(await state(id)).project.firefight;expect(rules.playerCount).toBe(1);expect(rules.teamLives).toBe(1);expect(rules.waves).toEqual(p.firefight.waves);expect(rules.spawnZones).toEqual(p.firefight.spawnZones);
+   if(nativeRoundHud)expect(rules.nativeHudMessages).toBe(true);
    report.savedRestart=true;report.savedProjectReopenedThroughLibrary=true;
    await chooseTool(page,'Level editor');
    const button=page.getByRole('button',{name:'Build & check playtest',exact:true});await expect(button).toBeEnabled();await button.click();
@@ -664,6 +676,14 @@ try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
    const query=await run(path.join(invader,'invader-edit.exe'),['-t',readback,'-G','encounters[*].name','-G','encounters[*].squads[*].normal_diff_count','-G','encounters[*].squads[*].starting_locations[*].position','-G','scripts[*].name',scenario+'.scenario']);
    const text=query.stdout.trim();expect(text).toContain('gs_w01_g01');expect(text).toContain('gs_w02_g01');expect(text).toContain('gs_ff_bootstrap');expect(text).toContain('gs_firefight');
    const field=async(key,flag='-G')=>(await run(path.join(invader,'invader-edit.exe'),['-t',readback,flag,key,scenario+'.scenario'])).stdout.trim();
+   if(nativeRoundHud){
+    expect(text).toContain('gs_ff_show_score');
+    const reference=(await field('hud_messages')).replaceAll('\\','/');
+    expect(reference).toBe(scenario+'/gs_firefight_messages.hud_message_text');
+    const receipt=await run(path.join(invader,'invader-extract.exe'),['-s',reference,'-t',readback,map]);
+    expect(receipt.stdout+'\n'+receipt.stderr).not.toMatch(/ERROR:|Failed to extract/i);
+    report.nativeRoundHud={reference,sha256:await hash(path.join(readback,reference)),savedRestart:true,gameplayVerified:false};
+   }
    // Report the standard singleplayer loadout independently of successful
    // encounter compilation. An empty profile is not a playable round.
    const profileCount=Number(await field('player_starting_profile','-C'));

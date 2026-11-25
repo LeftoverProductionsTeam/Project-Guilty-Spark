@@ -62,6 +62,15 @@ describe('opt-in native Firefight round source',()=>{
     expect(source.match(/\(gs_ff_clean_w01_g01\)/g)).toHaveLength(2);
     expect(out.warnings.some(w=>w.includes('corpses'))).toBe(true);
   });
+  it('keeps the authored preparation, spawn timeout and wave deadline in the native controller',()=>{
+    const rules={...nativeRoundFixture(),nativeHudMessages:true,preparationMs:2000,countdownMs:3000,
+      spawnTimeoutMs:9000,stuckTimeoutMs:120000};
+    const source=exportHaloCeFirefightRound(rules).content;
+    expect(source).toContain('(sleep_until (<= (unit_get_health gs_ff_player) 0) 1 150)');
+    expect(source).toContain('(sleep_until (or (= (ai_living_count gs_w01_g01) 2) (<= (unit_get_health gs_ff_player) 0)) 1 270)');
+    expect(source).toContain('(sleep_until (or (= (ai_living_count gs_w01_g01) 0) (<= (unit_get_health gs_ff_player) 0)) 1 3600)');
+    expect(source).toContain('(if (= gs_ff_failure 4) (hud_set_help_text gs_ff_timed_out))');
+  });
   it('refuses rules it cannot implement rather than silently dropping them',()=>{
     const config=nativeRoundFixture();
     for(const patch of [{playerCount:2},{teamLives:5},{allowRevives:true},{difficultyStepPercent:25},

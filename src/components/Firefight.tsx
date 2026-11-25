@@ -367,8 +367,11 @@ export default function Firefight({
                 ['maxAlive', 'Maximum alive', 1, 256],
                 ['maxTotalPerWave', 'Wave enemy limit', 1, 4096],
                 ['spawnIntervalMs', 'Spawn interval (ms)', 1, 60000],
+                ['preparationMs', 'Preparation (ms)', 0, 600000],
                 ['countdownMs', 'Countdown (ms)', 0, 60000],
                 ['intermissionMs', 'Intermission (ms)', 0, 600000],
+                ['spawnTimeoutMs', 'Spawn timeout (ms)', 1000, 600000],
+                ['stuckTimeoutMs', 'Wave time limit (ms)', 1000, 600000],
                 ['difficultyStepPercent', 'Difficulty step (%)', 0, 500],
                 ['extraPlayerCountPercent', 'Extra player scaling (%)', 0, 500],
               ] as const
@@ -679,7 +682,7 @@ export default function Firefight({
               weaponPaths={sourceMatches?catalog?.weapons??[]:[]} disabled={busy} onChange={playerProfile}/>}
           </details>
           <label><input type="checkbox" aria-label="Native Firefight HUD messages" checked={config.nativeHudMessages===true} disabled={busy||(!editableNativeRound&&catalog?.sourceScenarioType!==0&&config.nativeHudMessages!==true)} onChange={event=>change({...config,nativeHudMessages:event.target.checked?true:undefined},'Change native Firefight HUD feedback')}/>Native HUD: waves, team score and replay instructions</label>
-          <p className="subtle">For fresh native solo source, Prepare again after changing this option. For recovered solo source, Save, then Runtime Dock details → Firefight groups & controller → Prepare groups & controller; review the HUD append before building. The native build uses invader-string to create a separate standard HUD tag. After victory or a stopped round, use Halo’s pause menu to restart this cache or quit. This is team wave-clear scoring, not kill medals or multiplayer results. Original message indices are retained; unsupported lossless merges refuse without replacing source. Native UI/build/game acceptance is still pending.</p>
+          <p className="subtle">For fresh native solo source, Prepare again after changing this option or the round timings. The native wave time limit runs from when the full wave is ready. For recovered solo source, Save, then Runtime Dock details → Firefight groups & controller → Prepare groups & controller; review the HUD append before building. The native build uses invader-string to create a separate standard HUD tag. After victory or a stopped round, use Halo’s pause menu to restart this cache or quit. This is team wave-clear scoring, not kill medals or multiplayer results. Original message indices are retained; unsupported lossless merges refuse without replacing source. Native UI/build/game acceptance is still pending.</p>
           <div className="analysis-actions">
             <button disabled={busy} onClick={() => change(nativeSoloFirefightRules(config), 'Use solo native Firefight rules')}
               title="One player, one life, one finite round, one spawn attempt, bounded preparation/timeouts; no revives, scaling, starting-equipment overrides or resupply. Enemy groups, zones and any selected native player loadout are retained. A fresh profile starts with a pistol, ammunition, health and shields. Undo restores the previous rules.">

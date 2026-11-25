@@ -6110,6 +6110,35 @@ test('build badge distinguishes pending, blocked and unavailable checks',async({
 });
 
 
+test('Firefight timing controls edit the rules through keyboard, Undo, Redo and Save', async ({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{
+  const w=window as any,project=w.__sparkMock.projects.a.project;
+  const enemy={id:'grunt',name:'Grunt',actorVariantPath:'characters/grunt/grunt minor plasma pistol',points:100};
+  project.firefight={schemaVersion:1,title:'Native timing',sourceSha256:project.source.sha256,seed:1,
+   playerCount:1,teamLives:1,allowRevives:false,rounds:1,endless:false,preparationMs:1000,countdownMs:1000,
+   intermissionMs:1000,spawnIntervalMs:500,spawnTimeoutMs:5000,stuckTimeoutMs:60000,maxSpawnAttempts:1,
+   maxAlive:4,maxTotalPerWave:4,difficultyStepPercent:0,extraPlayerCountPercent:0,startingEquipment:[],
+   replenishAmmoEachWave:false,supplyDropTags:[],enemies:[enemy],spawnZones:[{id:'lane',position:[4,3,.1],radius:2,enabled:true}],
+   waves:[{id:'first',name:'First wave',boss:false,scoreMultiplierMilli:1000,groups:[{enemyId:enemy.id,count:1}]}]};
+  const invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='firefight_catalog'
+    ?Promise.resolve({sourceScenarioType:0,defaultConfig:project.firefight,enemies:[enemy],presets:[]})
+    :invoke(command,args);
+ });
+ await openFixture(page);await chooseTool(page,'Firefight rules');
+ const deadline=page.getByRole('spinbutton',{name:'Wave time limit (ms)',exact:true});
+ for(const [name,value] of [['Preparation (ms)','2500'],['Spawn timeout (ms)','9000'],['Wave time limit (ms)','120000']]){
+  const field=page.getByRole('spinbutton',{name,exact:true});await revealPagedControl(field);
+  await field.fill(value);await field.press('Tab');await expect(field).toHaveValue(value);
+ }
+ await page.keyboard.press('Control+z');await expect(deadline).toHaveValue('60000');
+ await page.keyboard.press('Control+y');await expect(deadline).toHaveValue('120000');
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.firefight))
+  .toMatchObject({preparationMs:2500,spawnTimeoutMs:9000,stuckTimeoutMs:120000});
+});
+
 test('unchanged CE cache uses native validation then the existing export controls',async({page})=>{
  await mockDesktop(page);
  await page.evaluate(()=>{
