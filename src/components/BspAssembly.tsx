@@ -6,7 +6,7 @@ import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
 import { runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -682,6 +682,18 @@ export default function BspAssembly({
                 </button>
               </div>
               <div className="bsp-settings">
+
+                {draft.tunnelPoints.length>=2&&<label>Distance between landings
+                  <NumberField
+                    value={Math.hypot(draft.tunnelPoints.at(-1)![0]-draft.tunnelPoints[0][0], draft.tunnelPoints.at(-1)![1]-draft.tunnelPoints[0][1])}
+                    min={0.5} max={6000} step={0.5} label="Distance between BSP landings" disabled={busy}
+                    onCommit={distance=>{
+                      const next=moveDonorToLandingDistance(draft,distance);
+                      if(next!==draft){update(next);void previewDraft(next);}
+                    }}
+                  />
+                  <small>Adjust horizontal spacing. The donor and all its entrances move together. Preview checks the resulting seam and clearance.</small>
+                </label>}
                 {vector(
                   draft.translation,
                   (v) => update(transformAssembly(draft, v, draft.yawDegrees)),

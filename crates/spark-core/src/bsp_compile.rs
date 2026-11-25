@@ -1221,6 +1221,7 @@ pub fn prepare_native(
     runner: &Runner,
     workspace: &Path,
     tags: &Path,
+    cache_version: u32,
 ) -> Result<()> {
     let Some(assembly) = &project.bsp_assembly else {
         return Ok(());
@@ -1245,6 +1246,10 @@ pub fn prepare_native(
     )?;
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing assembled base source".into()))?;
+    let restored_teleporters = crate::bsp_netgame_flags::PreparedFlags::from_merged_teleporters(
+        &base_source.preserved_path, inspection, 0, &assembly.donor_source.preserved_path, &donor,
+        assembly.translation, f64::from(assembly.yaw_degrees), cache_version,
+    )?;
     let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
     let donor_bsp = bsp_tag(&assembly.donor_source.preserved_path, &donor, assembly.donor_bsp_index)?;
     let base_hashes = namespace_materials(
@@ -1323,11 +1328,12 @@ pub fn prepare_native(
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
     bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
+    restored_teleporters.append(&inspection.scenario_path, tools, runner, workspace)?;
     let restored_flags = restore_collision_flags(&geometry, &edit, runner, workspace, tags, &bsp)?;
     project::atomic_write(
         &workspace.join("bsp-assembly.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":base_bsp,"donorBsp":donor_bsp,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"donorScenery":scenery,"modelReferenceChanges":donor_hashes.model_reference_changes,"inputTagHashes":{"base":base_hashes.hashes,"donor":donor_hashes.hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
+            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":base_bsp,"donorBsp":donor_bsp,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"donorScenery":scenery,"mergedNetgameFlags":(restored_teleporters.added()>0).then_some(restored_teleporters),"modelReferenceChanges":donor_hashes.model_reference_changes,"inputTagHashes":{"base":base_hashes.hashes,"donor":donor_hashes.hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
         )?,
         false,
     )?;

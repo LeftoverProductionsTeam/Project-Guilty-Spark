@@ -252,7 +252,8 @@ pub(crate) fn native_item_collections(
     })
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
 pub(crate) struct NativeNetgameFlag {
     pub position: [f32; 3],
     pub facing: f32,

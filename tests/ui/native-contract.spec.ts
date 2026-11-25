@@ -3935,6 +3935,14 @@ test('a flat terrain connector preserves source boundaries and can be shaped thr
  await chooseTool(page,'Level editor');await openDrawer(page,'Construction');const panel=page.getByRole('region',{name:'Construction panel',exact:true}),summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
  await (await constructionControl(page,'button','Plan adjacent terrain')).click();
  await expect(await constructionControl(page,'spinbutton','Terrain bank height')).toHaveValue('4');
+ const spacing=await constructionControl(page,'spinbutton','Distance between BSP landings');
+ const shorter=Number(await spacing.inputValue())-2;
+ await spacing.fill(String(shorter));await spacing.press('Enter');
+ await expect.poll(()=>page.evaluate(()=>{
+  const draft=(window as any).__sparkMock.calls.filter((row:any)=>row.command==='preview_bsp_assembly').at(-1)?.args.draft;
+  const a=draft?.tunnelPoints[0],b=draft?.tunnelPoints.at(-1);
+  return a&&b?Math.hypot(b[0]-a[0],b[1]-a[1]):null;
+ })).toBeCloseTo(shorter,2);
  await (await constructionControl(page,'button','Start with flat connector')).click();await expect(await constructionControl(page,'spinbutton','Terrain bank height')).toHaveValue('0');
  await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.terrainSeam)).toEqual({shoulderWidth:8,bankHeight:0,baseShaderPath:'fixture/grass',donorShaderPath:'fixture/snow'});const saved=await page.evaluate(()=>(window as any).__sparkMock.saved);

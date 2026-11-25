@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -36,6 +36,13 @@ describe('BSP assembly transforms', () => {
   it('changes semantic identity for scenery and donor transforms', () => {
     expect(assemblySignature({ ...plan, includeDonorScenery: true })).not.toBe(assemblySignature(plan));
     expect(assemblySignature(transformAssembly(plan, [30, 0, 0], 0))).not.toBe(assemblySignature(plan));
+  });
+  it('closes the gap along the primary landing axis and moves all donor entrances', () => {
+    const original=addInfantryTunnel(plan), moved=moveDonorToLandingDistance(original,18);
+    expect(moved.translation).toEqual([13,0,0]);
+    expect(moved.tunnelPoints).toEqual([[0,0,0],[10,0,0],[18,0,0]]);
+    expect(moved.infantryTunnel?.points.at(-1)).toEqual([18,0,0]);
+    expect(original.tunnelPoints.at(-1)).toEqual([25,0,0]);
   });
   it('moves the donor mouth while preserving the destination and authored bends', () => {
     const moved = transformAssembly(plan, [30, 10, 2], 90);

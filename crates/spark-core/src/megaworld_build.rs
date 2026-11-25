@@ -472,7 +472,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
         return Ok(record);
     }
     let import_hashes=crate::native_asset_imports::stage(import_root,project,&tags)?;
-    crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
+    crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags,target.version)?;
     // Donor scenery keeps its stable native array slots. Append authored rows
     // afterward through the existing Invader schema, never cache offsets.
     crate::native_asset_imports::append_scenario(project,inspection,&tags,&edit,&dir,&runner)?;
@@ -496,6 +496,8 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     connection_plans.push(plan.clone());
     let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
+    let imported_teleporters = crate::bsp_netgame_flags::verify_merged_manifest(&manifest,&file,&compiled)?;
+    if let Some(report)=imported_teleporters { project::atomic_write(&dir.join("teleporter-readback.json"), &serde_json::to_vec_pretty(&report)?, false)?; }
     let structure = crate::bsp_audio::inspect(&file, &compiled.sha256)?;
     let bsp = structure.bsps.first().ok_or_else(|| SparkError::Invalid("Native visibility metadata is missing".into()))?;
     let visibility = serde_json::json!({

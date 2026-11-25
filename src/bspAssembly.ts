@@ -112,6 +112,22 @@ export function transformAssembly(plan:BspAssembly,translation:Vec3,yawDegrees:n
     ...(plan.infantryTunnel?{infantryTunnel:{...plan.infantryTunnel,points:moveMouth(plan.infantryTunnel.points,plan.translation,translation,angle)}}:{}),
     ...(plan.highGround?{highGround:{...plan.highGround,points:moveMouth(plan.highGround.points,plan.translation,translation,angle)}}:{}),...(plan.sections?.length?{sections:plan.sections.map(section=>({...section,points:moveMouth(section.points,plan.translation,translation,angle)}))}:{})};
 }
+
+export function moveDonorToLandingDistance(plan: BspAssembly, distance: number): BspAssembly {
+  const base = plan.tunnelPoints[0];
+  const donor = plan.tunnelPoints.at(-1);
+  if (!base || !donor || !Number.isFinite(distance) || distance <= 0) return plan;
+  const dx = donor[0] - base[0], dy = donor[1] - base[1];
+  const current = Math.hypot(dx, dy);
+  if (current <= Number.EPSILON || Math.abs(current - distance) <= 1e-6) return plan;
+  const scale = (distance - current) / current;
+  return transformAssembly(plan, [
+    plan.translation[0] + dx * scale,
+    plan.translation[1] + dy * scale,
+    plan.translation[2],
+  ], plan.yawDegrees);
+}
+
 /** A reviewable second route, not a claim of native or vehicle clearance. */
 export function addInfantryTunnel(plan:BspAssembly,offset=plan.terrainSeam?Math.max(8,plan.tunnelWidth/2+plan.terrainSeam.shoulderWidth+2):8):BspAssembly {
   if(plan.infantryTunnel)return plan;

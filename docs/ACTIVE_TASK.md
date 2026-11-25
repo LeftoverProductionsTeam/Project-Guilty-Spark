@@ -3,10 +3,10 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: consolidated nineteen-region MCC13 84c955d3 carries the Derelict placement repair, supported starts for both Extraction hubs and both deploy controls. All 13 BSPs and 13 lightmaps matched the parent. Forerunner passed the separate 5df5d9ba infantry round trip and has the exact full cache for private plain-world acceptance.
+Latest verified revision: MCC13 5b738f30 restores the twelve stock Sidewinder teleporter endpoints to the nineteen-region cache. Native compilation and independent readback passed. The 84c955d3 parent retains the Derelict repair and two Extraction deployment hubs. A separate Derelict component passed a Forerunner infantry round trip.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native 78ddeb48 passed Forerunner death, Elite respawn, diagonal movement and jump. Two-client colors, arms and Spirit transfers remain open.
-Next action: Verify 84c955d3 in Forerunner, including Derelict and the reported traversal defects. Stage reviewed Pelican and Spirit dependencies through the existing native transport editor, check the actual pad footprints and author the recorded flight routes. Continue the remaining surface and underground connections. Keep MCC13 Extraction launch gated. See RUNTIME_INTEGRATION_20261107 and ENGINE_SOURCE_ATLAS.
+Next action: Verify physical Sidewinder teleporting in 5b738f30. Carry the remaining stock teleporter pairs and vehicle placements into one reviewed build. The 975 required netgame equipment rows exceed Forerunner’s current 512-row limit. Repair remaining geometry and stock lighting differences and author both faction aircraft routes. Keep MCC13 Extraction launch gated. See RUNTIME_INTEGRATION_20261107 and ENGINE_SOURCE_ATLAS.
 
 Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
 
