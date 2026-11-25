@@ -1189,6 +1189,23 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Requires the explicitly selected native numbered Extraction build"]
+    fn compiled_squad_replay_requires_the_deployment_callback_capability() {
+        let cache=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_SQUAD_REPLAY_MAP").expect("Select the owned numbered Extraction build"));
+        let map=crate::maps::inspect_map(&cache,None).unwrap();
+        let features=super::compiled_extraction_requirements(&cache,&map).unwrap().unwrap();
+        assert!(features.iter().any(|feature|feature==super::SQUAD_OBJECTIVES_FEATURE));
+        assert!(features.iter().any(|feature|feature==super::SQUAD_BEGIN_FEATURE));
+        let mut altered=map.clone();
+        altered.scripts.iter_mut().find(|script|script.name=="forerunner_squad_01_begin").unwrap().return_type=5;
+        assert!(super::compiled_extraction_requirements(&cache,&altered).unwrap_err().to_string().contains("void declarations"));
+        altered.scripts.retain(|script|script.name!="forerunner_squad_01_begin");
+        assert!(!super::compiled_extraction_requirements(&cache,&altered).unwrap().unwrap().iter().any(|feature|feature==super::SQUAD_BEGIN_FEATURE));
+        assert_eq!(crate::maps::hash_file(&cache).unwrap(),map.sha256);
+        eprintln!("Numbered Extraction cache {} requires {features:?}",map.sha256);
+    }
+
+    #[test]
     fn detects_only_supported_native_squad_callback_signatures(){
         let script=|name:&str,script_type,return_type|crate::maps::Script{name:name.into(),script_type,return_type};
         let valid=vec![script("forerunner_squad_01_begin",2,4),script("forerunner_squad_22_begin",1,4),script("forerunner_squad_01_aborted",2,4)];
