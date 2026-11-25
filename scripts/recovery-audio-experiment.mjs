@@ -650,47 +650,40 @@ function stageReviewedLegacySpawners() {
 
 // Decode the complete owned stream at its authored rate, then reuse the
 // audited C46 frame preparation before handing it to native Invader.
-async function prepareClassicMusicWave(stream) {
-  const { chromium } = await import('@playwright/test');
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
-  try {
-    const page = await browser.newPage();
-    const wave = await page.evaluate(async base64 => {
-      const encoded = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
-      const context = new OfflineAudioContext(2, 1, 44100);
-      const decoded = await context.decodeAudioData(encoded.buffer);
-      const { length: frames, numberOfChannels: channels, sampleRate: rate } = decoded;
-      if (frames !== 4_127_091 || channels !== 2 || rate !== 44100) throw new Error('Changed owned music dimensions');
-      const bytes = new Uint8Array(44 + frames * channels * 2);
-      const view = new DataView(bytes.buffer);
-      const writeText = (offset, text) => bytes.set(new TextEncoder().encode(text), offset);
-      writeText(0, 'RIFF');
-      view.setUint32(4, bytes.length - 8, true);
-      writeText(8, 'WAVEfmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, channels, true);
-      view.setUint32(24, rate, true);
-      view.setUint32(28, rate * channels * 2, true);
-      view.setUint16(32, channels * 2, true);
-      view.setUint16(34, 16, true);
-      writeText(36, 'data');
-      view.setUint32(40, bytes.length - 44, true);
-      for (let channel = 0; channel < channels; channel++) {
-        const samples = decoded.getChannelData(channel);
-        for (let frame = 0; frame < frames; frame++) {
-          const sample = Math.round(samples[frame] * 32768);
-          view.setInt16(44 + (frame * channels + channel) * 2, Math.max(-32768, Math.min(32767, sample)), true);
-        }
+async function prepareClassicSoundWave(page, stream, expectedFrames) {
+  const wave = await page.evaluate(async ({ base64, expectedFrames }) => {
+    const encoded = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    const context = new OfflineAudioContext(2, 1, 44100);
+    const decoded = await context.decodeAudioData(encoded.buffer);
+    const { length: frames, numberOfChannels: channels, sampleRate: rate } = decoded;
+    if (frames !== expectedFrames || channels !== 2 || rate !== 44100) throw new Error('Changed owned sound dimensions');
+    const bytes = new Uint8Array(44 + frames * channels * 2);
+    const view = new DataView(bytes.buffer);
+    const writeText = (offset, text) => bytes.set(new TextEncoder().encode(text), offset);
+    writeText(0, 'RIFF');
+    view.setUint32(4, bytes.length - 8, true);
+    writeText(8, 'WAVEfmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, channels, true);
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate * channels * 2, true);
+    view.setUint16(32, channels * 2, true);
+    view.setUint16(34, 16, true);
+    writeText(36, 'data');
+    view.setUint32(40, bytes.length - 44, true);
+    for (let channel = 0; channel < channels; channel++) {
+      const samples = decoded.getChannelData(channel);
+      for (let frame = 0; frame < frames; frame++) {
+        const sample = Math.round(samples[frame] * 32768);
+        view.setInt16(44 + (frame * channels + channel) * 2, Math.max(-32768, Math.min(32767, sample)), true);
       }
-      const pieces = [];
-      for (let at = 0; at < bytes.length; at += 24576) pieces.push(btoa(String.fromCharCode(...bytes.subarray(at, at + 24576))));
-      return pieces.join('');
-    }, stream.toString('base64'));
-    return prepareNativeAdpcmWave(Buffer.from(wave, 'base64'));
-  } finally {
-    await browser.close();
-  }
+    }
+    const pieces = [];
+    for (let at = 0; at < bytes.length; at += 24576) pieces.push(btoa(String.fromCharCode(...bytes.subarray(at, at + 24576))));
+    return pieces.join('');
+  }, { base64: stream.toString('base64'), expectedFrames });
+  return prepareNativeAdpcmWave(Buffer.from(wave, 'base64'));
 }
 
 async function prepareClassicCeTags() {
@@ -1118,54 +1111,106 @@ async function prepareClassicCeTags() {
   expect(fieldsWithout(edit(survivor, ['-L'], 'classic-survivor-fields-after'), [cameraFov]),
     fieldsWithout(cameraListing, [cameraFov]), 'unchanged Survivor biped fields');
 
-  const musicStem = 'sparky/sound/sparkmusic/v1_hit_themes/killer_tracks_invaders';
-  const music = musicStem + '.sound';
-  const musicName = 'Killer Tracks - CEZ4064 4 - Inv';
-  const originalMusic = fs.readFileSync(path.join(directory, music));
-  const musicStart = originalMusic.indexOf('OggS');
-  const musicStream = originalMusic.subarray(musicStart, musicStart + 3_708_886);
-  const musicStreamSha = '1e01df20b18bcae0b903ba27308dd78e2feffffa63bff8f7afbcb63d98c7d281';
+  const longSounds = [
+    ['sound/dialog/multiplayer1/game_over', 'scripted_effect', 'game_over', 3_877_619, 7_726_080, 0, 133, 49,
+      '065138d8c89610477cb4cda4f595bec7158bd62d9c17a3fef7ad51bb0f1bb9db', '777c1fa1c1d8439a6f5b1cbc0df1655eace6ef9dab03d46e64a9853121660891'],
+    ['sound/dialog/multiplayer1/ghost', 'scripted_effect', 'ghost', 5_251_966, 7_392_384, 0, 127, 28,
+      '1d7fd059c0b2b4608ca108965b0973617dd66ef633ec7a3e2eed4d988470b6df', '0ebce0127ca771e3b2b0151c49aadffc6b9599da876025721c70fc0f954a905e'],
+    ['sparky/sound/sparkmusic/v1_hit_themes/killer_tracks_invaders', 'music', 'Killer Tracks - CEZ4064 4 - Inv',
+      3_708_886, 4_127_091, 13, 71, 0,
+      '1e01df20b18bcae0b903ba27308dd78e2feffffa63bff8f7afbcb63d98c7d281', 'ee001e99aff89eb3cf058e751acf2b709a4901bfcc71acb19f548af891a16500'],
+  ];
   const soundToolSha = '764f3633697e69090e3c2f3df30060cc8b129ca3fc648a45514f998dd94822e3';
-  if (musicStart < 0 || sha(musicStream) !== musicStreamSha || hashFile(executables.sound.path) !== soundToolSha) {
-    throw new Error('Classic CE music does not match the reviewed sample or native encoder');
-  }
-  const musicFields = ['format', 'channel_count', 'sound_class', 'pitch_ranges[0].permutations[0].name'];
-  expect(get(music, musicFields, 'classic-long-music-before'), ['ogg_vorbis', 'stereo', 'music', musicName],
-    'original long music metadata');
-  const musicHeader = phase => {
-    const lines = edit(music, ['-L'], phase);
-    const end = lines.findIndex(line => line.startsWith('pitch_ranges['));
-    if (end < 0) throw new Error('Cannot review the native music header');
-    return lines.slice(0, end).filter(line => !/\b(?:split_long_sound_into_permutations|format|xbox_adpcm|ogg_vorbis)\s/.test(line));
-  };
-  const beforeMusicHeader = musicHeader('classic-long-music-header-before');
-  const rootMusic = 'pitch_ranges[0].permutations[0].';
-  const authoredMusic = [rootMusic + 'gain', rootMusic + 'skip_fraction', 'pitch_ranges[0].natural_pitch',
-    'pitch_ranges[0].bend_bounds'];
-  const originalMusicSettings = get(music, authoredMusic, 'classic-long-music-authored');
-  const wave = await prepareClassicMusicWave(musicStream);
-  if (wave.decodedPcmSha256 !== 'ee001e99aff89eb3cf058e751acf2b709a4901bfcc71acb19f548af891a16500'
-      || wave.compiledFrames !== 4_127_104 || wave.paddingFrames !== 13) {
-    throw new Error('Decoded music differs from the reviewed full-frame witness');
-  }
-  const musicData = path.join(data, musicStem);
-  fs.mkdirSync(musicData, { recursive: true });
-  fs.writeFileSync(path.join(musicData, musicName + '.wav'), wave.bytes, { flag: 'wx' });
-  const splitMusic = run('sound', ['-t', directory, '-d', data, '-F', 'xbox_adpcm', '-c', 'music',
-    '-C', 'stereo', '-r', '44100', '-s', '-j', '2', musicStem], 'classic-native-split-music');
-  if (splitMusic.exitCode !== 0 || splitMusic.incomplete) throw new Error('Native long music encoding failed');
-  // Invader lowercases input filenames. Preserve the authored root label
-  // and its playback settings inside the newly encoded native chain.
-  edit(music, ['-n', '-S', rootMusic + 'name', musicName,
-    ...authoredMusic.flatMap((field, i) => ['-S', field, originalMusicSettings[i]])], 'classic-restore-music-metadata');
-  expect(get(music, authoredMusic, 'classic-long-music-authored-after'), originalMusicSettings, 'preserved pitch and root gain');
-  expect(musicHeader('classic-long-music-header-after'), beforeMusicHeader, 'unchanged native music settings');
-  expect(get(music, musicFields, 'classic-long-music-after'), ['xbox_adpcm', 'stereo', 'music', musicName],
-    'native chained music metadata');
-  const links = get(music, ['pitch_ranges[0].permutations[*].next_permutation_index'], 'classic-long-music-links');
-  if (links.length !== 71 || links.slice(0, -1).some((index, i) => Number(index) !== i + 1)
-      || !['-1', '65535', 'none', 'null'].includes(links.at(-1).toLowerCase())) {
-    throw new Error('Native long music chain is not one complete linked permutation');
+  if (hashFile(executables.sound.path) !== soundToolSha) throw new Error('Classic CE requires the reviewed native sound encoder');
+  const soundChains = [];
+  const { chromium } = await import('@playwright/test');
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage();
+    for (const [stem, soundClass, label, encodedBytes, frames, padding, chunks, mouthBytes, sourceSha, pcmSha] of longSounds) {
+      const tag = stem + '.sound';
+      const filename = path.join(directory, tag);
+      const original = fs.readFileSync(filename);
+      // HEK sound header, one pitch range and fixed-size permutation headers.
+      const permutationStart = 64 + 164 + 72;
+      const permutationSize = 124;
+      const samplesField = permutationStart + 64;
+      const mouthField = permutationStart + 84;
+      const subtitleField = permutationStart + 104;
+      const originalSamplesAt = permutationStart + permutationSize;
+      const stream = original.subarray(originalSamplesAt, originalSamplesAt + encodedBytes);
+      const originalMouth = original.subarray(originalSamplesAt + encodedBytes);
+      if (original.readUInt32BE(samplesField) !== encodedBytes || original.readUInt32BE(mouthField) !== mouthBytes
+          || original.readUInt32BE(subtitleField) !== 0 || originalMouth.length !== mouthBytes || sha(stream) !== sourceSha) {
+        throw new Error('Long sound differs from the reviewed HEK layout or stream: ' + tag);
+      }
+      const root = 'pitch_ranges[0].permutations[0].';
+      const fields = ['format', 'channel_count', 'sound_class', root + 'name'];
+      expect(get(tag, fields, 'classic-long-sound-before'), ['ogg_vorbis', 'stereo', soundClass, label],
+        'original long sound metadata for ' + tag);
+      expect(edit(tag, ['-C', 'pitch_ranges', '-C', 'pitch_ranges[0].permutations'], 'classic-long-sound-count'),
+        ['1', '1'], 'single original long permutation for ' + tag);
+      const header = phase => {
+        const rows = edit(tag, ['-L'], phase);
+        const pitchRanges = rows.findIndex(line => line.startsWith('pitch_ranges['));
+        if (pitchRanges < 0) throw new Error('Cannot review the native sound header: ' + tag);
+        return rows.slice(0, pitchRanges).filter(line => !/\b(?:split_long_sound_into_permutations|format|xbox_adpcm|ogg_vorbis)\s/.test(line));
+      };
+      const beforeHeader = header('classic-long-sound-header-before');
+      const settingFields = [root + 'gain', root + 'skip_fraction', 'pitch_ranges[0].natural_pitch', 'pitch_ranges[0].bend_bounds'];
+      const settings = get(tag, settingFields, 'classic-long-sound-authored');
+      const wave = await prepareClassicSoundWave(page, stream, frames);
+      if (wave.decodedPcmSha256 !== pcmSha || wave.compiledFrames !== frames + padding || wave.paddingFrames !== padding) {
+        throw new Error('Decoded sound differs from the reviewed complete stream: ' + tag);
+      }
+      const soundData = path.join(data, stem);
+      fs.mkdirSync(soundData, { recursive: true });
+      fs.writeFileSync(path.join(soundData, label + '.wav'), wave.bytes, { flag: 'wx' });
+      const split = run('sound', ['-t', directory, '-d', data, '-F', 'xbox_adpcm', '-c', soundClass,
+        '-C', 'stereo', '-r', '44100', '-s', '-j', '2', stem], 'classic-native-split-sound');
+      if (split.exitCode !== 0 || split.incomplete) throw new Error('Native long sound encoding failed: ' + tag);
+      const generated = fs.readFileSync(filename);
+      const dataStart = permutationStart + permutationSize * chunks;
+      const lengths = Array.from({ length: chunks }, (_, i) => {
+        const fieldOffset = i * permutationSize;
+        if (generated.readUInt32BE(mouthField + fieldOffset) !== 0 || generated.readUInt32BE(subtitleField + fieldOffset) !== 0) {
+          throw new Error('Unexpected ancillary data in generated sound: ' + tag);
+        }
+        return generated.readUInt32BE(samplesField + fieldOffset);
+      });
+      const encoded = generated.subarray(dataStart);
+      if (lengths.some(n => n <= 0 || n % 72 !== 0) || lengths.reduce((sum, n) => sum + n, 0) !== encoded.length
+          || encoded.length / 72 * 64 !== frames + padding) {
+        throw new Error('Generated ADPCM blocks do not cover the verified complete stream: ' + tag);
+      }
+      const firstChunkEnd = dataStart + lengths[0];
+      if (mouthBytes) {
+        const merged = Buffer.concat([generated.subarray(0, firstChunkEnd), originalMouth, generated.subarray(firstChunkEnd)]);
+        merged.writeUInt32BE(mouthBytes, mouthField);
+        fs.writeFileSync(filename, merged);
+      }
+      // The native writer retains the source root label and regenerates the
+      // checksum while keeping the original mouth data on the first chunk.
+      edit(tag, ['-n', '-S', root + 'name', label,
+        ...settingFields.flatMap((field, i) => ['-S', field, settings[i]])], 'classic-restore-native-sound-settings');
+      expect(edit(tag, ['-V'], 'classic-long-sound-checksum'), ['matched'], 'native checksum for ' + tag);
+      expect(get(tag, settingFields, 'classic-long-sound-authored-after'), settings, 'preserved pitch and root gain for ' + tag);
+      expect(header('classic-long-sound-header-after'), beforeHeader, 'unchanged native header for ' + tag);
+      expect(get(tag, fields, 'classic-long-sound-after'), ['xbox_adpcm', 'stereo', soundClass, label], 'chained native sound for ' + tag);
+      const links = get(tag, ['pitch_ranges[0].permutations[*].next_permutation_index'], 'classic-long-sound-links');
+      if (links.length !== chunks || links.some((index, i) => Number(index) !== (i + 1 < chunks ? i + 1 : 65535))) {
+        throw new Error('Native long sound chain has a missing or unexpected link: ' + tag);
+      }
+      const final = fs.readFileSync(filename);
+      if (final.readUInt32BE(mouthField) !== mouthBytes
+          || !final.subarray(firstChunkEnd, firstChunkEnd + mouthBytes).equals(originalMouth)
+          || !Buffer.concat([final.subarray(dataStart, firstChunkEnd), final.subarray(firstChunkEnd + mouthBytes)]).equals(encoded)) {
+        throw new Error('Native metadata edit changed an encoded sample or the original mouth data: ' + tag);
+      }
+      soundChains.push({ tag, originalVorbisSha256: sourceSha, frames, paddingFrames: padding, chunks, mouthBytes });
+    }
+  } finally {
+    await browser.close();
   }
 
   expect(hashTagInventory(), before, 'preserved MCC source tree');
@@ -1173,7 +1218,7 @@ async function prepareClassicCeTags() {
   manifest.results.push({
     step: 'stage-classic-ce', state: 'native-source-reviewed', playable: false,
     restoredBuffers, repairedSoundBuffers,
-    longMusic: { tag: music, originalVorbisSha256: musicStreamSha, frames: wave.frames, paddingFrames: wave.paddingFrames, chunks: links.length },
+    longSounds: soundChains,
     melee: { original: meleeBefore, target: meleeAfter, fields: meleeFields },
     damageBounds: damageBounds.map(([tag, ...original]) => ({tag, original, fields: cappedDamageFields})),
     inactiveTurretGrenadeFields: legalEnums,
