@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertQaOutputPath } from './native-qa-storage.mjs';
 import { carrierAnimationSource } from './recover-zombie-carriers-native.mjs';
+import { prepareNativeAdpcmWave } from './prepare-native-adpcm-waves.mjs';
 
 const args = process.argv.slice(2);
 const value = (key) => { const i = args.indexOf(key); if (i < 0 || !args[i + 1]) throw new Error(`Required: ${key}`); return path.resolve(args[i + 1]); };
@@ -54,7 +55,7 @@ if (repairMixedPalettes && (resourceHashes['bitmaps.map'] !== '5357828124ed03b9b
 }
 const invaderCommands = nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit'];
 if (repairCarrierInertia) invaderCommands.push('crc');
-if (compileClassicCe) invaderCommands.push('bitmap', 'bludgeon');
+if (compileClassicCe) invaderCommands.push('bitmap', 'bludgeon', 'sound');
 const executables = Object.fromEntries(invaderCommands.map((name) => {
   const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`);
   return [name, { path: exe, sha256: hashFile(exe) }];
@@ -647,7 +648,52 @@ function stageReviewedLegacySpawners() {
   save();
 }
 
-function prepareClassicCeTags() {
+// Decode the complete owned stream at its authored rate, then reuse the
+// audited C46 frame preparation before handing it to native Invader.
+async function prepareClassicMusicWave(stream) {
+  const { chromium } = await import('@playwright/test');
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  try {
+    const page = await browser.newPage();
+    const wave = await page.evaluate(async base64 => {
+      const encoded = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+      const context = new OfflineAudioContext(2, 1, 44100);
+      const decoded = await context.decodeAudioData(encoded.buffer);
+      const { length: frames, numberOfChannels: channels, sampleRate: rate } = decoded;
+      if (frames !== 4_127_091 || channels !== 2 || rate !== 44100) throw new Error('Changed owned music dimensions');
+      const bytes = new Uint8Array(44 + frames * channels * 2);
+      const view = new DataView(bytes.buffer);
+      const writeText = (offset, text) => bytes.set(new TextEncoder().encode(text), offset);
+      writeText(0, 'RIFF');
+      view.setUint32(4, bytes.length - 8, true);
+      writeText(8, 'WAVEfmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, channels, true);
+      view.setUint32(24, rate, true);
+      view.setUint32(28, rate * channels * 2, true);
+      view.setUint16(32, channels * 2, true);
+      view.setUint16(34, 16, true);
+      writeText(36, 'data');
+      view.setUint32(40, bytes.length - 44, true);
+      for (let channel = 0; channel < channels; channel++) {
+        const samples = decoded.getChannelData(channel);
+        for (let frame = 0; frame < frames; frame++) {
+          const sample = Math.round(samples[frame] * 32768);
+          view.setInt16(44 + (frame * channels + channel) * 2, Math.max(-32768, Math.min(32767, sample)), true);
+        }
+      }
+      const pieces = [];
+      for (let at = 0; at < bytes.length; at += 24576) pieces.push(btoa(String.fromCharCode(...bytes.subarray(at, at + 24576))));
+      return pieces.join('');
+    }, stream.toString('base64'));
+    return prepareNativeAdpcmWave(Buffer.from(wave, 'base64'));
+  } finally {
+    await browser.close();
+  }
+}
+
+async function prepareClassicCeTags() {
   const before = hashTagInventory();
   const directory = path.join(output, 'classic-ce-tags');
   fs.cpSync(tags, directory, { recursive: true, force: false, errorOnExist: true });
@@ -1072,11 +1118,62 @@ function prepareClassicCeTags() {
   expect(fieldsWithout(edit(survivor, ['-L'], 'classic-survivor-fields-after'), [cameraFov]),
     fieldsWithout(cameraListing, [cameraFov]), 'unchanged Survivor biped fields');
 
+  const musicStem = 'sparky/sound/sparkmusic/v1_hit_themes/killer_tracks_invaders';
+  const music = musicStem + '.sound';
+  const musicName = 'Killer Tracks - CEZ4064 4 - Inv';
+  const originalMusic = fs.readFileSync(path.join(directory, music));
+  const musicStart = originalMusic.indexOf('OggS');
+  const musicStream = originalMusic.subarray(musicStart, musicStart + 3_708_886);
+  const musicStreamSha = '1e01df20b18bcae0b903ba27308dd78e2feffffa63bff8f7afbcb63d98c7d281';
+  const soundToolSha = '764f3633697e69090e3c2f3df30060cc8b129ca3fc648a45514f998dd94822e3';
+  if (musicStart < 0 || sha(musicStream) !== musicStreamSha || hashFile(executables.sound.path) !== soundToolSha) {
+    throw new Error('Classic CE music does not match the reviewed sample or native encoder');
+  }
+  const musicFields = ['format', 'channel_count', 'sound_class', 'pitch_ranges[0].permutations[0].name'];
+  expect(get(music, musicFields, 'classic-long-music-before'), ['ogg_vorbis', 'stereo', 'music', musicName],
+    'original long music metadata');
+  const musicHeader = phase => {
+    const lines = edit(music, ['-L'], phase);
+    const end = lines.findIndex(line => line.startsWith('pitch_ranges['));
+    if (end < 0) throw new Error('Cannot review the native music header');
+    return lines.slice(0, end).filter(line => !/\b(?:split_long_sound_into_permutations|format|xbox_adpcm|ogg_vorbis)\s/.test(line));
+  };
+  const beforeMusicHeader = musicHeader('classic-long-music-header-before');
+  const rootMusic = 'pitch_ranges[0].permutations[0].';
+  const authoredMusic = [rootMusic + 'gain', rootMusic + 'skip_fraction', 'pitch_ranges[0].natural_pitch',
+    'pitch_ranges[0].bend_bounds'];
+  const originalMusicSettings = get(music, authoredMusic, 'classic-long-music-authored');
+  const wave = await prepareClassicMusicWave(musicStream);
+  if (wave.decodedPcmSha256 !== 'ee001e99aff89eb3cf058e751acf2b709a4901bfcc71acb19f548af891a16500'
+      || wave.compiledFrames !== 4_127_104 || wave.paddingFrames !== 13) {
+    throw new Error('Decoded music differs from the reviewed full-frame witness');
+  }
+  const musicData = path.join(data, musicStem);
+  fs.mkdirSync(musicData, { recursive: true });
+  fs.writeFileSync(path.join(musicData, musicName + '.wav'), wave.bytes, { flag: 'wx' });
+  const splitMusic = run('sound', ['-t', directory, '-d', data, '-F', 'xbox_adpcm', '-c', 'music',
+    '-C', 'stereo', '-r', '44100', '-s', '-j', '2', musicStem], 'classic-native-split-music');
+  if (splitMusic.exitCode !== 0 || splitMusic.incomplete) throw new Error('Native long music encoding failed');
+  // Invader lowercases input filenames. Preserve the authored root label
+  // and its playback settings inside the newly encoded native chain.
+  edit(music, ['-n', '-S', rootMusic + 'name', musicName,
+    ...authoredMusic.flatMap((field, i) => ['-S', field, originalMusicSettings[i]])], 'classic-restore-music-metadata');
+  expect(get(music, authoredMusic, 'classic-long-music-authored-after'), originalMusicSettings, 'preserved pitch and root gain');
+  expect(musicHeader('classic-long-music-header-after'), beforeMusicHeader, 'unchanged native music settings');
+  expect(get(music, musicFields, 'classic-long-music-after'), ['xbox_adpcm', 'stereo', 'music', musicName],
+    'native chained music metadata');
+  const links = get(music, ['pitch_ranges[0].permutations[*].next_permutation_index'], 'classic-long-music-links');
+  if (links.length !== 71 || links.slice(0, -1).some((index, i) => Number(index) !== i + 1)
+      || !['-1', '65535', 'none', 'null'].includes(links.at(-1).toLowerCase())) {
+    throw new Error('Native long music chain is not one complete linked permutation');
+  }
+
   expect(hashTagInventory(), before, 'preserved MCC source tree');
 
   manifest.results.push({
     step: 'stage-classic-ce', state: 'native-source-reviewed', playable: false,
     restoredBuffers, repairedSoundBuffers,
+    longMusic: { tag: music, originalVorbisSha256: musicStreamSha, frames: wave.frames, paddingFrames: wave.paddingFrames, chunks: links.length },
     melee: { original: meleeBefore, target: meleeAfter, fields: meleeFields },
     damageBounds: damageBounds.map(([tag, ...original]) => ({tag, original, fields: cappedDamageFields})),
     inactiveTurretGrenadeFields: legalEnums,
@@ -1098,8 +1195,8 @@ function prepareClassicCeTags() {
   return directory;
 }
 
-function buildReviewedClassicCe() {
-  const directory = prepareClassicCeTags();
+async function buildReviewedClassicCe() {
+  const directory = await prepareClassicCeTags();
   const destination = path.join(output, 'classic-ce');
   fs.mkdirSync(destination);
   const result = run('build', ['-g', 'gbx-custom', '-t', directory, '-m', destination,
@@ -1257,7 +1354,7 @@ try {
   const carrierReadback = repairStandardCarrier ? recoverStandardCarrier() : null;
   if (nativeMccTool) compileOfficialMcc(carrierReadback);
   if (stageLegacySpawners) stageReviewedLegacySpawners();
-  if (compileClassicCe) buildReviewedClassicCe();
+  if (compileClassicCe) await buildReviewedClassicCe();
 } catch (error) {
   manifest.error = String(error); process.exitCode = 1;
 } finally {
