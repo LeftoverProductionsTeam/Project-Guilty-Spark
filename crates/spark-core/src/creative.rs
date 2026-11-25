@@ -64,6 +64,7 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")] pub squad_number:Option<u8>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub allow_shared_presentation:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub guidance:Option<MissionGuidance>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub early_extraction:Option<bool>,
     pub id: String,
     pub title: String,
     pub objective: String,
@@ -232,6 +233,13 @@ fn mission_scope_last(missions:&[MissionBeat],index:usize)->bool{missions[index+
 fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
  if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.target().is_none_or(|name|!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Mission guidance needs one native flag or object and a finite height");}
  if missions.iter().any(|beat|beat.squad_number.is_some_and(|number|!(1..=22).contains(&number))){return invalid("Squad numbers must be 1 through 22");}
+ if let Some((index,beat))=missions.iter().enumerate().find(|(_,beat)|beat.early_extraction==Some(true)){
+  let mut shared=missions.iter().filter(|row|row.squad_number.is_none());
+  let valid_arrival=shared.next().is_some_and(|arrival|arrival.trigger=="triggerVolume"&&arrival.condition_volume.is_none()&&arrival.condition_result.is_none());
+  let eligible=beat.squad_number.is_none()&&beat.trigger=="forerunnerExtractionSettled"&&mission_scope_last(missions,index)&&valid_arrival
+      &&!shared.any(|row|row.cinematic_cue.is_some()||row.checkpoint==Some(true)||row.complete_mission==Some(true));
+  if !eligible||missions.iter().filter(|row|row.early_extraction==Some(true)).count()!=1{return invalid("Early evacuation requires a shared mission with an unconditional first arrival volume and no cinematics, saves or level exit in later optional objectives");}
+ }
  if !missions.iter().any(|beat|beat.squad_number.is_some()){return Ok(());}
  if missions.iter().any(|beat|beat.checkpoint==Some(true)||beat.complete_mission==Some(true)){return invalid("Independent squad operations cannot save or end the shared world; use a separate shared campaign");}
  for(index,beat)in missions.iter().enumerate(){
@@ -344,6 +352,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Unsupported prepared mission binding or source hash");
     }
     validate_working_mission(project,&binding)?;
+    if binding.missions.iter().any(|beat|beat.early_extraction==Some(true)){return invalid("Early evacuation requires reviewed CE609 working tags");}
     if binding.missions.iter().any(|beat|beat.guidance.is_some()){return invalid("Native objective waypoints require reviewed CE609 working tags. Prepare the mission against recovered source");}
     if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){return invalid("Dropship insertion needs the reviewed CE609 working-tag transport module; build/open the base map and use recovered source");}
     if binding.missions.iter().any(|beat|beat.squad_number.is_some()){return invalid("Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates; preserve mission data and use the recovered source workflow");}
@@ -495,6 +504,7 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
     }
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
+    if binding.missions.iter().any(|beat|beat.early_extraction==Some(true)){expected.push(("gs_optional_contracts".into(),1));}
     let scoped=binding.missions.iter().filter_map(|beat|beat.squad_number).collect::<std::collections::BTreeSet<_>>();
     if binding.missions.iter().any(|beat|beat.guidance.is_some()){
         if map.header.version!=609||map.header.extended{return invalid("Native objective waypoints require standard Forerunner CE609 output");}

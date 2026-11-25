@@ -5626,6 +5626,33 @@ async function mockRecoveredMission(page:Page,blueprint=false,beforeOpen?:(page:
  },blueprint);if(beforeOpen)await beforeOpen(page);await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);if(blueprint)return page.locator('.studio-native-areas');await openRecoveredMissionAction(page);
  const form=page.locator('.native-recovered-mission-source');await revealPagedControl(form.locator('> summary'));await expect(form).toHaveAttribute('open','');await expect(form.getByRole('button',{name:'Read native mission source',exact:true})).toBeFocused();return form;
 }
+test('early extraction survives Undo Save and reopen and prepares native settlement',async({page})=>{
+ await mockRecoveredMission(page,true,async page=>{
+  await page.evaluate(()=>{(window as any).__sparkMock.projects.a.project.studio.missions=[
+   {id:'arrival',title:'Arrive',objective:'Reach the pad',trigger:'triggerVolume',triggerRef:'extraction_zone',encounterName:''},
+   {id:'contract',title:'Optional contract',objective:'Clear the guards',trigger:'encounterCleared',encounterName:'be_defense'},
+   {id:'return',title:'Return',objective:'Bank the gear',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:''},
+  ];});
+ });
+ const readScenario=page.getByRole('button',{name:'Read native Black Echo source',exact:true});
+ await revealPagedControl(readScenario);await readScenario.click();
+ const toggle=page.getByRole('checkbox',{name:'Allow evacuation after field arrival',exact:true});
+ await revealPagedControl(toggle);await toggle.check();await toggle.focus();
+ await page.keyboard.press('Control+z');await expect(toggle).not.toBeChecked();
+ await page.keyboard.press('Control+y');await expect(toggle).toBeChecked();
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions?.[2]?.earlyExtraction)).toBe(true);
+ await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
+ await expect(toggle).toBeChecked();
+ await openRecoveredMissionAction(page);
+ const form=page.locator('.native-recovered-mission-source'),read=form.getByRole('button',{name:'Read native mission source',exact:true});
+ await revealPagedControl(read);await read.click();
+ const prepare=form.getByRole('button',{name:'Prepare recovered mission draft',exact:true});
+ await revealPagedControl(prepare);await prepare.click();
+ const editor=page.locator('.native-script-attachment').filter({has:form});
+ await expect(editor.getByRole('textbox',{name:'Edit source',exact:true})).toContainText('(sleep -1 gs_optional_contracts)');
+});
+
 test('recovered escort route survives history and reopening and refuses an out-of-rally final stop',async({page})=>{
  await mockRecoveredMission(page,true,async page=>{
   await page.evaluate(()=>{

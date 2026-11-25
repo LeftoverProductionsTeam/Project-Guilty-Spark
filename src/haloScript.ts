@@ -84,6 +84,10 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
   if(guided&&!options.forerunner)throw Error('Native objective waypoints require Forerunner mission export.');
   const extractionBeats=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
   if(extractionBeats.length&&(!options.forerunner||extractionBeats.length!==1||studio.missions.at(-1)!==extractionBeats[0]||extractionBeats[0].conditionVolume!=null||extractionBeats[0].conditionResult!=null||extractionBeats[0].completeMission||extractionBeats[0].checkpoint))throw Error('Forerunner settled extraction must be the single final unconditional objective, without a checkpoint or level exit. Select its reviewed runtime; legacy engines cannot complete this callback.');
+  const early=extractionBeats[0]?.earlyExtraction===true;
+  const arrival=studio.missions[0];
+  if(early&&(scope||arrival.trigger!=='triggerVolume'||arrival.conditionVolume!=null||arrival.conditionResult!=null||studio.missions.slice(1).some(beat=>beat.cinematicCue||beat.checkpoint||beat.completeMission)))
+    throw Error('Early evacuation requires a shared mission with an unconditional first arrival volume. Later optional objectives cannot run cinematics, save or end the level.');
   const empty="(= (list_count (players)) 0)";
   const markAbort="  (if "+empty+" (set gs_aborted true))";
   const wait=(condition:string,interval:number,timeout?:number,settlement=false):string[]=>scope?["  (sleep_until (or gs_aborted "+empty+" "+condition+") "+interval+(timeout==null?"":" "+timeout)+")",settlement?"  (if (and "+empty+" (not "+condition+")) (set gs_aborted true))":markAbort]:["  (sleep_until "+condition+" "+interval+(timeout==null?"":" "+timeout)+")"];
@@ -132,7 +136,9 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
   };
   studio.missions.forEach((beat,local)=>{const index=indices?.[local]??local;if(beat.escortFailure==='continue')globals.push('(global boolean gs_result_'+(index+1)+'_done false)','(global boolean gs_result_'+(index+1)+'_failed false)');});
   const scripted:string[]=['(script dormant gs_mission', options.waitForLogic?'  (sleep_until gs_logic_ready 1)':'  (sleep 1)'];
+  let optionalStart=0;
   studio.missions.forEach((beat,local)=>{const i=indices?.[local]??local;
+    if(early&&local===1)optionalStart=scripted.length;
     if(scope)scripted.push(markAbort,"  (if (not gs_aborted) (begin");
     scripted.push(`  ; ${i+1}: ${safeComment(beat.title)} | ${safeComment(beat.objective)}`);
     if(beat.conditionResult){
@@ -195,8 +201,12 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
           scripted.push('  (set '+armed+' true)','  (device_group_set extraction_squad_'+String(scope).padStart(2,'0')+'_ready 1)',...wait(settled,1,undefined,true),'  (set '+armed+' false)');
         }else{
           manualSetters.push('(script dormant forerunner_extraction_complete',...(guided?['  (if '+armed+' (begin','    (set gs_nav_stage 0)','    (set '+settled+' true)','  ))']:['  (if '+armed+' (set '+settled+' true))']),')','');
+          if(early){
+            manualSetters.push('(script dormant gs_optional_contracts',...scripted.splice(optionalStart),')','');
+            scripted.push('  (if (not '+settled+') (wake gs_optional_contracts))','  (sleep_until '+settled+' 1)',
+              '  (sleep -1 gs_optional_contracts)','  (show_hud_help_text false)');
+          }else scripted.push('  (set '+armed+' true)','  (device_set_power '+control+' 1)','  (sleep_until '+settled+' 1)');
           scripted.splice(2,0,'  (device_set_power '+control+' 0)');
-          scripted.push('  (set '+armed+' true)','  (device_set_power '+control+' 1)','  (sleep_until '+settled+' 1)');
         }break;
       }
       case 'timer':
@@ -270,6 +280,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         scripted.push(...wait('(= (ai_living_count '+ref+') 0)',15));break;
       }
     }
+    if(early&&local===0)scripted.push('  (set gs_extraction_armed true)','  (device_set_power extraction_activate 1)');
     if(scope)scripted.push('  (if (not gs_aborted) (begin');
     scripted.push(...cueLines(beat,i,'complete'),...sceneCall(beat,i,'complete'));
     scripted.push('  (print "gs objective complete")');
@@ -321,7 +332,8 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     scope?"Optional conditions and rescue results stay within this squad. Decisions reset each operation and sample current native participants; skipped steps run no AI, HUD or cue.":'Optional volume conditions run when their step starts. Shared decisions sample once at their first eligible member and retain that result for every member; inside/outside outcomes are mutually exclusive. Skipped steps run no AI, HUD, cue or checkpoint. This is shared scenario state, not independent squad progress or replay settlement.',
     scope?"Manual beats wait for their namespaced gs_sqNN_complete_N function. State resets per operation; stale external calls and real native replay still require gameplay acceptance.":'Manual beats stop progression until another script or trigger calls their generated gs_complete_N function. Replaying in a persistent world needs explicit gate reset and run-aware settlement; this exporter does not certify replayability.',
     ...(studio.missions.some(beat=>beat.trigger==='weaponOwned')?[scope?"Collection scans current issued squad participants, requerying each tick. Use a technology tag absent from starting loadouts. This does not bank or award inventory.":'Collection scans one actual native player inventory per tick, including later players. Any matching owned weapon satisfies this shared objective; use a unique technology tag absent from starting loadouts if only one pickup should qualify. No pickup, duplication, bank award or per-squad quest is fabricated.']:[]),
-    ...(extractionBeats.length?[scope?"Forerunner-only squad operation: author the matching numbered terminal and unique readiness group, deployment/extraction volumes and hub starts. Readiness arms only after this squad finishes its objectives; the native callback confirms settlement. No global extraction control, reward writer, raid timer or teleport is added.":'Forerunner-only: enable its native Extraction mode and supply powered deployment control, initially unpowered extraction_activate, extraction_zone/extraction_return volumes and safe hub starts. Earlier objectives gate extraction power; the native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
+    ...(early?['Evacuation opens after the first arrival objective. Later contracts are optional and unfinished objectives stop when the native one-shot settlement callback confirms return. The current shared mission does not reset those contracts on redeployment.']:[]),
+    ...(extractionBeats.length?[scope?"Forerunner-only squad operation: author the matching numbered terminal and unique readiness group, deployment/extraction volumes and hub starts. Readiness arms only after this squad finishes its objectives; the native callback confirms settlement. No global extraction control, reward writer, raid timer or teleport is added.":'Forerunner-only: enable its native Extraction mode and supply powered deployment control, initially unpowered extraction_activate, extraction_zone/extraction_return volumes and safe hub starts. The native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?[scope?"Numbered squad deployment is detected through the native issued-participant query. Other terminal objectives observe shared control transitions; use independent controls when interaction must be isolated. Scripts may also activate controls; no terminal reset or inventory grant is added.":'Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?[scope?"Scoped rescue follows a current squad participant and uses its explicit encounter team, or preserves source teams when no override is selected. All surviving actors must reach the destination with the required minimum alive. Failure stops this operation or follows the authored rescue-result path. AI allegiance, navigation and multiplayer behavior require gameplay testing.":'Survivor escort places its source group and follows the closest players. Its selected encounter team applies; the legacy default assigns the native human team and player-human allegiance. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),
@@ -442,7 +454,7 @@ export interface NativeMissionBinding {
 }
 
 // Exhaustive against the saved beat type: new creator fields must remain reviewable.
-const nativeMissionBeatFields={guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionVisitDuring:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortRoute:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
+const nativeMissionBeatFields={earlyExtraction:true,guidance:true,squadNumber:true,allowSharedPresentation:true,id:true,title:true,objective:true,trigger:true,encounterName:true,encounterTeam:true,transportInsertion:true,triggerRef:true,weaponPath:true,createWeaponObject:true,timerSeconds:true,hudObjective:true,hudText:true,checkpoint:true,completeMission:true,conditionVolume:true,conditionGroup:true,conditionVisitDuring:true,conditionOutside:true,soundCue:true,minimumSurvivors:true,escortRequiresPlayer:true,escortRoute:true,escortFailure:true,conditionResult:true,cinematicCue:true} satisfies Record<keyof CreatorStudioDocument['missions'][number],true>;
 async function nativeMissionHash(body:string):Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(body)))]
     .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -499,7 +511,7 @@ async function readNativeMissionModule(module:{filename:string;content:string}):
 /** Rust Option values serialize as null; absence has the same authored meaning. */
 export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissionBinding['missions']):boolean {
   const normalize=(values:NativeMissionBinding['missions'])=>values.map(beat=>({...beat,
-    squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
+    squadNumber:beat.squadNumber??null,allowSharedPresentation:beat.allowSharedPresentation??null,earlyExtraction:beat.earlyExtraction===true,guidance:beat.guidance?{flag:beat.guidance.flag??null,object:beat.guidance.object??null,height:beat.guidance.height}:null,
     transportInsertion:beat.transportInsertion??null,encounterTeam:beat.encounterTeam??null,triggerRef:beat.triggerRef??null,weaponPath:beat.weaponPath??null,createWeaponObject:beat.createWeaponObject??null,timerSeconds:beat.timerSeconds??null,minimumSurvivors:beat.minimumSurvivors??null,escortRequiresPlayer:beat.escortRequiresPlayer===true,escortRoute:beat.escortRoute??null,escortFailure:beat.escortFailure??null,conditionResult:beat.conditionResult??null,
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionVisitDuring:beat.conditionVisitDuring??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
@@ -602,6 +614,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   if(missions.some(beat=>beat.squadNumber!=null))throw Error('Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates. Build a base map, open its compiled source and use Prepare recovered mission source. The saved mission fields are preserved.');
+  if(missions.some(beat=>beat.earlyExtraction===true))throw Error('Early evacuation requires reviewed CE609 working tags. Build or open the base map and use Prepare recovered mission source.');
   if(missions.some(beat=>beat.guidance!=null))throw Error('Native objective waypoints require reviewed CE609 working tags. Build or open a base map and use Prepare recovered mission source.');
   if(missions.some(beat=>beat.transportInsertion!=null))throw Error('Dropship insertion requires reviewed CE609 working tags with the matching built transport module. Build/open a base map and use Prepare recovered mission source; the saved mission fields are preserved.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
