@@ -6898,25 +6898,45 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(await fs.readFile((await (await returnedDownload).path())!)).toEqual(revised);
 });
 
-for(const origin of ['drawer','viewport'])test('creator map-source drop from '+origin+' selects the donor without switching projects', async ({ page }) => {
+for(const origin of ['drawer','viewport','region viewport'])test('creator map-source drop from '+origin+' selects the donor without switching projects', async ({ page }) => {
   await mockDesktop(page);
-  await openFixture(page);
-  await page.evaluate(() => {
+  const extendsWorld = origin === 'region viewport';
+  await page.evaluate(async (extendsWorld) => {
     const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    if (extendsWorld) {
+      const base = w.__sparkMock.projects.a;
+      const donor = w.__sparkMock.projects['dropped-ce-donor'] = structuredClone(w.__sparkMock.projects.c);
+      donor.project.id = 'dropped-ce-donor';
+      donor.project.source.cacheVersion = 609;
+      donor.inspection.header.version = 609;
+      base.project.source.cacheVersion = 13;
+      base.inspection.header.version = 13;
+      base.inspection.mesh.parts = [
+        { name: 'Base region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
+        { name: 'Other region', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
+      ];
+      const plan = await original('plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
+      base.project.inheritedBspConnections = [{ ...plan, separateNativeBsps: true }];
+    }
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'plan_bsp_assembly') w.__regionPlan = args;
       if (command !== 'import_map_sources') return original(command, args);
       w.__sourceDropArgs = args;
       const data = await original('bootstrap', {});
-      return { entries: data.entries.filter((entry: any) => entry.id === 'c'), failures: [] };
+      const entries = data.entries.filter((entry: any) => entry.id === 'c');
+      const result = {entries: extendsWorld ? entries.map((entry:any) => ({...entry,id:'dropped-ce-donor',version:609})) : entries, failures: []};
+      return extendsWorld ? new Promise(resolve => {w.__finishDonorDrop=()=>resolve(result);}) : result;
     };
-  });
+  }, extendsWorld);
+  await openFixture(page);
   await chooseTool(page, 'Level editor');
   const panel = page.getByRole('region', { name: 'Construction panel', exact: true });
   const assembly = page.locator('.bsp-assembly:visible');
   let drop;
-  if(origin==='viewport'){
+  if(origin!=='drawer'){
     if(await panel.isVisible())await panel.getByRole('button',{name:'Close Construction',exact:true}).click();
     await expect(panel).toBeHidden();
+    if(extendsWorld)await page.getByRole('combobox',{name:'Visible BSP',exact:true}).selectOption('1');
     drop=page.locator('[data-bsp-donor-target="a"]:visible').locator('canvas').first();
   }else{
     if(!await panel.isVisible())await openDrawer(page,'Construction');
@@ -6933,10 +6953,21 @@ for(const origin of ['drawer','viewport'])test('creator map-source drop from '+o
     }));
   })).toBe(true);
   await expect(panel).toBeVisible();
-  await expect(assembly.getByRole('combobox', { name: 'BSP donor map', exact: true, includeHidden: true })).toHaveValue('c');
+  if(extendsWorld){
+    await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishDonorDrop)).toBe('function');
+    await page.getByRole('combobox',{name:'Visible BSP',exact:true}).selectOption('0');
+    await page.evaluate(()=>(window as any).__finishDonorDrop());
+  }
+  await expect(assembly.getByRole('combobox', { name: 'BSP donor map', exact: true, includeHidden: true })).toHaveValue(extendsWorld?'dropped-ce-donor':'c');
   expect(await page.evaluate(() => (window as any).__sourceDropArgs)).toEqual({ paths: ['C:/owned/donor.map'], single: true });
   await expect(page.getByRole('tab', { name: 'Synthetic baseline', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(await constructionControl(page, 'button', 'Plan connected tunnel')).toBeEnabled();
+  const plan=await constructionControl(page,'button','Plan connected tunnel');
+  await expect(plan).toBeEnabled();
+  if(extendsWorld){
+    await expect(assembly.getByRole('combobox',{name:'Connect from BSP',exact:true,includeHidden:true})).toHaveValue('1');
+    await plan.click();
+    await expect.poll(()=>page.evaluate(()=>(window as any).__regionPlan?.baseBspIndex)).toBe(1);
+  }
 });
 
 test('creator batch import seeds a reviewed selection and changing the value retires the review', async ({ page }) => {

@@ -11,8 +11,8 @@ interface MapSourceImport {
 export default function MapSourceDrop({ single = false, disabled, onImported, viewport }: {
   single?: boolean;
   disabled?: boolean;
-  viewport?: { projectId: string; reveal: () => void };
-  onImported: (entries: LibraryEntry[]) => string | void;
+  viewport?: { projectId: string; sourceSlot?: number; reveal: () => void };
+  onImported: (entries: LibraryEntry[], sourceSlot?: number) => string | void;
 }) {
   const target = useRef<HTMLDivElement>(null);
   const importing = useRef(false);
@@ -22,7 +22,7 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
   current.current = { disabled, onImported, viewport };
 
   const mounted = useRef(false);
-  const importSources = useCallback(async (paths?: string[]) => {
+  const importSources = useCallback(async (paths?: string[], sourceSlot?: number) => {
     if (importing.current || current.current.disabled) return;
     setMessage('');
     importing.current = true;
@@ -31,7 +31,7 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
       const result = await call<MapSourceImport>('import_map_sources', { paths, single });
       if (!mounted.current) return;
       const note = !result.entries.length ? undefined : current.current.disabled
-        ? 'Source maps added to the library.' : current.current.onImported(result.entries);
+        ? 'Source maps added to the library.' : current.current.onImported(result.entries, sourceSlot);
       const failures = result.failures.map(({ path, message }) => path.split(/[\\/]/).at(-1) + ' · ' + message);
       setMessage([note, ...failures].filter(Boolean).join('\n'));
     } catch (error) {
@@ -58,7 +58,7 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
         if (overViewport) setMessage('Wait for the current operation before choosing a donor map.');
         return;
       }
-      void importSources(detail.paths);
+      void importSources(detail.paths, overViewport ? viewport.sourceSlot : undefined);
     }
     window.addEventListener('guilty-spark-map-source-drop', drop);
     return () => {

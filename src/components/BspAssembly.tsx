@@ -142,7 +142,7 @@ export default function BspAssembly({
     && !!project.inheritedBspConnections?.some(plan => plan.separateNativeBsps);
   const buildRuntime = project.buildTargets?.find(target => target.id === project.activeBuildTarget)?.runtimeId;
   const [baseIndex, setBaseIndex] = useMapState(project.id, 'bsp.baseSection', project.bspAssembly?.baseBspIndex ?? 0);
-  const [, setViewedBsp] = useMapState(project.id, 'world.bsp', 0);
+  const [viewedBsp, setViewedBsp] = useMapState(project.id, 'world.bsp', 0);
   const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
@@ -346,13 +346,15 @@ export default function BspAssembly({
       </summary>
       {(!nativePartitioned || canExtend) && (
         <MapSourceDrop single disabled={busy || !active}
-          viewport={active ? {projectId: project.id, reveal: () => {setOpen(true);revealPanel('construction');}} : undefined} onImported={([entry]) => {
+          viewport={active ? {projectId: project.id, sourceSlot: canExtend ? viewedBsp : undefined, reveal: () => {setOpen(true);revealPanel('construction');}} : undefined} onImported={([entry], sourceSlot) => {
           if (!admitsDonor(entry)) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
           setImportedDonor(entry);
+          const selectedRegion = canExtend && sourceSlot !== undefined ? baseParts[sourceSlot] : undefined;
+          if (selectedRegion && sourceSlot !== undefined) setBaseIndex(sourceSlot);
           setDonor(entry.id);
           setIndex(0);
           setError('');
-          return entry.title + ' selected. Choose its BSP section and plan the connection.';
+          return entry.title + (selectedRegion ? ' selected for '+selectedRegion.name+'.' : ' selected.') + ' Choose its BSP section and plan the connection.';
         }} />
       )}
       {open && (
