@@ -71,7 +71,7 @@ impl PreparedStarts {
             }
             row.position = position.map(|v| v as f32);
             row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
-            row.bsp_index = base_bsp_count as i16;
+            row.bsp_index = (base_bsp_count + usize::from(assembly.preserve_donor_bsp)) as i16;
         }
         Ok(Self { base, donor, base_bsp_count })
     }

@@ -130,6 +130,9 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     {
         return invalid("Use a single-BSP CE multiplayer base or its eligible compiled MCC13 extension with the matching build tags. Choose a CE donor and keep multi-BSP extensions on MCC13");
     }
+    if plan.preserve_donor_bsp && (!retaining || inspection.mesh.parts.len() > 14) {
+        return invalid("Preserving an intact donor requires a retained MCC13 assembly and two available BSP slots");
+    }
     if retaining && project.native_lighting.is_some() {
         return invalid("Save and compile lighting changes in the existing world before extending it");
     }
@@ -253,6 +256,7 @@ fn build_partition_cache(
     let existing = maps::scenario_volume_readback(preserved_path, source)?;
     let old_switches = maps::scenario_bsp_transitions(preserved_path, source)?.transitions;
     let old_count = source.mesh.parts.len();
+    let expected_count = old_count + if prepared.intact_overlaps.is_some() { 2 } else { 1 };
     let compiler = build::tool_path(tools, "invader-build").unwrap();
     let info = build::tool_path(tools, "invader-info").unwrap();
     let name = source.scenario_path.rsplit(['\\', '/']).next().ok_or_else(|| SparkError::Invalid("Missing scenario filename".into()))?;
@@ -272,7 +276,7 @@ fn build_partition_cache(
     let path = output.join(format!("{name}.map"));
     let map = maps::inspect_map(&path, None)?;
     if map.header.version != target.version || map.header.scenario_type != source.header.scenario_type
-        || map.scenario_path != source.scenario_path || map.mesh.parts.len() != old_count + 1
+        || map.scenario_path != source.scenario_path || map.mesh.parts.len() != expected_count
         || map.tags.iter().any(|tag| tag.external) || map.resources.iter().any(|resource| resource.required) {
         return invalid("Native partition probe differs from the authored scenario, format or self-contained resource policy");
     }
@@ -295,7 +299,7 @@ fn build_partition_cache(
         return invalid("Compiled native BSP slots differ from the staged structure tag identities");
     }
     if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
-        || transitions.bsp_count != old_count + 1
+        || transitions.bsp_count != expected_count
         || transitions.transitions.len() != old_switches.len() + prepared.switches.len()
         || old_switches.iter().any(|row| !transitions.transitions.contains(row)) {
         return invalid("Partition probe lost original volumes or compiled an unexpected BSP switch set");
@@ -315,13 +319,17 @@ fn build_partition_cache(
     let trees = world.bsps.iter().map(|bsp| bsp.listener_tree.as_ref()
         .ok_or_else(|| SparkError::Invalid("Missing compiled placement collision tree".into())))
         .collect::<Result<Vec<_>>>()?;
-    if trees.len() != old_count + 1 { return invalid("Unexpected number of compiled placement collision trees"); }
+    if trees.len() != expected_count { return invalid("Unexpected number of compiled placement collision trees"); }
     let donor_pickups_in_region = prepared.pickups.as_ref().map(|pickups| pickups.verify(&path, &map, &trees)).transpose()?;
     let native_flags = prepared.netgame_flags.as_ref().map(|flags| flags.verify(&path, &map, regional, &trees)).transpose()?;
     let native_starts = prepared.player_starts.as_ref().map(|starts| starts.verify(&path, &map, regional, &trees)).transpose()?;
-    let collision = crate::bsp_assembly::verify_bound_partition_collision(
-        &path, &map, plan, &project.inherited_bsp_connections, prepared.overlap, old_count,
-    )?;
+    let collision = if let Some(overlaps) = prepared.intact_overlaps {
+        crate::bsp_assembly::verify_intact_connector_collision(&path, &map, plan, overlaps, old_count)?
+    } else {
+        crate::bsp_assembly::verify_bound_partition_collision(
+            &path, &map, plan, &project.inherited_bsp_connections, prepared.overlap, old_count,
+        )?
+    };
     if old_count > 1 { verify_retained_collision(preserved_path, source, &path, &map)?; }
     let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
     if let Some(environment) = &prepared.donor_environment {
@@ -401,6 +409,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref())?;
     let mut detail=vec![];
     for (cache,i,root,index) in [(&source.preserved_path,inspection,base_tags,0),(&plan.donor_source.preserved_path,&donor,&plan.donor_tags_directory,plan.donor_bsp_index)]{
+        if plan.preserve_donor_bsp { continue; }
         if inspection.mesh.parts.len() > 1 && i.sha256 == inspection.sha256 { continue; }
         let path=maps::scenario_bsp_tag_paths(cache,i)?.into_iter().nth(index).ok_or_else(||SparkError::Invalid("Native source BSP slot is unavailable".into()))?;
         let relative=format!("{path}.scenario_structure_bsp");let file=root.join(crate::safe_relative(&relative)?);
@@ -430,7 +439,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
             id: id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(),
             target: target.engine.into(), output: Some(cache.path), sha256: Some(cache.sha256),
             message: format!("{} · {} native BSPs · {:.2} / {:.2} MiB resident tag space · physical corridor clearance checked. Runtime traversal remains unverified.",
-                target.name, inspection.mesh.parts.len() + 1, f64::from(cache.resident_bytes) / 1048576., f64::from(target.tag_capacity) / 1048576.),
+                target.name, parts.structure_tags.len(), f64::from(cache.resident_bytes) / 1048576., f64::from(target.tag_capacity) / 1048576.),
             project_fingerprint: fingerprint,
         };
         let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;

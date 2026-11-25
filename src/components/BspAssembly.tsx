@@ -705,17 +705,19 @@ export default function BspAssembly({
               <fieldset>
                 <legend>Build layout</legend>
                 <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy || canExtend}
-                  onChange={event => update({ separateNativeBsps: event.target.checked })} /> Separate native BSPs</label>
+                  onChange={event => update({ separateNativeBsps: event.target.checked, preserveDonorBsp: event.target.checked && draft.preserveDonorBsp })} /> Separate native BSPs</label>
                 {draft.separateNativeBsps && <>
                   <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
                   {canExtend && baseParts.length <= 14 && <div>
+                    <label><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
+                      onChange={event => update({ preserveDonorBsp: event.target.checked })} /> Preserve donor BSP in native build</label>
                     <button type="button" disabled={busy || !native || !project.bspAssembly || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
                     <div className="bsp-actions">
                       <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', true); }}>Pick current BSP landing</button>
                       <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', true)}>Pick donor landing</button>
                     </div>
-                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. The preview keeps both original BSPs visible. Building with the intact donor is still pending.</p>
+                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. With preservation enabled, apply and save the connection, then build for MCC13. The new connector gets its own BSP slot.</p>
                   </div>}
                   {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
                     onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>

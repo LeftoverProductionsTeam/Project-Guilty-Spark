@@ -603,7 +603,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         }
         let i=inspect(&state,&p)?;
         let cancel = AtomicBool::new(false);
-        let preserve_donor = intact_connector.unwrap_or(false);
+        let preserve_donor = intact_connector.unwrap_or(false) || p.bsp_assembly.as_ref().is_some_and(|plan| plan.preserve_donor_bsp);
         let mut intact_switches = None;
         let (geometry, partition_report) = if preserve_donor {
             let connector = core::bsp_assembly::generate_preserved_connector(&p, &i, &cancel).map_err(error)?;

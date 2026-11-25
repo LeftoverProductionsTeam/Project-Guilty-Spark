@@ -449,6 +449,7 @@ mod tests {
             donor_bsp_index: 0,
             base_bsp_index: 0,
             separate_native_bsps: false,
+            preserve_donor_bsp: false,
             include_donor_scenery: false,
             translation: [0.; 3],
             yaw_degrees: 0.,

@@ -25,7 +25,6 @@ pub(crate) struct PreparedFlags {
     base: Vec<NativeNetgameFlag>,
     donor: Vec<NativeNetgameFlag>,
     original_teleporter_homes: Vec<Option<usize>>,
-    original_bsp_count: usize,
 }
 
 fn teleporter_side(kind: u16) -> Option<usize> {
@@ -90,7 +89,7 @@ impl PreparedFlags {
                 exclusive_teleporter_home(&trees, row.position).map(Some)
             } else { Ok(None) }).collect::<Result<Vec<_>>>()?
         };
-        Ok(Self { base, donor, original_teleporter_homes, original_bsp_count })
+        Ok(Self { base, donor, original_teleporter_homes })
     }
 
     pub(crate) fn append(
@@ -195,7 +194,7 @@ impl PreparedFlags {
                 };
                 let expected_bsp = if index < self.base.len() {
                     self.original_teleporter_homes[index].unwrap()
-                } else { self.original_bsp_count };
+                } else { trees.len().checked_sub(1).ok_or_else(|| SparkError::Invalid("Missing donor teleporter BSP".into()))? };
                 if row.usage_id < 0 || exclusive_teleporter_home(trees, row.position)? != expected_bsp {
                     return invalid(format!("Teleporter flag {index} needs an unambiguous native home outside the overlap"));
                 }

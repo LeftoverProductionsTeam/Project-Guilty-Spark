@@ -66,6 +66,8 @@ pub struct BspAssembly {
     #[serde(default, skip_serializing_if = "is_false")]
     pub separate_native_bsps: bool,
     #[serde(default, skip_serializing_if = "is_false")]
+    pub preserve_donor_bsp: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
     pub translation: [f64; 3],
     pub yaw_degrees: f64,
@@ -144,6 +146,9 @@ impl BspAssembly {
             );
         }
         if self.separate_native_bsps { self.validate_partition_route()?; }
+        if self.preserve_donor_bsp && (!self.separate_native_bsps || self.yaw_degrees != 0. || !self.native_seals.is_empty()) {
+            return invalid("An intact donor requires separate BSPs, translation without yaw, and no boundary seals");
+        }
         if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
         }
@@ -1324,6 +1329,7 @@ pub fn generate_preserved_connector(
     let points = [offset(start, -3.0), offset(start, 2.5), offset(end, -2.5), offset(end, 3.0)];
     let mut review = plan.clone();
     review.separate_native_bsps = false;
+    review.preserve_donor_bsp = false;
     review.base_bsp_index = 0;
     review.tunnel_points = points[1..3].to_vec();
     review.validate()?;
@@ -1413,6 +1419,47 @@ pub fn generate_preserved_connector(
         switches,
         overlaps: [overlap(start), overlap(end)],
     })
+}
+
+pub(crate) fn verify_intact_connector_collision(
+    cache: &Path, compiled: &MapInspection, plan: &BspAssembly,
+    overlaps: [[V; 2]; 2], original_count: usize,
+) -> Result<serde_json::Value> {
+    let (collision, _) = maps::collision_source(cache, compiled)?;
+    if collision.parts.len() != original_count + 2 {
+        return invalid("Compiled intact extension has the wrong BSP count");
+    }
+    let connector = crate::bsp_clearance::RouteChecker::for_part(&collision, original_count)?;
+    let mut route = plan.clone();
+    route.separate_native_bsps = false;
+    route.preserve_donor_bsp = false;
+    route.base_bsp_index = 0;
+    let mut samples = Vec::with_capacity(2);
+    let mut max_delta: f64 = 0.;
+    for (slot, overlap) in [plan.base_bsp_index, original_count + 1].into_iter().zip(overlaps) {
+        let region = crate::bsp_clearance::RouteChecker::for_part(&collision, slot)?;
+        route.tunnel_points = overlap.to_vec();
+        let both = [region.verify(&route)?, region.verify_return(&route)?];
+        let original = region.floor_profile(overlap)?;
+        let added = connector.floor_profile(overlap)?;
+        if original.len() != added.len() || original.is_empty() {
+            return invalid("Compiled intact connector has incompatible overlap measurements");
+        }
+        let delta = original.into_iter().zip(added).map(|(a,b)| (a-b).abs()).fold(0., f64::max);
+        max_delta = max_delta.max(delta);
+        samples.push(both);
+    }
+    if max_delta > 0.02 { return invalid("Compiled intact connector landing floors are misaligned"); }
+    let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
+    let delta = sub(end, start);
+    let forward = [delta[0], delta[1], 0.];
+    let offset = mul(forward, 2.5 / forward[0].hypot(forward[1]));
+    route.tunnel_points = vec![overlaps[0][0], add(start, offset), sub(end, offset), overlaps[1][1]];
+    let corridor = [connector.verify(&route)?, connector.verify_return(&route)?];
+    Ok(serde_json::json!({
+        "connectorSamples": corridor, "landingSamples": samples, "maxFloorDelta": max_delta,
+        "bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
+    }))
 }
 
 pub(crate) fn verify_bound_partition_collision(
@@ -1681,6 +1728,7 @@ pub fn plan_from_bsp(
         donor_bsp_index: index,
         base_bsp_index: base_index,
         separate_native_bsps: retaining,
+        preserve_donor_bsp: false,
         include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,

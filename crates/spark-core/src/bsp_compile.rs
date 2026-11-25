@@ -102,6 +102,7 @@ fn namespace_materials(
     workspace: &Path,
     destination: &Path,
     recovery: Option<(&project::Source,&MapInspection)>,
+    extra_roots: &[String],
 ) -> Result<NamespacedDependencies> {
     crate::reject_links(source)?;
     if !source.is_dir() {
@@ -217,6 +218,7 @@ fn namespace_materials(
         }
     }
     roots.extend(scenery.iter().map(|p| format!("{}.scenery", p.tag_path)));
+    roots.extend(extra_roots.iter().cloned());
     roots.sort();
     roots.dedup();
     let bsp_root = format!("{bsp}.scenario_structure_bsp");
@@ -757,7 +759,8 @@ fn bake_structure_lightmaps(
 
 pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
-    pub switches: [bsp_assembly::PartitionSwitch; 2],
+    pub switches: Vec<bsp_assembly::PartitionSwitch>,
+    pub intact_overlaps: Option<[[[f64; 3]; 2]; 2]>,
     pub overlap: [[f64; 3]; 2],
     pub structure_tags: Vec<String>,
     pub scenery: Vec<crate::bsp_scenery::Placement>,
@@ -833,6 +836,105 @@ fn bind_partition_scenario(
     Ok(())
 }
 
+// Return only loose immutable-layout input from the reviewed cache. Native
+// dependency extraction and the existing namespacer handle all tag references.
+fn extract_intact_donor(
+    plan: &bsp_assembly::BspAssembly, donor: &MapInspection, donor_bsp: &str,
+    tools: &Toolchain, runner: &Runner, workspace: &Path,
+) -> Result<(PathBuf, Vec<String>)> {
+    let source = &plan.donor_source;
+    let resources = source.resource_directory.as_deref().ok_or_else(||
+        SparkError::Invalid("Connect the original CE donor resource banks before preserving its BSP".into()))?;
+    crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+    crate::native_resources::review(source, donor, resources)?;
+    let root = workspace.join("intact-donor-tags");
+    fs::create_dir(&root)?;
+    let scenario = format!("{}.scenario", donor.scenario_path);
+    let edit = find_tool(tools, "invader-edit")?;
+    let extract = find_tool(tools, "invader-extract")?;
+    let extract_tags = |cache: &Path, roots: &[String], recursive: bool| {
+        let mut args = vec!["-t".into(), root.to_string_lossy().into_owned(),
+            "-m".into(), resources.to_string_lossy().into_owned()];
+        for tag in roots { args.extend(["-s".into(), tag.clone()]); }
+        if recursive { args.push("-r".into()); }
+        args.push(cache.to_string_lossy().into_owned());
+        runner.run(&extract, &args, workspace, "extract", 38)
+    };
+    extract_tags(&source.preserved_path, std::slice::from_ref(&scenario), false)?;
+    let sky_count = runner.run(&edit, &["-t".into(), root.to_string_lossy().into_owned(), "-C".into(),
+        "skies".into(), scenario.clone()], workspace, "partition-environment", 39)?
+        .trim().parse::<usize>().ok().filter(|&count| count <= 8)
+        .ok_or_else(|| SparkError::Invalid("Native donor sky count is unreadable".into()))?;
+    let mut skies = Vec::with_capacity(sky_count);
+    for index in 0..sky_count {
+        let sky = runner.run(&edit, &["-t".into(), root.to_string_lossy().into_owned(), "-G".into(),
+            format!("skies[{index}].sky"), scenario.clone()], workspace, "partition-environment", 39)?;
+        let sky = sky.trim();
+        safe_relative(sky)?;
+        if !sky.ends_with(".sky") { return invalid("Donor has an unsupported empty or non-native sky reference"); }
+        skies.push(sky.to_owned());
+    }
+    let mut dependencies = vec![format!("{donor_bsp}.scenario_structure_bsp")];
+    dependencies.extend_from_slice(&skies);
+    if plan.translation == [0.; 3] {
+        extract_tags(&source.preserved_path, &dependencies, true)?;
+    } else {
+        let (cache, _) = maps::translate_bsp_extraction_input(&source.preserved_path, donor, plan.translation)?;
+        let input = workspace.join("intact-donor-extract.map");
+        project::atomic_write(&input, &cache, false)?;
+        let result = extract_tags(&input, &dependencies, true);
+        fs::remove_file(&input)?;
+        result?;
+    }
+    for tag in &dependencies {
+        if !root.join(safe_relative(tag)?).is_file() { return invalid(format!("Intact donor extraction is missing {tag}")); }
+    }
+    crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+    Ok((root, skies))
+}
+
+fn bind_intact_skies(
+    edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
+    scenario: &str, donor: &str, donor_skies: &[String],
+) -> Result<()> {
+    let run = |tag: &str, fields: Vec<String>| {
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+        args.extend(fields);
+        args.push(tag.into());
+        runner.run(edit, &args, workspace, "partition-environment", 57)
+    };
+    let base_count = run(scenario, vec!["-C".into(), "skies".into()])?.trim()
+        .parse::<usize>().ok().filter(|&count| count + donor_skies.len() <= 8)
+        .ok_or_else(|| SparkError::Invalid("The intact extension exceeds the native eight-sky scenario budget".into()))?;
+    let before = run(donor, vec!["-G".into(), "clusters[*].sky".into()])?;
+    let indices = before.lines().map(|value| {
+        value.trim().parse::<usize>().ok().filter(|&index| index == 65535 || index < donor_skies.len())
+            .ok_or_else(|| SparkError::Invalid("A native donor cluster references an invalid sky slot".into()))
+    }).collect::<Result<Vec<_>>>()?;
+    if donor_skies.is_empty() { return Ok(()); }
+    let mut args = vec!["-I".into(), "skies".into(), donor_skies.len().to_string(), "end".into()];
+    for (index, sky) in donor_skies.iter().enumerate() {
+        args.extend(["-S".into(), format!("skies[{}].sky", base_count + index),
+            format!("gsbsp_{}_1\\{sky}", &runner.id[..8])]);
+    }
+    run(scenario, args)?;
+    if base_count != 0 {
+        let mut args = Vec::new();
+        for (cluster, &index) in indices.iter().enumerate().filter(|(_, i)| **i != 65535) {
+            args.extend(["-S".into(), format!("clusters[{cluster}].sky"), (base_count + index).to_string()]);
+            // Bound Windows native command lines on highly partitioned donors.
+            if args.len() >= 600 { run(donor, std::mem::take(&mut args))?; }
+        }
+        if !args.is_empty() { run(donor, args)?; }
+    }
+    let after = run(donor, vec!["-G".into(), "clusters[*].sky".into()])?;
+    let expected = indices.into_iter().map(|i| if i == 65535 { i } else { base_count + i }).collect::<Vec<_>>();
+    if !after.lines().map(|s| s.trim().parse::<usize>().ok()).eq(expected.into_iter().map(Some)) {
+        return invalid("Intact donor sky remap did not survive native readback");
+    }
+    Ok(())
+}
+
 /// Stage each native structure. Only the explicit scenario probe binds the
 /// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
@@ -842,7 +944,14 @@ pub(crate) fn prepare_partition_structure(
     let bind = stage != PartitionStage::Structure;
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
-    let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
+    let (base_geometry, added_geometry, switches, overlap, overlap_samples, max_floor_delta, intact_overlaps) =
+        if plan.preserve_donor_bsp {
+            let intact = bsp_assembly::generate_preserved_connector(project, inspection, runner.cancel)?;
+            (None, intact.geometry, Vec::from(intact.switches), intact.overlaps[0], None, None, Some(intact.overlaps))
+        } else {
+            let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
+            (parts.base, parts.donor, Vec::from(parts.switches), parts.overlap, Some(parts.overlap_samples), Some(parts.max_floor_delta), None)
+        };
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
     let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
     let original_structures = maps::scenario_bsp_tag_paths(&base_source.preserved_path, inspection)?;
@@ -850,38 +959,52 @@ pub(crate) fn prepare_partition_structure(
         return invalid("A native source BSP is missing from its collision inspection");
     }
     let mut retained = Vec::new();
-    if let Some(base) = &parts.base {
-        namespace_materials(tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None)?;
+    if let Some(base) = &base_geometry {
+        namespace_materials(tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None, &[])?;
     } else {
         for bsp in &original_structures {
             let file = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
             let sha = maps::hash_file(&file)?;
             retained.push((file, sha));
         }
-        namespace_materials(tags, &original_structures[plan.base_bsp_index], 0, &parts.donor, &[], tools, runner, workspace, tags, None)?;
+        namespace_materials(tags, &original_structures[plan.base_bsp_index], 0, &added_geometry, &[], tools, runner, workspace, tags, None, &[])?;
     }
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
     let donor_source_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;
-    namespace_materials(&plan.donor_tags_directory, &donor_source_bsp, 1, &parts.donor, &scenery,
-        tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
+    let extracted = plan.preserve_donor_bsp.then(||
+        extract_intact_donor(plan, &donor, &donor_source_bsp, tools, runner, workspace)).transpose()?;
+    let (donor_root, skies) = extracted.as_ref().map_or(
+        (plan.donor_tags_directory.as_path(), &[][..]), |(root, skies)| (root.as_path(), skies.as_slice()));
+    namespace_materials(donor_root, &donor_source_bsp, 1, &added_geometry, &scenery,
+        tools, runner, workspace, tags, Some((&plan.donor_source, &donor)), skies)?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
-    let donor_name = if parts.base.is_some() { "donor".into() } else { format!("region_{}", original_structures.len()) };
+    let donor_name = if base_geometry.is_some() { "donor".into() } else { format!("region_{}", original_structures.len()) };
     if original_structures.iter().any(|tag| tag.rsplit(['\\', '/']).next().is_some_and(|name| name.eq_ignore_ascii_case(&donor_name)))
-        && parts.base.is_none()
+        && base_geometry.is_none()
     {
         return invalid("The generated donor BSP name already exists in the retained source");
     }
     let mut regions = Vec::with_capacity(2);
-    if let Some(base) = &parts.base { regions.push(("base", base)); }
-    regions.push((donor_name.as_str(), &parts.donor));
+    if let Some(base) = &base_geometry { regions.push(("base", base)); }
+    regions.push((donor_name.as_str(), &added_geometry));
     let built = regions.iter().map(|(name, geometry)| compile_structure(&tool, runner, workspace, tags, &parent, name, geometry))
         .collect::<Result<Vec<_>>>()?;
-    let structure_tags = if parts.base.is_some() {
+    let mut structure_tags = if base_geometry.is_some() {
         built.iter().map(|(tag, _, _)| tag.clone()).collect::<Vec<_>>()
     } else {
         original_structures.iter().cloned().chain(built.iter().map(|(tag, _, _)| tag.clone())).collect()
     };
+    if plan.preserve_donor_bsp {
+        let donor_path = format!("gsbsp_{}_1\\{}", &runner.id[..8], donor_source_bsp);
+        let donor_tag = format!("{donor_path}.scenario_structure_bsp");
+        if bind {
+            bind_intact_skies(&edit, runner, workspace, tags, &format!("{}.scenario", inspection.scenario_path), &donor_tag, skies)?;
+        }
+        let file = tags.join(safe_relative(&donor_tag)?);
+        retained.push((file.clone(), maps::hash_file(&file)?));
+        structure_tags.push(donor_path);
+    }
     let netgame_flags = if bind {
         Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
     } else { None };
@@ -889,7 +1012,7 @@ pub(crate) fn prepare_partition_structure(
         Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor, cache_version)?)
     } else { None };
     let pickups = if bind {
-        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &parts.switches)?;
+        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
             project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
@@ -949,7 +1072,7 @@ pub(crate) fn prepare_partition_structure(
         }
     }
     let donor_tag = format!("{}.scenario_structure_bsp", structure_tags.last().unwrap());
-    let donor_environment = if bind {
+    let donor_environment = if bind && !plan.preserve_donor_bsp {
         let source = format!("gsbsp_{}_1\\{}.scenario_structure_bsp", &runner.id[..8], donor_source_bsp);
         let invoke = |tag: &str, fields: Vec<String>| {
             let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
@@ -979,9 +1102,9 @@ pub(crate) fn prepare_partition_structure(
     }
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
         "retainedStructureTags": retained.len(),
-        "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
-        "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+        "overlap": overlap, "overlapSamples": overlap_samples, "maxFloorDelta": max_floor_delta, "intactOverlaps": intact_overlaps,
+        "switches": switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
+    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(
@@ -1028,6 +1151,7 @@ pub fn prepare_native(
         workspace,
         tags,
         None,
+        &[],
     )?;
     let donor_hashes = namespace_materials(
         &assembly.donor_tags_directory,
@@ -1040,6 +1164,7 @@ pub fn prepare_native(
         workspace,
         tags,
         Some((&assembly.donor_source,&donor)),
+        &[],
     )?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let name = "connected";
