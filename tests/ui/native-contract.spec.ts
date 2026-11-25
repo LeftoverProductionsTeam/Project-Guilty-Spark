@@ -6898,7 +6898,7 @@ test('Chupathingy Forge .hmv uses the shared history, Save and lossless export c
   expect(await fs.readFile((await (await returnedDownload).path())!)).toEqual(revised);
 });
 
-test('creator map-source drop selects the donor without switching projects', async ({ page }) => {
+for(const origin of ['drawer','viewport'])test('creator map-source drop from '+origin+' selects the donor without switching projects', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
   await page.evaluate(() => {
@@ -6911,12 +6911,20 @@ test('creator map-source drop selects the donor without switching projects', asy
     };
   });
   await chooseTool(page, 'Level editor');
-  if (!await page.getByRole('region', { name: 'Construction panel', exact: true }).isVisible()) await openDrawer(page, 'Construction');
+  const panel = page.getByRole('region', { name: 'Construction panel', exact: true });
   const assembly = page.locator('.bsp-assembly:visible');
-  await revealPagedControl(assembly.locator('summary').first());
-  await assembly.locator('summary').first().click();
-  const drop = assembly.getByText('Drop a donor map here', { exact: true });
-  await revealPagedControl(drop);
+  let drop;
+  if(origin==='viewport'){
+    if(await panel.isVisible())await panel.getByRole('button',{name:'Close Construction',exact:true}).click();
+    await expect(panel).toBeHidden();
+    drop=page.locator('[data-bsp-donor-target="a"]:visible').locator('canvas').first();
+  }else{
+    if(!await panel.isVisible())await openDrawer(page,'Construction');
+    await revealPagedControl(assembly.locator('summary').first());
+    await assembly.locator('summary').first().click();
+    drop=assembly.getByText('Drop a donor map here',{exact:true});
+    await revealPagedControl(drop);
+  }
   await drop.scrollIntoViewIfNeeded();
   expect(await drop.evaluate((element) => {
     const box = element.getBoundingClientRect();
@@ -6924,6 +6932,7 @@ test('creator map-source drop selects the donor without switching projects', asy
       cancelable: true, detail: { paths: ['C:/owned/donor.map'], x: box.x + box.width / 2, y: box.y + box.height / 2 },
     }));
   })).toBe(true);
+  await expect(panel).toBeVisible();
   await expect(assembly.getByRole('combobox', { name: 'BSP donor map', exact: true, includeHidden: true })).toHaveValue('c');
   expect(await page.evaluate(() => (window as any).__sourceDropArgs)).toEqual({ paths: ['C:/owned/donor.map'], single: true });
   await expect(page.getByRole('tab', { name: 'Synthetic baseline', exact: true })).toHaveAttribute('aria-selected', 'true');

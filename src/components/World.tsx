@@ -1636,6 +1636,7 @@ export default function World({
           ref={viewportElement}
           className={`viewport${assetDrag.dragging ? ' viewport-asset-drop-active' : ''}`}
           data-testid="viewport"
+          data-bsp-donor-target={activity.active && !cinematic && immersiveWritable ? project.id : undefined}
         >
           <ViewportBoundary>
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>

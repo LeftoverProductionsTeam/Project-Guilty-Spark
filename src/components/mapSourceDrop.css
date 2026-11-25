@@ -10,7 +10,7 @@
 }
 .map-source-drop p { width: 100%; margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 /* Tauri reports the drop to the window. Keep the underlying targets visible. */
-body:has(.map-source-drop:hover) .drag-overlay {
+body:has(.map-source-drop:hover, [data-bsp-donor-target]:hover) .drag-overlay {
   background: #15363748;
   backdrop-filter: none;
   justify-content: end;

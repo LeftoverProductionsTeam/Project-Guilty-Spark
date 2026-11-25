@@ -13,6 +13,7 @@ import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
 import MapSourceDrop from './MapSourceDrop';
+import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 interface NativeBspTransitions {
   cacheSha256: string;
@@ -131,6 +132,7 @@ export default function BspAssembly({
   onBuild: () => void;
 }) {
   const {active}=useWorkspaceActivity();
+  const revealPanel=useRevealWorkspacePanel();
   const sourceSha256 = project.source?.sha256;
   const nativePartitioned = sourceSha256 && inspection?.sha256 === sourceSha256
     && (inspection.mesh.parts?.length ?? 0) > 1 && [609, 13].includes(inspection.header.version);
@@ -342,6 +344,17 @@ export default function BspAssembly({
       <summary>
         {nativePartitioned ? 'Native BSP transitions' : 'Connect another map’s BSP'}{project.bspAssembly ? ` · ${project.bspAssembly.donorTitle}` : ''}
       </summary>
+      {(!nativePartitioned || canExtend) && (
+        <MapSourceDrop single disabled={busy || !active}
+          viewport={active ? {projectId: project.id, reveal: () => {setOpen(true);revealPanel('construction');}} : undefined} onImported={([entry]) => {
+          if (!admitsDonor(entry)) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
+          setImportedDonor(entry);
+          setDonor(entry.id);
+          setIndex(0);
+          setError('');
+          return entry.title + ' selected. Choose its BSP section and plan the connection.';
+        }} />
+      )}
       {open && (
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
@@ -361,14 +374,6 @@ export default function BspAssembly({
               {' '}connections alongside the new route.
             </p>
           )}
-          <MapSourceDrop single disabled={busy || !active} onImported={([entry]) => {
-            if (!admitsDonor(entry)) return canExtend ? 'Choose a different CE609 donor for this MCC13 world.' : 'Choose a different supported Halo map.';
-            setImportedDonor(entry);
-            setDonor(entry.id);
-            setIndex(0);
-            setError('');
-            return entry.title + ' selected. Choose its BSP section and plan the connection.';
-          }} />
           <div className="bsp-actions">
             {canExtend && <label>Connect from BSP
               <select value={baseIndex} onChange={event => {
