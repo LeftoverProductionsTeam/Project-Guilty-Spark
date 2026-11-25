@@ -252,16 +252,27 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   const earlyTypes=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
   assert.equal(earlyTypes[earlyNames.indexOf('gs_optional_contracts')],'dormant');
   console.log('PASS: native early evacuation and independent optional script type readback');
-  // Native author-provided hooks use the existing Forerunner operation interface.
-  await fs.writeFile(missionFile,'(script continuous forerunner_squad_01_begin (sleep -1) (sleep 1))\n(script continuous forerunner_squad_01_aborted (sleep -1) (sleep 1))\n');
+  await run('invader-edit',['-I','device_groups','1','end','-S','device_groups[6].name','extraction_squad_01_ready',scenario]);
+  const repeat=emptyCreatorStudio();
+  repeat.missions=[
+   {id:'guard',title:'Guards',objective:'Clear the guards',trigger:'encounterCleared',encounterName:'be_defense',squadNumber:1},
+   {id:'return',title:'Return',objective:'Bank gear',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',squadNumber:1,resetOnDeployment:true},
+  ];
+  const repeatSource=exportHaloCeMission(repeat,{forerunner:true}).content;
+  assert.ok(repeatSource.includes('(sleep_until (and gs_sq01_enabled gs_sq01_begin_pending) 1)'));
+  assert.ok(repeatSource.indexOf('(ai_erase be_defense)')<repeatSource.indexOf('(ai_place be_defense)'));
+  assert.ok(repeatSource.includes('(sleep_until (or gs_sq01_aborted gs_sq01_begin_pending gs_sq01_settled_2) 1)'));
+  assert.ok(!repeatSource.includes('gs_sq01_guard'));
+  await fs.writeFile(missionFile,repeatSource);
   await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
   const callbacks=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
   const kinds=(await run('invader-edit',['-G','scripts[*].script_type',scenario])).split(/\r?\n/);
   const returns=(await run('invader-edit',['-G','scripts[*].return_type',scenario])).split(/\r?\n/);
-  assert.deepEqual(callbacks,['forerunner_squad_01_begin','forerunner_squad_01_aborted']);
-  assert.deepEqual(kinds,['continuous','continuous']);
-  assert.deepEqual(returns,['void','void']);
-  console.log('PASS: native per-squad deployment and abort callback signatures');
+  for(const name of ['forerunner_squad_01_begin','forerunner_squad_01_aborted','forerunner_squad_01_complete']){
+   const index=callbacks.indexOf(name);assert.ok(index>=0,name);
+   assert.equal(kinds[index],'continuous');assert.equal(returns[index],'void');
+  }
+  console.log('PASS: generated per-squad deployment and abort callback signatures');
   await fs.unlink(missionFile);
   console.log('PASS: shared mission object guidance native CE compile and independent script/global readback');
   await fs.writeFile(path.join(data,'scripts/cues.hsc'),'(script static void depart_cue (sleep 1))\n(script static void arrive_cue (sleep 1))\n');

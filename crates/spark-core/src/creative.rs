@@ -65,6 +65,7 @@ pub struct MissionBeat {
     #[serde(default,skip_serializing_if="Option::is_none")] pub allow_shared_presentation:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub guidance:Option<MissionGuidance>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub early_extraction:Option<bool>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub reset_on_deployment:Option<bool>,
     pub id: String,
     pub title: String,
     pub objective: String,
@@ -240,6 +241,7 @@ fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
       &&!shared.any(|row|row.cinematic_cue.is_some()||row.checkpoint==Some(true)||row.complete_mission==Some(true));
   if !eligible||missions.iter().filter(|row|row.early_extraction==Some(true)).count()!=1{return invalid("Early evacuation requires a shared mission with an unconditional first arrival volume and no cinematics, saves or level exit in later optional objectives");}
  }
+ if missions.iter().enumerate().any(|(index,beat)|beat.reset_on_deployment==Some(true)&&(beat.squad_number.is_none()||beat.trigger!="forerunnerExtractionSettled"||!mission_scope_last(missions,index))){return invalid("Native deployment reset belongs to the final numbered squad settlement objective");}
  if !missions.iter().any(|beat|beat.squad_number.is_some()){return Ok(());}
  if missions.iter().any(|beat|beat.checkpoint==Some(true)||beat.complete_mission==Some(true)){return invalid("Independent squad operations cannot save or end the shared world; use a separate shared campaign");}
  for(index,beat)in missions.iter().enumerate(){
@@ -542,8 +544,12 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
         let markers=crate::maps::scenario_logic_readback(cache,map)?;
         crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
         for number in &scoped{
-            expected.extend([(format!("gs_sq{number:02}_mission"),2),(format!("gs_sq{number:02}_guard"),2),(format!("forerunner_squad_{number:02}_players"),3)]);
-            if binding.missions.iter().any(|beat|beat.squad_number==Some(*number)&&beat.guidance.is_some()){expected.extend(["hide","show","update"].map(|name|(format!("gs_sq{number:02}_nav_{name}"),3)));}
+            expected.extend([(format!("gs_sq{number:02}_mission"),2),(format!("forerunner_squad_{number:02}_players"),3)]);
+            let lifecycle=binding.missions.iter().any(|beat|beat.squad_number==Some(*number)&&beat.reset_on_deployment==Some(true));
+            let guided=binding.missions.iter().any(|beat|beat.squad_number==Some(*number)&&beat.guidance.is_some());
+            if lifecycle{expected.extend(["begin","aborted"].map(|name|(format!("forerunner_squad_{number:02}_{name}"),2)));}
+            if guided||!lifecycle{expected.push((format!("gs_sq{number:02}_guard"),2));}
+            if guided{expected.extend(["hide","show","update"].map(|name|(format!("gs_sq{number:02}_nav_{name}"),3)));}
             let ready=format!("extraction_squad_{number:02}_ready");
             let groups=markers.groups.iter().enumerate().filter(|(_,group)|group.name==ready).collect::<Vec<_>>();
             if groups.len()!=1||groups[0].1.initial_value!=0.||groups[0].1.flags!=0||markers.devices.iter().any(|device|[device.power_group,device.position_group].contains(&Some(groups[0].0 as i16))){return invalid("Compiled squad mission needs one isolated zero-initialized readiness group");}

@@ -4,7 +4,7 @@ Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: All nineteen regions compiled as MCC13 f0835f5e and passed independent native collision, environment, lighting, placement and sky-slot readback. Fourteen-region 71fc1648 remains installed. Every exact retained handoff is preserved.
-Next action: Continue exact Black Echo 95603ac1 from the verified boarding prompt with enough native execution time for return and banking. Wire the existing Mission Director to the newly admitted deployment/abort callbacks and verify actual contract reset. Continue Covenant, LAN, nineteen-region and Zombie gates.
+Next action: Verify the exact Black Echo 95603ac1 occupied return and banking on the longer Forerunner run. Compile a playable numbered squad mission with Reset this squad’s objectives on confirmed deployment and exercise two native operations plus abort. Covenant, private LAN, MegaWorld and Zombie gates remain open.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 
