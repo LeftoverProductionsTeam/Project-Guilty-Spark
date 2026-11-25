@@ -801,6 +801,32 @@ mod test_fixture;
 #[cfg(test)]
 mod tests {
     #[test]
+    #[ignore = "Requires the pinned CE609 Black Echo return survey cache"]
+    fn compiled_pelican_return_footprint_has_readable_surfaces() {
+        let cache=std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_PELICAN_PAD_MAP").expect("Select the reviewed Black Echo cache"));
+        let map=crate::maps::inspect_map(&cache,None).unwrap();
+        let routes=crate::maps::scenario_command_readback(&cache,&map).unwrap();
+        let route=routes.iter().find(|route|route.name=="hub_loaded").unwrap();
+        let volumes=crate::maps::scenario_volume_readback(&cache,&map).unwrap();
+        let pad=volumes.iter().find(|volume|volume.name=="pelican_return").unwrap().geometry.as_ref().unwrap();
+        eprintln!("Occupied return movement destinations: {:?}",route.movement_destinations().unwrap());
+        // Survey the recorded hull center and three candidate pad centers.
+        let centers=[[55.391,-99.150],[53.5,-102.5],[54.0,-103.0],[54.5,-102.5]];
+        let steps=[-1.5,0.,1.5];
+        let points:Vec<_>=centers.iter().flat_map(|center|steps.iter().flat_map(move |x|steps.map(|y|[center[0]+x,center[1]+y,3.]))).collect();
+        let surveyed=crate::maps::bsp_point_locations(&cache,&map,&points,Some(5.)).unwrap();
+        for (center,grid) in centers.iter().zip(surveyed.chunks_exact(9)){
+            let z:Vec<_>=grid.iter().map(|sample|sample.ground.iter().find(|surface|surface.bsp==0).expect("Readable BSP 0 ground").z).collect();
+            let relief=z.iter().copied().fold(f32::NEG_INFINITY,f32::max)-z.iter().copied().fold(f32::INFINITY,f32::min);
+            let rise_x=(z[7]-z[1])/3.; let rise_y=(z[5]-z[3])/3.;
+            let center_up=(1.+rise_x*rise_x+rise_y*rise_y).sqrt().recip();
+            assert!(pad.contains([center[0],center[1],z[4]+0.5]));
+            eprintln!("Return center {center:?} | Z samples {z:?} | relief {relief:.4} | estimated terrain up.k {center_up:.4}");
+        }
+        assert_eq!(crate::maps::hash_file(&cache).unwrap(),map.sha256);
+    }
+
+    #[test]
     #[ignore = "Requires an explicitly selected owned CE609 Black Echo pad candidate"]
     fn compiled_extraction_loadout_must_be_usable_from_the_hub() {
         let cache = std::path::PathBuf::from(

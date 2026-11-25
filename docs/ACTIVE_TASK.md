@@ -4,7 +4,7 @@ Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: All nineteen regions compiled as MCC13 f0835f5e and passed independent native collision, environment, lighting, placement and sky-slot readback. Fourteen-region 71fc1648 remains installed. Every exact retained handoff is preserved.
-Next action: Measure the exact 95603ac1 Pelican return footprint near (55.391, -99.150, 0.655) before changing its authored route. Native early banking, restart and reissue passed; same-session egress is blocked at up.k .947. Forerunner has grounded numbered replay map 26be7e13. Continue Covenant, LAN, MegaWorld and Zombie gates.
+Next action: Forerunner has the exact 95603ac1 footprint and hub_loaded endpoint comparison. Diagnose wheel/contact and attitude at the recorded post-bank stop before changing the pinned route. Continue grounded numbered replay, Covenant, LAN, MegaWorld and Zombie gates.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

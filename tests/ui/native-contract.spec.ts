@@ -5826,6 +5826,14 @@ test('native BSP flight review checks the supplied first leg and navigates nativ
  const requests=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls);
  expect(requests.at(-1).routeOrigin).toEqual([-4,0,3]);
  expect(requests.at(-1).commandRoute.commands[2]).toMatchObject({point1:0,point2:2});
+ const terrain=form.getByText("Landing terrain at selected point",{exact:true});await revealPagedControl(terrain);await terrain.click();
+ const survey=form.getByRole("button",{name:"Check landing footprint",exact:true});await revealPagedControl(survey);await survey.click();
+ const result=form.getByLabel("Landing footprint results",{exact:true});
+ await expect(result).toContainText("BSP 0 · Height range 0.000 units · Estimated surface up.k 1.0000");
+ const probes=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1));
+ expect(probes.points).toHaveLength(9);expect(probes.groundDrop).toBe(16);
+ const half=form.getByRole("spinbutton",{name:"Footprint half-width",exact:true});await revealPagedControl(half);await half.fill("2.5");await half.press("Tab");
+ await expect(result).toHaveCount(0);
  await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0]);
  await page.locator('.native-tag-operations:visible').getByRole('button',{name:'Refresh source',exact:true}).click();
  await expect(form).toContainText('recipe-owned AI group');
