@@ -24,7 +24,7 @@ An external file with a valid payload CRC can still be semantically invalid. Spa
 
 Select an object in the map or Objects drawer. Drag the rendered transform gizmo, or enter coordinates in Transform. Object tags opens in a drawer without replacing the viewport. Tag changes and dependency navigation use the same project as the full Tag editor.
 
-For supported existing persistent placements in MCC 13, the save plan can publish a direct copy. Adding objects, swapping models, importing custom meshes, editing BSP topology or applying preview atmosphere is a different operation. Source/compiler guards refuse unsupported publication. QuickForge source geometry and verified BSP assembly keep their existing build workflows, collision/portal checks and source preservation.
+For supported existing persistent placements in MCC 13, the save plan can publish a direct copy. For scenery moved in a multi-BSP map, use **Extract & rebuild** so the native compiler updates the object’s BSP membership. Save the project first to retain the transform and enable recovery. Adding objects, swapping models, importing custom meshes, editing BSP topology or applying preview atmosphere is a different operation. Source/compiler guards refuse unsupported publication. QuickForge source geometry and verified BSP assembly keep their existing build workflows, collision/portal checks and source preservation.
 
 ## Assets and audio
 

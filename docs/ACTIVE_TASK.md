@@ -3,10 +3,10 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: MCC13 cec966dc compiled the layered Derelict route from the thirteen-region ancestor. Native switch, collision, lighting, placement and preservation readback passed. Source faction kit revisions passed exact CE609 readback on 4140808a. Spark exposes the surface and buried presets, sphere cave and arch radius in its existing editors.
+Latest verified revision: Derelict MCC13 component 5df5d9ba recompiles the one native scenery move from cec966dc. Runtime trace identified the obstruction. The four BSPs and their lightmaps, six switches and 963 other placements match. Gameplay return trip is pending. The nineteen-region plain and faction candidates are retained.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native 78ddeb48 passed Forerunner death, Elite respawn, diagonal movement and jump. Two-client colors, arms and Spirit transfers remain open.
-Next action: Add faction-local deploy controls and reviewed Covenant squad starts to nineteen-region faction and transfer candidate dda73a19. Author aircraft, flight routes and mission goals through existing source. Verify Derelict runtime contact on cec966dc before reconsolidating geometry. Preserve the plain world and keep Extraction launch gated. See RUNTIME_INTEGRATION_20261107.
+Next action: Author faction-local deployment controls and reviewed Covenant squad starts on nineteen-region candidate dda73a19. Continue aircraft, flight routes and mission goals through existing source. Forerunner has the exact 5df5d9ba Derelict component for bidirectional traversal; consolidate only after it passes. Keep multiplayer Extraction launch gated. See RUNTIME_INTEGRATION_20261107.
 
 Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
 

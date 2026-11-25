@@ -181,6 +181,9 @@ fn scalar_layout(class: &str, key: &str) -> Option<usize> {
         _ => None,
     }
 }
+const REGIONAL_SCENERY_REBUILD: &str =
+    "Scenery moves in a multi-BSP map require Extract & rebuild to update native BSP membership.";
+
 pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
     project.validate()?;
     crate::project::validate_edits(project, map)?;
@@ -336,6 +339,14 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
             before_rotation: old.rotation,
             rotation: object.rotation,
         });
+        // MCC caches store compiler-derived BSP residency on scenery placements.
+        // A fixed-cell transform would leave that membership at the old pose.
+        if old.kind == "Scenery" && map.mesh.parts.len() > 1 {
+            if !a.direct_blockers.iter().any(|issue| issue == REGIONAL_SCENERY_REBUILD) {
+                a.direct_blockers.push(REGIONAL_SCENERY_REBUILD.into());
+            }
+            continue;
+        }
         for i in 0..3 {
             push_float(
                 &mut a.cells,
@@ -456,6 +467,39 @@ mod tests {
         bytes[2052] = 9;
         assert!(apply(&bytes, &cells).is_err());
     }
+    #[test]
+    #[ignore = "Requires the exact retained and rebuilt native Derelict caches"]
+    fn derelict_scenery_repair_requires_native_bsp_membership_rebuild() {
+        let original = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_DERELICT_CACHE").unwrap());
+        let revised = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_DERELICT_REPAIR").unwrap());
+        let before = crate::maps::inspect_map(&original, None).unwrap();
+        let after = crate::maps::inspect_map(&revised, None).unwrap();
+        assert_eq!(before.sha256, "cec966dc2c258bc37e2756c078fc8507d83bb6bb71c9bc3e4db1a27d52dc7df8");
+        assert_eq!(after.sha256, "5df5d9ba0f7559da9de2a71b0eaf0e6bb22f8803dfd698ef4dc184fc86858b8e");
+        let mut project = Project::new("Derelict scenery relocation");
+        project.scene = before.objects.clone();
+        let repaired = after.objects.iter().find(|row| row.id == "Scenery-550").unwrap();
+        let row = project.scene.iter_mut().find(|row| row.id == repaired.id).unwrap();
+        row.position = repaired.position;
+        let plan = analyze(&project, &before).unwrap();
+        assert_eq!(plan.direct_blockers, [REGIONAL_SCENERY_REBUILD]);
+        assert!(plan.cells.is_empty());
+        assert!(matches!(plan.intents.as_slice(), [Intent::TransformPlacement { object_id, .. }]
+            if object_id == "Scenery-550"));
+
+        // Invader ScenarioScenery contains its cache-only uint16 BSP mask
+        // immediately after position and rotation (two twelve-byte fields).
+        for (path, map, expected) in [(&original, &before, 0x000c), (&revised, &after, 0x0008)] {
+            let row = map.objects.iter().find(|row| row.id == "Scenery-550").unwrap();
+            let position = row.source_offset.unwrap();
+            let bytes = std::fs::read(path).unwrap();
+            assert_eq!(u16::from_le_bytes(bytes[position+24..position+26].try_into().unwrap()), expected);
+        }
+        let support = crate::maps::bsp_point_locations(&revised, &after, &[repaired.position], Some(0.5)).unwrap();
+        assert_eq!(support[0].bsps, [3]);
+        assert_eq!(support[0].ground[0].bsp, 3);
+    }
+
     #[test]
     fn readable_fields_and_manual_preferences_do_not_grant_writes() {
         assert_eq!(scalar_layout("weap", "bounding-radius"), Some(4));
