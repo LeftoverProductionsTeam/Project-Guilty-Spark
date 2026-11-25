@@ -822,7 +822,7 @@ fn bind_partition_scenario(
 /// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
-    runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage,
+    runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32,
 ) -> Result<PreparedPartitions> {
     let bind = stage != PartitionStage::Structure;
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
@@ -871,23 +871,27 @@ pub(crate) fn prepare_partition_structure(
         Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
     } else { None };
     let player_starts = if bind {
-        Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor)?)
+        Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor, cache_version)?)
     } else { None };
     let pickups = if bind {
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &parts.switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
             project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
-            inspection, plan, &donor, tools, runner, workspace, tags,
+            inspection, plan, &donor, tools, runner, workspace, tags, cache_version,
         )?)
     } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
         let mut bake_only = None;
-        let original_flags = netgame_flags.as_ref().map_or(0, |flags| flags.base_count());
-        if parts.base.is_none() && original_flags > maps::CLASSIC_NETGAME_FLAG_LIMIT {
-            // Regional gameplay can exceed the HEK array that the native baker reads.
-            // The bake-only tag keeps the original geometry, scenery and sky references.
+        let gameplay_blocks = [
+            ("netgame_flags", netgame_flags.as_ref().map_or(0, |flags| flags.base_count()), maps::CLASSIC_NETGAME_FLAG_LIMIT),
+            ("player_starting_locations", player_starts.as_ref().map_or(0, |starts| starts.base_count()), maps::PLAYER_START_LIMIT),
+            ("netgame_equipment", pickups.as_ref().map_or(0, |items| items.total_count()), maps::NETGAME_EQUIPMENT_LIMIT),
+        ];
+        if gameplay_blocks.iter().any(|(_, count, limit)| count > limit) {
+            // Keep extended gameplay in the original scenario and give the
+            // native baker a separate tag with the same geometry and lighting inputs.
             let scenario = format!("{}.scenario", inspection.scenario_path);
             let source = tags.join(safe_relative(&scenario)?);
             let before = maps::hash_file(&source)?;
@@ -899,15 +903,23 @@ pub(crate) fn prepare_partition_structure(
             reject_links(&file)?;
             if file.try_exists()? { return invalid("The bake-only scenario path already exists"); }
             let tags_arg = tags.to_string_lossy().into_owned();
-            runner.run(&edit, &["-t".into(), tags_arg.clone(), "-E".into(),
-                format!("netgame_flags[{}-{}]", maps::CLASSIC_NETGAME_FLAG_LIMIT, original_flags - 1),
-                "-O".into(), tag.clone(), scenario], workspace, "partition-bake-scenario", 64)?;
-            let count = runner.run(&edit, &["-t".into(), tags_arg, "-C".into(), "netgame_flags".into(), tag],
-                workspace, "partition-bake-scenario", 64)?;
-            if count.trim().parse::<usize>().ok() != Some(maps::CLASSIC_NETGAME_FLAG_LIMIT)
-                || maps::hash_file(&source)? != before
-            {
-                return invalid("The bake-only scenario did not keep the original regional scenario intact");
+            let mut args = vec!["-t".into(), tags_arg.clone()];
+            for (key, count, limit) in gameplay_blocks {
+                if count > limit {
+                    args.extend(["-E".into(), format!("{key}[{limit}-{}]", count - 1)]);
+                }
+            }
+            args.extend(["-O".into(), tag.clone(), scenario]);
+            runner.run(&edit, &args, workspace, "partition-bake-scenario", 64)?;
+            for (key, count, limit) in gameplay_blocks {
+                let result = runner.run(&edit, &["-t".into(), tags_arg.clone(), "-C".into(), key.into(), tag.clone()],
+                    workspace, "partition-bake-scenario", 64)?;
+                if result.trim().parse::<usize>().ok() != Some(count.min(limit)) {
+                    return invalid(format!("The bake-only {key} count differs from the reviewed source"));
+                }
+            }
+            if maps::hash_file(&source)? != before {
+                return invalid("The bake-only scenario changed the original regional scenario");
             }
             bake_only = Some((copy, file, source, before));
         }

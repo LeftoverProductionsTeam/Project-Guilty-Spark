@@ -287,11 +287,11 @@ pub struct CapabilityEvidence {
         let mut current = previous.clone();
         let classic = CompanionMapTarget {
             cache_version: 609, tag_space_bytes: 23 << 20, invader_engine: "gbx-custom".into(),
-            required_feature: None, is_default: true, max_netgame_flags: None,
+            required_feature: None, is_default: true, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
         };
         let expanded = CompanionMapTarget {
             cache_version: 13, tag_space_bytes: 64 << 20, invader_engine: "mcc-cea".into(),
-            required_feature: Some("maps.mcc13_tag_space_64m.v1".into()), is_default: false, max_netgame_flags: None,
+            required_feature: Some("maps.mcc13_tag_space_64m.v1".into()), is_default: false, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
         };
         current.map_targets = vec![classic, expanded];
         current.profile_machine().unwrap();
@@ -301,7 +301,19 @@ pub struct CapabilityEvidence {
         current.map_targets[1].max_netgame_flags = Some(4096);
         assert!(current.matches_reviewed(&without_flag_limit));
         assert_eq!(serde_json::to_value(&current).unwrap()["map_targets"][1]["max_netgame_flags"], 4096);
+        let flags_only = current.clone();
+        current.map_targets[1].max_player_starts = Some(1024);
+        current.map_targets[1].max_netgame_equipment = Some(512);
+        current.validate().unwrap();
+        assert!(current.matches_reviewed(&flags_only));
         let reviewed = current.clone();
+        assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_player_starts"], 1024);
+        assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_netgame_equipment"], 512);
+        current.map_targets[1].max_netgame_equipment = None;
+        assert!(!current.matches_reviewed(&reviewed));
+        current.map_targets[1].max_netgame_equipment = Some(0);
+        assert!(current.validate().is_err());
+        current.map_targets[1].max_netgame_equipment = Some(512);
         current.map_targets[1].max_netgame_flags = Some(200);
         assert!(!current.matches_reviewed(&reviewed));
         current.map_targets[1].max_netgame_flags = Some(0);
@@ -380,6 +392,10 @@ pub struct CompanionMapTarget {
     pub required_feature: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_netgame_flags: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_player_starts: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_netgame_equipment: Option<u16>,
     #[serde(rename = "default")]
     pub is_default: bool,
 }
@@ -414,7 +430,8 @@ impl CompanionCapabilities {
             self.map_targets.iter().any(|row| {
                 row.cache_version == 0 || row.tag_space_bytes == 0 || !identifier(&row.invader_engine) ||
                 row.required_feature.as_deref().is_some_and(|name| !identifier(name)) ||
-                row.max_netgame_flags.is_some_and(|limit| !(1..=32767).contains(&limit)) ||
+                [row.max_netgame_flags, row.max_player_starts, row.max_netgame_equipment].into_iter()
+                    .flatten().any(|limit| !(1..=32767).contains(&limit)) ||
                 !targets.insert((row.cache_version, row.invader_engine.as_str()))
             });
         if invalid_targets || !(1..=1000).contains(&self.simulation_hz) ||
@@ -444,6 +461,12 @@ impl CompanionCapabilities {
             for (current, saved) in map_targets.iter_mut().zip(&reviewed.map_targets) {
                 if saved.max_netgame_flags.is_none() {
                     current.max_netgame_flags = None;
+                }
+                if saved.max_player_starts.is_none() {
+                    current.max_player_starts = None;
+                }
+                if saved.max_netgame_equipment.is_none() {
+                    current.max_netgame_equipment = None;
                 }
             }
         }

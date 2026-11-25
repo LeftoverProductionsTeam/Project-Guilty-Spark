@@ -28,6 +28,18 @@ pub use terrain::TerrainSeam;
 mod seam_sections;
 pub use seam_sections::{SeamEdge,SeamSection,append_edge_section};
 type V = [f64; 3];
+
+// H1A Tool validates collision vertices per axis in native world units.
+const NATIVE_STRUCTURE_BOUND: f64 = 1500.;
+
+fn validate_native_bsp_point(point: V) -> Result<()> {
+    if let Some((axis, value)) = ["X", "Y", "Z"].into_iter().zip(point)
+        .find(|(_, value)| !value.is_finite() || value.abs() > NATIVE_STRUCTURE_BOUND)
+    {
+        return invalid(format!("Native BSP coordinate {axis} {value:+.2} exceeds Halo Tool’s ±{NATIVE_STRUCTURE_BOUND:.0} world-unit bound"));
+    }
+    Ok(())
+}
 const MAX_INPUT_TRIANGLES: usize = 100_000;
 const MAX_OUTPUT_TRIANGLES: usize = 150_000;
 /// Optional second passage in Spark metadata, never an invented Halo tag field.
@@ -520,9 +532,7 @@ fn source_solid(
                 })
                 .unwrap_or_else(|| planar_uv(point, n));
             let world = transform(point, translation, yaw);
-            if world.iter().any(|v| v.abs() > 2048.) {
-                return invalid("Transformed BSP exceeds the supported world bounds");
-            }
+            validate_native_bsp_point(world)?;
             gl.vert_properties.extend(world);
             gl.vert_properties.extend(uv);
         }
@@ -833,6 +843,9 @@ fn generate_end(
     // The base half does not contain the donor boundary to be sealed.
     if !matches!(partition, Some((_, PartitionEnd::Base))) {
         seam_sections::append_native_seals(&assembly.native_seals, &mut mesh, &mut materials, &mut triangle_materials)?;
+    }
+    for point in mesh.positions.chunks_exact(3) {
+        validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
     }
     let mut clearance_route = route_geometry.clone();
     clearance_route.separate_native_bsps = false;
@@ -1812,6 +1825,19 @@ pub fn export_jms(geometry: &AssemblyGeometry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_structure_bound_includes_exact_edges_and_checks_each_axis() {
+        for axis in 0..3 {
+            let mut point = [0.; 3];
+            point[axis] = -1500.;
+            validate_native_bsp_point(point).unwrap();
+            point[axis] = 1500.;
+            validate_native_bsp_point(point).unwrap();
+            point[axis] += 0.01;
+            assert!(validate_native_bsp_point(point).is_err());
+        }
+    }
 
     #[test]
     fn authored_visibility_exports_real_portal_faces_and_preserves_empty_serialization() {

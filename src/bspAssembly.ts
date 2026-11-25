@@ -49,6 +49,8 @@ export interface AssemblyReport {
     netgameEquipment: ScenarioPlacementBudget;
     netgameFlags: ScenarioPlacementBudget;
     mcc13RegionalFlags?: ScenarioPlacementBudget;
+    mcc13RegionalStarts?: ScenarioPlacementBudget;
+    mcc13RegionalEquipment?: ScenarioPlacementBudget;
   };
   nativeGameplayBudgetError?: string;
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };

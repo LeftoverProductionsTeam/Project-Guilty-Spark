@@ -24,6 +24,8 @@ pub(crate) struct PreparedPickups {
 }
 
 impl PreparedPickups {
+    pub(crate) fn total_count(&self) -> usize { self.base.len() + self.donor.len() }
+
     pub(crate) fn donor_count(&self) -> usize {
         self.donor.len()
     }
@@ -276,6 +278,7 @@ pub(crate) fn stage(
     runner: &Runner,
     workspace: &Path,
     tags: &Path,
+    cache_version: u32,
 ) -> Result<PreparedPickups> {
     if donor.mesh.parts.len() != 1 || assembly.donor_bsp_index != 0 {
         return invalid(
@@ -285,8 +288,9 @@ pub(crate) fn stage(
     let base_rows = maps::scenario_netgame_pickups(&base_source.preserved_path, base)?;
     let mut donor_rows =
         maps::scenario_netgame_pickups(&assembly.donor_source.preserved_path, donor)?;
-    if base_rows.len() + donor_rows.len() > maps::NETGAME_EQUIPMENT_LIMIT {
-        return invalid(format!("Combined native pickup count exceeds {}. Review the scenario gameplay limits before building", maps::NETGAME_EQUIPMENT_LIMIT));
+    let limit = maps::netgame_equipment_limit(cache_version);
+    if base_rows.len() + donor_rows.len() > limit {
+        return invalid(format!("Combined native pickup count exceeds {limit} for cache version {cache_version}."));
     }
     let base_collections = base_rows.iter().map(|row| row.collection.clone()).collect();
     let mut collections =

@@ -127,6 +127,8 @@ pub struct ScenarioGameplayBudget {
     netgame_equipment: ScenarioPlacementBudget,
     netgame_flags: ScenarioPlacementBudget,
     mcc13_regional_flags: ScenarioPlacementBudget,
+    mcc13_regional_starts: ScenarioPlacementBudget,
+    mcc13_regional_equipment: ScenarioPlacementBudget,
 }
 
 // Published Forerunner MCC loader bound. Invader's native ScenarioNetgameFlags
@@ -135,6 +137,16 @@ pub(crate) const MCC13_REGIONAL_FLAG_LIMIT: usize = 4096;
 pub(crate) const CLASSIC_NETGAME_FLAG_LIMIT: usize = 200;
 pub(crate) const NETGAME_EQUIPMENT_LIMIT: usize = 200;
 pub(crate) const PLAYER_START_LIMIT: usize = 256;
+const MCC13_PLAYER_START_LIMIT: usize = 1024;
+const MCC13_NETGAME_EQUIPMENT_LIMIT: usize = 512;
+
+pub(crate) fn player_start_limit(cache_version: u32) -> usize {
+    if cache_version == 13 { MCC13_PLAYER_START_LIMIT } else { PLAYER_START_LIMIT }
+}
+
+pub(crate) fn netgame_equipment_limit(cache_version: u32) -> usize {
+    if cache_version == 13 { MCC13_NETGAME_EQUIPMENT_LIMIT } else { NETGAME_EQUIPMENT_LIMIT }
+}
 
 // Standard HEK scenario reflexives. Extra BSP references share these arrays.
 fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 3]> {
@@ -162,6 +174,8 @@ pub fn scenario_gameplay_merge_budget(
         netgame_equipment: row(1, NETGAME_EQUIPMENT_LIMIT),
         netgame_flags: row(2, CLASSIC_NETGAME_FLAG_LIMIT),
         mcc13_regional_flags: row(2, MCC13_REGIONAL_FLAG_LIMIT),
+        mcc13_regional_starts: row(0, player_start_limit(13)),
+        mcc13_regional_equipment: row(1, netgame_equipment_limit(13)),
     })
 }
 
@@ -179,7 +193,7 @@ pub(crate) struct NativeNetgamePickup {
 
 pub(crate) fn scenario_netgame_pickups(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeNetgamePickup>> {
     with_scenario(path, inspection, |reader, space, scenario| {
-        let (start, count) = space.block(reader, scenario + 0x384, 144, NETGAME_EQUIPMENT_LIMIT)?;
+        let (start, count) = space.block(reader, scenario + 0x384, 144, netgame_equipment_limit(inspection.header.version))?;
         (0..count).map(|index| {
             let row = start + index * 144;
             let id = reader.u32(row + 92)?;
@@ -287,7 +301,7 @@ pub(crate) struct NativeRegionStart {
 
 pub(crate) fn scenario_region_starts(path: &Path, inspection: &MapInspection) -> Result<Vec<NativeRegionStart>> {
     with_scenario(path, inspection, |reader, space, scenario| {
-        let (start, count) = space.block(reader, scenario + 0x354, 52, PLAYER_START_LIMIT)?;
+        let (start, count) = space.block(reader, scenario + 0x354, 52, player_start_limit(inspection.header.version))?;
         (0..count).map(|index| {
             let row = start + index * 52;
             let position = vec3(reader, row)?;
@@ -604,6 +618,10 @@ mod tests {
         let base_inspection = inspect_map(&base, base.parent()).unwrap();
         let donor_inspection = inspect_map(&donor, donor.parent()).unwrap();
         let budget = scenario_gameplay_merge_budget(&base, &base_inspection, &donor, &donor_inspection).unwrap();
+        assert_eq!(scenario_region_starts(&base, &base_inspection).unwrap().len(), budget.player_starts.existing);
+        assert_eq!(scenario_region_starts(&donor, &donor_inspection).unwrap().len(), budget.player_starts.donor);
+        assert_eq!(scenario_netgame_pickups(&base, &base_inspection).unwrap().len(), budget.netgame_equipment.existing);
+        assert_eq!(scenario_netgame_pickups(&donor, &donor_inspection).unwrap().len(), budget.netgame_equipment.donor);
         assert_eq!(base_inspection.sha256, hash_file(&base).unwrap());
         assert_eq!(donor_inspection.sha256, hash_file(&donor).unwrap());
         println!("Native scenario budgets {}", serde_json::to_string(&budget).unwrap());
@@ -629,6 +647,14 @@ mod tests {
         assert_eq!(read_bsp_tag_paths(&Reader(&bytes), &space, 0, &tags).unwrap(), ["levels/second/region", "levels/first/region"]);
         bytes[start + 28..start + 32].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(read_bsp_tag_paths(&Reader(&bytes), &space, 0, &tags).is_err());
+    }
+
+    #[test]
+    fn extended_native_placement_limits_are_mcc_only() {
+        assert_eq!([player_start_limit(13), netgame_equipment_limit(13)], [1024, 512]);
+        for classic in [5, 6, 7, 609] {
+            assert_eq!([player_start_limit(classic), netgame_equipment_limit(classic)], [256, 200]);
+        }
     }
 
     #[test]

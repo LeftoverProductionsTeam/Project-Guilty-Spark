@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Lit MCC13 Derelict 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b retained in %TEMP%/GuiltySpark-Traversal-Handoff/fourteen-mcc13-ubQ0YV/ready. Native readback matched both earlier BSPs, four switches, 12 / 9 / 3 lightmap pages, 190 starts and 363 flags. Exact lit Chiron ba57480a is retained separately for Forerunner acceptance.
-Next action: Reposition Death Island using its measured stock footprint before invoking Tool. The shortest retained north layout reaches Y +3,236.28 against Spark’s +2,048 bound. Forerunner can test the exact Chiron handoff now. Derelict traversal, mixed ambience and simultaneous regional gameplay remain open.
+Latest verified revision: Fourteen-region MCC13 Derelict 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b remains retained. Forerunner verified the two-way Chiron and Derelict switches with private peers. Spark independently read back a disposable MCC13 compile with 563 starts and 485 pickups.
+Next action: Trace the non-closed Death Island donor through original collision surfaces and the existing native toolchain before authoring its tunnel. For Boarding Action, survey retained interior switch clearances and its landing approach. The uncommitted vertical placement experiment remains available for review.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

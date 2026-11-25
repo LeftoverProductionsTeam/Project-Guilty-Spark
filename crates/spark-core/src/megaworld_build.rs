@@ -201,7 +201,7 @@ fn partition_preview(
         let edit = build::tool_path(&tools, "invader-edit").unwrap();
         crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
     }
-    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage)?;
+    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version)?;
     let receipt = if bind {
         let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
         serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
@@ -228,7 +228,8 @@ fn build_partition_probes(
     tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path, bake: bool,
 ) -> Result<Vec<serde_json::Value>> {
     // Keep the classic cache before the staged scenario receives the MCC rows.
-    let targets: &[CacheTarget] = if source.mesh.parts.len() > 1 { &[MCC] } else { &[CLASSIC, MCC] };
+    let extended_items = prepared.pickups.as_ref().is_some_and(|items| items.total_count() > maps::NETGAME_EQUIPMENT_LIMIT);
+    let targets: &[CacheTarget] = if source.mesh.parts.len() > 1 || extended_items { &[MCC] } else { &[CLASSIC, MCC] };
     targets.iter().copied().map(|target| {
         let output = workspace.join(target.engine);
         Ok(build_partition_cache(project, source, prepared, tools, runner, workspace, tags, &output, target, bake)?.receipt)
@@ -346,7 +347,8 @@ fn build_partition_cache(
     let receipt = serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
         "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "bspTagPaths": transitions.bsp_tag_paths, "lightmapPages": lightmap_pages,
         "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
-        "netgameFlags": native_flags, "playerStarts": native_starts, "retainedBspCollisionVerified": if old_count > 1 { old_count } else { 0 }});
+        "netgameFlags": native_flags, "playerStarts": native_starts,
+        "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if old_count > 1 { old_count } else { 0 }});
     Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })
 }
 
@@ -412,7 +414,7 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
         project::atomic_write(&dir.join("authored-scenario.json"),&serde_json::to_vec_pretty(&authored)?,false)?;
     if plan.separate_native_bsps {
         let parts = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &dir, &tags,
-            crate::bsp_compile::PartitionStage::Lighting)?;
+            crate::bsp_compile::PartitionStage::Lighting, target.version)?;
         let cache = build_partition_cache(project, inspection, &parts, &tools, &runner, &dir, &tags, &dir.join("output"), target, true)?;
         if cancel.load(Ordering::Relaxed) { return invalid("Build cancelled"); }
         if crate::tool_transaction::inventory(base_tags)? != hashes {

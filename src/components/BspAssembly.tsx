@@ -63,11 +63,14 @@ function NativeGameplayBudget({ budget, cacheTarget }: {
     return () => { active = false; };
   }, []);
   const regional = budget.mcc13RegionalFlags;
-  const flags = cacheTarget === 'MCC13' && regional ? regional : budget.netgameFlags;
+  const mcc = cacheTarget === 'MCC13';
+  const flags = mcc ? regional ?? budget.netgameFlags : budget.netgameFlags;
+  const starts = mcc ? budget.mcc13RegionalStarts ?? budget.playerStarts : budget.playerStarts;
+  const items = mcc ? budget.mcc13RegionalEquipment ?? budget.netgameEquipment : budget.netgameEquipment;
   const classic = cacheTarget === 'CE609';
   const rows = [
-    { label: 'Player starts', ...budget.playerStarts, donor: classic ? 0 : budget.playerStarts.donor },
-    { label: 'Multiplayer item placements', ...budget.netgameEquipment },
+    { label: 'Player starts', ...starts, donor: classic ? 0 : starts.donor },
+    { label: 'Multiplayer item placements', ...items },
     { label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor },
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
@@ -87,14 +90,24 @@ function NativeGameplayBudget({ budget, cacheTarget }: {
       {profiles.map(profile => {
         const capabilities = profile.reviewedCompanion?.capabilities;
         const target = capabilities?.map_targets?.find(row => row.cache_version === 13 && row.invader_engine === 'mcc-cea');
-        if (target?.max_netgame_flags == null) return null;
-        if (target.required_feature && !capabilities?.native_features?.includes(target.required_feature)) return null;
-        const limit = Math.min(regional.limit, target.max_netgame_flags);
-        const total = regional.existing + regional.donor;
-        return <p key={profile.id}>
-          {runtimeProfileLabel(profile)} · {total} / {limit} · Saved runtime review
-          {total > limit && <strong> · {total - limit} over the build or runtime limit</strong>}
-        </p>;
+        if (!target || (target.required_feature && !capabilities?.native_features?.includes(target.required_feature))) return null;
+        const reviewed = [
+          { label: 'Starts', count: budget.mcc13RegionalStarts, limit: target.max_player_starts },
+          { label: 'Pickups', count: budget.mcc13RegionalEquipment, limit: target.max_netgame_equipment },
+          { label: 'Flags', count: regional, limit: target.max_netgame_flags },
+        ];
+        if (reviewed.every(row => row.limit == null)) return null;
+        return <div key={profile.id}>
+          <p>{runtimeProfileLabel(profile)} · Saved runtime review</p>
+          <ul>{reviewed.map(({ label, count, limit }) => {
+            if (!count || limit == null) return null;
+            const effective = Math.min(count.limit, limit);
+            const total = count.existing + count.donor;
+            return <li key={label}>{label} · {total} / {effective}
+              {total > effective && <strong> · {total - effective} over the build or runtime limit</strong>}
+            </li>;
+          })}</ul>
+        </div>;
       })}
       <p>Regional gameplay needs a compatible multiplayer runtime and multiple native BSPs.</p>
     </>}
