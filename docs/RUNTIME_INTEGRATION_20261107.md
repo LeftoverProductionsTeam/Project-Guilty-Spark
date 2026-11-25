@@ -3376,3 +3376,9 @@ The derived CE609 cache is 67,215,596 bytes with SHA-256 95599caa307aa24fd29fe5e
 ### Extraction terminal ground review
 
 Existing and draft controls now search the compiled BSP by default. The same review reports the upright model-base clearance for each eligible BSP surface and applies the selected base height directly to the placement draft. Custom offsets and explicit Preview → Accept → Save → rebuild remain available. TypeScript and three focused browser workflows passed, including the numbered terminal draft, manual offsets and native revision restore. No installed map was modified and no native build was staged for this editor change. Forerunner separately reports physical early evacuation, banking, normal egress and exact gear reissue on 26be7e13. Live second boarding, Covenant return and private human multiplayer remain open.
+
+### Native export destinations and first Firefight spawn
+
+Build history and Save a Map Copy now offer only configured destination types that support the verified native cache format. The read-only desktop check uses the owned build receipt and exact output, then the write action independently revalidates it. TypeScript, three browser workflows covering CE and MCC choices, native export refusal and stale map results, and Windows cargo check passed. Browser and native compiler scratch were disposed. This is format admission, not engine gameplay support.
+
+Forerunner Win64 d0ae6548 discovered exact CE609 95599caa via Firefight → Authored Encounter → Custom Singleplayer with internet play off. It loaded the authored 12/72 pistol, suppressed the built-in director and spawned Wave 1 at (3.992, 2.973, 0). The Grunt stayed at full vitality and was removed at the 60-second timeout. Wave 2, visible outcome, replay and MCC13 gameplay remain open. The runtime did not use the mode sidecar for admission. Exact evidence is in the existing Forerunner integration contract.

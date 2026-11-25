@@ -3744,6 +3744,7 @@ pub fn run() {
             storage_native::storage_cleanup,
             storage_native::storage_recover_accounting,
             storage_native::storage_mod_locations,
+            storage_native::storage_map_export_options,
             storage_native::storage_export_map,
             storage_native::storage_choose_mod_location,
             storage_native::storage_open_mod_location,

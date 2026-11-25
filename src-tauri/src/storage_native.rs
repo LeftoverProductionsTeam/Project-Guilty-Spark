@@ -43,8 +43,14 @@ fn locations(state: &AppState) -> Reply<ModLocations> {
         note: "These are optional destinations for your mods and exports. Connecting a folder does not copy installed maps. Native builds remain in their validated job until you deliberately export them.",
     })
 }
+const MAP_EXPORT_RUNTIMES: [runtime::RuntimeId; 4] = [
+    runtime::RuntimeId::MccSteam,
+    runtime::RuntimeId::HaloCustomEdition,
+    runtime::RuntimeId::OpenCe,
+    runtime::RuntimeId::ChupathingyCe,
+];
 fn export_runtime_key(runtime: runtime::RuntimeId) -> Reply<String> {
-    if !matches!(runtime, runtime::RuntimeId::MccSteam | runtime::RuntimeId::HaloCustomEdition | runtime::RuntimeId::OpenCe | runtime::RuntimeId::ChupathingyCe) {
+    if !MAP_EXPORT_RUNTIMES.contains(&runtime) {
         return Err("Choose MCC, Custom Edition, OpenCE or Chupathingy for a runtime export folder".into());
     }
     serde_json::to_value(runtime).map_err(error)?.as_str().map(str::to_owned)
@@ -112,6 +118,29 @@ fn map_export_credits(library: &Library, project: &Project, export: &build::MapE
     }
     lines.push(String::new());
     lines.join("\n")
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct MapExportOptions {
+    cache_version: u32,
+    runtimes: Vec<runtime::RuntimeId>,
+}
+
+#[tauri::command]
+pub(super) async fn storage_map_export_options(
+    app: tauri::AppHandle, project_id: String, build_id: String,
+) -> Reply<MapExportOptions> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let record = verified_build(&state, &project, &build_id)?;
+        let header = maps::inspect_header(record.output.as_ref().ok_or("Map output is missing")?).map_err(error)?;
+        let runtimes = MAP_EXPORT_RUNTIMES.into_iter().filter(|&id|
+            !header.extended && runtime::supports_map_version(id, header.version)
+        ).collect();
+        Ok(MapExportOptions { cache_version: header.version, runtimes })
+    }).await.map_err(error)?
 }
 
 #[tauri::command]

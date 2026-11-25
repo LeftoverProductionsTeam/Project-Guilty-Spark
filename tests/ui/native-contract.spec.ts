@@ -6122,6 +6122,7 @@ test('unchanged CE cache uses native validation then the existing export control
     await w.__sparkMock.emit('spark:library-changed');
     return 'Existing cache checked and copied unchanged. No compilation or conversion was performed.';
    }
+   if(command==='storage_map_export_options')return {cacheVersion:609,runtimes:['haloCustomEdition','openCe','chupathingyCe']};
    if(command==='storage_export_map'){
     w.__sparkMock.calls.push({command,args:structuredClone(args)});
     return {output:'Synthetic/Mods/test.map',modeMetadata:'Synthetic/Mods/test.spark-mode.json',gameplayMode:'multiplayer',credits:'Synthetic/Mods/CREDITS-5d61b56259c59eed.txt',sha256:p.source.sha256,bytes:128,cacheVersion:609,runtimeId:args.runtimeId,reused:false};
@@ -6135,7 +6136,7 @@ test('unchanged CE cache uses native validation then the existing export control
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='validate_existing').length)).toBe(1);
  const history=page.locator('.build-history');await history.locator(':scope > summary').click();
  await expect(history).toContainText('ce-existing');await expect(history).toContainText('no compilation or game acceptance');
- await history.getByText(/^Export map/,{exact:true}).click();const select=history.getByRole('combobox',{name:'Map export runtime',exact:true});await revealPagedControl(select);await expect(select).toHaveValue('haloCustomEdition');await select.selectOption('openCe');await history.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+ await history.getByText(/^Export map/,{exact:true}).click();const select=history.getByRole('combobox',{name:'Map export runtime',exact:true});await revealPagedControl(select);await expect(select).toHaveValue('haloCustomEdition');await expect(select.locator('option')).toHaveCount(3);await expect(select.locator('option[value=mccSteam]')).toHaveCount(0);await select.selectOption('openCe');await history.getByRole('button',{name:'Export to mods folder',exact:true}).click();
  await expect(history.getByRole('status')).toContainText('Native map exported and hash-verified');
  await expect(history.getByRole('status')).toContainText('Game mode · Multiplayer');
  await expect(history.getByRole('status')).toContainText('Synthetic/Mods/test.spark-mode.json');
