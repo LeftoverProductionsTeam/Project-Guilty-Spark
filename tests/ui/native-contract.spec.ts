@@ -5010,6 +5010,18 @@ test('native control support uses the reviewed ground and mounting offset in the
  await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeEnabled();
 });
 
+test('native Extraction terminal review names the real loadout action and opens its placement',async({page})=>{
+ await mockRecoveredMissionAreas(page,true);
+ await page.evaluate(()=>{const control=(window as any).__sparkMock.nativeDevices[0];control.name='extraction_loadout';});
+ const controls=page.locator('.studio-native-areas');
+ if(await controls.getAttribute('open')===null)await controls.locator(':scope > summary').click();
+ await controls.getByRole('button',{name:'Read native controls',exact:true}).click();
+ await expect(controls.getByText('Further uses can change the saved selection.',{exact:false})).toBeVisible();
+ await expect(controls.getByText('Required controls missing:',{exact:false})).toBeVisible();
+ await controls.getByRole('button',{name:'Locate review loadout',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Frame native device',exact:true})).toBeEnabled();
+});
+
 test('recovered mission terminals move the actual model through native source review without modifying the cache scene',async({page})=>{
  await mockRecoveredMissionAreas(page,true);const row=page.locator('.studio-mission-record').first();await row.getByRole('combobox',{name:'Mission trigger 1',exact:true}).selectOption('deviceActivated');const controls=page.locator('.studio-native-areas');if(await controls.getAttribute('open')===null)await controls.locator(':scope > summary').click();await controls.getByRole('button',{name:'Read native controls',exact:true}).click();await row.getByRole('combobox',{name:'Mission terminal 1',exact:true}).selectOption('terminal');await page.keyboard.press('Control+s');await row.getByRole('button',{name:'Select objective terminal in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame native device',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();await expect(page.locator('.viewport-object-actions:visible')).toHaveCount(1);for(const width of [800,1280]){await page.setViewportSize({width,height:800});const bar=page.locator('.native-device-actions');expect(await bar.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await expect(bar.getByRole('button',{name:'Object tags',exact:true})).toBeVisible();await expect(bar.getByRole('button',{name:'Transform',exact:true})).toBeVisible();}
  const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');const h=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse((e as HTMLElement).dataset.gsGizmo!);return{x:r.x+(g.handles.X[0]+1)*r.width/2,y:r.y+(1-g.handles.X[1])*r.height/2,dx:(g.handles.X[0]-g.origin[0])*r.width/2,dy:-(g.handles.X[1]-g.origin[1])*r.height/2};});const n=Math.hypot(h.dx,h.dy);expect(n).toBeGreaterThan(1);await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+h.dx/n*40,h.y+h.dy/n*40,{steps:10});await page.mouse.up();

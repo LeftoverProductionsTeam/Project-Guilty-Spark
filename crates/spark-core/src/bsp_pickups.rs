@@ -5,7 +5,7 @@ use crate::{
     invalid,
     maps::{self, MapInspection, NativeItemCollection, NativeNetgamePickup, NATIVE_SPAWN_TYPES},
     native_staging,
-    project::Source,
+    project::{Project, Source},
     reject_links, safe_relative, Result, SparkError,
 };
 use std::{
@@ -16,6 +16,7 @@ use std::{
 
 pub(crate) struct PreparedPickups {
     base: Vec<NativeNetgamePickup>,
+    moved_base: Vec<usize>,
     donor: Vec<NativeNetgamePickup>,
     aliased_tags: usize,
     shared_tags: usize,
@@ -73,6 +74,11 @@ impl PreparedPickups {
         }
         let donor_slot = regions.len().checked_sub(1)
             .ok_or_else(|| SparkError::Invalid("Missing compiled pickup region".into()))?;
+        for &index in &self.moved_base {
+            if regions.unique_slot(actual[index].position).is_none_or(|slot| slot >= donor_slot) {
+                return invalid(format!("Moved pickup {} needs a position inside exactly one existing BSP", index + 1));
+            }
+        }
         if donor_slot > 1 && actual[..self.base.len()].iter().any(|row| regions.contains(donor_slot, row.position)) {
             return invalid("The donor overlaps an existing pickup. Move the shared passage clear of the item.");
         }
@@ -272,7 +278,7 @@ fn isolate_dependencies(
 }
 
 pub(crate) fn stage(
-    base_source: &Source,
+    project: &Project,
     base: &MapInspection,
     assembly: &BspAssembly,
     donor: &MapInspection,
@@ -287,7 +293,10 @@ pub(crate) fn stage(
             "Pickup import needs a single-BSP donor to associate every native placement",
         );
     }
-    let base_rows = maps::scenario_netgame_pickups(&base_source.preserved_path, base)?;
+    let base_source = project.source.as_ref()
+        .ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?;
+    let mut base_rows = maps::scenario_netgame_pickups(&base_source.preserved_path, base)?;
+    let moved_base = crate::bsp_compile::apply_expected_pickup_poses(project, base, &mut base_rows)?;
     let mut donor_rows =
         maps::scenario_netgame_pickups(&assembly.donor_source.preserved_path, donor)?;
     let limit = maps::netgame_equipment_limit(cache_version);
@@ -300,6 +309,7 @@ pub(crate) fn stage(
     if donor_rows.is_empty() {
         return Ok(PreparedPickups {
             base: base_rows,
+            moved_base,
             donor: donor_rows,
             aliased_tags: 0,
             shared_tags: 0,
@@ -446,6 +456,7 @@ pub(crate) fn stage(
     }
     Ok(PreparedPickups {
         base: base_rows,
+        moved_base,
         donor: donor_rows,
         aliased_tags: aliases.len(),
         shared_tags: total_tags - aliases.len(),

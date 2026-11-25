@@ -5,9 +5,30 @@ import type {Project} from './types';
 import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,reviewRecoveredCampaignMission,recoveredCampaignMission,composeRecoveredCampaignMission,readRecoveredMissionSource,sameMissionData,exportHaloCeMission,nativeMissionBinding} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
-import { connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, defaultBlackEchoOptions, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
+import { extractionTerminalReview, connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, defaultBlackEchoOptions, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
 
 describe('Project-integrated Creator Studio', () => {
+  it('surfaces runtime terminal actions, duplicate bindings and unassigned monitor controls', () => {
+    const base = {nameIndex:0,tagPath:'devices/holo control',position:[0,0,0] as [number,number,number],
+      rotationRadians:[0,0,0] as [number,number,number]};
+    const review = extractionTerminalReview([
+      {...base,class:'ctrl',index:0,name:'extraction_deploy'},
+      {...base,class:'mach',index:0,name:'extraction_deploy'},
+      {...base,class:'ctrl',index:1,name:'extraction_loadout'},
+      {...base,class:'ctrl',index:2,name:'debug_monitor',interactionDisabled:true},
+      {...base,class:'ctrl',index:3,name:'extraction_squad_22'},
+      {...base,class:'ctrl',index:4,name:'extraction_squad_23'},
+    ]);
+    expect(review.missing).toEqual(['extraction_activate']);
+    expect(review.terminals.map(row=>[row.purpose,row.issue,row.canLocate])).toEqual([
+      ['Deploy','Duplicate scenario name',false],
+      ['Review loadout',null,true],
+      ['Unassigned monitor','Player interaction is disabled',true],
+      ['Select squad 22',null,true],
+      ['Unassigned monitor','Review script or device links before enabling this control',true],
+    ]);
+  });
+
   it('starts private without fabricated gameplay evidence', () => {
     const doc = emptyCreatorStudio();
     expect(validateCreatorStudio(doc)).toEqual([]);

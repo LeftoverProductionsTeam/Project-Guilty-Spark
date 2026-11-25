@@ -12,7 +12,7 @@ import MissionSourceReview from './MissionSourceReview';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
 import {
-  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, addBlackEchoDraft, connectBlackEchoObjectives, defaultBlackEchoOptions, missionSoundImport, missionBranchGroups, missionCollectionSources, missionCinematicShots, missionCameraUsers,
+  emptyCreatorStudio, exportStudioEvidence, validateCreatorStudio, extractionTerminalReview, addBlackEchoDraft, connectBlackEchoObjectives, defaultBlackEchoOptions, missionSoundImport, missionBranchGroups, missionCollectionSources, missionCinematicShots, missionCameraUsers,
 } from '../creatorStudio';
 import type { CameraShot, CreatorStudioDocument, MissionBeat, PlaytestRecord, BlackEchoOptions } from '../creatorStudio';
 import { Notice, NumberField, PageTitle, Pill } from './ui';
@@ -84,6 +84,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const missionCinematic=nextCinematic==='source'?attachedCinematic:nextCinematic==='enabled';
   const [preparingMission,setPreparingMission]=useState(false);
   const [nativeAreas,setNativeAreas]=useState<NativeTagContext|null>(null),[readingNativeAreas,setReadingNativeAreas]=useState(false);
+  const [reviewTerminals,setReviewTerminals]=useState(false);
   const nativeAreaGeneration=useRef(0),nativeBuildsKey=project.builds.map(build=>build.id+':'+build.status).join('|');
   useEffect(()=>{nativeAreaGeneration.current++;setNativeAreas(null);setReadingNativeAreas(false);const changed=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id){nativeAreaGeneration.current++;setNativeAreas(null);setReadingNativeAreas(false);}};window.addEventListener('guilty-spark-native-source-changed',changed);return()=>{nativeAreaGeneration.current++;window.removeEventListener('guilty-spark-native-source-changed',changed);};},[project.id,nativeBuildsKey]);
   const latestProject=useRef(project);latestProject.current=project;
@@ -117,6 +118,8 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   }
   const encounterChoices=useId(), volumeChoices=useId();
   const sourceInspection=inspection?.sha256&&inspection.sha256===project.source?.sha256?inspection:null;
+  const extractionReview=useMemo(()=>nativeAreas?.scenarioDevices ? extractionTerminalReview(nativeAreas.scenarioDevices) : null,[nativeAreas]);
+  const sourceIsExtractionFormat=sourceInspection?.header.version===609&&sourceInspection.header.scenarioType===0&&!sourceInspection.header.extended;
   useWorkspaceFileActions('creator:'+project.id,[
     {id:'prepare-native-mission',label:'Prepare campaign mission source…',run:()=>prepareNativeMission()},
     {id:'script-pack',label:'Export CE script sources…',run:()=>exportSourcePack()},
@@ -220,9 +223,9 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     }catch(problem){if(generation===nativeAreaGeneration.current){setNativeAreas(null);setError(String(problem));}}
     finally{if(generation===nativeAreaGeneration.current)setReadingNativeAreas(false);}
   }
-  async function selectMissionArea(name:string,device=false){
+  async function selectMissionArea(name:string,device=false,nativeOnly=false){
     const doc=project.quickForge;
-    const area=device?(doc?.logic?.devices??[]).filter(binding=>binding.nativeName===name)
+    const area=nativeOnly?[]:device?(doc?.logic?.devices??[]).filter(binding=>binding.nativeName===name)
       .flatMap(binding=>doc!.placements.filter(placement=>placement.id===binding.placementId&&placement.tagClass==='ctrl')):sourceAreas(name);
     if(!onLevelEditor){setError('The Level Editor is unavailable in this window.');return;}
     if(area.length===1){selectSourceObject(area[0].id);return;}
@@ -399,10 +402,30 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         ...(nativeAreas?.missionSource?.encounters??sourceInspection?.encounters??[]).map(entry=>entry.name),
       ])].map(name=><option key={name} value={name}/>)}</datalist>
       <details className="studio-handoff studio-native-areas"><summary>Recovered scenario areas &amp; controls</summary>
-        <button type="button" disabled={!native||readingNativeAreas||!project.builds.some(build=>build.status==='validated')} onClick={()=>void readNativeAreas()}>{readingNativeAreas?'Reading native areas…':'Read native scenario areas'}</button><button type="button" disabled={!native||readingNativeAreas||!project.builds.some(build=>build.status==='validated')} onClick={()=>void readNativeAreas()}>Read native controls</button>
+        <button type="button" disabled={!native||readingNativeAreas||!project.builds.some(build=>build.status==='validated')} onClick={()=>void readNativeAreas()}>{readingNativeAreas?'Reading native areas…':'Read native scenario areas'}</button>
+        <button type="button" disabled={!native||readingNativeAreas||!project.builds.some(build=>build.status==='validated')} onClick={()=>{setReviewTerminals(true);void readNativeAreas();}}>Read native controls</button>
         <p className="studio-hint">Read the latest verified native scenario, then use its names in area objectives, optional conditions and terminal objectives. Select objective area in Level Editor opens the real native box. Review trigger source returns to its existing Preview/Accept/Restore workflow; Save and rebuild after accepting. Script-only mission exports do not change native scripts automatically.</p>
         {!project.builds.some(build=>build.status==='validated')&&<p className="studio-hint">Connect matching native source and complete its validated build first. The original map stays unchanged.</p>}
         {nativeAreas&&<p className="studio-hint">{nativeAreas.scenarioVolumes?.length??0} native areas · {nativeAreas.scenarioDevices?.length??0} controls/machines/vehicles · source {nativeAreas.tagSha256?.slice(0,12)}. Native compilation and gameplay remain separate checks.</p>}
+        {sourceInspection&&!sourceIsExtractionFormat&&(forerunnerMission||studio.missions.some(beat=>beat.trigger==='forerunnerExtractionSettled')||(sourceInspection.mesh.parts?.length??0)>1)&&<Notice tone="info">The reviewed Forerunner Extraction workflow runs a CE609 campaign. A multiplayer or MCC13 MegaWorld build needs runtime support for Extraction in that world before it can be played as this mode.</Notice>}
+        {extractionReview&&(reviewTerminals||forerunnerMission||extractionReview.terminals.length>0)&&<details open={reviewTerminals} onToggle={event=>{if(event.target===event.currentTarget)setReviewTerminals(event.currentTarget.open);}}>
+          <summary>Extraction terminals · {extractionReview.terminals.length}</summary>
+          {extractionReview.missing.length>0&&<p className="studio-hint">Required controls missing: {extractionReview.missing.join(', ')}.</p>}
+          <ul className="studio-extraction-terminal-list">
+            {extractionReview.terminals.map(({device,purpose,effect,issue,canLocate})=><li key={device.class+'-'+device.index}>
+              <strong>{purpose}</strong> <code>{device.name||'Unnamed control'}</code>
+              {canLocate&&onLevelEditor&&<button type="button" disabled={readingNativeAreas||!!nativeAreas?.deviceEditIssue} onClick={()=>void selectMissionArea(device.name,true,true)}>Locate {purpose.toLowerCase()}</button>}
+              <small>{issue??effect}</small>
+            </li>)}
+          </ul>
+          {!!nativeAreas?.factionKits?.length&&<><h4>Faction spawn kits</h4><ul className="studio-extraction-terminal-list">
+            {nativeAreas.factionKits.map(({kit,body})=><li key={kit.faction}>
+              <strong>{kit.faction==='unsc'?'UNSC':'Covenant'}</strong>
+              <small>Body · {body?.bipedTagPath??'Campaign default (no faction body bound)'}</small>
+              <small>Starter weapons · {[kit.profile.primaryWeapon,kit.profile.secondaryWeapon].filter(Boolean).join(' + ')}</small>
+            </li>)}
+          </ul><p className="studio-hint">Review these bindings in AI &amp; scenario → Forerunner faction terminals &amp; kits or Forerunner faction player bodies. Saved gear and respawn behavior depend on the runtime.</p></>}
+        </details>}
         {nativeAreas?.missionSourceIssue&&<Notice tone="info">{nativeAreas.missionSourceIssue}</Notice>}
         {nativeAreas?.deviceEditIssue&&<Notice tone="info">{nativeAreas.deviceEditIssue}</Notice>}
         {nativeAreas?.triggerEditIssue&&<Notice tone="info">{nativeAreas.triggerEditIssue}</Notice>}

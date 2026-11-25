@@ -1119,8 +1119,7 @@ pub(crate) fn prepare_partition_structure(
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
-            project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
-            inspection, plan, &donor, tools, runner, workspace, tags, cache_version,
+            project, inspection, plan, &donor, tools, runner, workspace, tags, cache_version,
         )?)
     } else { None };
     if stage == PartitionStage::Lighting {
@@ -1399,6 +1398,7 @@ pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result
         if object == old { continue; }
         let (block, prefix, yaw_only) = match old.kind.as_str() {
             "Player spawn" => ("player_starting_locations", "spawn", true),
+            "Netgame item" => ("netgame_equipment", "netgame-equipment", true),
             "Scenery" => ("scenery", "Scenery", false),
             "Biped" => ("bipeds", "Biped", false),
             "Vehicle" => ("vehicles", "Vehicle", false),
@@ -1426,11 +1426,12 @@ pub(crate) fn base_transforms(project: &Project, base: &MapInspection) -> Result
                 ("Weapon", "weap") => "weapon", ("Machine", "mach") => "device_machine",
                 ("Control", "ctrl") => "device_control",
                 ("Sound scenery", "ssce") => "sound_scenery",
-                _ => return invalid("Source placement class does not match its native scenario palette"),
+                ("Netgame item", "itmc") if !tag.external => "item_collection",
+                _ => return invalid("Source placement class does not match its native scenario reference"),
             };
             let path = format!("{}.{}", tag.path, extension); safe_relative(&path)?; Ok(path)
         }).transpose()?;
-        if tag.is_none() && !yaw_only { return invalid("Native placement has no verified palette tag"); }
+        if tag.is_none() && block != "player_starting_locations" { return invalid("Native placement has no verified source tag"); }
         result.push(BaseTransform { object_id: old.id.clone(), block: block.into(), source_count: counts[old.kind.as_str()], index,
             before_position: old.position, position: object.position, before_rotation: old.rotation,
             rotation: object.rotation, yaw_only, tag });
@@ -1471,12 +1472,23 @@ pub(crate) fn apply_base_transforms(project: &Project, base: &MapInspection, edi
         }
         read_transform(row, &row.before_position, &row.before_rotation).map_err(|e| SparkError::Invalid(format!("{} source conflict: {e}", row.object_id)))?;
         if let Some(expected) = &row.tag {
-            let slot = query("-G", format!("{}[{}].type",row.block,row.index))?.trim().parse::<usize>()
-                .map_err(|_|SparkError::Invalid("Native placement palette index is invalid".into()))?;
-            let palette = if row.block == "machines" { "machine_palette".to_string() } else if row.block == "sound_scenery" { "sound_scenery_palette".into() } else if row.block == "scenery" { "scenery_palette".into() } else { format!("{}_palette", row.block.trim_end_matches('s')) };
-            let actual = query("-G", format!("{palette}[{slot}].name"))?;
+            let prefix = format!("{}[{}]", row.block, row.index);
+            let reference = if row.block == "netgame_equipment" {
+                format!("{prefix}.item_collection")
+            } else {
+                let slot = query("-G", format!("{prefix}.type"))?.trim().parse::<usize>()
+                    .map_err(|_| SparkError::Invalid("Native placement palette index is invalid".into()))?;
+                let palette = match row.block.as_str() {
+                    "machines" => "machine_palette".into(),
+                    "sound_scenery" => "sound_scenery_palette".into(),
+                    "scenery" => "scenery_palette".into(),
+                    block => format!("{}_palette", block.trim_end_matches('s')),
+                };
+                format!("{palette}[{slot}].name")
+            };
+            let actual = query("-G", reference)?;
             if !actual.trim().replace('/',"\\").eq_ignore_ascii_case(&expected.replace('/',"\\")) {
-                return invalid(format!("{} native palette tag differs from the source; reconcile it before rebuilding",row.object_id));
+                return invalid(format!("{} native tag reference differs from the source; reconcile it before rebuilding",row.object_id));
             }
         }
     }
@@ -1493,6 +1505,28 @@ pub(crate) fn apply_base_transforms(project: &Project, base: &MapInspection, edi
     Ok(serde_json::json!({"schemaVersion":1,"sourceSha256":base.sha256,"scenario":scenario,"beforeSha256":before,
         "afterSha256":maps::hash_file(&file)?,"transforms":rows,"scope":"Original scenario position/rotation fields only; staged tag readback passed. Compiled readback and gameplay are independent gates."}))
 }
+/// Use the reviewed pickup poses as the expected output of the partitioned build.
+pub(crate) fn apply_expected_pickup_poses(
+    project: &Project,
+    base: &MapInspection,
+    pickups: &mut [maps::NativeNetgamePickup],
+) -> Result<Vec<usize>> {
+    let mut moved = vec![];
+    for row in base_transforms(project, base)?.into_iter().filter(|row| row.block == "netgame_equipment") {
+        let pickup = pickups.get_mut(row.index)
+            .ok_or_else(|| SparkError::Invalid(format!("{} is missing from native pickup readback", row.object_id)))?;
+        if pickup.position != row.before_position || pickup.facing != row.before_rotation[0] {
+            return invalid(format!("{} differs from the reviewed native pickup", row.object_id));
+        }
+        if row.position != row.before_position {
+            moved.push(row.index);
+        }
+        pickup.position = row.position;
+        pickup.facing = row.rotation[0];
+    }
+    Ok(moved)
+}
+
 /// Check every original placement, including untouched rows, against the
 /// compiled cache. Native datum IDs may change; class/path identities may not.
 pub(crate) fn verify_compiled_base(project: &Project, base: &MapInspection, compiled: &MapInspection) -> Result<()> {
@@ -1603,6 +1637,36 @@ mod base_transform_tests {
         changed=compiled.clone();changed.objects[1].position[0]=f32::NAN;assert!(verify(&changed).is_err());
         changed=compiled.clone();changed.tags[0].path="unrelated/rock".into();assert!(verify(&changed).is_err());
     }
+    #[test]
+    fn pickup_moves_preserve_collection_and_spawn_rules() {
+        let (mut project, mut base) = source();
+        let object = &mut base.objects[0];
+        object.id = "netgame-equipment-0".into();
+        object.kind = "Netgame item".into();
+        object.tag_id = Some(42);
+        base.tags.push(maps::Tag { id: 42, index: 0, class: "itmc".into(), path: "items/rockets".into(),
+            data_offset: Some(1000), external: false, fields: vec![], references: vec![],
+            primary_bitmap_status: None, shader_preview: None });
+        project.scene = base.objects.clone();
+        project.scene[0].position[2] = 2.5;
+        project.scene[0].rotation[0] = 0.25;
+        assert_eq!(base_transforms(&project, &base).unwrap()[0].tag.as_deref(), Some("items/rockets.item_collection"));
+        let mut pickups = [maps::NativeNetgamePickup { collection: "items/rockets".into(),
+            flags: 1, spawn_types: [12, 0, 0, 0], team_index: -1, spawn_time: 45,
+            position: [1., 2., 3.], facing: 0. }];
+        assert_eq!(apply_expected_pickup_poses(&project, &base, &mut pickups).unwrap(), vec![0]);
+        let [item] = pickups;
+        assert_eq!((item.position, item.facing), ([1., 2., 2.5], 0.25));
+        assert_eq!((item.collection.as_str(), item.flags, item.spawn_types, item.team_index, item.spawn_time),
+            ("items/rockets", 1, [12, 0, 0, 0], -1, 45));
+        let mut compiled = base.clone();
+        compiled.objects = project.scene.clone();
+        verify_compiled_base(&project, &base, &compiled).unwrap();
+        assert!(verify_compiled_base(&project, &base, &base).is_err());
+        project.scene[0].rotation[1] = 0.25;
+        assert!(base_transforms(&project, &base).is_err());
+    }
+
     #[test]
     fn missing_native_spans_and_unreviewed_source_kinds_cannot_be_transformed() {
         let (mut project,mut base)=source();base.objects[0].source_offset=None;project.scene=base.objects.clone();project.scene[0].position[0]+=0.25;

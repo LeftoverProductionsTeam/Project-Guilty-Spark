@@ -8,6 +8,49 @@ import type {NativeTagContext} from './nativeOperations';
 import {addLogicTrigger,setNativeLogicName} from './nativeLogic.ts';
 import type {Project} from './types';
 import {validMachinimaSettings} from './machinima.ts';
+
+const extractionTerminalRoles = new Map<string, {purpose:string; effect:string}>([
+  ['extraction_deploy', {purpose:'Deploy', effect:'Issues the selected kit and starts deployment.'}],
+  ['extraction_loadout', {purpose:'Review loadout', effect:'First use shows the kit. Further uses can change the saved selection. Crouch-use opens the discard interaction.'}],
+  ['extraction_debrief', {purpose:'Review debrief', effect:'Standing use reads the operation result. Crouch-use opens the stash discard interaction.'}],
+  ['extraction_unsc', {purpose:'Join UNSC', effect:'Selects the UNSC body and kit. Incompatible carried weapons may drop next to the player.'}],
+  ['extraction_covenant', {purpose:'Join Covenant', effect:'Selects the Covenant body and kit. Incompatible carried weapons may drop next to the player.'}],
+  ['extraction_activate', {purpose:'Request evacuation', effect:'Calls the shared evacuation when the mission allows it.'}],
+  ['extraction_pelican_activate', {purpose:'Call Pelican', effect:'Requests Pelican evacuation when the UNSC route is ready.'}],
+  ['extraction_spirit_activate', {purpose:'Call Spirit', effect:'Requests Spirit evacuation when the Covenant route is ready.'}],
+]);
+
+/** Recognize the engine's exact control names and flag other monitors for source review. */
+export function extractionTerminalReview(devices: NonNullable<NativeTagContext['scenarioDevices']>) {
+  const counts = new Map<string, number>();
+  for (const device of devices) counts.set(device.name, (counts.get(device.name) ?? 0) + 1);
+  const seen = new Set<string>();
+  const terminals = devices.flatMap(device => {
+    const {name, class: tagClass} = device;
+    const squad = /^extraction_squad_(0[1-9]|1[0-9]|2[0-2])$/.exec(name);
+    const role = extractionTerminalRoles.get(name) ?? (squad ? {
+      purpose:'Select squad ' + Number(squad[1]), effect:'Changes the player’s squad selection in the hub.',
+    } : undefined);
+    // Include nonstandard extraction controls so a typo or a debug binding
+    // does not appear to be recognized by the runtime.
+    if (!role && (tagClass !== 'ctrl' || (!/^extraction_/i.test(name) && !/holo[ _-]*control|monitor/i.test(device.tagPath)))) return [];
+    if (role && seen.has(name)) return [];
+    if (role) seen.add(name);
+    const duplicate = !!name && (counts.get(name) ?? 0) > 1;
+    const issue = duplicate ? 'Duplicate scenario name'
+      : tagClass !== 'ctrl' ? 'Name is assigned to a different object class'
+      : device.interactionDisabled ? 'Player interaction is disabled'
+      : !role ? 'Review script or device links before enabling this control'
+      : null;
+    return [{
+      device, purpose: role?.purpose ?? 'Unassigned monitor',
+      effect: role?.effect ?? 'This name has no built-in Extraction action.', issue,
+      canLocate: tagClass === 'ctrl' && !!name && !duplicate,
+    }];
+  });
+  return {terminals, missing: ['extraction_deploy','extraction_activate'].filter(name => !seen.has(name))};
+}
+
 /** Native radio cue: imported snd! closure, not a separate audio engine. */
 export interface MissionSoundCue {
   importId: string;
