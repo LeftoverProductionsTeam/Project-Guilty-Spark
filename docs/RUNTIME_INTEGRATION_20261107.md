@@ -3286,3 +3286,11 @@ Existing controls now measure an upright render model’s base from its exact co
 TypeScript, the Windows desktop compilation check, and three browser workflows passed, including measured and manual offsets, stale review invalidation, device source review and switch linkage. Independent native Rust readback of Black Echo d113e9db measured the compiled terminal model base at approximately 0.0995 world units below its origin. The exact source cache rehashed unchanged. This verifies native geometry and editing controls. The installed mission was not remounted in this pass.
 
 Separately, Forerunner b9ba76e0f resolved the original Zombie Apocalypse grenade vitality divergence on unchanged d29437a7. Two private peers with Win64 694be0b7 matched 4.00 healed vitality and 3.35 after a pistol hit. The authored map is unchanged. Legacy Chupathingy authority, full Survival, and replay remain open.
+
+### Black Echo deployment HUD waypoint, 25 November
+
+The deploy control remains in the verified location. Its existing interaction was observed with normal E from the hub approach on the retained d113e9db cache. The private waypoint candidate 974e2ffa2d7bc2e125c22e2db48695362f6f86295d8e2ccc14ec420705c3be00 adds an on-foot hub marker for the existing deployment terminal. It uses the native nav-point functions, the existing return volume and the actual Pelican and Spirit seat labels. It does not add inventory, transport, or mission-state logic.
+
+The native CE609 control rebuild reproduced d113e9dbec1bae9554e7d4df3843ecc2bb6d40b4ee2c7cdf5f81831fc7b29b09 byte for byte. Invader verified the same five control poses, trigger count, ordered list of 3,680 tags and all 43 original recovered script/global declarations. The candidate adds one script and seven globals at the end and has no external tags. CE HaloScript rejected the first vehicle-query function; verified native seat queries replaced it. Both native compile and independent readback scratch were disposed.
+
+The exact cache, editable HSC and verification receipt are retained under %TEMP%/GuiltySpark-Traversal-Handoff/black-echo-deploy-marker-Z4QH74/ready. Forerunner has the hash and private test request. Actual marker visibility, boarding cleanup and return behavior for both factions remain open on this cache. The installed previous-good cache remains available.
