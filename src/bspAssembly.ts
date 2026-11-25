@@ -22,7 +22,7 @@ export interface BspAssembly {
   highGround?: {points:Vec3[];width:number;height:number;shaderPath:string};
   sections?:SeamSection[];
   archSegments?:number;
-  nativeSeals?: Vec3[][];
+  nativeSeals?: (Vec3[] | { vertices: [Vec3, Vec3, Vec3]; lift: number })[];
   visibilityZones?: import('./visibilityZones').VisibilityZone[];
 }
 export interface BspOption {

@@ -30,24 +30,9 @@ fn extension(class: &str) -> Result<&'static str> {
         _ => invalid(format!("Unsupported BSP shader class {class}")),
     }
 }
-fn bsp_tag(i: &MapInspection, index: usize) -> Result<String> {
-    let name = &i
-        .mesh
-        .parts
-        .get(index)
-        .ok_or_else(|| SparkError::Invalid("Source BSP index changed".into()))?
-        .name;
-    i.tags
-        .iter()
-        .find(|t| {
-            t.class == "sbsp"
-                && t.path
-                    .rsplit(['\\', '/'])
-                    .next()
-                    .is_some_and(|s| s.eq_ignore_ascii_case(name))
-        })
-        .map(|t| t.path.clone())
-        .ok_or_else(|| SparkError::Invalid("Selected BSP tag identity is unavailable".into()))
+fn bsp_tag(path: &Path, map: &MapInspection, index: usize) -> Result<String> {
+    maps::scenario_bsp_tag_paths(path, map)?.into_iter().nth(index)
+        .ok_or_else(|| SparkError::Invalid("Selected scenario BSP slot is unavailable".into()))
 }
 struct NamespacedDependencies {
     hashes: BTreeMap<String, String>,
@@ -774,6 +759,7 @@ pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
     pub switches: [bsp_assembly::PartitionSwitch; 2],
     pub overlap: [[f64; 3]; 2],
+    pub structure_tags: [String; 2],
     pub scenery: Vec<crate::bsp_scenery::Placement>,
     pub donor_tag: String,
     pub donor_environment: Option<crate::bsp_audio::DonorEnvironment>,
@@ -784,7 +770,7 @@ pub(crate) struct PreparedPartitions {
 
 fn bind_partition_scenario(
     inspection: &MapInspection, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    structures: &[String; 2], switches: &[bsp_assembly::PartitionSwitch; 2],
+    original_structure: &str, structures: &[String; 2], switches: &[bsp_assembly::PartitionSwitch; 2],
 ) -> Result<()> {
     let scenario = format!("{}.scenario", inspection.scenario_path);
     let scenario_file = tags.join(safe_relative(&scenario)?);
@@ -797,6 +783,10 @@ fn bind_partition_scenario(
     };
     let bsp_count = || run(vec!["-C".into(), "structure_bsps".into()]);
     if bsp_count()?.trim() != "1" { return invalid("Partition binding needs the original single BSP scenario"); }
+    let original = run(vec!["-G".into(), "structure_bsps[0].structure_bsp".into()])?;
+    if !original.trim().eq_ignore_ascii_case(&format!("{original_structure}.scenario_structure_bsp")) {
+        return invalid("Staged scenario BSP does not match the preserved base slot");
+    }
     let mut args = vec!["-I".into(), "structure_bsps".into(), "1".into(), "end".into()];
     for (index, bsp) in structures.iter().enumerate() {
         args.extend(["-S".into(), format!("structure_bsps[{index}].structure_bsp"), format!("{bsp}.scenario_structure_bsp")]);
@@ -838,9 +828,11 @@ pub(crate) fn prepare_partition_structure(
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
     let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
-    namespace_materials(tags, &bsp_tag(inspection, 0)?, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
+    let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
+    let base_source_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
+    namespace_materials(tags, &base_source_bsp, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
-    let donor_source_bsp = bsp_tag(&donor, plan.donor_bsp_index)?;
+    let donor_source_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;
     namespace_materials(&plan.donor_tags_directory, &donor_source_bsp, 1, &parts.donor, &scenery,
         tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
@@ -851,17 +843,15 @@ pub(crate) fn prepare_partition_structure(
         compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)
     };
     let built = [compile(0)?, compile(1)?];
+    let structure_tags = [built[0].0.clone(), built[1].0.clone()];
     let netgame_flags = if bind {
-        let base_source = project.source.as_ref()
-            .ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
         Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
     } else { None };
     let player_starts = if bind {
         Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor)?)
     } else { None };
     let pickups = if bind {
-        let names = [built[0].0.clone(), built[1].0.clone()];
-        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &names, &parts.switches)?;
+        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &base_source_bsp, &structure_tags, &parts.switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
             project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
@@ -903,7 +893,7 @@ pub(crate) fn prepare_partition_structure(
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
         "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
         "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+    Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(
@@ -936,9 +926,12 @@ pub fn prepare_native(
         assembly.donor_source.resource_directory.as_deref(),
     )?;
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
+    let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing assembled base source".into()))?;
+    let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
+    let donor_bsp = bsp_tag(&assembly.donor_source.preserved_path, &donor, assembly.donor_bsp_index)?;
     let base_hashes = namespace_materials(
         tags,
-        &bsp_tag(inspection, 0)?,
+        &base_bsp,
         0,
         &geometry,
         &[],
@@ -950,7 +943,7 @@ pub fn prepare_native(
     )?;
     let donor_hashes = namespace_materials(
         &assembly.donor_tags_directory,
-        &bsp_tag(&donor, assembly.donor_bsp_index)?,
+        &donor_bsp,
         1,
         &geometry,
         &scenery,
@@ -1014,7 +1007,7 @@ pub fn prepare_native(
     project::atomic_write(
         &workspace.join("bsp-assembly.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":bsp_tag(inspection,0)?,"donorBsp":bsp_tag(&donor,assembly.donor_bsp_index)?,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"donorScenery":scenery,"modelReferenceChanges":donor_hashes.model_reference_changes,"inputTagHashes":{"base":base_hashes.hashes,"donor":donor_hashes.hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
+            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":base_bsp,"donorBsp":donor_bsp,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"donorScenery":scenery,"modelReferenceChanges":donor_hashes.model_reference_changes,"inputTagHashes":{"base":base_hashes.hashes,"donor":donor_hashes.hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
         )?,
         false,
     )?;

@@ -280,6 +280,11 @@ fn build_partition_cache(
     }
     let volumes = maps::scenario_volume_readback(&path, &map)?;
     let transitions = maps::scenario_bsp_transitions(&path, &map)?;
+    if transitions.bsp_tag_paths.len() != prepared.structure_tags.len() || transitions.bsp_tag_paths.iter()
+        .zip(&prepared.structure_tags).any(|(compiled, expected)| !compiled.eq_ignore_ascii_case(expected))
+    {
+        return invalid("Compiled native BSP slots differ from the staged structure tag identities");
+    }
     if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
         || transitions.bsp_count != 2 || transitions.transitions.len() != 2 {
         return invalid("Partition probe lost original volumes or compiled an unexpected BSP switch set");
@@ -327,7 +332,7 @@ fn build_partition_cache(
     } else { None };
     if maps::hash_file(&path)? != map.sha256 { return invalid("Compiled partition cache changed during validation"); }
     let receipt = serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
-        "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages,
+        "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "bspTagPaths": transitions.bsp_tag_paths, "lightmapPages": lightmap_pages,
         "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
         "netgameFlags": native_flags, "playerStarts": native_starts});
     Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })
@@ -352,13 +357,12 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     // generating replacement geometry rather than dropping authored instances.
     let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref())?;
     let mut detail=vec![];
-    for (i,root,index) in [(inspection,base_tags,0),(&donor,&plan.donor_tags_directory,plan.donor_bsp_index)]{
-        let name=&i.mesh.parts.get(index).ok_or_else(||SparkError::Invalid("Selected BSP disappeared".into()))?.name;
-        let tag=i.tags.iter().find(|t|t.class=="sbsp"&&t.path.rsplit(['\\','/']).next().is_some_and(|p|p.eq_ignore_ascii_case(name))).ok_or_else(||SparkError::Invalid("Native source BSP identity unavailable".into()))?;
-        let relative=format!("{}.scenario_structure_bsp",tag.path);let file=root.join(crate::safe_relative(&relative)?);
+    for (cache,i,root,index) in [(&source.preserved_path,inspection,base_tags,0),(&plan.donor_source.preserved_path,&donor,&plan.donor_tags_directory,plan.donor_bsp_index)]{
+        let path=maps::scenario_bsp_tag_paths(cache,i)?.into_iter().nth(index).ok_or_else(||SparkError::Invalid("Native source BSP slot is unavailable".into()))?;
+        let relative=format!("{path}.scenario_structure_bsp");let file=root.join(crate::safe_relative(&relative)?);
         if !file.is_file(){return invalid(format!("Matching editable source BSP is missing: {}. Extract this exact region and its dependencies before rebuilding",file.display()));}
         let snapshot=crate::bsp_detail::snapshot(&file,&edit,|args|{let mut a=vec!["-t".into(),root.to_string_lossy().into_owned()];a.extend_from_slice(args);a.push(relative.clone());runner.run(&edit,&a,&dir,"detail-preflight",8)})?;
-        if snapshot.has_payload(){return invalid(format!("{} contains {} painted detail instances. Their transformed native rebuild is not implemented; originals and prior builds were retained",tag.path,snapshot.instances));}detail.push(snapshot);
+        if snapshot.has_payload(){return invalid(format!("{} contains {} painted detail instances. Their transformed native rebuild is not implemented; originals and prior builds were retained",path,snapshot.instances));}detail.push(snapshot);
     }
     let tags=dir.join("tags");let hashes=crate::forge_build::stage_tags(base_tags,&tags,&cancel,|done,total,_,_|{if done==total{runner.emit("stage",format!("Verified {total} isolated CE source tags"),20,"info");}})?;
     fs::create_dir(dir.join("data"))?;

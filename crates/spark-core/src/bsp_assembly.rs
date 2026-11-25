@@ -77,8 +77,21 @@ pub struct BspAssembly {
     pub visibility_zones: Vec<crate::bsp_visibility::VisibilityZone>,
     /// Ordered world-space boundaries reviewed against a native Tool diagnostic.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub native_seals: Vec<Vec<V>>,
+    pub native_seals: Vec<NativeSeal>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NativeSeal {
+    Flat(Vec<V>),
+    Raised { vertices: [V; 3], lift: f64 },
+}
+
+impl NativeSeal {
+    fn vertices(&self) -> &[V] {
+        match self { Self::Flat(vertices) => vertices, Self::Raised { vertices, .. } => vertices }
+    }
+}
+
 fn is_false(value: &bool) -> bool { !*value }
 impl BspAssembly {
     pub fn validate(&self) -> Result<()> {
@@ -118,10 +131,12 @@ impl BspAssembly {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
         }
         if self.native_seals.len() > 8 || self.native_seals.iter().any(|seal| {
-            !matches!(seal.len(), 3 | 4)
-                || seal.iter().flatten().any(|p| !p.is_finite() || p.abs() > 2048.)
+            let vertices = seal.vertices();
+            !matches!(vertices.len(), 3 | 4)
+                || vertices.iter().flatten().any(|p| !p.is_finite() || p.abs() > 2048.)
+                || matches!(seal, NativeSeal::Raised { lift, .. } if !(0.002..=0.25).contains(&lift.abs()))
         }) {
-            return invalid("Use up to eight native seals with three or four finite world-space vertices each");
+            return invalid("Use up to eight native seals. Flat seals take three or four vertices. Raised seals take three vertices and an offset of 0.002 to 0.25 world units in either direction.");
         }
         let mut section_ids=BTreeSet::new();
         for section in &self.sections {
@@ -175,9 +190,9 @@ impl BspAssembly {
         if self.donor_bsp_index != 0 || self.tunnel_points.len() != 2 || self.open_road
             || self.terrain_seam.is_some() || self.arch_segments.is_some()
             || self.infantry_tunnel.is_some() || self.high_ground.is_some()
-            || !self.sections.is_empty() || !self.visibility_zones.is_empty() || !self.native_seals.is_empty()
+            || !self.sections.is_empty() || !self.visibility_zones.is_empty()
         {
-            return invalid("Separate native BSPs require a single-BSP donor and one straight enclosed passage without custom portal cuts or seals.");
+            return invalid("Separate native BSPs require a single-BSP donor and one straight enclosed passage without custom portal cuts.");
         }
         let [start, end] = [self.tunnel_points[0], self.tunnel_points[1]];
         if (end[0] - start[0]).hypot(end[1] - start[1]) < 12. {
@@ -808,9 +823,10 @@ fn generate_end(
     crate::bsp_triangulate::improve(&mut gl);
     for material in passage_materials.into_iter().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
-    seam_sections::append_native_seals(
-        &assembly.native_seals, &mut mesh, &mut materials, &mut triangle_materials,
-    )?;
+    // The base half does not contain the donor boundary to be sealed.
+    if !matches!(partition, Some((_, PartitionEnd::Base))) {
+        seam_sections::append_native_seals(&assembly.native_seals, &mut mesh, &mut materials, &mut triangle_materials)?;
+    }
     let mut clearance_route = route_geometry.clone();
     clearance_route.separate_native_bsps = false;
     if let Some((seam, end)) = partition {

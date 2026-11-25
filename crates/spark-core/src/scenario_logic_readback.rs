@@ -371,6 +371,7 @@ pub struct NativeBspTransition {
 pub struct NativeBspTransitions {
     pub cache_sha256: String,
     pub bsp_count: usize,
+    pub bsp_tag_paths: Vec<String>,
     pub transitions: Vec<NativeBspTransition>,
 }
 
@@ -386,6 +387,27 @@ pub fn native_bsp_switch_name(name: &str) -> Option<(usize, usize)> {
     (from != to).then_some((from, to))
 }
 
+fn read_bsp_tag_paths(reader: &Reader, space: &Space, scenario: usize, tags: &[Tag]) -> Result<Vec<String>> {
+    let (start, count) = space.block(reader, scenario + 0x5a4, 32, 16)?;
+    (0..count).map(|index| {
+        let row = start + index * 32;
+        let datum = reader.u32(row + 28)?;
+        if datum == u32::MAX || reader.fourcc(row + 16)? != "sbsp" {
+            return invalid(format!("Scenario BSP {index} has no native structure tag reference"));
+        }
+        let paths = tags.iter().filter(|tag| tag.id == datum && tag.class == "sbsp" && !tag.external);
+        let mut paths = paths.map(|tag| tag.path.as_str());
+        let path = paths.next().filter(|_| paths.next().is_none())
+            .ok_or_else(|| SparkError::Invalid(format!("Scenario BSP {index} has an invalid or ambiguous structure tag")))?;
+        Ok(path.into())
+    }).collect()
+}
+
+/// Resolve structure BSPs by the source scenario’s native datum and slot.
+pub fn scenario_bsp_tag_paths(path: &Path, map: &MapInspection) -> Result<Vec<String>> {
+    with_scenario(path, map, |reader, space, scenario| read_bsp_tag_paths(reader, space, scenario, &map.tags))
+}
+
 /// Read native compiled switch rows. The compiler derives these from ordinary
 /// scenario trigger volumes. Each row describes a global BSP switch.
 pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<NativeBspTransitions> {
@@ -393,7 +415,8 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
         return invalid("Native BSP transition review supports CE609 and MCC13 caches");
     }
     with_scenario(path, map, |reader, tags, scenario| {
-        let (_, bsp_count) = tags.block(reader, scenario + 0x5a4, 32, 16)?;
+        let bsp_tag_paths = read_bsp_tag_paths(reader, tags, scenario, &map.tags)?;
+        let bsp_count = bsp_tag_paths.len();
         let (trigger_start, trigger_count) = tags.block(reader, scenario + 0x360, 96, 4096)?;
         let (switch_start, switch_count) = tags.block(reader, scenario + 0x39c, 8, 256)?;
         let transitions = (0..switch_count).map(|index| {
@@ -412,7 +435,7 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
                 arrival_marker: match reader.u16(at + 6)? { u16::MAX => None, marker => Some(marker) },
             })
         }).collect::<Result<Vec<_>>>()?;
-        Ok(NativeBspTransitions { cache_sha256: map.sha256.clone(), bsp_count, transitions })
+        Ok(NativeBspTransitions { cache_sha256: map.sha256.clone(), bsp_count, bsp_tag_paths, transitions })
     })
 }
 
@@ -584,6 +607,28 @@ mod tests {
         assert_eq!(base_inspection.sha256, hash_file(&base).unwrap());
         assert_eq!(donor_inspection.sha256, hash_file(&donor).unwrap());
         println!("Native scenario budgets {}", serde_json::to_string(&budget).unwrap());
+    }
+
+    #[test]
+    fn scenario_structure_slots_resolve_exact_datums_with_duplicate_leaf_names() {
+        let mut bytes = vec![0u8; 2048];
+        let start = 0x600usize;
+        bytes[0x5a4..0x5a8].copy_from_slice(&2u32.to_le_bytes());
+        bytes[0x5a8..0x5ac].copy_from_slice(&(start as u32).to_le_bytes());
+        let tags: Vec<_> = [("levels/first/region", 0xa001u32), ("levels/second/region", 0xb002)].into_iter()
+            .enumerate().map(|(index, (path, id))| Tag {
+                id, index, path: path.into(), class: "sbsp".into(), data_offset: None, external: false,
+                fields: vec![], references: vec![], primary_bitmap_status: None, shader_preview: None,
+            }).collect();
+        for (index, tag) in tags.iter().rev().enumerate() {
+            let row = start + index * 32;
+            bytes[row + 16..row + 20].copy_from_slice(b"psbs");
+            bytes[row + 28..row + 32].copy_from_slice(&tag.id.to_le_bytes());
+        }
+        let space = Space { begin: 0, end: bytes.len(), address: 0 };
+        assert_eq!(read_bsp_tag_paths(&Reader(&bytes), &space, 0, &tags).unwrap(), ["levels/second/region", "levels/first/region"]);
+        bytes[start + 28..start + 32].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(read_bsp_tag_paths(&Reader(&bytes), &space, 0, &tags).is_err());
     }
 
     #[test]

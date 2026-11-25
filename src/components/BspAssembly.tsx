@@ -16,6 +16,7 @@ import { useWorkspaceActivity } from './WorkspaceActivity';
 interface NativeBspTransitions {
   cacheSha256: string;
   bspCount: number;
+  bspTagPaths?: string[];
   transitions: {triggerIndex: number; triggerName: string; sourceBsp: number; destinationBsp: number}[];
 }
 
@@ -41,6 +42,7 @@ function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string
     {error && <p role="alert" className="bsp-error">{error}</p>}
     {report && <details open>
       <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
+      {!!report.bspTagPaths?.length && <ol start={0} aria-label="Native structure tags">{report.bspTagPaths.map((path, index) => <li key={index}><code className="path-text" title={path}>{path}</code></li>)}</ol>}
       {report.transitions.length > 0 ? <ul>{report.transitions.map((row, index) => <li key={index}>BSP {row.sourceBsp} → BSP {row.destinationBsp} · {row.triggerName || "Unnamed volume"} (volume {row.triggerIndex})</li>)}</ul>
         : <p>This scenario has no compiled trigger-volume switches.</p>}
     </details>}
@@ -117,6 +119,7 @@ export default function BspAssembly({
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const [sealText, setSealText] = useMapState(project.id, 'bsp.nativeSealVertices', '');
+  const [sealLift, setSealLift] = useMapState(project.id, 'bsp.nativeSealLift', 0);
   const [nativeBspIndex, setNativeBspIndex] = useMapState(project.id, 'bsp.nativePartitionPreview', 0);
   const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
@@ -411,14 +414,20 @@ export default function BspAssembly({
               </fieldset>
               <details>
                 <summary>Native boundary seals{draft.nativeSeals?.length ? ' · ' + draft.nativeSeals.length : ''}</summary>
-                <p>Enter the ordered vertices of a reviewed Halo Tool opening in world units. Divide WRL coordinates by 100. Choose Apply connection, then Preview joined seam &amp; clearance to check the seal.</p>
+                <p>Enter the ordered vertices of the donor opening in world units. Divide raw WRL coordinates by 100. A nonzero apex offset raises or lowers the center of a triangular seal. Apply the connection and preview the donor BSP before building.</p>
                 <label>Boundary vertices
                   <textarea rows={4} maxLength={512} value={sealText} onChange={event => setSealText(event.target.value)} />
                 </label>
+                <label>Seal apex Z offset <NumberField label="Seal apex Z offset" value={sealLift} min={-0.25} max={0.25} step={0.002} onCommit={setSealLift}/></label>
                 <div className="bsp-actions">
                   <button disabled={busy || !sealText.trim() || (draft.nativeSeals?.length ?? 0) >= 8} onClick={() => {
                     try {
-                      update({ nativeSeals: [...(draft.nativeSeals ?? []), nativeSealVertices(sealText)] });
+                      const vertices = nativeSealVertices(sealText);
+                      if (sealLift !== 0 && (vertices.length !== 3 || Math.abs(sealLift) < 0.002)) {
+                        throw new Error("Raised seals need three vertices and a Z offset of at least 0.002 world units.");
+                      }
+                      const seal = sealLift === 0 ? vertices : {vertices: vertices as [Vec3, Vec3, Vec3], lift: sealLift};
+                      update({ nativeSeals: [...(draft.nativeSeals ?? []), seal] });
                       setSealText('');
                     } catch (error) {
                       setError(String(error));

@@ -4,7 +4,7 @@ use super::*;
 /// Fill reviewed Tool openings with Halo's native seam-sealer material.
 /// Use the mesh's own edge positions and preserve the two-sided donor faces.
 pub(super) fn append_native_seals(
-    seals: &[Vec<V>],
+    seals: &[NativeSeal],
     mesh: &mut MeshData,
     materials: &mut Vec<AssemblyMaterial>,
     slots: &mut Vec<usize>,
@@ -31,9 +31,10 @@ pub(super) fn append_native_seals(
             "Native seal {} must follow an exact open Tool boundary beside a two-sided donor face",
             index + 1,
         ));
-        let mut edges = Vec::with_capacity(seal.len());
+        let boundary = seal.vertices();
+        let mut edges = Vec::with_capacity(boundary.len());
         let mut forward = None;
-        for (&from, &to) in seal.iter().zip(seal.iter().cycle().skip(1)) {
+        for (&from, &to) in boundary.iter().zip(boundary.iter().cycle().skip(1)) {
             if close(from, to) {
                 return Err(missing());
             }
@@ -76,10 +77,24 @@ pub(super) fn append_native_seals(
         if forward == Some(true) {
             points[1..].reverse();
         }
-        let mut faces = vec![[points[0], points[1], points[2]]];
-        if points.len() == 4 {
-            faces.push([points[0], points[2], points[3]]);
-        }
+        let faces = match seal {
+            NativeSeal::Flat(_) => {
+                let mut faces = vec![[points[0], points[1], points[2]]];
+                if points.len() == 4 { faces.push([points[0], points[2], points[3]]); }
+                faces
+            }
+            NativeSeal::Raised { lift, .. } => {
+                let [a, b, c] = [points[0], points[1], points[2]];
+                let away = [0., 0., *lift];
+                let apex = add(mul(add(add(a, b), c), 1. / 3.), away);
+                if dot(normal(a, b, c), away).abs() < 0.002
+                    || apex.iter().any(|v| !v.is_finite() || v.abs() > 2048.)
+                {
+                    return invalid("A raised seal needs an apex off the native triangle plane and inside the world bounds");
+                }
+                vec![[a, b, apex], [b, c, apex], [c, a, apex]]
+            }
+        };
         let normals: Vec<_> = faces.iter().map(|p| normal(p[0], p[1], p[2])).collect();
         let too_thin = faces.iter().any(|[a, b, c]| {
             let ab = sub(*b, *a);
@@ -136,7 +151,14 @@ fn native_seal_closes_only_edges_bordered_by_two_sided_donor_faces() {
             slots.push(slot);
         }
     }
-    let seal = vec![points.to_vec()];
+    let raised = [NativeSeal::Raised { vertices: points, lift: 0.08 }];
+    let (mut raised_mesh, mut raised_materials, mut raised_slots) = (mesh.clone(), materials.clone(), slots.clone());
+    append_native_seals(&raised, &mut raised_mesh, &mut raised_materials, &mut raised_slots).unwrap();
+    assert_eq!(&raised_mesh.positions[..mesh.positions.len()], &mesh.positions);
+    assert_eq!(raised_slots.len() - slots.len(), 3);
+    assert_eq!(raised_materials[1].flags, materials[1].flags);
+    assert_eq!(raised_mesh.positions.chunks_exact(3).filter(|p| p[2] == 0.08).count(), 3);
+    let seal = [NativeSeal::Flat(points.to_vec())];
     let source = mesh.positions.clone();
     append_native_seals(&seal, &mut mesh, &mut materials, &mut slots).unwrap();
     assert_eq!(&mesh.positions[..source.len()], &source);

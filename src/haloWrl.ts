@@ -97,8 +97,8 @@ function coordinateList(section: string): Vec3[] {
 export function parseHaloWrl(text: string, sourceCentimetres = true): WrlDiagnostics {
   if (typeof text !== 'string' || !text.length || text.length > MAX_FILE)
     throw new Error('Halo WRL must be a nonempty text file smaller than 2 MiB');
-  if (!/^\s*#VRML 1\.0 ascii(?:\s|$)/i.test(text))
-    throw new Error('Only Halo 1 Tool #VRML 1.0 ascii diagnostic files are supported. VRML 2.0 is different.');
+  if (!/^\s*#VRML V?1\.0 ascii(?:\s|$)/i.test(text))
+    throw new Error('Choose a Halo 1 Tool VRML 1.0 ASCII diagnostic file.');
   const source = text.split(/\r?\n/).map(line => line.replace(/#.*/, '')).join('\n');
   const scale = sourceCentimetres ? .01 : 1;
   let searchAt = 0;

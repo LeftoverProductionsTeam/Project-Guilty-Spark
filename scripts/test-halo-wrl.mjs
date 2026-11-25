@@ -9,6 +9,11 @@ assert.deepEqual(a.segments[1].color,[0,1,0]);
 assert.deepEqual(a.faces[0].color,[0,.5,1]);
 assert.deepEqual(a.bounds.max,[3,1,0]);
 assert.deepEqual(parseHaloWrl(wrl,false).bounds.max,[300,100,0]);
+const h1a = '#VRML V1.0 ascii\r\n\r\nSeparator\r\n{\r\n Coordinate3 { point[11691.349609 -2260.953613 600.166992, 11691.321289 -2655.917236 600.166992] }\r\n MaterialBinding { value PER_VERTEX }\r\n Material { diffuseColor[1 0 0,1 0 0] }\r\n IndexedLineSet { coordIndex[0,1,-1] }\r\n}';
+const edge = parseHaloWrl(h1a).segments[0];
+assert.deepEqual(edge.color,[1,0,0]);
+assert.ok(Math.abs(edge.start[0]-116.91349609)<1e-8);
+assert.ok(Math.abs(edge.end[1]+26.55917236)<1e-8);
 for(const bad of ['#VRML V2.0 utf8\nSeparator {}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3]} IndexedLineSet {coordIndex [0,1,-1]}}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3,1 1 1]} IndexedLineSet {coordIndex [0,9,-1]}}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3,1 1 1]} IndexedLineSet {coordIndex [0,1]}}', '#VRML 1.0 ascii\nSeparator {'])
   assert.throws(()=>parseHaloWrl(bad));
 assert.throws(()=>parseHaloWrl(wrl+' '.repeat(2*1024*1024)));
