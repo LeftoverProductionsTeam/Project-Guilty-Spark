@@ -435,6 +435,7 @@ pub const SQUAD_OBJECTIVES_FEATURE:&str="extraction.squad_objectives.v1";
 pub const SQUAD_BEGIN_FEATURE:&str="extraction.squad_begin.v1";
 pub const FACTION_LANDING_ZONES_FEATURE: &str = "extraction.faction_landing_zones.v1";
 pub const PELICAN_RETURN_PAD_FEATURE: &str = "extraction.pelican_return_pad.v1";
+pub const HOVER_TRANSFER_FEATURE: &str = "extraction.hover_transfer.v1";
 /// Native interface names from the reviewed Forerunner contract. This detects
 /// required engine behavior, not mission completion, membership or gameplay.
 fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>> {
@@ -465,9 +466,19 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
     let begins=squad_callbacks(&map.scripts,"_begin")?;
     let settled=squad_callbacks(&map.scripts,"_complete")?;
     let aborted=squad_callbacks(&map.scripts,"_aborted")?;
+    let mut hover_transfer = false;
+    for marker in ["gs_pelican_hover_field", "gs_spirit_hover_field"] {
+        let mut matches = map.scripts.iter().filter(|script| script.name == marker);
+        if let Some(script) = matches.next() {
+            if script.script_type != 3 || script.return_type != 5 || matches.next().is_some() {
+                return invalid("Hover transfer requires a unique static boolean marker for each opted-in aircraft");
+            }
+            hover_transfer = true;
+        }
+    }
     let has_squad_scripts=![&queries,&begins,&settled,&aborted].iter().all(|rows|rows.is_empty());
     if map.header.version!=609||map.header.scenario_type!=0||map.header.extended{
-        if callbacks.is_empty()&&!has_squad_scripts{return Ok(None);}
+        if callbacks.is_empty()&&!has_squad_scripts&&!hover_transfer{return Ok(None);}
         return invalid("Forerunner Extraction requires a standard native CE609 solo map");
     }
     if !callbacks.is_empty()&&(callbacks.len()!=1||callbacks[0].script_type!=1){return invalid("Forerunner settled Extraction requires one dormant completion callback");}
@@ -482,10 +493,11 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
     }}
     if !begins.is_subset(&terminals)||!aborted.is_subset(&terminals){return invalid("Native squad begin and abort callbacks require their matching numbered hub terminal");}
     let squad=has_squad_scripts||!ready.is_empty()||!terminals.is_empty();
-    if callbacks.is_empty()&&!squad{return Ok(None);}
+    if callbacks.is_empty()&&!squad&&!hover_transfer{return Ok(None);}
     let faction_landing_zones = crate::native_logic::validate_compiled_extraction_layout(map, &markers)?;
     let mut features = Vec::new();
     if squad { features.push(SQUAD_OBJECTIVES_FEATURE.into()); }
+    if hover_transfer { features.push(HOVER_TRANSFER_FEATURE.into()); }
     if !begins.is_empty() { features.push(SQUAD_BEGIN_FEATURE.into()); }
     if faction_landing_zones { features.push(FACTION_LANDING_ZONES_FEATURE.into()); }
     if markers.volumes.iter().any(|volume| volume.name == "pelican_return") {
@@ -1222,6 +1234,12 @@ mod tests {
         let features=super::compiled_extraction_requirements(&cache,&map).unwrap().unwrap();
         assert!(features.iter().any(|feature|feature==super::SQUAD_OBJECTIVES_FEATURE));
         assert!(features.iter().any(|feature|feature==super::SQUAD_BEGIN_FEATURE));
+        assert!(!features.iter().any(|feature|feature==super::HOVER_TRANSFER_FEATURE));
+        let mut hover=map.clone();
+        hover.scripts.push(crate::maps::Script{name:"gs_pelican_hover_field".into(),script_type:3,return_type:5});
+        assert!(super::compiled_extraction_requirements(&cache,&hover).unwrap().unwrap().iter().any(|feature|feature==super::HOVER_TRANSFER_FEATURE));
+        hover.scripts.last_mut().unwrap().return_type=4;
+        assert!(super::compiled_extraction_requirements(&cache,&hover).unwrap_err().to_string().contains("static boolean marker"));
         let mut altered=map.clone();
         altered.scripts.iter_mut().find(|script|script.name=="forerunner_squad_01_begin").unwrap().return_type=5;
         assert!(super::compiled_extraction_requirements(&cache,&altered).unwrap_err().to_string().contains("void declarations"));

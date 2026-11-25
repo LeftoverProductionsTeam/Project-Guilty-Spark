@@ -178,6 +178,9 @@ export function nativeTransportRecordingIssue(
   options: NativeTransportOptions,
   recordings: WorkingScriptSources['transportRecordings'],
 ): string | null {
+  if (options.hoverFieldTransfer && (!options.recordings?.outbound || !options.returnAfterInsertion)) {
+    return 'Field hover requires a final field recording and Return empty after insertion.';
+  }
   for (const leg of nativeTransportLegs(options)) {
     const recording = nativeTransportRecording(options, leg);
     if (!recording) continue;

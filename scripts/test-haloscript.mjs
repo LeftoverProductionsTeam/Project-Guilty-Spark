@@ -357,11 +357,25 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
    const {inbound:ignored,...mixedRecordings}=options.recordings;
    const mixed=exportHaloCeTransport({...options,inbound:'hub_route',recordings:mixedRecordings});
    assert.ok(mixed.content.includes('(vehicle_hover extraction_'+role+' false)\n  (ai_braindead pilot_'+role+' false)\n  (ai_command_list pilot_'+role+' hub_route)'));
-   await fs.writeFile(path.join(data,'scripts',source.filename),source.content);
+   const hoverOptions={...options,hoverFieldTransfer:true,pickupCue:'gs_pickup_'+role,occupancySeats:[seat,'passenger_1','player_1'],
+    crew:[{group:faction==='unsc'?'be_marines':'be_covenant',seat:'passenger_1',releaseAtInsertion:true}]};
+   const hover=exportHaloCeTransport(hoverOptions);
+   assert.deepEqual(readNativeTransportSource(hover.content),hoverOptions);
+   assert.ok(hover.content.includes('(script static boolean gs_'+role+'_hover_field true)'));
+   assert.ok(hover.content.includes('(vehicle_unload extraction_'+role+' "passenger_1")'));
+   assert.ok(hover.content.includes('(gs_pickup_'+role+')'));
+   assert.ok(!hover.content.includes('(vehicle_unload extraction_'+role+' "rider")'));
+   assert.throws(()=>exportHaloCeTransport({...hoverOptions,occupancySeats:undefined}),/reviewed native seat labels/);
+   const ambiguous=exportHaloCeTransport({...hoverOptions,occupancySeats:[...hoverOptions.occupancySeats,'passenger_10']});
+   assert.ok(!ambiguous.content.includes('(vehicle_unload '));
+   await fs.writeFile(path.join(data,'scripts',source.filename),hover.content);
   }
+  const cuesFile=path.join(data,'scripts','test_hover_cues.hsc');
+  await fs.writeFile(cuesFile,'(script static void gs_pickup_pelican (sleep 1))\n(script static void gs_pickup_spirit (sleep 1))\n');
   await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  await fs.unlink(cuesFile);
   const compiledTransport=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
-  assert.ok(['gs_pelican_trip','gs_spirit_trip'].every(name=>compiledTransport.includes(name)));
+  assert.ok(['gs_pelican_trip','gs_spirit_trip','gs_pelican_hover_field','gs_spirit_hover_field'].every(name=>compiledTransport.includes(name)));
   // Restore the established AI-route fixture for recovery and mission composition below.
   await Promise.all(transportFiles.map((file,index)=>fs.writeFile(file,priorTransport[index])));
   await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
