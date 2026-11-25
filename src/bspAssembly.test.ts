@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -164,4 +164,36 @@ it('widens the native terrain ribbon to the complete ridge deck and keeps the or
   expect(draft.terrainSeam?.shoulderWidth).toBe(8);
   expect(fillTerrainToRidge(widened)).toBe(widened);
   expect(()=>fillTerrainToRidge(addHighGroundRoute(road,-40))).toThrow(/fill limit/);
+});
+
+it('drafts a six-unit flat bridge above both landings with graded ramps and a separate cave',()=>{
+  const road:BspAssembly={...plan,openRoad:true,tunnelPoints:[[0,0,0],[40,0,1]],tunnelWidth:6,tunnelHeight:4,
+    terrainSeam:{shoulderWidth:8,bankHeight:0,baseShaderPath:'owned/grass',donorShaderPath:'owned/snow'}};
+  const bridge=addFlatLandBridge(road);
+  const route=bridge.highGround!;
+  expect(route.width).toBe(6);
+  expect(route.points[0]).toEqual(road.tunnelPoints[0]);
+  expect(route.points.at(-1)).toEqual(road.tunnelPoints.at(-1));
+  expect(route.points[2][2]).toBe(route.points[3][2]);
+  expect(route.points[2][2]).toBeGreaterThan(1);
+  for(let i=1;i<route.points.length;i++){
+    const a=route.points[i-1],b=route.points[i];
+    expect(Math.abs(b[2]-a[2])/Math.hypot(b[0]-a[0],b[1]-a[1])).toBeLessThanOrEqual(.25);
+  }
+  expect(bridge.infantryTunnel!.points[1][1]).toBeGreaterThan(0);
+  expect(route.points[2][1]).toBeLessThan(0);
+  expect(bridge.tunnelPoints).toBe(road.tunnelPoints);
+  expect(bridge.terrainSeam?.shoulderWidth).toBe(13);
+  expect(road).not.toHaveProperty('highGround');
+});
+
+it('keeps a chosen ridge landing and existing cave and refuses impossible bridge elevations',()=>{
+  const existing=makeThreeRouteSeam({...plan,tunnelPoints:[[0,0,0],[40,0,0]]});
+  const selected:[number,number,number]=[40,-2,1];
+  existing.highGround!.points[5]=selected;
+  const bridge=addFlatLandBridge(existing);
+  expect(bridge.highGround!.points.at(-1)).toEqual(selected);
+  expect(bridge.infantryTunnel).toBe(existing.infantryTunnel);
+  expect(()=>addFlatLandBridge({...plan,separateNativeBsps:true})).toThrow(/joined BSP/);
+  expect(()=>addFlatLandBridge({...plan,tunnelPoints:[[0,0,0],[20,0,3]]})).toThrow(/landing elevations/);
 });

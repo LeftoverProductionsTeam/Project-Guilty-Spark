@@ -3805,6 +3805,38 @@ test('three-route seam is one source edit with retained route controls and per-r
  await click('Build & playtest connection');await expect(page.getByRole('tab',{name:'Build & playtest',exact:true})).toBeVisible();
 });
 
+
+test('Construction applies and saves a flat land bridge with a separate cave', async ({page}) => {
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{
+  const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   const value=await invoke(command,args);
+   return command==='plan_bsp_assembly'
+    ? {...value,tunnelPoints:[[0,0,0],[40,0,1]],tunnelWidth:6,tunnelHeight:4,openRoad:true,terrainSeam:{
+      shoulderWidth:8,bankHeight:0,baseShaderPath:'fixture/grass',donorShaderPath:'fixture/snow',
+     }}
+    :value;
+  };
+ });
+ await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
+ const panel=page.getByRole('region',{name:'Construction panel',exact:true});
+ const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
+ await (await constructionControl(page,'button','Plan adjacent terrain')).click();
+ await (await constructionControl(page,'button','Add flat land bridge & cave')).click();
+ await expect(await constructionControl(page,'combobox','Connection route')).toHaveValue('highGround');
+ await (await constructionControl(page,'button','Apply connection')).click();
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.highGround?.width)).toBe(6);
+ const saved=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly);
+ expect(saved.highGround.points[2][2]).toBe(saved.highGround.points[3][2]);
+ expect(saved.infantryTunnel.points[1][1]).toBeGreaterThan(0);
+ expect(saved.highGround.points[2][1]).toBeLessThan(0);
+ expect(saved.tunnelPoints).toEqual([[0,0,0],[40,0,1]]);
+ await page.keyboard.press('Control+z');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.bspAssembly??null)).toBeNull();
+});
+
 test('three-route Construction controls use one reachable scrolling drawer',async({page})=>{
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
  const panel=page.getByRole('region',{name:'Construction panel',exact:true});const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();

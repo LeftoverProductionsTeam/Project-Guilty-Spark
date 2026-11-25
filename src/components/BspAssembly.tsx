@@ -6,7 +6,7 @@ import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
 import { runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -541,6 +541,10 @@ export default function BspAssembly({
                 <button disabled={busy||!!draft.infantryTunnel} onClick={()=>{try{update(addInfantryTunnel(draft));setRouteView('infantry');}catch(error){setError(String(error));}}}>Add infantry tunnel</button>
                 <button disabled={busy||!!draft.highGround} onClick={()=>{try{update(addHighGroundRoute(draft));setRouteView('highGround');}catch(error){setError(String(error));}}}>Add high-ground route</button>
                 <button disabled={busy||!!draft.infantryTunnel&&!!draft.highGround&&draft.tunnelWidth>=6&&draft.tunnelHeight>=4} onClick={()=>{try{update(makeThreeRouteSeam(draft));setRouteView('primary');}catch(error){setError(String(error));}}}>Make three-route seam</button>
+                <button disabled={busy} onClick={()=>{try{update(addFlatLandBridge(draft));setRouteView('highGround');}catch(error){setError(String(error));}}}
+                  title="Shape a wide, level deck between the landings, with graded ramps and a separate lower tunnel.">
+                  {draft.highGround?'Shape ridge as flat land bridge':'Add flat land bridge & cave'}
+                </button>
                 {routeKey&&<button disabled={busy} onClick={()=>{update({[routeKey]:undefined});setRouteView('primary');}}>Remove {infantry?'infantry tunnel':'high-ground route'}</button>}
                 {selectedSection&&<button disabled={busy} onClick={()=>{update({sections:draft.sections!.filter(section=>section.id!==selectedSection.id)});setRouteView('primary');}}>Remove seam section</button>}
                 {!routeKey&&<label><input type="checkbox" aria-label="Open-sky road" checked={routeDraft!.openRoad??false} disabled={busy} onChange={e=>updateRoute({openRoad:e.target.checked,archSegments:undefined,...(e.target.checked?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}/> Open sky above road</label>}

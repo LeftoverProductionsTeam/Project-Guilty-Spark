@@ -150,6 +150,37 @@ export function addHighGroundRoute(plan:BspAssembly,offset=-12):BspAssembly {
   if(points.flat().some(n=>!Number.isFinite(n)||Math.abs(n)>2048))throw Error('The ridge exceeds the supported world bounds.');
   return {...plan,highGround:{points,width:4,height:8,shaderPath:plan.terrainSeam?.baseShaderPath??plan.tunnelShaderPath}};
 }
+/** A level deck with graded approaches, using the existing native ridge route. */
+export function addFlatLandBridge(plan:BspAssembly):BspAssembly {
+  if(plan.separateNativeBsps)throw Error('Use a joined BSP draft to author a land bridge.');
+  const landings=plan.highGround?.points??plan.tunnelPoints;
+  const start=landings[0],end=landings.at(-1)!;
+  const dx=end[0]-start[0],dy=end[1]-start[1],length=Math.hypot(dx,dy);
+  if(!Number.isFinite(length)||length<16)throw Error('Pick supported bridge landings at least 16 world units apart.');
+
+  const width=Math.max(6,plan.highGround?.width??0);
+  const offset=-Math.max(12,(plan.tunnelWidth+width)/2+1);
+  const at=(t:number):Vec3=>[start[0]+dx*t-dy/length*offset,start[1]+dy*t+dx/length*offset,0];
+  const approach=at(.2),deckStart=at(.4),deckEnd=at(.6),departure=at(.8);
+  const distance=(a:Vec3,b:Vec3)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
+  const startRun=distance(approach,deckStart);
+  const endRun=distance(deckEnd,departure);
+  const high=Math.max(start[2],end[2]);
+  const deckHeight=Math.min(high+3,start[2]+startRun*.25,end[2]+endRun*.25);
+  if(!Number.isFinite(deckHeight)||deckHeight<high+.5)throw Error('Choose closer landing elevations or leave more room for the approach ramps.');
+  approach[2]=start[2];
+  departure[2]=end[2];
+  deckStart[2]=deckEnd[2]=deckHeight;
+  const points:Vec3[]=[[...start],approach,deckStart,deckEnd,departure,[...end]];
+  if(points.flat().some(value=>!Number.isFinite(value)||Math.abs(value)>2048))throw Error('The land bridge exceeds the supported world bounds.');
+  const bridge={...plan,highGround:{
+    points,width,height:Math.max(8,plan.highGround?.height??0),
+    shaderPath:plan.highGround?.shaderPath??plan.terrainSeam?.baseShaderPath??plan.tunnelShaderPath,
+  }};
+  const joined=bridge.terrainSeam?fillTerrainToRidge(bridge):bridge;
+  return addInfantryTunnel(joined);
+}
+
 /** Size the real terrain ribbon to meet the ridge deck without changing either source BSP. */
 export function fillTerrainToRidge(plan:BspAssembly):BspAssembly {
   if(!plan.terrainSeam||!plan.highGround)throw Error('Plan adjacent terrain and a high-ground route first.');

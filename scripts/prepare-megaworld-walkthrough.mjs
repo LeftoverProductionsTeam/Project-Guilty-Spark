@@ -6,8 +6,10 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertQaOutputPath } from './native-qa-storage.mjs';
 const [toolPath, inputPath, outputPath, ...options] = process.argv.slice(2);
-if (!toolPath || !inputPath || !outputPath) throw Error('prepare-megaworld-walkthrough <Invader> <accepted-pair-cache-or-tags> <fresh-output> [native-dependency-tag-roots...] OR <Invader> <validated-job-or-handoff> <fresh-output> --drive <compiled.gsproject> [--banks <CE-maps-directory>]');
+if (!toolPath || !inputPath || !outputPath) throw Error('prepare-megaworld-walkthrough <Invader> <accepted-pair-cache-or-tags> <fresh-output> [native-dependency-tag-roots...] OR <Invader> <validated-job-or-handoff> <fresh-output> --drive <compiled.gsproject> [--banks <CE-maps-directory>] [--deck]');
 const driving = options[0] === '--drive';
+const deck = driving && options.at(-1) === '--deck';
+if (deck) options.pop();
 if (driving && !(options.length === 2 || (options.length === 4 && options[2] === '--banks'))) throw Error('--drive requires one compiled connection project.');
 const bankRoot = driving && options.length === 4 ? path.resolve(options[3]) : null;
 const toolFolder = path.resolve(toolPath);
@@ -88,15 +90,23 @@ async function readTrial() {
     if (recorded.dev !== actual.dev || recorded.ino !== actual.ino) throw Error('The validated native job path changed.');
     sourceTags = path.join(input,'tags');
   }
-  const points = plan?.tunnelPoints;
-  if (!plan?.terrainSeam || !plan.openRoad || !plan.highGround || plan.tunnelWidth < 6 ||
+  const points = deck ? plan?.highGround?.points?.slice(2,4) : plan?.tunnelPoints;
+  if (!plan?.highGround || (!deck && (!plan.terrainSeam || !plan.openRoad || plan.tunnelWidth < 6)) ||
       plan.tunnelWidth !== routes.routeClearance[0][0].width || !Array.isArray(points) || points.length !== 2 ||
       points.some(point => !Array.isArray(point) || point.length !== 3 || point.some(value => !Number.isFinite(value)))) {
     throw Error('The Warthog trial requires a reviewed straight primary road at least six units wide and an authored ridge.');
   }
   const [start,end] = points;
   const length = Math.hypot(end[0]-start[0],end[1]-start[1]);
-  if (length < 28 || length > 128 || Math.abs(start[2]-end[2]) > 0.1) {
+  if (deck) {
+    const ridge = plan.highGround;
+    const checked = routes.routeClearance[0].find(route => route.label === 'High-ground route');
+    if (ridge.points.length !== 6 || ridge.width < 6 || checked?.width !== ridge.width ||
+        length < 6 || length > 128 || start[2] !== end[2] ||
+        start[2] <= Math.max(ridge.points[1][2],ridge.points[4][2])) {
+      throw Error('Select a checked six-unit land bridge with a level deck at least six units long.');
+    }
+  } else if (length < 28 || length > 128 || Math.abs(start[2]-end[2]) > 0.1) {
     throw Error('The Warthog trial needs a level road with room for opposing start areas.');
   }
   const direction = [(end[0]-start[0])/length,(end[1]-start[1])/length];
@@ -108,7 +118,8 @@ async function readTrial() {
   if (!/^levels\/spark\/assembly_[0-9a-f]+\/connected\.scenario_structure_bsp$/.test(structure)) throw Error('Validated source has no safe connected BSP path.');
   report.sourceCache = {path:cache,sha256:build.sha256};
   report.sourceTags = sourceTags;
-  report.mode = 'warthog';
+  report.mode = deck ? 'land-bridge-warthog' : 'warthog';
+  if (deck) report.deck = {start,end,width:plan.highGround.width};
   report.routes = reviewedRoutes;
   return {pose,yaw,length};
 }
@@ -134,8 +145,9 @@ async function planVehicles(trial) {
   }).filter(row => row.type === warthog && row.position.length === 3 && row.position.every(Number.isFinite) &&
     ['0','1'].includes(row.metadata[0]) &&
     row.metadata[1] === '1' && row.metadata[2] === '1');
-  const targets = [{side:'Timberland',position:trial.pose(3.5,-1.6),yaw:trial.yaw},
-    {side:'Sidewinder',position:trial.pose(trial.length-3.5,1.6),yaw:trial.yaw+Math.PI}];
+  const inset = deck ? 1.1 : 3.5;
+  const targets = [{side:'Timberland',position:trial.pose(inset,-1.6),yaw:trial.yaw},
+    {side:'Sidewinder',position:trial.pose(trial.length-inset,1.6),yaw:trial.yaw+Math.PI}];
   if (!['0','1'].every(team => placements.some(row => row.metadata[0] === team))) {
     throw Error('Both teams need original Warthogs enabled in native Slayer and CTF defaults.');
   }
@@ -182,12 +194,13 @@ try {
     // A small centerline spread avoids forcing every respawn onto one point.
     const row = Math.floor(index/2);
     const side = index % 2;
-    const depth = 5.5+(row % 9)*0.7;
+    const depth = deck ? 1.1+(row % 9)*0.03 : 5.5+(row % 9)*0.7;
     // Opposing starts use separate lanes so two players can test the crossing simultaneously.
-    const lane = (side ? 0.95 : -0.95) + (Math.floor(row/9)-1.5)*0.35;
+    const lane = deck ? (side ? 0.65 : -0.65) + (Math.floor(row/9)-1.5)*0.05
+      : (side ? 0.95 : -0.95) + (Math.floor(row/9)-1.5)*0.35;
     const position = trial ? trial.pose(side ? trial.length-depth : depth, lane)
       : [40.811767578125 + (index % 16)*0.8,34.44912338256836 + Math.floor(index/16)*0.2-0.4,-20.875042829581236];
-    const facing = trial ? trial.yaw+(side ? 0 : Math.PI) : 0;
+    const facing = deck ? trial.yaw+(side ? Math.PI/2 : -Math.PI/2) : trial ? trial.yaw+(side ? 0 : Math.PI) : 0;
     starts.push({position,facing});
     args.push('-S',`player_starting_locations[${index}].position`,position.join(','),'-S',`player_starting_locations[${index}].facing`,String(facing));
   }
@@ -264,7 +277,9 @@ try {
     if (await hash(bank) !== sha256) throw Error('A source resource bank changed during walkthrough preparation.');
   }
   report.nativeCompiled = true; report.complete = true; report.startsVerified = count;
-  report.guidance = trial
+  report.guidance = deck
+    ? 'Board the Warthog beside the flat deck. Drive along the deck and down the far ramp to check deck and approach collision.'
+    : trial
     ? 'Start beside a Warthog at one end of the road. Drive across, turn around and drive back. Check road approaches, vehicle clearance and collision in both directions.'
     : 'You start inside the metal tunnel facing snowy Sidewinder. Walk forward until you enter Sidewinder, turn around and walk the entire tunnel into Timberland, then return. Check both mouths, floor and head clearance.';
 } catch(error) {report.error=String(error);process.exitCode=1;}
