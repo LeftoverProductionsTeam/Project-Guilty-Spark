@@ -10,16 +10,17 @@
 }
 .bsp-assembly > summary {
   cursor: pointer;
-  padding: 10px 14px;
+  padding: 7px 8px;
   font-size: 12px;
   font-weight: 700;
 }
 .bsp-assembly-body {
-  padding: 0 14px 12px;
+  padding: 0 8px 8px;
+  min-inline-size: 0;
 }
 .bsp-assembly-body p {
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.4;
   max-width: 110ch;
 }
 .bsp-actions,
@@ -27,11 +28,11 @@
 .bsp-vector {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .bsp-actions {
-  margin: 10px 0;
+  margin: 6px 0;
 }
 .bsp-actions label,
 .bsp-settings > label {
@@ -41,7 +42,7 @@
 }
 .bsp-settings > label {
   flex: 1;
-  min-width: 150px;
+  min-inline-size: min(116px, 100%);
 }
 .bsp-vector > span {
   min-width: 110px;
@@ -83,7 +84,7 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px 18px;
-  margin-top: 14px;
+  margin-top: 8px;
   color: var(--text);
 }
 .bsp-draft-heading span {
@@ -105,7 +106,7 @@
 .bsp-workflow li {
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 5px 10px;
+  padding: 2px 6px;
 }
 .bsp-workflow li[data-done='true'] {
   border-color: var(--accent);
@@ -128,7 +129,7 @@
 .gs-page-body .bsp-assembly {max-height:none;overflow:visible;}
 
 .bsp-edge-controls{margin:8px 0;padding:6px 8px;border:1px solid var(--line);border-radius:4px;min-width:0;}
-.bsp-edge-controls legend{font-size:11px;font-weight:700;}
+.bsp-edge-controls summary,.bsp-help summary{cursor:pointer;font-size:11px;font-weight:700;}
 .bsp-edge-controls p{margin:2px 0;font-size:11px;line-height:1.4;}
 .bsp-edge-controls .bsp-actions{gap:4px;margin:2px 0;}
 .bsp-seam-sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin:8px 0;}
@@ -136,3 +137,8 @@
 .bsp-seam-sliders input{grid-column:1/-1;min-width:0;width:100%;padding:0;}
 .bsp-seam-sliders span{grid-column:1/-1;font-size:11px;line-height:1.4;color:var(--muted);}
 .bsp-section-name{display:flex;gap:6px;align-items:center;font-size:11px;}
+
+.bsp-assembly :is(label, select, input, textarea) { min-inline-size: 0; max-inline-size: 100%; }
+.bsp-build-actions { margin-block: 6px 9px; }
+.bsp-help { margin-block: 5px; color: var(--muted); }
+.bsp-help p { margin-block: 4px; }

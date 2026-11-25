@@ -276,6 +276,7 @@
 .gs-panel-content {
   flex: 1;
   min-height: 0;
+  min-inline-size: 0;
   overflow: clip;
   display:flex;flex-direction:column;
   padding: 8px;
@@ -845,3 +846,10 @@ html[data-gs-reduced-motion='true'] .gs-workspace-content{transition:none;}
 
 /* Docked surfaces share the actual available rectangle, including short windows. */
 .gs-workspace-panel:not([data-dock='float']){min-width:0;min-height:0;}
+
+/* Drawer content shares the available width, including detached and side docks. */
+.gs-panel-content .gs-page-body,
+.gs-panel-content .gs-page-body > * { min-inline-size: 0; }
+.gs-panel-content .gs-page-body :is(input:not([type=range]), select, textarea, button) {
+  max-inline-size: 100%;
+}

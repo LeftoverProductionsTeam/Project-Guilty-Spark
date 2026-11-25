@@ -395,11 +395,11 @@ export default function BspAssembly({
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
           {(!nativePartitioned || canExtend) && <>
-          {canExtend ? <p>Connect a Custom Edition region to a compiled MCC world. Keep the entrance on an existing walkable floor. Build with MCC13 to keep the existing BSP slots and switches.</p> : <p>
-            Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one native world
-            with collision and new lightmaps. Your original maps stay preserved. Campaign actors and scripts
-            are separate.
-          </p>}
+          <details className="bsp-help">
+            <summary>Connection help</summary>
+            {canExtend ? <p>Use a walkable entrance and build for MCC13 to keep existing BSP slots and switches.</p>
+              : <p>Choose terrain or a tunnel between two original BSPs. Rebuilding creates collision and new lightmaps. Campaign actors and scripts use their own transfer tools.</p>}
+          </details>
           {!native && <p>Open the desktop app to inspect and compile owned Halo geometry.</p>}
           {Boolean(project.inheritedBspConnections?.length) && (
             <p className="subtle">
@@ -503,19 +503,6 @@ export default function BspAssembly({
                   world units · {routeDraft!.tunnelPoints.length - 2} bends
                 </span>
               </div>
-              {!draft.separateNativeBsps && <fieldset className="bsp-edge-controls"><legend>Edge-to-edge seam sections</legend>
-                <div className="bsp-actions">
-                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='base'} onClick={()=>armEdge('base')}>Pick edge in this BSP</button>
-                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='donor'} onClick={()=>armEdge('donor')}>Pick edge in donor BSP</button>
-                  <button disabled={busy||!native||!applied||!edgePicks.base||!edgePicks.donor||(draft.sections?.length??0)>=8} onClick={()=>void perform(async current=>{
-                    const signature=assemblySignature(draft);await onSave();if(!current()||latest.current.signature!==signature)return;
-                    const next=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,edges:[edgePicks.base,edgePicks.donor]});
-                    if(current()&&latest.current.signature===signature){update(next);setRouteView(`section:${next.sections!.at(-1)!.id}`);setEdgePicks({});}
-                  })}>Add seam section from edges</button>
-                  {edgeTarget&&<button onClick={()=>setEdgeTarget(null)}>Cancel edge selection</button>}
-                </div>
-                <p role="status">{edgeTarget?`Click an edge on ${edgeTarget==='base'?'this region, then an edge on the donor':'the donor region'}.`:`Edges: ${edgePicks.base?'this BSP selected':'pick this BSP'} · ${edgePicks.donor?'donor selected':'pick donor'}.`} Apply the donor first. Each section keeps its own width, path and roof; original architecture stays intact outside the cut.</p>
-              </fieldset>}
               <details>
                 <summary>Native boundary seals{draft.nativeSeals?.length ? ' · ' + draft.nativeSeals.length : ''}</summary>
                 <p>Enter the ordered vertices of the donor opening in world units. Divide raw WRL coordinates by 100. A nonzero apex offset raises or lowers the center of a triangular seal. Apply the connection and preview the donor BSP before building.</p>
@@ -570,8 +557,21 @@ export default function BspAssembly({
                 }catch(error){setError(String(error));}}}>Fill terrain to ridge</button>}
                 <small>A six-unit ridge also checks both sides of the deck for missing collision floor. Drive the compiled route to verify handling.</small>
               </div>}
-              <p className="subtle">{ridge?'Open ridge with access ramps. Pick canyon-top floors on both source BSPs and use intermediate points for gradual ramps and overlooks. Source checks must pass before compiling.':infantry?'Separate player cave. Keep both entrances on the original ground.':'Widen the primary passage for a Warthog cave or choose open sky for a canyon road.'} All routes rebuild together. Vehicle handling, continuous mountain access and sniper sightlines require a Halo playtest.</p>
+              <p className="subtle">{ridge?'Pick both canyon-top floors, then use bends to shape ramps and overlooks.':infantry?'Keep both cave entrances on the original ground.':'Choose an enclosed passage or an open canyon road.'}</p>
               </>}
+              {!draft.separateNativeBsps && <details className="bsp-edge-controls"><summary>Edge stitching{draft.sections?.length ? ` · ${draft.sections.length}` : ""}</summary>
+                <div className="bsp-actions">
+                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='base'} onClick={()=>armEdge('base')}>Pick edge in this BSP</button>
+                  <button disabled={busy||!applied} aria-pressed={edgeTarget==='donor'} onClick={()=>armEdge('donor')}>Pick edge in donor BSP</button>
+                  <button disabled={busy||!native||!applied||!edgePicks.base||!edgePicks.donor||(draft.sections?.length??0)>=8} onClick={()=>void perform(async current=>{
+                    const signature=assemblySignature(draft);await onSave();if(!current()||latest.current.signature!==signature)return;
+                    const next=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,edges:[edgePicks.base,edgePicks.donor]});
+                    if(current()&&latest.current.signature===signature){update(next);setRouteView(`section:${next.sections!.at(-1)!.id}`);setEdgePicks({});}
+                  })}>Add seam section from edges</button>
+                  {edgeTarget&&<button onClick={()=>setEdgeTarget(null)}>Cancel edge selection</button>}
+                </div>
+                <p role="status">{edgeTarget?`Click an edge on ${edgeTarget==='base'?'this region, then an edge on the donor':'the donor region'}.`:`Edges: ${edgePicks.base?'this BSP selected':'pick this BSP'} · ${edgePicks.donor?'donor selected':'pick donor'}.`} Apply the connection before picking edges.</p>
+              </details>}
               {pickedSurface&&project.source?.sha256===pickedSurface.sourceHash&&pickedSurface.bspIndex===(draft.baseBspIndex??0)&&<button disabled={busy} onClick={()=>updateRoute({tunnelPoints:routeDraft!.tunnelPoints.map((p,i)=>i===0?[...pickedSurface.point]:p)})}>Use selected landscape for entrance</button>}
               {!selectionMatches && (
                 <div className="bsp-selection-warning" role="status">
@@ -610,6 +610,49 @@ export default function BspAssembly({
                 {routeDraft!.archSegments&&<label>Arch facets <output>{routeDraft!.archSegments}</output><input type="range" aria-label="Seam arch facets" min={2} max={12} step={1} value={routeDraft!.archSegments} onChange={e=>updateRoute({archSegments:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>}
                 <button disabled={busy||!native||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
                 <span>Release a slider or adjust it with the arrow, Home/End or Page Up/Down keys to rebuild the exact preview and triangle count. Apply keeps it as one undoable source edit; native compilation is still required.</span>
+              </div>
+              <div className="bsp-actions bsp-build-actions" aria-label="Connection actions">
+                <button
+                  disabled={busy || applied || !selectionMatches}
+                  onClick={() =>
+                    onEdit({ ...project, bspAssembly: draft }, draft.terrainSeam?'Join adjacent native terrain':'Connect imported BSP with a tunnel')
+                  }
+                >
+                  Apply connection
+                </button>
+                <button
+                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
+                  onClick={() =>
+                    void perform(async (current) => {
+                      const request = { projectId: project.id, signature: assemblySignature(draft) };
+                      await onSave();
+                      const matches = () =>
+                        current() &&
+                        latest.current.projectId === request.projectId &&
+                        latest.current.signature === request.signature;
+                      if (!matches()) return;
+                      const checked = await call<AssemblyReport>('preview_bsp_assembly', {
+                        projectId: project.id, includeGeometry:true,
+                        nativeBspIndex: draft.separateNativeBsps ? nativeBspIndex : undefined,
+                      });
+                      if (matches()) {setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
+                    })
+                  }
+                >
+                  {draft.separateNativeBsps ? 'Preview native BSP & clearance' : 'Preview joined seam & clearance'}
+                </button>
+                <button
+                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
+                  onClick={() =>
+                    void perform(async (current) => {
+                      const signature = assemblySignature(draft);
+                      await onSave();
+                      if (current() && latest.current.signature === signature) onBuild();
+                    })
+                  }
+                >
+                  {draft.separateNativeBsps ? 'Open Build & playtest' : 'Build & playtest connection'}
+                </button>
               </div>
               <div className="bsp-settings">
                 {vector(
@@ -792,47 +835,6 @@ export default function BspAssembly({
                   }}
                 >
                   Add tunnel bend
-                </button>
-                <button
-                  disabled={busy || applied || !selectionMatches}
-                  onClick={() =>
-                    onEdit({ ...project, bspAssembly: draft }, draft.terrainSeam?'Join adjacent native terrain':'Connect imported BSP with a tunnel')
-                  }
-                >
-                  Apply connection
-                </button>
-                <button
-                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
-                  onClick={() =>
-                    void perform(async (current) => {
-                      const request = { projectId: project.id, signature: assemblySignature(draft) };
-                      await onSave();
-                      const matches = () =>
-                        current() &&
-                        latest.current.projectId === request.projectId &&
-                        latest.current.signature === request.signature;
-                      if (!matches()) return;
-                      const checked = await call<AssemblyReport>('preview_bsp_assembly', {
-                        projectId: project.id, includeGeometry:true,
-                        nativeBspIndex: draft.separateNativeBsps ? nativeBspIndex : undefined,
-                      });
-                      if (matches()) {setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
-                    })
-                  }
-                >
-                  {draft.separateNativeBsps ? 'Preview native BSP & clearance' : 'Preview joined seam & clearance'}
-                </button>
-                <button
-                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
-                  onClick={() =>
-                    void perform(async (current) => {
-                      const signature = assemblySignature(draft);
-                      await onSave();
-                      if (current() && latest.current.signature === signature) onBuild();
-                    })
-                  }
-                >
-                  {draft.separateNativeBsps ? 'Open Build & playtest' : 'Build & playtest connection'}
                 </button>
                 <button
                   disabled={busy || !project.bspAssembly}

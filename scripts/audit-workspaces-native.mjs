@@ -13,6 +13,7 @@ const [application, destination, ownedMap] = process.argv.slice(2);
 const profileBsp = process.argv.includes('--profile-bsp');
 const only=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7).split(',');
 const strict=process.argv.includes('--strict');
+const productionSizes=process.argv.includes('--production-sizes');
 if (!application || !destination || !ownedMap) throw Error('audit-workspaces-native <Spark.exe> <fresh-output> <owned-map>');
 const root = path.resolve(destination), expect = assertion.configure({ timeout: 90000 });
 await fs.mkdir(await assertQaOutputPath(root));
@@ -21,7 +22,7 @@ await fs.copyFile(path.resolve(application), exe, fs.constants.COPYFILE_EXCL);
 const digest = async file => crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const sourceHash = await digest(ownedMap);
 const report = { schemaVersion: 1, appSha256: await digest(exe), mockedIpc: false,
-  originalMapSha256: sourceHash, monitorTransferTested: false, dpiEmulated: true,
+  originalMapSha256: sourceHash, monitorTransferTested: false, dpiEmulated: !productionSizes,
   complete: false, routes: [], errors: [] };
 const socket = net.createServer();
 await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
@@ -132,11 +133,22 @@ try {
     const entry = { workspace:route, nativeWindow: true, sizes: [], subviews: [] };
     report.routes.push(entry);
     const cdp = await page.context().newCDPSession(page);
-    for (const size of [{width:800,height:600,dpr:1},{width:1280,height:720,dpr:1},{width:1920,height:1080,dpr:1},{width:1280,height:720,dpr:2}]) {
-      await invoke(page, 'plugin:window|set_size', {label,value:{Logical:{width:size.width,height:size.height}}});
-      const actual = await invoke(page, 'plugin:window|inner_size', {label});
-      await cdp.send('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,deviceScaleFactor:size.dpr,mobile:false});
+    const sizes = productionSizes
+      ? [{width:1920,height:1080},{width:2560,height:1440},{width:3840,height:2160}]
+      : [{width:800,height:600,dpr:1},{width:1280,height:720,dpr:1},{width:1920,height:1080,dpr:1},{width:1280,height:720,dpr:2}];
+    for (const size of sizes) {
+      await cdp.send('Emulation.clearDeviceMetricsOverride');
+      const requested = {width:size.width,height:size.height};
+      await invoke(page, 'plugin:window|set_size', {label,value:{[productionSizes?'Physical':'Logical']:requested}});
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const actual = await invoke(page, 'plugin:window|inner_size', {label});
+      const nativeViewport = await page.evaluate(() => ({width:innerWidth,height:innerHeight,dpr:devicePixelRatio}));
+      const nativeSizeMatched = productionSizes && actual.width === requested.width && actual.height === requested.height;
+      if (!nativeSizeMatched) {
+        report.dpiEmulated=true;
+        await cdp.send('Emulation.setDeviceMetricsOverride',{...requested,deviceScaleFactor:size.dpr??1,mobile:false});
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      }
       const result = await layout(page);
       if (result.routedToMore.length) {
         await page.getByLabel('More workspace drawers',{exact:true}).click();
@@ -144,8 +156,11 @@ try {
         for (const name of result.routedToMore) await expect(menu.getByRole('menuitemcheckbox',{name,exact:true})).toBeVisible();
         await page.getByLabel('More workspace drawers',{exact:true}).click();
       }
-      entry.sizes.push({...result,requested:size,nativeSize:actual});
-      if (size.width === 800 || size.width === 1920) await page.screenshot({path:path.join(root,`${route}-${size.width}.png`)});
+      entry.sizes.push({...result,requested:size,nativeSize:actual,nativeViewport,nativeSizeMatched,emulated:!nativeSizeMatched});
+      if (productionSizes && ['world','tags','scenario','creator','quickforge-arena','firefight','machinima','runtimes'].includes(route))
+        await page.screenshot({path:path.join(root,`${route}-${size.width}.jpg`),quality:70});
+      if (!productionSizes && (size.width === 800 || size.width === 1920))
+        await page.screenshot({path:path.join(root,`${route}-${size.width}.png`)});
     }
     await cdp.send('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:1,mobile:false});
     // Exercise visible subview tabs, without map tabs or destructive actions.
@@ -194,8 +209,8 @@ try {
   }
   report.originalMapUnchanged = await digest(ownedMap) === sourceHash;
   if(strict)for(const entry of report.routes)for(const view of [...entry.sizes,...entry.subviews])
-    if(view.pageOverflow||view.clippedControls.length||view.headerOverlaps.length)
-      throw Error(`Unreachable/overlapping controls in ${entry.workspace}, ${view.name??view.viewport.width}`);
+    if(view.pageOverflow||view.clippedControls.length||view.headerOverlaps.length||(productionSizes&&view.requested&&!view.nativeSizeMatched))
+      throw Error(`Layout or native size mismatch in ${entry.workspace}, ${view.name??view.viewport.width}`);
   expect(report.originalMapUnchanged).toBe(true);
   expect(report.errors).toEqual([]);
   report.complete = true;

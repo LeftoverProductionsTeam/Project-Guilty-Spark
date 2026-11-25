@@ -3892,6 +3892,7 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
  const appliedSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(appliedSection.archSegments).toBe(7);expect(appliedSection.height).toBe(2.9);
  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4);
  const restoredSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(restoredSection.archSegments).toBe(6);expect(restoredSection.height).toBe(3);
+ const stitching=panel.locator('.bsp-edge-controls > summary');await revealPagedControl(stitching);await stitching.click();
  await (await constructionControl(page,'button','Pick edge in this BSP')).click();await expect(page.getByRole('button',{name:'Cancel edge selection',exact:true}).first()).toBeVisible();
 });
 
