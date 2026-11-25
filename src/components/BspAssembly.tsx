@@ -15,15 +15,19 @@ import MegaworldAtlas from './MegaworldAtlas';
 import MapSourceDrop from './MapSourceDrop';
 import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
+import { volumeCenter } from '../nativeTriggerVolume';
+import type { NativeVolumeGeometry } from '../nativeOperations';
 interface NativeBspTransitions {
   cacheSha256: string;
   bspCount: number;
   bspTagPaths?: string[];
-  transitions: {triggerIndex: number; triggerName: string; sourceBsp: number; destinationBsp: number}[];
+  transitions: {triggerIndex: number; triggerName: string; sourceBsp: number; destinationBsp: number; arrivalMarker?: number; geometry?: NativeVolumeGeometry}[];
 }
 
-function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string; sourceSha256: string}) {
+function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBsp}: {projectId: string; sourceSha256: string; partCount: number; onViewBsp: (slot:number) => void}) {
   const [report, setReport] = useState<NativeBspTransitions | null>(null);
+  const [sourceFilter, setSourceFilter] = useState(-1);
+  const transitions = report?.transitions.filter(row => sourceFilter < 0 || row.sourceBsp === sourceFilter) ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function inspectTransitions() {
@@ -45,8 +49,22 @@ function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string
     {report && <details open>
       <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
       {!!report.bspTagPaths?.length && <ol start={0} aria-label="Native structure tags">{report.bspTagPaths.map((path, index) => <li key={index}><code className="path-text" title={path}>{path}</code></li>)}</ol>}
-      {report.transitions.length > 0 ? <ul>{report.transitions.map((row, index) => <li key={index}>BSP {row.sourceBsp} → BSP {row.destinationBsp} · {row.triggerName || "Unnamed volume"} (volume {row.triggerIndex})</li>)}</ul>
-        : <p>This scenario has no compiled trigger-volume switches.</p>}
+      {report.transitions.length > 0 && <label>Filter switches by source BSP
+        <select value={sourceFilter} onChange={event => setSourceFilter(Number(event.target.value))}>
+          <option value={-1}>All source BSPs</option>
+          {Array.from({length:report.bspCount},(_,slot)=><option key={slot} value={slot}>BSP {slot}</option>)}
+        </select>
+      </label>}
+      {transitions.length > 0 ? <ul aria-label="Compiled BSP switches">{transitions.map((row, index) => <li key={index}>
+        <strong>BSP {row.sourceBsp} → BSP {row.destinationBsp} · {row.triggerName || "Unnamed volume"}</strong>
+        <div>Volume {row.triggerIndex}{row.arrivalMarker !== undefined && ' · Arrival marker '+row.arrivalMarker}</div>
+        {row.geometry ? <p>Center {volumeCenter(row.geometry).map(value=>value.toFixed(2)).join(' / ')} · Size {row.geometry.dimensions.map(value=>value.toFixed(2)).join(' × ')}</p>
+          : <p>Oriented volume geometry unavailable.</p>}
+        <div className="button-row">
+          <button type="button" disabled={row.sourceBsp>=partCount} onClick={()=>onViewBsp(row.sourceBsp)}>View source BSP {row.sourceBsp}</button>
+          <button type="button" disabled={row.destinationBsp>=partCount} onClick={()=>onViewBsp(row.destinationBsp)}>View destination BSP {row.destinationBsp}</button>
+        </div>
+      </li>)}</ul> : <p>{report.transitions.length ? 'No switches from this source BSP.' : 'This scenario has no compiled trigger-volume switches.'}</p>}
     </details>}
   </section>;
 }
@@ -362,7 +380,7 @@ export default function BspAssembly({
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
-          {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!}/>}
+          {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
           {(!nativePartitioned || canExtend) && <>
           {canExtend ? <p>Connect a Custom Edition region to a compiled MCC world. Keep the entrance on an existing walkable floor. Build with MCC13 to keep the existing BSP slots and switches.</p> : <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one native world

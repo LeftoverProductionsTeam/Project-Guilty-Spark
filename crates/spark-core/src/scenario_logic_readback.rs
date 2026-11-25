@@ -369,7 +369,7 @@ fn parse_recordings(r: &Reader, space: &Space, scenario: usize) -> Result<Vec<Na
 #[serde(rename_all="camelCase")]
 pub struct NativeScriptGlobal {pub name:String,pub value_type:u16}
 pub fn scenario_global_readback(path:&Path,map:&MapInspection)->Result<Vec<NativeScriptGlobal>>{with_scenario(path,map,|r,space,sc|{let(at,count)=space.block(r,sc+0x4a8,92,4096)?;(0..count).map(|index|{let p=at+index*92;Ok(NativeScriptGlobal{name:r.string(p,32)?,value_type:r.u16(p+32)?})}).collect()})}
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeBspTransition {
     pub trigger_index: usize,
@@ -378,6 +378,8 @@ pub struct NativeBspTransition {
     pub destination_bsp: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arrival_marker: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<ScenarioLogicVolumeGeometry>,
 }
 
 #[derive(Debug, Serialize)]
@@ -441,9 +443,11 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
             if trigger_index >= trigger_count || source_bsp >= bsp_count || destination_bsp >= bsp_count {
                 return invalid(format!("Compiled BSP transition {index} points outside the native scenario arrays"));
             }
+            let trigger = trigger_start + trigger_index * 96;
             Ok(NativeBspTransition {
                 trigger_index,
-                trigger_name: reader.string(trigger_start + trigger_index * 96 + 4, 32)?,
+                trigger_name: reader.string(trigger + 4, 32)?,
+                geometry: oriented_volume_geometry(reader, trigger)?.filter(ScenarioLogicVolumeGeometry::valid),
                 source_bsp,
                 destination_bsp,
                 arrival_marker: match reader.u16(at + 6)? { u16::MAX => None, marker => Some(marker) },
@@ -453,6 +457,14 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
     })
 }
 
+fn oriented_volume_geometry(r: &Reader, at: usize) -> Result<Option<ScenarioLogicVolumeGeometry>> {
+    if r.u16(at)? != 1 { return Ok(None); }
+    Ok(Some(ScenarioLogicVolumeGeometry {
+        forward: vec3(r, at + 48)?, up: vec3(r, at + 60)?,
+        corner: vec3(r, at + 72)?, dimensions: vec3(r, at + 84)?,
+    }))
+}
+
 pub fn scenario_volume_readback(path:&Path,inspection:&MapInspection)->Result<Vec<ScenarioLogicVolume>> {with_scenario(path,inspection,parse_volumes)}
 fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolume>> {
     let (at,count)=space.block(r,at+0x360,96,4096)?;let mut volumes=vec![];
@@ -460,7 +472,7 @@ fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolum
         if kind>1{return invalid("Compiled native trigger volume has an unsupported representation");}
         // Axis-aligned volumes use another union member. Never interpret their
         // unused basis bytes as an oriented box or manufacture zero telemetry.
-        let geometry=if kind==1{Some(ScenarioLogicVolumeGeometry{forward:vec3(r,p+48)?,up:vec3(r,p+60)?,corner:vec3(r,p+72)?,dimensions:vec3(r,p+84)?})}else{None};
+        let geometry=oriented_volume_geometry(r,p)?;
         volumes.push(ScenarioLogicVolume{name:r.string(p+4,32)?,kind,geometry});
     }
     Ok(volumes)

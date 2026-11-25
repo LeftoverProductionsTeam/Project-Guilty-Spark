@@ -339,6 +339,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'For an imported map, open Connect another map’s BSP; plan with a donor, apply the draft, then check source clearance.',
       'Rotate around tunnel entrance keeps the tunnel mouth fixed; Return to current draft and Reset draft preserve a clear editing path.',
       'Drop one .map file onto the viewport to open Construction and select the donor. On a compiled MCC13 world you can extend, choose Visible BSP before dropping to connect from that region. Use Browse for donor map to keep the Construction selection.',
+      'In a compiled multi-BSP map, open Construction → Native BSP transitions → Inspect native BSP transitions. Filter by source BSP, read each compiled switch volume and choose either region to inspect in the viewport.',
       'Enable Include donor source scenery for a single-BSP donor when you want its scenery retained in the compiled world.',
       'Build with the matching Halo Tool and test the compiled collision in game.',
     ],

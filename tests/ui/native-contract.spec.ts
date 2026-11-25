@@ -7027,6 +7027,14 @@ test('creator intact BSP preview preserves both sources and reports only connect
     base.project.bspAssembly = { ...plan, separateNativeBsps: true };
     base.project.inheritedBspConnections = [base.project.bspAssembly];
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'inspect_native_bsp_transitions') return {
+        cacheSha256:base.inspection.sha256,bspCount:2,bspTagPaths:['levels/base','levels/other'],
+        transitions:[
+          {sourceBsp:0,destinationBsp:1,triggerIndex:2,triggerName:'bsp0,1',arrivalMarker:0,
+            geometry:{forward:[1,0,0],up:[0,0,1],corner:[1,2,3],dimensions:[2,4,6]}},
+          {sourceBsp:1,destinationBsp:0,triggerIndex:3,triggerName:'bsp1,0'},
+        ],
+      };
       if (command !== 'preview_bsp_assembly' || !args.intactConnector) return original(command, args);
       w.__intactPreviewArgs = args;
       return {
@@ -7043,6 +7051,18 @@ test('creator intact BSP preview preserves both sources and reports only connect
   const assembly = page.locator('.bsp-assembly:visible');
   await revealPagedControl(assembly.locator('summary').first());
   await assembly.locator('summary').first().click();
+  const inspect=assembly.getByRole('button',{name:'Inspect native BSP transitions',exact:true});
+  await revealPagedControl(inspect);await inspect.click();
+  const switches=assembly.getByRole('list',{name:'Compiled BSP switches',exact:true,includeHidden:true});
+  await expect(switches).toContainText('Center 2.00 / 4.00 / 6.00');
+  await expect(switches).toContainText('Arrival marker 0');
+  const filter=assembly.getByRole('combobox',{name:'Filter switches by source BSP',exact:true,includeHidden:true});
+  await revealPagedControl(filter);await filter.selectOption('0');
+  await expect(switches.getByRole('listitem',{includeHidden:true})).toHaveCount(1);
+  const destination=switches.getByRole('button',{name:'View destination BSP 1',exact:true,includeHidden:true});
+  await revealPagedControl(destination);await destination.click();
+  await expect(page.getByRole('combobox',{name:'Visible BSP',exact:true})).toHaveValue('1');
+  await expect(assembly.getByRole('combobox',{name:'Connect from BSP',exact:true,includeHidden:true})).toHaveValue('0');
   await (await constructionControl(page, 'button', 'Pick donor landing')).click();
   await expect(page.getByText('Click the landing floor on the donor region.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Cancel landing selection', exact: true }).click();

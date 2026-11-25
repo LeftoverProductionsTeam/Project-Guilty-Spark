@@ -2312,7 +2312,7 @@ mod tests {
         let old = partition_switch(1, 5, [0., 0., 0.], [1., 0., 0.], 2., 1.6);
         let fields = [maps::ScenarioLogicVolume { name: old.name.clone(), kind: 1, geometry: Some(old.geometry) }];
         let retained = [maps::NativeBspTransition { trigger_index: 0, trigger_name: old.name,
-            source_bsp: 1, destination_bsp: 5, arrival_marker: None }];
+            source_bsp: 1, destination_bsp: 5, arrival_marker: None, geometry: None }];
         let overlapping = partition_switch(1, 7, [0.2, 0.2, 0.], [DIAG, -DIAG, 0.], 2., 1.6);
         assert!(verify_intact_switch_spacing(&[overlapping], &retained, &fields).unwrap_err().to_string().contains("bsp1,5"));
         let independent = partition_switch(2, 7, [0.2, 0.2, 0.], [DIAG, -DIAG, 0.], 2., 1.6);

@@ -1,4 +1,25 @@
 use spark_core::{bsp_workshop, forge_session, native_logic as l, quickforge as q};
+
+#[test]
+#[ignore = "Requires the explicitly selected retained nineteen-region MCC13 cache; read-only"]
+fn retained_megaworld_switch_report_matches_native_volumes() {
+    use spark_core::maps;
+    let path = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_MEGAWORLD_CACHE").expect("Explicit cache required"));
+    let map = maps::inspect_map(&path, None).unwrap();
+    assert_eq!(map.sha256, "f0835f5e10aebf05e3db0696c60821ad669a3c0981c0d5dfba8e2fb5368876c6");
+    let report = maps::scenario_bsp_transitions(&path, &map).unwrap();
+    let volumes = maps::scenario_volume_readback(&path, &map).unwrap();
+    assert_eq!(report.bsp_count, 13);
+    assert_eq!(report.transitions.len(), 24);
+    for switch in report.transitions {
+        let volume = &volumes[switch.trigger_index];
+        assert_eq!(switch.trigger_name, volume.name);
+        assert!(switch.geometry.is_some());
+        assert_eq!(switch.geometry, volume.geometry);
+    }
+    assert_eq!(maps::hash_file(&path).unwrap(), map.sha256);
+}
+
 fn level() -> q::QuickForgeDocument {
     let mut d = bsp_workshop::example().unwrap();
     d.placements.push(q::ForgePlacement { hmv_physics:None, transport_signals:None, native_name: None,
