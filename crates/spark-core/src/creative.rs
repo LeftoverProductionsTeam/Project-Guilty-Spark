@@ -230,7 +230,7 @@ pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
 /// Authoring metadata does not replace source/geometry or compiled-cache checks.
 fn mission_scope_last(missions:&[MissionBeat],index:usize)->bool{missions[index+1..].iter().all(|other|other.squad_number!=missions[index].squad_number)}
 fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
- if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|beat.squad_number.is_none()||g.target().is_none_or(|name|!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Personal guidance needs one native flag or object, finite height and Forerunner squad scope");}
+ if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.target().is_none_or(|name|!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Mission guidance needs one native flag or object and a finite height");}
  if missions.iter().any(|beat|beat.squad_number.is_some_and(|number|!(1..=22).contains(&number))){return invalid("Squad numbers must be 1 through 22");}
  if !missions.iter().any(|beat|beat.squad_number.is_some()){return Ok(());}
  if missions.iter().any(|beat|beat.checkpoint==Some(true)||beat.complete_mission==Some(true)){return invalid("Independent squad operations cannot save or end the shared world; use a separate shared campaign");}
@@ -313,6 +313,7 @@ pub fn recovered_mission_binding_for_module(project:&crate::project::Project,sou
     let binding=NativeMissionBinding {schema_version:1,missions:config.missions,activation:config.activation,
         source_sha256:crate::studio_native::digest(body.as_bytes()),cinematic:if scenes{Some(config.shots.clone())}else{None},cinematic_intro:if scenes{Some(false)}else{None}};
     validate_working_mission(project,&binding)?;
+    if !config.forerunner&&binding.missions.iter().any(|beat|beat.guidance.is_some()){return invalid("Native objective waypoints require Forerunner mission export");}
     if project.studio.as_ref().is_none_or(|studio|studio.shots!=config.shots){return invalid("Recovered mission camera references changed; prepare again");}
     for (index,beat) in binding.missions.iter().enumerate() {
         if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||!mission_scope_last(&binding.missions,index)||beat.trigger_ref.as_deref()!=Some("extraction_activate")||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
@@ -343,6 +344,7 @@ pub fn native_mission_binding(project:&crate::project::Project,doc:&crate::quick
         return invalid("Unsupported prepared mission binding or source hash");
     }
     validate_working_mission(project,&binding)?;
+    if binding.missions.iter().any(|beat|beat.guidance.is_some()){return invalid("Native objective waypoints require reviewed CE609 working tags. Prepare the mission against recovered source");}
     if binding.missions.iter().any(|beat|beat.transport_insertion.is_some()){return invalid("Dropship insertion needs the reviewed CE609 working-tag transport module; build/open the base map and use recovered source");}
     if binding.missions.iter().any(|beat|beat.squad_number.is_some()){return invalid("Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates; preserve mission data and use the recovered source workflow");}
     if !crate::studio_native::digest(body.as_bytes()).eq_ignore_ascii_case(&binding.source_sha256) {
@@ -494,17 +496,24 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
     if map.header.scenario_type!=0{return invalid("Compiled mission is not a native singleplayer scenario");}
     let mut expected=vec![("gs_mission".to_string(),1u16)];
     let scoped=binding.missions.iter().filter_map(|beat|beat.squad_number).collect::<std::collections::BTreeSet<_>>();
-    if !scoped.is_empty(){
-        if map.header.version!=609||map.header.extended{return invalid("Independent squad missions require standard CE609 Forerunner content");}
-        if binding.missions.iter().any(|beat|beat.squad_number.is_none()){expected.push(("gs_shared_mission".into(),1));}
-        let markers=crate::maps::scenario_logic_readback(cache,map)?;
-        crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
+    if binding.missions.iter().any(|beat|beat.guidance.is_some()){
+        if map.header.version!=609||map.header.extended{return invalid("Native objective waypoints require standard Forerunner CE609 output");}
         let flags=crate::maps::scenario_flag_readback(cache,map)?;
         let objects=if binding.missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.object.is_some())){crate::maps::scenario_named_object_readback(cache,map)?}else{vec![]};
         for guide in binding.missions.iter().filter_map(|beat|beat.guidance.as_ref()){
             if let Some(name)=&guide.flag{if flags.iter().filter(|flag|flag.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled objective waypoint flag is missing or ambiguous");}}
             if let Some(name)=&guide.object{if objects.iter().filter(|object|object.name.eq_ignore_ascii_case(name)).count()!=1{return invalid("Compiled objective waypoint object is missing or ambiguous");}}
         }
+        if binding.missions.iter().any(|beat|beat.squad_number.is_none()&&beat.guidance.is_some()){
+            expected.extend(["hide","show","update"].map(|name|(format!("gs_nav_{name}"),3)));
+            expected.push(("gs_guard".into(),2));
+        }
+    }
+    if !scoped.is_empty(){
+        if map.header.version!=609||map.header.extended{return invalid("Independent squad missions require standard CE609 Forerunner content");}
+        if binding.missions.iter().any(|beat|beat.squad_number.is_none()){expected.push(("gs_shared_mission".into(),1));}
+        let markers=crate::maps::scenario_logic_readback(cache,map)?;
+        crate::native_logic::validate_compiled_extraction_layout(map,&markers)?;
         for number in &scoped{
             expected.extend([(format!("gs_sq{number:02}_mission"),2),(format!("gs_sq{number:02}_guard"),2),(format!("forerunner_squad_{number:02}_players"),3)]);
             if binding.missions.iter().any(|beat|beat.squad_number==Some(*number)&&beat.guidance.is_some()){expected.extend(["hide","show","update"].map(|name|(format!("gs_sq{number:02}_nav_{name}"),3)));}
@@ -1128,6 +1137,22 @@ mod tests {
         project.studio=Some(studio);attach(&mut doc,&binding);assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("reviewed camera shots"));
         binding.cinematic=Some(project.studio.as_ref().unwrap().shots.clone());attach(&mut doc,&binding);native_mission_binding(&project,&doc).unwrap();
         project.studio.as_mut().unwrap().shots[0].fov=80.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
+    }
+
+    #[test]
+    fn recovered_shared_waypoint_requires_forerunner_and_preserves_binding() {
+        let mut project=crate::project::Project::new("Shared waypoint");
+        let mut studio=studio();
+        studio.missions=vec![serde_json::from_value(serde_json::json!({
+            "id":"deploy","title":"Deploy","objective":"Use the terminal","trigger":"deviceActivated",
+            "encounterName":"","triggerRef":"extraction_deploy","guidance":{"object":"extraction_deploy","height":0.35}
+        })).unwrap()];
+        project.studio=Some(studio);
+        let source=|forerunner|format!("{RECOVERED_MISSION_PREFIX}\n; configuration: {}\n; fixture",
+            serde_json::json!({"activation":"manual","forerunner":forerunner,"missions":project.studio.as_ref().unwrap().missions,"shots":[]}));
+        let binding=recovered_mission_binding(&project,&source(true)).unwrap().unwrap();
+        assert_eq!(binding.missions[0].guidance.as_ref().unwrap().target(),Some("extraction_deploy"));
+        assert!(recovered_mission_binding(&project,&source(false)).unwrap_err().to_string().contains("Forerunner"));
     }
 
     #[test]

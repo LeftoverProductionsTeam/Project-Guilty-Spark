@@ -5631,6 +5631,7 @@ test('recovered escort route survives history and reopening and refuses an out-o
   await page.evaluate(()=>{
    const m=(window as any).__sparkMock;
    m.projects.a.project.studio.missions=[{id:'rescue',title:'Rescue allies',objective:'Reach the rally',trigger:'escort',encounterName:'be_covenant',encounterTeam:'source',triggerRef:'be_survivors',minimumSurvivors:1,escortRequiresPlayer:true}];
+   m.guidanceFlags=[{index:0,name:'rescue_goal',position:[2,2,2],facing:[0,0]}];
    m.escortCommandLists=[{index:0,name:'rescue_rally',commands:2},{index:1,name:'ROUTE_DUP',commands:1},{index:2,name:'route_dup',commands:1},{index:3,name:'empty_route',commands:0}];
    m.escortRoutes=[{name:'rescue_rally',points:2,commands:2,finalPosition:[2,2,2],arrivalVolumes:['be_insert']}];
   });
@@ -5640,6 +5641,12 @@ test('recovered escort route survives history and reopening and refuses an out-o
  const readScenario=page.getByRole('button',{name:'Read native Black Echo source',exact:true});
  await revealPagedControl(readScenario);await readScenario.click();
  await expect(route.locator('option')).toHaveText(['Follow players','rescue_rally']);
+ const waypoint=page.locator('.studio-mission-record').first().locator('details').filter({has:page.locator('summary').filter({hasText:/^Objective waypoint/})});
+ const summary=waypoint.locator(':scope > summary');await revealPagedControl(summary);await summary.click();
+ const show=waypoint.getByRole('checkbox',{name:'Show objective waypoint 1',exact:true});
+ await show.check();
+ await expect(waypoint.getByRole('combobox',{name:'Mission waypoint flag 1',exact:true})).toHaveValue('rescue_goal');
+ await summary.click();
  await revealPagedControl(route);await route.selectOption('rescue_rally');
  await route.focus();await page.keyboard.press('Control+z');await expect(route).toHaveValue('');
  await page.keyboard.press('Control+y');await expect(route).toHaveValue('rescue_rally');
@@ -5647,6 +5654,7 @@ test('recovered escort route survives history and reopening and refuses an out-o
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions?.[0]?.escortRoute)).toBe('rescue_rally');
  await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Creator Studio');await openMissionBeats(page);
  await expect(route).toHaveValue('rescue_rally');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions?.[0]?.guidance?.flag)).toBe('rescue_goal');
  await openRecoveredMissionAction(page);
  const form=page.locator('.native-recovered-mission-source'),dialog=page.locator('.runtime-details-dialog:visible');
  const read=form.getByRole('button',{name:'Read native mission source',exact:true}),prepare=form.getByRole('button',{name:'Prepare recovered mission draft',exact:true});
@@ -5660,6 +5668,8 @@ test('recovered escort route survives history and reopening and refuses an out-o
  const content=await text.inputValue(),start=content.indexOf('(ai_command_list be_covenant rescue_rally)'),arrival=content.indexOf('(volume_test_objects_all be_survivors (ai_actors be_covenant))'),follow=content.indexOf('(ai_follow_target_players be_covenant)');
  expect(start).toBeLessThan(arrival);expect(arrival).toBeLessThan(follow);
  expect(content).toContain('(volume_test_objects be_survivors (players))');
+ expect(content).toContain('(activate_nav_point_flag default gs_nav_viewer rescue_goal 1)');
+ expect(content).toContain('(set gs_nav_members (players))');
  const save=editor.getByRole('button',{name:'Save project draft',exact:true});await revealPagedControl(save);await save.click();
  const review=editor.getByRole('checkbox',{name:'I reviewed this source and its native scenario references.',exact:true});await revealPagedControl(review);await review.check();
  const build=editor.getByRole('button',{name:'Attach source & compile',exact:true});await revealPagedControl(build);await expect(build).toBeEnabled();await build.click();

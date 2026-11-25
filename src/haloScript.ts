@@ -602,6 +602,7 @@ export async function attachNativeCampaignMission(project:Project,activation:'ma
   const missions=project.studio?.missions;
   if(!missions?.length)throw Error('Add mission beats before preparing native mission source.');
   if(missions.some(beat=>beat.squadNumber!=null))throw Error('Independent squads require reviewed CE609 working tags with numbered terminals/readiness gates. Build a base map, open its compiled source and use Prepare recovered mission source. The saved mission fields are preserved.');
+  if(missions.some(beat=>beat.guidance!=null))throw Error('Native objective waypoints require reviewed CE609 working tags. Build or open a base map and use Prepare recovered mission source.');
   if(missions.some(beat=>beat.transportInsertion!=null))throw Error('Dropship insertion requires reviewed CE609 working tags with the matching built transport module. Build/open a base map and use Prepare recovered mission source; the saved mission fields are preserved.');
   const soundErrors=missionSoundProblems(project);if(soundErrors.length)throw Error(soundErrors.join('\n'));
   const shots=project.studio?.shots??[];
