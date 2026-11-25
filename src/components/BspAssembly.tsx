@@ -6,8 +6,8 @@ import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
 import { runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
-import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
@@ -26,6 +26,8 @@ interface NativeBspTransitions {
 
 function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBsp}: {projectId: string; sourceSha256: string; partCount: number; onViewBsp: (slot:number) => void}) {
   const [report, setReport] = useState<NativeBspTransitions | null>(null);
+  const [, setPreview] = useMapState<NativeBspSwitchPreview | null>(projectId, NATIVE_BSP_SWITCH_PREVIEW, () => null);
+  function viewBsp(slot: number) { setPreview(null); onViewBsp(slot); }
   const [sourceFilter, setSourceFilter] = useState(-1);
   const transitions = report?.transitions.filter(row => sourceFilter < 0 || row.sourceBsp === sourceFilter) ?? [];
   const [busy, setBusy] = useState(false);
@@ -61,8 +63,13 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
         {row.geometry ? <p>Center {volumeCenter(row.geometry).map(value=>value.toFixed(2)).join(' / ')} · Size {row.geometry.dimensions.map(value=>value.toFixed(2)).join(' × ')}</p>
           : <p>Oriented volume geometry unavailable.</p>}
         <div className="button-row">
-          <button type="button" disabled={row.sourceBsp>=partCount} onClick={()=>onViewBsp(row.sourceBsp)}>View source BSP {row.sourceBsp}</button>
-          <button type="button" disabled={row.destinationBsp>=partCount} onClick={()=>onViewBsp(row.destinationBsp)}>View destination BSP {row.destinationBsp}</button>
+          <button type="button" disabled={row.sourceBsp>=partCount} onClick={()=>viewBsp(row.sourceBsp)}>View source BSP {row.sourceBsp}</button>
+          <button type="button" disabled={row.destinationBsp>=partCount} onClick={()=>viewBsp(row.destinationBsp)}>View destination BSP {row.destinationBsp}</button>
+          {row.geometry && <button type="button" disabled={row.sourceBsp>=partCount} onClick={()=>{
+            if (!row.geometry) return;
+            onViewBsp(row.sourceBsp);
+            setPreview({...row, geometry:row.geometry, cacheSha256:sourceSha256});
+          }}>Frame switch volume {row.triggerIndex}</button>}
         </div>
       </li>)}</ul> : <p>{report.transitions.length ? 'No switches from this source BSP.' : 'This scenario has no compiled trigger-volume switches.'}</p>}
     </details>}

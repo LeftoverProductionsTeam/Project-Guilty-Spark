@@ -7059,6 +7059,13 @@ test('creator intact BSP preview preserves both sources and reports only connect
   const filter=assembly.getByRole('combobox',{name:'Filter switches by source BSP',exact:true,includeHidden:true});
   await revealPagedControl(filter);await filter.selectOption('0');
   await expect(switches.getByRole('listitem',{includeHidden:true})).toHaveCount(1);
+  const frame=switches.getByRole('button',{name:'Frame switch volume 2',exact:true,includeHidden:true});
+  await revealPagedControl(frame);await frame.press('Enter');
+  await expect(page.getByText('Compiled switch volume 2 · BSP 0 → 1',{exact:false})).toBeVisible();
+  const canvas=page.getByTestId('viewport').locator('canvas');
+  await expect.poll(async()=>JSON.parse((await canvas.getAttribute('data-gs-camera'))??'{}').target).toEqual([2,4,6]);
+  await page.getByRole('button',{name:'Hide switch volume',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Hide switch volume',exact:true})).toHaveCount(0);
   const destination=switches.getByRole('button',{name:'View destination BSP 1',exact:true,includeHidden:true});
   await revealPagedControl(destination);await destination.click();
   await expect(page.getByRole('combobox',{name:'Visible BSP',exact:true})).toHaveValue('1');

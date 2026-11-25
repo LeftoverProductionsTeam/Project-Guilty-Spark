@@ -1,4 +1,14 @@
 import type { Project, Vec3 } from './types';
+import type { NativeVolumeGeometry } from './nativeOperations';
+export const NATIVE_BSP_SWITCH_PREVIEW = 'world.compiled-bsp-switch';
+export interface NativeBspSwitchPreview {
+  cacheSha256: string;
+  triggerIndex: number;
+  triggerName: string;
+  sourceBsp: number;
+  destinationBsp: number;
+  geometry: NativeVolumeGeometry;
+}
 export interface SeamEdge {sourceSha256:string;bspIndex:number;vertices:[Vec3,Vec3];point:Vec3;}
 export interface SeamSection {id:string;name:string;points:Vec3[];width:number;height:number;shaderPath:string;openRoad?:boolean;archSegments?:number;edges:[SeamEdge,SeamEdge];}
 export interface BspAssembly {

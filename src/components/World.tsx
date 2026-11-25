@@ -3,7 +3,9 @@ import type {NativeDeviceView} from '../nativeDevicePlacement';
 import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
 import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
-import {NATIVE_VOLUME_VIEW} from '../nativeTriggerVolume';
+import {NATIVE_VOLUME_VIEW,volumeCenter,volumeQuaternion} from '../nativeTriggerVolume';
+import {NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
+import type {NativeBspSwitchPreview} from '../bspAssembly';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
 import {NATIVE_CAMERA_VIEW,cameraPoint,nativeCameraPose} from '../nativeCutsceneCamera';
 import type {NativeCameraView} from '../nativeCutsceneCamera';
@@ -250,7 +252,7 @@ function FrameCamera({
   startId,
   focus,
   director=false,
-  sessionId,additionalBounds,
+  sessionId,additionalBounds,focusBounds,
 }: {
   mesh: MeshData | null;
   objects: SceneObject[];
@@ -261,6 +263,7 @@ function FrameCamera({
   director?:boolean;
   sessionId?:string;
   additionalBounds?:{min:Vec3;max:Vec3}|null;
+  focusBounds?:THREE.Box3|null;
 }) {
   const { camera, controls } = useThree();
   const request=useRef({frame,playerView,startId});
@@ -282,18 +285,18 @@ function FrameCamera({
       orbit?.update?.();
       return;
     }
-    if(!playerView&&frame>0&&focus){const center=new THREE.Vector3(...focus.position).add(new THREE.Vector3(0,0,.3));const size=Math.max(...focus.scale)*(focus.kind==='Vehicle'?5:1.8);camera.up.set(0,0,1);camera.position.copy(center).add(new THREE.Vector3(size,-size,size*.7));camera.lookAt(center);orbit?.target?.copy(center);orbit?.update?.();return;}
-    const box = new THREE.Box3();
-    if (mesh?.positions.length) {
+    if(!focusBounds&&!playerView&&frame>0&&focus){const center=new THREE.Vector3(...focus.position).add(new THREE.Vector3(0,0,.3));const size=Math.max(...focus.scale)*(focus.kind==='Vehicle'?5:1.8);camera.up.set(0,0,1);camera.position.copy(center).add(new THREE.Vector3(size,-size,size*.7));camera.lookAt(center);orbit?.target?.copy(center);orbit?.update?.();return;}
+    const box = focusBounds?.clone() ?? new THREE.Box3();
+    if (!focusBounds && mesh?.positions.length) {
       const p = mesh.positions;
       for (const index of mesh.indices) {
         const i = index * 3;
         box.expandByPoint(new THREE.Vector3(p[i], p[i + 1], p[i + 2]));
       }
-    } else {
+    } else if (!focusBounds) {
       for (const o of objects) box.expandByPoint(new THREE.Vector3(...o.position));
     }
-    if(additionalBounds)box.union(new THREE.Box3(new THREE.Vector3(...additionalBounds.min),new THREE.Vector3(...additionalBounds.max)));
+    if(!focusBounds&&additionalBounds)box.union(new THREE.Box3(new THREE.Vector3(...additionalBounds.min),new THREE.Vector3(...additionalBounds.max)));
     if (box.isEmpty()) box.setFromCenterAndSize(new THREE.Vector3(), new THREE.Vector3(10, 10, 10));
     const center = box.getCenter(new THREE.Vector3());
     const size = Math.max(...box.getSize(new THREE.Vector3()).toArray(), 5);
@@ -306,7 +309,7 @@ function FrameCamera({
     }
     orbit?.target?.copy(center);
     orbit?.update?.();
-  }, [camera, controls, mesh, frame, playerView, startId,additionalBounds]);
+  }, [camera, controls, mesh, frame, playerView, startId,additionalBounds,focusBounds]);
   return null;
 }
 function SkyGeometry({data,shaderTextures,shaderMetadata,extraTextures}:{data:MeshData;shaderTextures:Record<number,THREE.Texture>;shaderMetadata:Record<number,ShaderPreview>;extraTextures:Record<string,THREE.Texture>}){
@@ -338,7 +341,7 @@ function Scene({
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
-  ownedModels,assembly,joinedPreview,additionalBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
+  ownedModels,assembly,joinedPreview,additionalBounds,focusBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -368,6 +371,7 @@ function Scene({
   assembly:AssemblyViewportSource|null;
   joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
+  focusBounds?:THREE.Box3|null;
   pickTarget?:'base'|'donor'|null;surfacePick?:NativeSurfacePick|null;sourceScope?:string;transformLocked?:boolean;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -562,7 +566,7 @@ function Scene({
         objects={project.scene}
         frame={frame}
         playerView={playerView} startId={startId} director={cinematic} sessionId={project.id}
-        focus={chosen} additionalBounds={additionalBounds}
+        focus={chosen} additionalBounds={additionalBounds} focusBounds={focusBounds}
       />}
     </>
   );
@@ -769,6 +773,21 @@ export default function World({
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
   const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
+  const [compiledSwitch, setCompiledSwitch] = useMapState<NativeBspSwitchPreview|null>(project.id,NATIVE_BSP_SWITCH_PREVIEW,()=>null);
+  const visibleSwitch = !cinematic && !pickTarget && !xrActive && compiledSwitch?.cacheSha256 === inspection?.sha256
+    && compiledSwitch?.sourceBsp === bsp ? compiledSwitch : null;
+  const switchPose = useMemo(()=>{
+    if(!visibleSwitch)return null;
+    const {geometry}=visibleSwitch;
+    const center=volumeCenter(geometry),rotation=volumeQuaternion(geometry);
+    const bounds=new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(),new THREE.Vector3(...geometry.dimensions));
+    bounds.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...center),rotation,new THREE.Vector3(1,1,1)));
+    return {center,rotation,bounds};
+  },[visibleSwitch]);
+  useEffect(()=>{
+    if(!visibleSwitch||cameraLocked||externalCameraAuthority)return;
+    setFly(false);setPlayerView(false);setFrame(value=>value+1);
+  },[visibleSwitch,cameraLocked,externalCameraAuthority]);
   const [exportModelId, setExportModelId] = useState('');
   const [environment, setEnvironment] = useState<EditorEnvironment>(() => project.worldEnvironment??structuredClone(DEFAULT_ENVIRONMENT));
   const [sourceAppearance,setSourceAppearance]=useState<SourceAppearance|null>(null);
@@ -1682,7 +1701,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked:cameraLocked||xrActive,
                     externalCameraAuthority:externalCameraAuthority||xrActive,
-                    ownedModels,assembly,joinedPreview:pickTarget?undefined:assemblyDonor.preview,additionalBounds:donorBounds,pickTarget,surfacePick,
+                    ownedModels,assembly,joinedPreview:pickTarget?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}
@@ -1692,6 +1711,10 @@ export default function World({
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
+                {visibleSwitch && switchPose && <mesh position={switchPose.center} quaternion={switchPose.rotation} name="compiled-bsp-switch-volume">
+                  <boxGeometry args={visibleSwitch.geometry.dimensions} />
+                  <meshBasicMaterial color="#82ded0" wireframe depthTest={false} />
+                </mesh>}
                 <ViewportSession
                   id={project.id}
                   channel={cinematic ? 'machinima' : 'world'}
@@ -1764,6 +1787,10 @@ export default function World({
               <button onClick={() => setSelected(null)}>Deselect object</button>
             </div>
           )}
+          {visibleSwitch && <div className="viewport-object-actions" role="status">
+            Compiled switch volume {visibleSwitch.triggerIndex} · BSP {visibleSwitch.sourceBsp} → {visibleSwitch.destinationBsp}
+            <button type="button" onClick={()=>setCompiledSwitch(null)}>Hide switch volume</button>
+          </div>}
           {pickTarget&&<div className="viewport-object-actions" role="status">Click {pickingLanding?'the landing floor':'an edge'} on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>{setPickTarget(null);setPickingLanding(false);}}>{pickingLanding?'Cancel landing selection':'Cancel edge selection'}</button></div>}
           {!pickTarget&&!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
             <strong>BSP {surfacePick.bspIndex+1} · landscape</strong>
