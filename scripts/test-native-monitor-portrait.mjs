@@ -91,7 +91,8 @@ try{
  await character.selectOption('character:cortana');
  await expect(home).toHaveAttribute('data-native-animation-count',/^[1-9]\d*$/);
  await expect(canvas).toHaveAttribute('data-gs-animation',/stand unarmed idle/);
- const readAnimation=()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsAnimation));
+ const readAnimation=()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsAnimation||'{}'));
+ await expect.poll(async()=> (await readAnimation()).bones??0).toBeGreaterThan(2);
  await home.getByRole('button',{name:'Pause showcase animation',exact:true}).click();
  await expect.poll(async()=> (await readAnimation()).playing).toBe(false);
  const idle=await readAnimation();

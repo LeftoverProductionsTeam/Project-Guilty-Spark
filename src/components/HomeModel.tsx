@@ -3,7 +3,7 @@ import { native } from '../api';
 import type { Bootstrap } from '../types';
 import type { ForgeAsset } from '../forge';
 import { preloadHomeModels,preloadHomeCharacter } from '../homeShowcase';
-import {characterChoice,characterFromChoice,homeCharacters} from '../homeCharacters';
+import {characterChoice,characterFromChoice,homeCharacters,matchesHomeCharacter} from '../homeCharacters';
 import NativeModelPreview from './NativeModelPreview';
 import {useMapState} from '../mapSession';
 import {sourceSurfaceEnvironment} from '../environment';
@@ -41,7 +41,10 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
     if(character)void preloadHomeCharacter(data,character).then(asset=>{if(!alive)return;setSelectedModel(asset);if(!asset)setMessage(`Link campaign maps containing ${homeCharacters.find(c=>c.id===character)?.label} in Asset library.`);}).catch(error=>{if(alive)setMessage(String(error));});
     return () => {alive=false;};
   }, [data.dataDirectory, data.installation.mccPath,data.settings.preferredHalo,selection]);
-  const model = characterFromChoice(selection)?selectedModel:models.find(asset=>showcaseKey(asset)===selection);
+  const character = characterFromChoice(selection);
+  const model = character
+    ? selectedModel && matchesHomeCharacter(selectedModel, character) ? selectedModel : null
+    : models.find(asset=>showcaseKey(asset)===selection);
   return (
     <div className="home-native-model" data-lighting="studio">
       {model ? (
