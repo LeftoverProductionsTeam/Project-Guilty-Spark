@@ -10,6 +10,7 @@ export interface SpawnZone {
   position: Vec3;
   radius: number;
   enabled: boolean;
+  facingDegrees?: number;
 }
 export interface WaveDefinition {
   id: string;

@@ -24,6 +24,8 @@ pub struct SpawnZone {
     pub position: [f32; 3],
     pub radius: f32,
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facing_degrees: Option<f32>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -252,6 +254,7 @@ pub fn default_config() -> FirefightConfig {
             position: [0.0; 3],
             radius: 2.0,
             enabled: true,
+            facing_degrees: None,
         }],
         waves: vec![],
         starting_equipment: vec![],
@@ -325,6 +328,9 @@ pub fn validate_document(config: &FirefightConfig) -> Result<()> {
     }
     let mut zone_ids = BTreeSet::new();
     for zone in &config.spawn_zones {
+        if zone.facing_degrees.is_some_and(|angle| !(-180.0..=180.0).contains(&angle)) {
+            return invalid("Spawn zone facing must be between -180 and 180 degrees");
+        }
         if !identifier(&zone.id)
             || !zone_ids.insert(zone.id.as_str())
             || !zone.radius.is_finite()
@@ -1348,6 +1354,7 @@ pub struct NativeRoundEncounter {
     pub name:String,
     pub actor_path:String,
     pub positions:Vec<[f32;3]>,
+    pub facing_radians:f32,
 }
 /// Shared native actor grid. Offsets remain unscaled so the existing zone-radius
 /// calculation keeps its original arithmetic and group partitioning.
@@ -1367,7 +1374,7 @@ pub(crate) fn native_actor_start_grid(center:[f32;3],total:usize,offset:usize,co
 /// Source authoring layout shared by fresh construction and preserving appends.
 /// This checks authored radius/start clearance, not BSP collision or pathfinding.
 #[derive(Clone,Debug)]
-pub struct NativeGroupGrid {pub center:[f32;3],pub total:usize,pub offset:usize,pub starts:Vec<([f32;3],[f32;2])>}
+pub struct NativeGroupGrid {pub center:[f32;3],pub total:usize,pub offset:usize,pub facing_radians:Option<f32>,pub starts:Vec<([f32;3],[f32;2])>}
 pub fn native_group_grid(config:&FirefightConfig,w:usize,g:usize,player_starts:&[[f32;3]])->Result<NativeGroupGrid> {
     let wave=config.waves.get(w).ok_or_else(||SparkError::Invalid("Native wave is missing".into()))?;
     let group=wave.groups.get(g).ok_or_else(||SparkError::Invalid("Native wave group is missing".into()))?;
@@ -1388,7 +1395,7 @@ pub fn native_group_grid(config:&FirefightConfig,w:usize,g:usize,player_starts:&
         if (dx*dx+dy*dy).sqrt()*0.75>zone.radius{return invalid("Native actor starting positions do not fit the authored spawn-zone radius; enlarge or split the group");}
         if player_starts.iter().any(|spawn|spawn.iter().zip(position).map(|(a,b)|(a-b).powi(2)).sum::<f32>()<4.0){return invalid("Move the enemy spawn zone at least two world units from the player start before preparing a native round");}
     }
-    Ok(NativeGroupGrid{center:zone.position,total,offset,starts})
+    Ok(NativeGroupGrid{center:zone.position,total,offset,facing_radians:zone.facing_degrees.map(f32::to_radians),starts})
 }
 
 pub fn validate_native_round_rules(config:&FirefightConfig)->Result<()> {
@@ -1524,17 +1531,19 @@ pub fn native_round_plan(project: &crate::project::Project) -> Result<Option<Nat
             }
             let encounter=plan.encounter_names.len();
             let name=format!("gs_w{:02}_g{:02}",w+1,g+1);plan.encounter_names.push(name.clone());
-            let mut layout=NativeRoundEncounter {name:name.clone(),actor_path:path.clone(),positions:vec![]};
+            let grid=native_group_grid(config,w,g,&player_starts)?;
+            let facing_radians=grid.facing_radians.unwrap_or_default();
+            let mut layout=NativeRoundEncounter {name:name.clone(),actor_path:path.clone(),positions:vec![],facing_radians};
             let e=format!("encounters[{encounter}]");let s=format!("{e}.squads[0]");
             let mut args=vec!["-I".into(),"encounters".into(),"1".into(),"end".into(),"-I".into(),format!("{e}.squads"),"1".into(),"end".into()];
             for (key,value) in [(format!("{e}.name"),name),(format!("{e}.flags.not_initially_created"),"1".into()),(format!("{e}.team_index"),"default_by_unit".into()),(format!("{e}.manual_bsp_index"),"-1".into()),
                 (format!("{s}.name"),"round_squad".into()),(format!("{s}.actor_type"),index.to_string()),(format!("{s}.platoon"),"-1".into()),(format!("{s}.initial_state"),"alert".into()),(format!("{s}.return_state"),"alert".into()),(format!("{s}.maneuver_to_squad"),"-1".into()),
                 (format!("{s}.normal_diff_count"),group.count.to_string()),(format!("{s}.insane_diff_count"),group.count.to_string()),(format!("{s}.major_upgrade"),"none".into())] {set(&mut args,key,value);}
-            for (a,(position,_)) in native_group_grid(config,w,g,&player_starts)?.starts.into_iter().enumerate() {
+            for (a,(position,_)) in grid.starts.into_iter().enumerate() {
                 layout.positions.push(position);
                 let p=format!("{s}.starting_locations[{a}]");let f=format!("{e}.firing_positions[{a}]");
                 args.extend(["-I".into(),format!("{s}.starting_locations"),"1".into(),"end".into(),"-I".into(),format!("{e}.firing_positions"),"1".into(),"end".into()]);
-                for (key,value) in [(format!("{p}.position"),vector(position)),(format!("{p}.facing"),"0".into()),(format!("{p}.sequence_id"),"-1".into()),(format!("{p}.flags.required"),"1".into()),(format!("{p}.initial_state"),"alert".into()),(format!("{p}.return_state"),"alert".into()),(format!("{p}.actor_type"),"-1".into()),(format!("{p}.command_list"),"-1".into()),(format!("{f}.position"),vector(position)),(format!("{f}.group_index"),"a".into())] {set(&mut args,key,value);}
+                for (key,value) in [(format!("{p}.position"),vector(position)),(format!("{p}.facing"),facing_radians.to_string()),(format!("{p}.sequence_id"),"-1".into()),(format!("{p}.flags.required"),"1".into()),(format!("{p}.initial_state"),"alert".into()),(format!("{p}.return_state"),"alert".into()),(format!("{p}.actor_type"),"-1".into()),(format!("{p}.command_list"),"-1".into()),(format!("{f}.position"),vector(position)),(format!("{f}.group_index"),"a".into())] {set(&mut args,key,value);}
             }
             args.push(tag.clone());add(&mut plan,args);
             plan.encounter_layouts.push(layout);
@@ -1602,7 +1611,7 @@ pub fn verify_native_round(plan:&NativeRoundPlan,map:&crate::maps::MapInspection
         }
         let mut remaining=expected.positions.clone();
         for (index,location) in squad.starting_locations.iter().enumerate() {
-            if location.actor_variant_tag_id!=actor || location.actor_palette_index!=-1 || location.flags&1==0 || location.initial_state!=2 || location.return_state!=2 || location.command_list!=-1 || location.facing.abs()>0.0001 {
+            if location.actor_variant_tag_id!=actor || location.actor_palette_index!=-1 || location.flags&1==0 || location.initial_state!=2 || location.return_state!=2 || location.command_list!=-1 || !crate::native_operations::facings_close(expected.facing_radians,location.facing) {
                 return invalid(format!("Compiled Firefight starting-location properties differ: {} start {}",expected.name,index));
             }
             let Some(slot)=remaining.iter().position(|position|position.iter().zip(location.position).all(|(a,b)|(*a-b).abs()<=0.0001)) else {

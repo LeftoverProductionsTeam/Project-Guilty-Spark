@@ -248,7 +248,11 @@ impl SquadCountEdit {
 pub struct EncounterDifficulty {pub normal:u16,pub insane:u16}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct EncounterGrid {pub total:u16,pub offset:u16}
+pub struct EncounterGrid {
+    pub total:u16,pub offset:u16,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub facing_radians:Option<f32>,
+}
 // Native ScenarioReturnState values; moving states need separately authored routes.
 #[derive(Clone,Copy,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="snake_case")]
@@ -331,7 +335,9 @@ impl EncounterAppend {
             return Ok(starts.clone());
         }
         let(total,offset)=self.grid.as_ref().map(|grid|(usize::from(grid.total),usize::from(grid.offset))).unwrap_or((usize::from(self.count),0));
-        Ok(crate::firefight::native_actor_start_grid(self.position,total,offset,usize::from(self.count),self.spacing)?.into_iter().enumerate().map(|(i,value)|EncounterStart{id:format!("grid-{i}"),position:value.0,facing_radians:0.,visible:true,locked:false}).collect())
+        let facing_radians=self.grid.as_ref().and_then(|grid|grid.facing_radians).unwrap_or_default();
+        if !(-std::f32::consts::PI..=std::f32::consts::PI).contains(&facing_radians){return invalid("Native grid facing must be between -π and π radians");}
+        Ok(crate::firefight::native_actor_start_grid(self.position,total,offset,usize::from(self.count),self.spacing)?.into_iter().enumerate().map(|(i,value)|EncounterStart{id:format!("grid-{i}"),position:value.0,facing_radians,visible:true,locked:false}).collect())
     }
     pub fn positions(&self)->Result<Vec<[f32;3]>> {Ok(self.poses()?.into_iter().map(|value|value.position).collect())}
     pub fn operation(&self)->Operation {Operation::AppendEncounter{name:self.name.clone(),actor_path:self.actor_path.clone(),position:self.position,start_active:self.start_active,count:self.count,spacing:self.spacing,difficulty:self.difficulty.clone(),major_upgrade:self.major_upgrade.clone()}}
@@ -967,7 +973,8 @@ fn reviewed_encounter_group_append(before:&str,after:&str,operation:&Operation)-
         let patrol=entry.patrol.as_ref().map(|p|format!("; {} native patrol points with facing/weight/wait",p.points.len())).unwrap_or_default();
         let behavior=entry.behavior.as_ref().map(|b|format!("; native initial={}, return={}",b.initial_state.native().0,b.return_state.native().0)).unwrap_or_default();
         let upgrades = entry.major_upgrade.as_ref().map(|value| format!("; major-variant upgrades={value}")).unwrap_or_default();
-        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+&combat+&upgrades+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
+        let heading = entry.grid.as_ref().and_then(|grid|grid.facing_radians).map(|angle| format!("; initial facing={:.1} degrees",angle.to_degrees())).unwrap_or_default();
+        differences.push(FieldDifference{before:format!("No appended encounter at index{index}"),after:format!("{} → {}; center={:?}; actors={}, spacing={}; initial creation={}",entry.name,entry.actor_path,entry.position,entry.count,entry.spacing,entry.start_active)+&difficulty+&behavior+&patrol+&combat+&upgrades+&heading+if entry.starts.is_some(){"; individually authored XYZ/facing (including editor-hidden starts)"}else{""}});
     }
     Ok(differences)
 }
@@ -1010,7 +1017,7 @@ fn saved_firefight_group_plan(project:&crate::project::Project,parent_sha:&str,f
     for(w,wave)in config.waves.iter().enumerate(){for(g,group)in wave.groups.iter().enumerate(){
         let enemy=config.enemies.iter().find(|enemy|enemy.id==group.enemy_id).ok_or_else(||crate::SparkError::Invalid("Saved wave actor is missing".into()))?;
         let layout=crate::firefight::native_group_grid(config,w,g,&players)?;
-        encounters.push(EncounterAppend{major_upgrade:None,name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16}),starts:None,behavior:None,patrol:None,combat:None});
+        encounters.push(EncounterAppend{major_upgrade:None,name:format!("gs_w{:02}_g{:02}",w+1,g+1),actor_path:enemy.actor_variant_path.clone(),position:layout.center,start_active:false,count:group.count,spacing:0.75,difficulty:None,grid:Some(EncounterGrid{total:layout.total as u16,offset:layout.offset as u16,facing_radians:layout.facing_radians}),starts:None,behavior:None,patrol:None,combat:None});
     }}
     let operation=Operation::AppendEncounters{encounters,source_rules:Some(config.clone())};
     operation.validate("scnr","planned.scenario")?;
@@ -2460,7 +2467,7 @@ mod tests {
         let legacy:EncounterAppend=serde_json::from_value(base.clone()).unwrap();assert!(legacy.starts.is_none());assert!(serde_json::to_value(&legacy).unwrap().get("starts").is_none());let mut custom=legacy.clone();let mut starts=custom.poses().unwrap();starts[0].position=[6.,4.,0.1];starts[0].facing_radians=std::f32::consts::FRAC_PI_2;starts[1].visible=false;starts[1].locked=true;custom.starts=Some(starts);
         let op=Operation::AppendEncounters{encounters:vec![custom.clone()],source_rules:None};op.validate("scnr","level.scenario").unwrap();assert_eq!(custom.positions().unwrap(),vec![[6.,4.,0.1],[4.375,2.625,0.1]]);
         let fields="actor_palette[0] array\nencounters[0] array\n";let args=op.arguments_with_fields(Path::new("tags"),"scnr","level.scenario",fields).unwrap();assert!(args.windows(3).any(|row|row[0]=="-S"&&row[1].ends_with("starting_locations[0].facing")&&row[2]==std::f32::consts::FRAC_PI_2.to_string()));assert!(args.windows(4).any(|row|row==["-I","encounters[0].squads[0].starting_locations","2","end"]));
-        let mut wrong=custom.clone();wrong.count=1;assert!(wrong.poses().is_err());wrong=custom.clone();wrong.grid=Some(EncounterGrid{total:2,offset:0});assert!(wrong.poses().is_err());
+        let mut wrong=custom.clone();wrong.count=1;assert!(wrong.poses().is_err());wrong=custom.clone();wrong.grid=Some(EncounterGrid{total:2,offset:0,facing_radians:None});assert!(wrong.poses().is_err());
         for value in [f32::NAN,2049.] {wrong=custom.clone();wrong.starts.as_mut().unwrap()[0].position[0]=value;assert!(wrong.poses().is_err());}
         wrong=custom.clone();wrong.starts.as_mut().unwrap()[0].facing_radians=7.;assert!(wrong.poses().is_err());wrong=custom;wrong.starts.as_mut().unwrap()[1].id="grid-0".into();assert!(wrong.poses().is_err());
     }

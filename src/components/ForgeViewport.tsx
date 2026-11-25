@@ -675,10 +675,20 @@ function ForgeScene(props: ForgeViewportProps) {
         .filter((zone) => zone.enabled)
         .map((zone) => {
           const visual = <group onClick={(event) => { event.stopPropagation(); props.onZoneSelect(zone.id); }}>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <mesh>
               <torusGeometry args={[zone.radius, 0.04, 6, 48]} />
               <meshBasicMaterial color="#e2a374" />
             </mesh>
+            <group position={[0,0,0.06]} rotation={[0,0,THREE.MathUtils.degToRad(zone.facingDegrees ?? 0)]}>
+              <mesh position={[zone.radius * 0.35,0,0]}>
+                <boxGeometry args={[zone.radius * 0.7,0.08,0.04]} />
+                <meshBasicMaterial color="#e2a374" />
+              </mesh>
+              <mesh position={[zone.radius * 0.8,0,0]} rotation={[0,0,-Math.PI / 2]}>
+                <coneGeometry args={[0.13,zone.radius * 0.25,8]} />
+                <meshBasicMaterial color="#e2a374" />
+              </mesh>
+            </group>
             <ViewportLabel position={[0,0,0.6]} text={`AI zone · ${zone.id.slice(0,8)}`}/>
           </group>;
           return zone.id === props.selectedZone ? <TransformControls key={zone.id} object={zoneGroup as MutableRefObject<THREE.Group>} mode="translate" enabled={cameraMode === 'orbit'} translationSnap={snap || null} onMouseUp={() => { if (zoneGroup.current) props.onZoneMove(zone.id, zoneGroup.current.position.toArray() as Vec3); }}><group ref={zoneGroup} position={zone.position}>{visual}</group></TransformControls> : <group key={zone.id} position={zone.position}>{visual}</group>;

@@ -615,7 +615,7 @@ export default function Firefight({
               Zone
             </button>
           </div>
-          <p className="subtle">Assign each enemy group to a zone in its wave row, or keep Automatic. Removing or disabling an assigned zone blocks native preparation until you choose a replacement.</p>
+          <p className="subtle">Assign each enemy group to a zone in its wave row, or keep Automatic. Removing or disabling an assigned zone blocks native preparation until you choose a replacement. Facing sets the initial direction of native enemies in that zone. Zero faces +X, and 90° faces +Y.</p>
           {config.spawnZones.map((zone, index) => (
             <div className={`forge-zone ${zone.id === selectedZone ? 'selected' : ''}`} key={zone.id}>
               <div className="forge-panel-heading">
@@ -661,6 +661,17 @@ export default function Firefight({
                   min={0.1}
                   max={100}
                   onCommit={(radius) => updateZone(zone.id, { radius })}
+                />
+              </label>
+              <label className="forge-field">
+                Facing (degrees)
+                <NumberField
+                  label={'AI zone '+(index + 1)+' facing (degrees)'}
+                  value={zone.facingDegrees ?? 0}
+                  min={-180}
+                  max={180}
+                  step={1}
+                  onCommit={(facingDegrees) => updateZone(zone.id, { facingDegrees: facingDegrees || undefined })}
                 />
               </label>
               <label className="checkbox-label">

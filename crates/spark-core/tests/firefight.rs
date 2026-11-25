@@ -320,7 +320,7 @@ fn native_project() -> spark_core::project::Project {
     c.max_alive=4;c.max_total_per_wave=4;c.stuck_timeout_ms=60000;
     c.native_player_profile=Some(NativePlayerProfile{primary_weapon:"weapons/pistol/pistol".into(),primary_loaded:12,primary_reserved:60,secondary_weapon:None,secondary_loaded:0,secondary_reserved:0,health:1.0,shields:1.0,fragmentation_grenades:2,plasma_grenades:0});
     c.enemies=vec![EnemyType{id:"grunt".into(),name:"Grunt".into(),actor_variant_path:"characters/grunt/grunt minor plasma pistol".into(),points:100}];
-    c.spawn_zones=vec![SpawnZone{id:"enemy-zone".into(),position:[6.0,0.0,0.2],radius:2.0,enabled:true}];
+    c.spawn_zones=vec![SpawnZone{id:"enemy-zone".into(),position:[6.0,0.0,0.2],radius:2.0,enabled:true,facing_degrees:None}];
     c.waves=vec![WaveDefinition{id:"wave".into(),name:"Wave".into(),boss:false,score_multiplier_milli:1000,groups:vec![EnemyGroup{enemy_id:"grunt".into(),count:2,spawn_zone_id:None}]}];
     let mut doc=spark_core::quickforge::create_arena("Native round test","firefightArena").unwrap();
     doc.spawns.truncate(1);doc.spawns[0].position=[-6.0,0.0,0.2];
@@ -339,6 +339,23 @@ fn native_round_uses_standard_scenario_fields_and_preserves_unrelated_source() {
     let args=plan.commands.iter().flat_map(|command|command.args.iter()).cloned().collect::<Vec<_>>().join("|");
     for field in ["actor_palette[0].reference","encounters[0].flags.not_initially_created","encounters[0].squads[0].normal_diff_count","encounters[0].squads[0].starting_locations[1].position","encounters[0].firing_positions[1].position"] {assert!(args.contains(field),"{field}");}
     assert!(!args.contains(".one|"),"cache-only scenario fields belong to the native compiler");assert!(!args.contains("-n|"));assert!(!args.contains("-E|"));assert_eq!(serde_json::to_vec(&p).unwrap(),before);
+}
+#[test]
+fn native_round_keeps_authored_zone_heading_and_legacies_keep_zero() {
+    let mut p=native_project();
+    let baseline=native_round_plan(&p).unwrap().unwrap().encounter_layouts.remove(0);
+    assert_eq!(baseline.facing_radians,0.0);
+    assert!(!serde_json::to_string(&p.firefight).unwrap().contains("facingDegrees"));
+    p.firefight.as_mut().unwrap().spawn_zones[0].facing_degrees=Some(-135.0);
+    rebind(&mut p);
+    let plan=native_round_plan(&p).unwrap().unwrap();
+    let heading=(-135.0f32).to_radians();
+    assert_eq!(plan.encounter_layouts[0].positions,baseline.positions);
+    assert_eq!(plan.encounter_layouts[0].facing_radians,heading);
+    assert_eq!(plan.commands.iter().flat_map(|command|command.args.windows(3)).filter(|pair|
+        pair[0]=="-S"&&pair[1].contains("starting_locations")&&pair[1].ends_with(".facing")&&pair[2]==heading.to_string()).count(),2);
+    p.firefight.as_mut().unwrap().spawn_zones[0].facing_degrees=Some(181.0);
+    assert!(validate(p.firefight.as_ref().unwrap()).unwrap_err().to_string().contains("Spawn zone facing"));
 }
 #[test]
 fn native_round_refuses_stale_rules_unsupported_options_and_unsafe_spawns_before_staging() {

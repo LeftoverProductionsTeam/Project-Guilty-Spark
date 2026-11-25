@@ -6110,7 +6110,7 @@ test('build badge distinguishes pending, blocked and unavailable checks',async({
 });
 
 
-test('Firefight timing controls edit the rules through keyboard, Undo, Redo and Save', async ({page})=>{
+test('Firefight timing and facing controls preserve keyboard edits through Undo, Redo and Save', async ({page})=>{
  await mockDesktop(page);
  await page.evaluate(()=>{
   const w=window as any,project=w.__sparkMock.projects.a.project;
@@ -6134,9 +6134,14 @@ test('Firefight timing controls edit the rules through keyboard, Undo, Redo and 
  }
  await page.keyboard.press('Control+z');await expect(deadline).toHaveValue('60000');
  await page.keyboard.press('Control+y');await expect(deadline).toHaveValue('120000');
+ const facing=page.getByRole('spinbutton',{name:'AI zone 1 facing (degrees)',exact:true});
+ await revealPagedControl(facing);await expect(facing).toHaveValue('0');
+ await facing.fill('-135');await facing.press('Tab');await expect(facing).toHaveValue('-135');
+ await page.keyboard.press('Control+z');await expect(facing).toHaveValue('0');
+ await page.keyboard.press('Control+y');await expect(facing).toHaveValue('-135');
  await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.firefight))
-  .toMatchObject({preparationMs:2500,spawnTimeoutMs:9000,stuckTimeoutMs:120000});
+  .toMatchObject({preparationMs:2500,spawnTimeoutMs:9000,stuckTimeoutMs:120000,spawnZones:[{id:'lane',facingDegrees:-135}]});
 });
 
 test('unchanged CE cache uses native validation then the existing export controls',async({page})=>{
