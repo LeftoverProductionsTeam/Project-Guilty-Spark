@@ -3539,26 +3539,29 @@ test('a missing CE map offers protected setup and direct-link download without j
 });
 
 
-test('File New creates a blank multiplayer map through the shared wizard and closes both menus',async({page})=>{
+test('File New opens a separate multiplayer creation window without replacing the source tab',async({page})=>{
  await mockDesktop(page);await openFixture(page);
  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
   if(command!=='create_quickforge_project')return invoke(command,args);w.__sparkMock.calls.push({command,args});
   const result=structuredClone(w.__sparkMock.projects.b);result.project.id='new-map';result.project.title=args.title;result.project.source=null;result.inspection=null;result.project.quickForge={schemaVersion:1,name:args.title,template:args.template,runtimeId:args.target,gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]};w.__sparkMock.projects['new-map']=result;return result;
  };});
  const file=page.getByLabel('File menu',{exact:true});await file.focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'New',exact:true})).toBeFocused();await page.keyboard.press('ArrowRight');await expect(page.getByRole('menuitem',{name:'Multiplayer Map',exact:true})).toBeFocused();await page.keyboard.press('Enter');
- const dialog=page.getByRole('dialog',{name:'New Multiplayer Map',exact:true});await expect(dialog).toBeVisible();await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();
- await expect(dialog.getByLabel('New map template',{exact:true})).toHaveValue('customBlank');await dialog.getByLabel('New map name',{exact:true}).fill('Original two-base map');await dialog.getByLabel('New map runtime',{exact:true}).selectOption('haloCustomEdition');await dialog.getByRole('button',{name:'Create editable map',exact:true}).click();
- await expect(dialog).toBeHidden();expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='create_quickforge_project').args)).toEqual({title:'Original two-base map',template:'customBlank',target:'haloCustomEdition'});
- await expect(page.getByRole('tab',{name:'Original two-base map',exact:true})).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='open_workspace_window')?.args)).toEqual({workspace:'library',creation:'multiplayer',another:true});
+ await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();
+ await expect(page.getByRole('dialog',{name:'New Multiplayer Map',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+ await page.goto('/?workspace=library&create=multiplayer');
+ await expect(page.getByRole('dialog',{name:'New Multiplayer Map',exact:true}).getByLabel('New map template',{exact:true})).toHaveValue('customBlank');
 });
 
 test('File New MegaWorld keeps the original project when native source setup is unavailable',async({page})=>{
  await mockDesktop(page);await openFixture(page);
  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.before=structuredClone(w.__sparkMock.projects.a);w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{if(command==='discover_asset_sources')return {maps:[],notices:[],elapsedMs:0};if(command!=='create_megaworld_project')return invoke(command,args);w.__sparkMock.calls.push({command,args});throw Error('Select matching editable donor tags in Project setup. Original maps were retained.');};});
- await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menuitem',{name:'New',exact:true}).click();await page.getByRole('menuitem',{name:'MegaWorld',exact:true}).click();
+ await page.goto('/?workspace=library&create=megaworld');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.before=structuredClone(w.__sparkMock.projects.a);w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{if(command==='discover_asset_sources')return {maps:[],notices:[],elapsedMs:0};if(command!=='create_megaworld_project')return invoke(command,args);w.__sparkMock.calls.push({command,args});throw Error('Select matching editable donor tags in Project setup. Original maps were retained.');};});
  const dialog=page.getByRole('dialog',{name:'New MegaWorld',exact:true});await dialog.getByLabel('First region',{exact:true}).selectOption('a');await dialog.getByLabel('Second region',{exact:true}).selectOption('b');await dialog.getByRole('button',{name:'Create MegaWorld',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('Original maps were retained');
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='create_megaworld_project').args)).toEqual({title:'The Great Canyon',baseProjectId:'a',donorProjectId:'b',donorBspIndex:0});
- expect(await page.evaluate(()=>JSON.stringify((window as any).__sparkMock.projects.a)===JSON.stringify((window as any).__sparkMock.before))).toBe(true);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+ expect(await page.evaluate(()=>JSON.stringify((window as any).__sparkMock.projects.a)===JSON.stringify((window as any).__sparkMock.before))).toBe(true);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(dialog).toBeHidden();
 });
 
 

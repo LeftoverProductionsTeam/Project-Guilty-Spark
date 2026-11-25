@@ -87,26 +87,33 @@ function Model({
   const group = useRef<THREE.Group>(null),
     { camera, gl, invalidate } = useThree();
   const pointer=useRef({x:0,y:0});
+  const manipulating=useRef(false);
+  const interactiveShowcase=showcase&&!portrait;
   const {active}=useWorkspaceActivity();
   const controls=useRef<ComponentRef<typeof OrbitControls>>(null);
   const sessionKey=`preview.camera.${identity.tagId}`;
   const remember=()=>{
     const target=controls.current?.target??new THREE.Vector3();
     const value={sourceHash:identity.sourceHash,position:camera.position.toArray(),target:target.toArray()};
-    if(validModelPreviewCamera(value,identity.sourceHash,fit.radius))writeMapSession(identity.projectId,sessionKey,value);
+    if(!showcase&&validModelPreviewCamera(value,identity.sourceHash,fit.radius))writeMapSession(identity.projectId,sessionKey,value);
     gl.domElement.dataset.gsPreviewCamera=JSON.stringify(value);invalidate();
   };
   const poseSample = useRef(0);
   const motionAllowed = useMemo(() => !matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   useEffect(() => {
-    if (!showcase || !live || !motionAllowed) return;
+    if (!interactiveShowcase || !live || !motionAllowed) return;
     const follow = (event: PointerEvent) => {
-      pointer.current.x=THREE.MathUtils.clamp(event.clientX/Math.max(1,innerWidth)*2-1,-1,1);
-      pointer.current.y=THREE.MathUtils.clamp(1-event.clientY/Math.max(1,innerHeight)*2,-1,1);
+      if (event.pointerType === 'touch' || manipulating.current) return;
+      const bounds=gl.domElement.getBoundingClientRect();
+      const x=(event.clientX-(bounds.left+bounds.width/2))/Math.max(1,bounds.width/2);
+      const y=((bounds.top+bounds.height/2)-event.clientY)/Math.max(1,bounds.height/2);
+      pointer.current.x=THREE.MathUtils.clamp(x,-1,1);
+      pointer.current.y=THREE.MathUtils.clamp(y,-1,1);
+      invalidate();
     };
     window.addEventListener('pointermove', follow, { passive: true });
     return () => window.removeEventListener('pointermove', follow);
-  }, [showcase, live, motionAllowed]);
+  }, [interactiveShowcase, live, motionAllowed, gl, invalidate]);
   const fit = useMemo(() => {
     const box = new THREE.Box3();
     for (let i = 0; i < view.mesh.positions.length; i += 3)
@@ -132,10 +139,10 @@ function Model({
       camera.updateProjectionMatrix();
     }
     invalidate();
-    if(!showcase)remember();
+    if(!portrait)remember();
   }, [camera, fit, invalidate, showcase,portrait,identity.projectId,identity.sourceHash,sessionKey,framing]);
   useFrame((_, dt) => {
-    if (!group.current || !active) return;
+    if (!group.current || !active || manipulating.current) return;
     // Keep the left-facing resting pose, but let the right half of the page
     // turn the model far enough to face that side as well.
     const followYaw = pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6);
@@ -143,7 +150,7 @@ function Model({
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
     group.current.rotation.x = THREE.MathUtils.damp(
       group.current.rotation.x,
-      showcase && live && motionAllowed ? pointer.current.y * 0.08 : 0,
+      interactiveShowcase && live && motionAllowed ? pointer.current.y * 0.18 : 0,
       4,
       dt,
     );
@@ -175,7 +182,11 @@ function Model({
           />
         )}
       </group>
-    </group>{!showcase&&<OrbitControls ref={controls} makeDefault enabled={live} enablePan enableDamping minDistance={fit.radius*.15} maxDistance={fit.radius*25} onEnd={remember}/>}</>
+    </group>{(!showcase||interactiveShowcase)&&<OrbitControls ref={controls} makeDefault enabled={live}
+      enablePan enableDamping enableZoom minDistance={fit.radius*(interactiveShowcase?1.4:.15)}
+      maxDistance={fit.radius*(interactiveShowcase?7:25)}
+      onStart={()=>{if(interactiveShowcase)manipulating.current=true;}}
+      onEnd={()=>{manipulating.current=false;remember();}}/>}</>
   );
 }
 /** Uses the exact same native geometry, texture decoder and shader as the map viewport. */
@@ -285,6 +296,8 @@ export default function NativeModelPreview({
       className={`native-model-preview${showcase ? ' native-model-showcase' : ''}`}
       data-transparent-background={showcase}
       data-model-portrait={portrait?'front':undefined}
+      data-showcase-interactive={showcase&&!portrait&&live?'true':undefined}
+      title={showcase&&!portrait&&live?'Drag to rotate · Scroll to zoom · Right-drag to move':undefined}
       ref={host}
       data-model-tag={asset.tagId ?? undefined}
       data-model-source={asset.sourceProjectId ?? undefined}

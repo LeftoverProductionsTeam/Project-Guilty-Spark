@@ -105,14 +105,16 @@ function NativeGameplayBudget({ budget, cacheTarget, separate }: {
   const starts = mcc ? budget.mcc13RegionalStarts ?? budget.playerStarts : budget.playerStarts;
   const items = mcc ? budget.mcc13RegionalEquipment ?? budget.netgameEquipment : budget.netgameEquipment;
   const classic = cacheTarget === 'CE609';
+  const vehicles = mcc ? budget.mcc13Vehicles : budget.vehicles;
   const rows = [
     { label: 'Player starts', ...starts, donor: classic && separate ? 0 : starts.donor },
     { label: 'Multiplayer item placements', ...items },
+    ...(vehicles ? [{ label: 'Native vehicle placements', ...vehicles }] : []),
     ...(separate ? [{ label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor }] : []),
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
     <summary>Native gameplay placement limits{cacheTarget ? ' · ' + cacheTarget : ''}</summary>
-    <p>{!separate ? 'Merged builds import donor player starts, pickups and paired teleporters.' : classic ? 'This CE609 split build keeps the base player starts and flags, and adds donor pickups.' : 'Projected placement counts across the compiled scenario.'}</p>
+    <p>{!separate ? 'Merged builds import donor starts, pickups, vehicles and paired teleporters.' : classic ? 'This CE609 split build keeps the base player starts and flags, and adds donor pickups and vehicles.' : 'Projected placement counts across the compiled scenario.'}</p>
     <ul>
       {rows.map(({ label, existing, donor, limit }) => {
         const total = existing + donor;

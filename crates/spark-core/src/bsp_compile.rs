@@ -1254,6 +1254,7 @@ pub fn prepare_native(
         let counts = [
             ("native item placements", budget.netgame_equipment, maps::netgame_equipment_limit(cache_version)),
             ("native player starts", budget.player_starts, maps::player_start_limit(cache_version)),
+            ("native vehicle placements", budget.vehicles, crate::bsp_vehicles::limit(cache_version)),
         ];
         for (kind, count, limit) in counts {
             let total = count.existing + count.donor;

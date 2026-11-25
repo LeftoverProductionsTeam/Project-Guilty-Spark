@@ -350,12 +350,18 @@ fn workspace_query(workspace:&str,context:Option<&str>,section:Option<&str>)->Re
     Ok(query)
 }
 #[tauri::command]
-pub(super) async fn open_workspace_window(app:tauri::AppHandle,window:tauri::WebviewWindow,workspace:String,context:Option<String>,section:Option<String>,panel:Option<String>,another:Option<bool>)->Reply<String>{
+pub(super) async fn open_workspace_window(app:tauri::AppHandle,window:tauri::WebviewWindow,workspace:String,context:Option<String>,section:Option<String>,panel:Option<String>,another:Option<bool>,creation:Option<String>)->Reply<String>{
     let mut query=workspace_query(&workspace,context.as_deref(),section.as_deref())?;
     if let Some(panel)=&panel {checked_panel(&workspace,panel,false)?;query.push_str(&format!("&panel={panel}"));}
+    if let Some(choice)=creation.as_deref() {
+        if workspace!="library" || panel.is_some() || section.is_some() || context.is_some()
+            || !matches!(choice, "multiplayer" | "megaworld" | "assets")
+        { return Err("Invalid new project window".into()); }
+        query.push_str(&format!("&create={choice}"));
+    }
     let view=WorkspaceView{workspace:workspace.clone(),project:None,section:section.clone(),dirty:false,documents:Vec::new(),places:Vec::new()};
     // An explicit lesson requests its own context; don't focus a different one.
-    if another!=Some(true)&&context.is_none(){if let Some(label)=existing_workspace(&app,window.label(),&view,panel.as_deref())?{focus_window(&app,&label)?;return Ok(label);}}
+    if another!=Some(true)&&context.is_none()&&creation.is_none(){if let Some(label)=existing_workspace(&app,window.label(),&view,panel.as_deref())?{focus_window(&app,&label)?;return Ok(label);}}
     if app.webview_windows().len()>=16{return Err("Close a Spark window before opening another workspace".into());}
     let label=format!("workspace-{}",uuid::Uuid::new_v4());
     let child=tauri::WebviewWindowBuilder::new(&app,&label,tauri::WebviewUrl::App(query.into())).title("Project Guilty Spark").inner_size(if panel.is_some(){620.}else{1120.},800.).min_inner_size(if panel.is_some(){400.}else{720.},400.).resizable(true).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;

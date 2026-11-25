@@ -3616,14 +3616,14 @@ small {
   --text: #dceaf2; --muted: #90a6b8;
 }
 :root[data-gs-theme='unsc'] {
-  --bg: #101713; --surface: #202b23; --panel: #131f19;
-  --line: #485e4b; --accent: #d5b875; --cyan: #adc8a7; --amber: #e4c18c;
-  --text: #e1e7d7; --muted: #a7b5a0;
+  --bg: #101713; --surface: #24302a; --panel: #1b2720;
+  --line: #496752; --accent: #b9d6a8; --cyan: #a0c8ad; --amber: #d8bb81;
+  --text: #eef1e7; --muted: #aab9a8;
 }
 :root[data-gs-theme='covenant'] {
-  --bg: #160e23; --surface: #261b38; --panel: #190e2b;
-  --line: #62477f; --accent: #c5a4ee; --cyan: #aab2f0; --amber: #edb5cc;
-  --text: #eee4f7; --muted: #b6a5ca;
+  --bg: #100c1c; --surface: #231833; --panel: #171124;
+  --line: #6b4785; --accent: #f4a9e6; --cyan: #c6b6ff; --amber: #edb5cc;
+  --text: #f7edf9; --muted: #c1adc9;
 }
 :root[data-gs-theme='forerunner'] {
   --bg: #091b20; --surface: #102a30; --panel: #0b2127;
@@ -3641,6 +3641,21 @@ small {
 :root[data-gs-theme] .panel,
 :root[data-gs-theme] .surface { border-color: var(--line); background: var(--surface); }
 :root[data-gs-theme] .brand strong { color: var(--text); }
+:root[data-gs-theme='covenant'] .application :is(.gs-compact-header,.gs-panel,.gs-settings-tabs,.halo-runtime-card) {
+  background: linear-gradient(155deg,#f6a7e51c 0%,#986bdb0e 37%,#10091c55 74%), var(--panel);
+  border-color: var(--line);
+  box-shadow: inset 0 1px #ffc9ed2d, inset 0 -1px #9c76da17;
+}
+:root[data-gs-theme='covenant'] .application :is(.halo-runtime-card,.gs-settings-tabs button)[aria-pressed='true'],
+:root[data-gs-theme='covenant'] .application .gs-settings-tabs button[aria-selected='true'] {
+  border-color: var(--accent);
+  background: linear-gradient(135deg,#a653924a,#59417740), var(--surface);
+}
+:root[data-gs-theme='unsc'] .application :is(.gs-compact-header,.gs-panel,.gs-settings-tabs,.halo-runtime-card) {
+  background: linear-gradient(165deg,#7eaa8b12,#151b17 78%), var(--panel);
+  border-color: var(--line);
+  box-shadow: inset 0 1px #b9d6a819;
+}
 :root[data-gs-theme='halo-ce'] .app-header,
 :root[data-gs-theme='forerunner'] .app-header { box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 22%, transparent); }
 :root[data-gs-reduced-motion='true'] *,
@@ -3668,8 +3683,8 @@ small {
 .interface-theme-option strong { font-size: 12px; letter-spacing: .025em; }
 .interface-theme-option small { font-size: 10px; line-height: 1.5; color: var(--muted); }
 .interface-swatch { display: block; height: 26px; width: 100%; border: 1px solid #ffffff2b; background: linear-gradient(115deg, #0c1928 40%, #2d526b 40%, #90cbe6 85%); }
-.interface-theme-unsc .interface-swatch { background: linear-gradient(115deg,#131f19 40%,#485e4b 40%,#d5b875 85%); }
-.interface-theme-covenant .interface-swatch { background: linear-gradient(115deg,#190e2b 40%,#62477f 40%,#c5a4ee 85%); }
+.interface-theme-unsc .interface-swatch { background: linear-gradient(115deg,#1b2720 25%,#496752 56%,#b9d6a8 88%); }
+.interface-theme-covenant .interface-swatch { background: linear-gradient(115deg,#171124 14%,#6b4785 48%,#f4a9e6 78%,#ffe7fa 87%,#915bc0 94%); }
 .interface-theme-forerunner .interface-swatch { background: linear-gradient(115deg,#0b2127 40%,#2c6873 40%,#90dce9 85%); }
 .interface-control { display: flex; gap: 10px; align-items: center; padding: 14px 0; color: var(--text); font-size: 12px; }
 .interface-volume { display: flex; flex-direction: column; gap: 10px; font-size: 12px; color: var(--text); }

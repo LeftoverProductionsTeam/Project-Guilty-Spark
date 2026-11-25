@@ -233,7 +233,18 @@ export default function App() {
   const [logs, setLogs] = useState<JobEvent[]>([]);
   const [activeJob, setActiveJob] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
-  const [createModal, setCreateModal] = useState<boolean | 'multiplayer' | 'megaworld'>(false);
+  const [createModal, setCreateModal] = useState<boolean | 'multiplayer' | 'megaworld'>(() => {
+    const query = new URLSearchParams(location.search);
+    const creation = query.get('create');
+    if (query.get('workspace') !== 'library') return false;
+    return creation === 'multiplayer' || creation === 'megaworld' ? creation : creation === 'assets';
+  });
+  async function openCreationWindow(creation: 'multiplayer' | 'megaworld' | 'assets') {
+    if (!native) { setCreateModal(creation === 'assets' ? true : creation); return; }
+    try {
+      await call('open_workspace_window', {workspace:'library', creation, another:true});
+    } catch (error) { notice(String(error), 'error'); }
+  }
   const [studioGuide,setStudioGuide]=useState(false);
   const returnPanelRequested=useRef(false);
   useEffect(()=>{
@@ -1503,8 +1514,12 @@ export default function App() {
     if (workspace === 'settings')
       return (
         <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings project={current} settings={data.settings} onEditProject={edit} onBeforeSave={persist=>save(persist===true,current?.id)}/>:settingsTab==='dependencies'?<div className="analysis-page">
-          <label className="field">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>setDependencyRuntime(e.target.value as RuntimeId)}>
-            <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="arenaEvolved">Arena Evolved</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
+          <label className="field dependency-target">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>{
+            if(e.target.value==='forerunner'){openCommunityFlavorSetup('forerunner');return;}
+            setDependencyRuntime(e.target.value as RuntimeId);
+          }}>
+            <optgroup label="Flagship"><option value="chupathingyCe">ChupathingyCE</option><option value="forerunner">Forerunner</option><option value="mccSteam">Halo 1 · MCC (Steam)</option></optgroup>
+            <optgroup label="Compatibility"><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="openCe">OpenCE</option><option value="arenaEvolved">Arena Evolved</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option></optgroup>
           </select></label>
           <DependencyPanel project={current} runtime={dependencyRuntime} onSetupChanged={next=>{setData(next);setEpoch(value=>value+1);}} onProjectUpdated={applyDependencyChoice} onChooseAssets={()=>setWorkspace(current?'assets':'library')} onChooseRuntime={()=>{writeMapSession(current?.id??'global','hosting.runtime',dependencyRuntime);writeMapSession('global','tools.dashboard','setup');writeMapSession('global','tools.connectRuntime',dependencyRuntime);writeMapSession('global','tools.downloadOpen',true);if(dependencyRuntime==='chupathingyCe')writeMapSession('global','tools.enginePackage','chupathingy');setSettingsTab('tools');}}/>
         </div>:<GamesTools data={data} project={current} busy={busy}
@@ -1835,9 +1850,9 @@ export default function App() {
                 fileActions={[
                   {id:'open-saved-project',label:'Open saved project…',hint:'Browse saved projects; other open maps keep their drafts and Undo history.',run:chooseSavedProject,disabled:busy},
                   {id:'open-map',label:'Open map or archive…',run:()=>void importFiles(),disabled:busy},
-                  {id:'new-multiplayer',group:'new',label:'Multiplayer Map',run:()=>setCreateModal('multiplayer'),disabled:busy},
-                  {id:'new-megaworld',group:'new',label:'MegaWorld',run:()=>setCreateModal('megaworld'),disabled:busy},
-                  {id:'new-project',group:'new',label:'Asset Workspace',run:()=>setCreateModal(true),disabled:busy},
+                  {id:'new-multiplayer',group:'new',label:'Multiplayer Map',run:()=>void openCreationWindow('multiplayer'),disabled:busy},
+                  {id:'new-megaworld',group:'new',label:'MegaWorld',run:()=>void openCreationWindow('megaworld'),disabled:busy},
+                  {id:'new-project',group:'new',label:'Asset Workspace',run:()=>void openCreationWindow('assets'),disabled:busy},
                   ...(current ? [
                     {id:'save-project',label:'Save',shortcut:'Control+s',run:()=>void save(true,current.id).catch(()=>{}),disabled:!native||busy||windowWriters[current.id]===false},
                     {id:'save-as-project',label:'Save As…',hint:current.source||current.quickForge?'Review a native map copy; structural edits use the existing source compiler.':'Export a .gsproject descriptor; referenced assets stay in their current locations.',run:()=>{if(current.source||current.quickForge){writeMapSession(current.id,'smart-edit.open',true);setWorkspace('build');if(current.quickForge)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'forge-palette'}})));}else void action(async()=>{const id=current.id;await save(true,id);return call('export_project',{id});},'Project descriptor exported. Referenced source and asset files must remain available.');},disabled:!native||busy||windowWriters[current.id]===false},

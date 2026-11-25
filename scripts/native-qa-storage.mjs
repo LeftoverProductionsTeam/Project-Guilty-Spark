@@ -1814,3 +1814,162 @@ export async function exportDevelopmentBuild(release, destination) {
     files: rows.map(({ source, target, ...row }) => row),
   };
 }
+
+const playtestFiles = ['BUILD.json', 'GuiltySpark.exe', 'startup.json'];
+
+async function validatedPlaytest(directory) {
+  await noLinks(directory);
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  if (entries.length !== playtestFiles.length ||
+      entries.some(row => !row.isFile() || !playtestFiles.includes(row.name))) {
+    throw Error('Playtest folder contains unrelated files. Profiles and user content are protected.');
+  }
+  for (const name of playtestFiles) {
+    const info = await fs.lstat(path.join(directory, name));
+    const limit = name.endsWith('.exe') ? 512 * 1024 ** 2 : 64 * 1024;
+    if (!info.isFile() || info.nlink !== 1 || !info.size || info.size > limit)
+      throw Error('Playtest artifact is linked, empty or exceeds its size limit');
+  }
+  const [build, startup] = await Promise.all(['BUILD.json', 'startup.json'].map(async name =>
+    JSON.parse(await fs.readFile(path.join(directory, name), 'utf8'))));
+  const file = build.files?.[0];
+  const exe = path.join(directory, 'GuiltySpark.exe');
+  if (build.workingTreeDirty !== false || build.files?.length !== 1 ||
+      file?.file !== 'GuiltySpark.exe' || !/^[a-f0-9]{40}$/.test(build.sourceCommit ?? '') ||
+      !/^[a-f0-9]{64}$/.test(file?.sha256 ?? '') || file.bytes !== (await fs.stat(exe)).size ||
+      startup.schemaVersion !== 1 || startup.sourceCommit !== build.sourceCommit ||
+      startup.platform !== 'windows-x64' || startup.mockedIpc !== false ||
+      startup.complete !== true || startup.workspaceReady !== true ||
+      startup.executableSha256 !== file.sha256 || !Array.isArray(startup.errors) || startup.errors.length ||
+      await fileHash(exe) !== file.sha256) {
+    throw Error('Playtest promotion requires a clean build and matching native Windows startup evidence');
+  }
+  return { sourceCommit: build.sourceCommit, sha256: file.sha256 };
+}
+
+async function retirePlaytest(directory) {
+  await validatedPlaytest(directory);
+  const size = await measure(directory, 513 * 1024 ** 2);
+  if (size.sharedFiles !== 0 || size.files !== playtestFiles.length || size.directories !== 1)
+    throw Error('Unexpected playtest contents. The older build was preserved.');
+  // Delete the executable first so a Windows sharing violation keeps both receipts.
+  for (const name of ['GuiltySpark.exe', 'BUILD.json', 'startup.json'])
+    await fs.unlink(path.join(directory, name));
+  await fs.rmdir(directory);
+  return size;
+}
+
+// Rotate executables and their two receipts only. Application data lives in
+// the user's library, outside these managed directories.
+export async function promoteValidatedPlaytest(candidate, { seedPrevious } = {}) {
+  candidate = await canonicalOutputPath(candidate);
+  if (contains(projectRoot, candidate) || contains(candidate, projectRoot))
+    throw Error('Choose the startup-verified candidate from isolated build output');
+  const identity = await validatedPlaytest(candidate);
+  const latest = path.join(projectRoot, 'Latest');
+  const previous = path.join(projectRoot, 'Previous');
+  const slotExists = async directory => {
+    await noLinks(directory);
+    return (await fs.lstat(directory).catch(error => {
+      if (error.code !== 'ENOENT') throw error;
+      return null;
+    })) !== null;
+  };
+  const lock = path.join(projectRoot, '.spark-playtest.lock');
+  const held = await fs.open(lock, 'wx');
+  let scratch, incoming, retired, seed;
+  let hasRetired = false, movedLatest = false, installed = false, seeded = false;
+  let latestBefore, previousBefore;
+  const present = directory => fs.stat(directory).then(() => true, error => {
+    if (error.code !== 'ENOENT') throw error;
+    return false;
+  });
+  const copy = async (from, to) => {
+    await fs.mkdir(to);
+    for (const name of playtestFiles)
+      await fs.copyFile(path.join(from, name), path.join(to, name), fs.constants.COPYFILE_EXCL);
+    return validatedPlaytest(to);
+  };
+  try {
+    await held.writeFile(JSON.stringify({ pid: process.pid, candidate: identity.sha256 }));
+    if (await slotExists(latest)) latestBefore = await validatedPlaytest(latest);
+    if (await slotExists(previous)) previousBefore = await validatedPlaytest(previous);
+    if (latestBefore?.sha256 === identity.sha256)
+      return { latest, previous: previousBefore ? previous : null, ...identity, reclaimedBytes: 0 };
+    if (seedPrevious && (latestBefore || previousBefore))
+      throw Error('A rollback can be seeded only on first playtest promotion');
+    if (latestBefore) {
+      const result = isEarlierPlaytestCommit(latestBefore.sourceCommit, identity.sourceCommit);
+      if (!result) throw Error('Candidate does not descend from the current validated Spark build');
+    }
+    scratch = await fs.mkdtemp(path.join(projectRoot, '.spark-playtest-'));
+    if (key(await canonicalOutputPath(scratch)) !== key(scratch) || !contains(projectRoot, scratch))
+      throw Error('Playtest rotation directory redirects');
+    incoming = path.join(scratch, 'incoming');
+    retired = path.join(scratch, 'retired');
+    if ((await copy(candidate, incoming)).sha256 !== identity.sha256)
+      throw Error('Candidate changed while staging');
+    if (seedPrevious) {
+      const source = await canonicalOutputPath(seedPrevious);
+      if (contains(projectRoot, source) || contains(source, projectRoot))
+        throw Error('Choose an isolated, validated first rollback');
+      const expected = await validatedPlaytest(source);
+      if (expected.sha256 === identity.sha256 ||
+          !isEarlierPlaytestCommit(expected.sourceCommit, identity.sourceCommit))
+        throw Error('The seeded rollback must be an earlier validated build');
+      seed = path.join(scratch, 'seed');
+      if ((await copy(source, seed)).sha256 !== expected.sha256) throw Error('Rollback changed while staging');
+    }
+    if (previousBefore && latestBefore) {
+      await fs.rename(previous, retired);
+      hasRetired = true;
+    }
+    if (latestBefore) {
+      await fs.rename(latest, previous);
+      movedLatest = true;
+    } else if (seed) {
+      await fs.rename(seed, previous);
+      seeded = true;
+    }
+    await fs.rename(incoming, latest);
+    installed = true;
+    if ((await validatedPlaytest(latest)).sha256 !== identity.sha256)
+      throw Error('Installed playtest differs from its verified candidate');
+  } catch (error) {
+    if (installed) await fs.rename(latest, incoming);
+    if (movedLatest) await fs.rename(previous, latest);
+    if (seeded) await fs.rename(previous, seed);
+    if (hasRetired) await fs.rename(retired, previous);
+    for (const dir of [incoming, seed].filter(Boolean)) {
+      // A partial copy contains only this transaction's known fixture files.
+      await noLinks(dir);
+      if (await present(dir)) {
+        for (const name of playtestFiles) await fs.unlink(path.join(dir, name)).catch(error => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+        await fs.rmdir(dir);
+      }
+    }
+    if (scratch) await fs.rmdir(scratch);
+    throw error;
+  } finally {
+    await held.close();
+    await fs.unlink(lock);
+  }
+  const disposed = hasRetired ? await retirePlaytest(retired) : { bytes: 0, allocatedBytes: 0 };
+  if (scratch) await fs.rmdir(scratch);
+  return { latest, previous: await present(previous) ? previous : null, ...identity,
+    reclaimedLogicalBytes: disposed.bytes, reclaimedBytes: disposed.allocatedBytes };
+}
+
+function isEarlierPlaytestCommit(previous, next) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', previous, next], {
+      cwd: projectRoot, stdio: 'ignore', windowsHide: true,
+    });
+    return true;
+  } catch (error) {
+    if (error.status === 1) return false;
+    throw error;
+  }
+}

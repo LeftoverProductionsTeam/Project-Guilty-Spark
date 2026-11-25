@@ -18,6 +18,7 @@ mod bsp_scenery;
 mod bsp_netgame_flags;
 mod bsp_player_starts;
 mod bsp_pickups;
+mod bsp_vehicles;
 mod bsp_clearance;
 mod bsp_triangulate;
 pub mod build;

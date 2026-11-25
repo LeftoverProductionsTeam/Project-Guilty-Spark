@@ -281,7 +281,8 @@
 .application .games-tools-page{display:flex;flex-direction:column;min-height:0;height:100%;max-width:1920px;margin-inline:auto;padding:6px 12px;}
 .games-tools-page>.games-tools-heading{margin-bottom:3px;flex:none;}
 .games-tools-page>.games-tools-heading>span{display:none;}
-.games-tools-page>.halo-runtime-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:3px 0 7px;flex:none;}
+ .games-tools-page>.halo-runtime-grid{grid-template-columns:repeat(auto-fit,minmax(min(126px,100%),1fr));gap:4px;margin:2px 0 5px;flex:none;}
+.halo-runtime-group-label{grid-column:1/-1;color:var(--muted);font-size:10px;}
 .games-tools-page .halo-runtime-card{padding:4px 6px;grid-template-columns:16px minmax(0,1fr);border-radius:5px;}
 .games-tools-page .halo-runtime-card strong{font-size:11px;white-space:nowrap;}
 .games-tools-page>.games-tools-context{flex:none;gap:5px;}

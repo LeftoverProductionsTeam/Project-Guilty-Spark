@@ -24,6 +24,8 @@ pub(crate) struct PreparedPickups {
     shared_tags: usize,
     collections: BTreeMap<String, NativeItemCollection>,
     donor_membership: Vec<bool>,
+    #[serde(default)]
+    vehicles: Option<crate::bsp_vehicles::PreparedVehicles>,
 }
 
 impl PreparedPickups {
@@ -73,6 +75,7 @@ impl PreparedPickups {
                 "Compiled pickup collections changed ordered items, weights or spawn timing",
             );
         }
+        if let Some(vehicles) = &self.vehicles { vehicles.verify(path, map)?; }
         Ok(())
     }
 
@@ -140,7 +143,42 @@ pub(crate) fn verify_merged_manifest(
         return invalid("An imported or moved pickup no longer has a valid home in the merged native BSP");
     }
     Ok(Some(serde_json::json!({ "count": actual.len(), "donorCount": planned.donor_count(),
-        "checkedMembership": positions.len(), "dependencies": planned.dependency_summary() })))
+        "checkedMembership": positions.len(), "donorVehicleCount": planned.vehicles.as_ref().map_or(0, |rows| rows.donor_count()),
+        "dependencies": planned.dependency_summary() })))
+}
+
+
+fn reuse_reviewed_recovery(
+    source: &Path, staged: &Path, dependencies: &BTreeSet<String>, runner: &Runner,
+) -> Result<()> {
+    for correction in crate::ce_source_recovery::corrections() {
+        if !dependencies.contains(correction.tag) { continue; }
+        let original = source.join(safe_relative(correction.tag)?);
+        let reviewed = staged.join(safe_relative(correction.tag)?);
+        reject_links(&original)?;
+        reject_links(&reviewed)?;
+        if !reviewed.is_file() || maps::hash_file(&original)? != correction.before_sha256
+            || maps::hash_file(&reviewed)? != correction.after_sha256
+        {
+            continue;
+        }
+        // The reviewed lens edit is valid only for the same one-image bitmap.
+        if correction.tag.ends_with(".lens_flare") {
+            let bitmap = source.join(crate::ce_source_recovery::BITMAP);
+            reject_links(&bitmap)?;
+            if !bitmap.is_file()
+                || maps::hash_file(&bitmap)? != crate::ce_source_recovery::BITMAP_SHA
+            {
+                continue;
+            }
+        }
+        fs::copy(&reviewed, &original)?;
+        if maps::hash_file(&original)? != correction.after_sha256 {
+            return invalid("The staged donor recovery bytes differ from the acknowledged correction");
+        }
+        runner.emit("bsp-gameplay-recovery", format!("{}: {}", correction.tag, correction.explanation), 43, "info");
+    }
+    Ok(())
 }
 
 fn isolate_dependencies(
@@ -174,13 +212,13 @@ fn isolate_dependencies(
         )?;
         if !["0", "false"].contains(&result.trim().to_lowercase().as_str()) {
             return invalid(format!(
-                "Donor pickup extraction stopped at source check {field}: {result}"
+                "Donor gameplay extraction stopped at source check {field}: {result}"
             ));
         }
     }
     for tag in &donor.tags {
         maps::validate_cache_tag_path(&tag.path).map_err(|error| {
-            SparkError::Invalid(format!("Unsafe donor pickup extraction tag {} {:?}: {error}", tag.class, tag.path))
+            SparkError::Invalid(format!("Unsafe donor gameplay extraction tag {} {:?}: {error}", tag.class, tag.path))
         })?;
     }
     fs::create_dir(&extracted)?;
@@ -213,10 +251,11 @@ fn isolate_dependencies(
         let files = closure(root, "pickup-source", &extracted)?;
         dependencies.extend(files.iter().cloned());
         if dependencies.len() > 8192 {
-            return invalid("Pickup dependency closure exceeds 8192 native tags");
+            return invalid("Donor gameplay dependency closure exceeds 8192 native tags");
         }
         bindings.insert(root, files);
     }
+    reuse_reviewed_recovery(&extracted, tags, &dependencies, runner)?;
     let working = workspace.join("pickup-aliases");
     fs::create_dir(&working)?;
     let mut candidates = BTreeMap::new();
@@ -309,7 +348,7 @@ fn isolate_dependencies(
         let root = remap(root);
         if closure(&root, "tags", tags)? != expected {
             return invalid(format!(
-                "Namespaced pickup dependency readback differed for {root}"
+                "Namespaced donor dependency readback differed for {root}"
             ));
         }
     }
@@ -345,7 +384,7 @@ pub(crate) fn stage(
     let base_collections = base_rows.iter().map(|row| row.collection.clone()).collect();
     let mut collections =
         maps::native_item_collections(&base_source.preserved_path, base, &base_collections)?;
-    if donor_rows.is_empty() {
+    if donor_rows.is_empty() && !donor.objects.iter().any(|row| row.kind == "Vehicle") {
         return Ok(PreparedPickups {
             base: base_rows,
             moved_base,
@@ -354,6 +393,7 @@ pub(crate) fn stage(
             shared_tags: 0,
             collections,
             donor_membership: vec![],
+            vehicles: None,
         });
     }
     let original =
@@ -394,9 +434,13 @@ pub(crate) fn stage(
         row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
     }
 
+    let mut vehicles = crate::bsp_vehicles::PreparedVehicles::from_sources(
+        project, base, assembly, donor, cache_version, |position| collision.contains_placement(position),
+    )?;
     let roots = donor_rows
         .iter()
         .map(|row| format!("{}.item_collection", row.collection))
+        .chain(vehicles.roots())
         .collect();
     let (aliases, total_tags) = isolate_dependencies(
         &assembly.donor_source,
@@ -454,12 +498,14 @@ pub(crate) fn stage(
     if count()? != base_rows.len() {
         return invalid("Staged base pickup count changed. Reconcile editable tags with the source cache before merging");
     }
-    run(vec![
-        "-I".into(),
-        "netgame_equipment".into(),
-        donor_rows.len().to_string(),
-        "end".into(),
-    ])?;
+    if !donor_rows.is_empty() {
+        run(vec![
+            "-I".into(),
+            "netgame_equipment".into(),
+            donor_rows.len().to_string(),
+            "end".into(),
+        ])?;
+    }
     for (index, row) in donor_rows.iter_mut().enumerate() {
         let from = format!("{}.item_collection", row.collection);
         let target = aliases.get(&from).map(String::as_str).unwrap_or(&from);
@@ -493,6 +539,7 @@ pub(crate) fn stage(
     if count()? != base_rows.len() + donor_rows.len() {
         return invalid("Native writer did not retain the reviewed pickup count");
     }
+    vehicles.append(&aliases, cache_version, run)?;
     Ok(PreparedPickups {
         base: base_rows,
         moved_base,
@@ -501,5 +548,6 @@ pub(crate) fn stage(
         shared_tags: total_tags - aliases.len(),
         collections,
         donor_membership,
+        vehicles: Some(vehicles),
     })
 }

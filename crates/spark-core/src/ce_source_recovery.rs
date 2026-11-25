@@ -27,8 +27,8 @@ pub fn corrections() -> Vec<Correction> {
         Correction { tag: "vehicles/scorpion/secondary fire bullet.effect", before_sha256: "84d8518bf452c7e92f5ffff76c950b95705687a29ac6bca8a908e11810f2fc9a", after_sha256: "c1f91648209a895d2514a82a984379a3380d2058886b1cfbeac5b1eacb11a447", fields: 3, explanation: "Clear three references to missing effect location 1 to the native null sentinel (65535). Those undefined attachment references are removed." },
     ]
 }
-const BITMAP: &str = "vehicles/scorpion/bitmaps/headlight_lens_flare.bitmap";
-const BITMAP_SHA: &str = "030be8836308fa1a732436e458e39ce33199803a2c1737d02045bc20989aa1ff";
+pub(crate) const BITMAP: &str = "vehicles/scorpion/bitmaps/headlight_lens_flare.bitmap";
+pub(crate) const BITMAP_SHA: &str = "030be8836308fa1a732436e458e39ce33199803a2c1737d02045bc20989aa1ff";
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Plan {

@@ -1688,7 +1688,7 @@ fn run_with(
         }
         let log = invoke(&runner, &input.tool, &args, &workspace, "scenario", 50)?;
         if cache_version == 13 && !crate::conversion::native_compile_succeeded(&log) {
-            return invalid("H1A Tool did not confirm successful cache compilation; zero exit status is insufficient");
+            return invalid(crate::conversion::native_compile_failure(&log));
         }
         if cache_version == 609 && log.lines().any(|line| {
             let line=line.trim_start().to_ascii_lowercase();

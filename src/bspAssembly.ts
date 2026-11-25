@@ -60,6 +60,8 @@ export interface AssemblyReport {
     playerStarts: ScenarioPlacementBudget;
     netgameEquipment: ScenarioPlacementBudget;
     netgameFlags: ScenarioPlacementBudget;
+    vehicles?: ScenarioPlacementBudget;
+    mcc13Vehicles?: ScenarioPlacementBudget;
     mcc13RegionalFlags?: ScenarioPlacementBudget;
     mcc13RegionalStarts?: ScenarioPlacementBudget;
     mcc13RegionalEquipment?: ScenarioPlacementBudget;

@@ -207,12 +207,7 @@ pub fn extract_selected_tag(
         if !["bitmaps.map","sounds.map","loc.map"].contains(&name.as_str()) ||
             maps::hash_file(&resources.join(name))?!=*digest {return invalid("Source resource checksum changed; extraction blocked");}
     }
-    for resource in &inspection.resources {
-        if resource.required && !resources.join(&resource.name).is_file() {
-            return invalid(format!("Extraction requires the source runtime resource {}",resource.name));
-        }
-    }
-    if [6,7,609].contains(&source.cache_version){crate::native_resources::review(source,inspection,resources)?;}
+     if [6,7,609].contains(&source.cache_version){crate::native_resources::review(source,inspection,resources)?;}
     // Scenario recovery must not invoke Invader's recursive single-tag compiler:
     // it receives empty script/data build parameters. Extract the complete cache
     // in its supported non-recursive mode, keeping all tags and script source.
@@ -241,6 +236,13 @@ pub fn extract_selected_tag(
         let tags=staging.join("tags");fs::create_dir(&tags)?;
         let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
         let prepared_audio=crate::audio::mcc_extraction_input(source,inspection,tag_id)?;
+        for resource in &inspection.resources {
+            if resource.required && !resources.join(&resource.name).is_file() &&
+                !(resource.name == "sounds.map" && prepared_audio.is_some())
+            {
+                return invalid(format!("Extraction requires the source runtime resource {}",resource.name));
+            }
+        }
         if cancel.load(std::sync::atomic::Ordering::Relaxed){return invalid("Native audio extraction cancelled before tool launch");}
         let extraction_input=if let Some((bytes,report))=&prepared_audio {
             let input=staging.join("mcc-audio-extraction-input.map");

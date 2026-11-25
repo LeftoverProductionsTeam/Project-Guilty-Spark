@@ -1706,34 +1706,68 @@ async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::Webvie
 #[tauri::command]
 async fn choose_project_resources(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     project_id: String,
 ) -> Reply<Option<OpenProject>> {
-    let chosen = rfd::AsyncFileDialog::new()
-        .set_title("Choose original runtime resources for this project")
-        .pick_folder()
-        .await;
-    let Some(chosen) = chosen else {
-        return Ok(None);
-    };
+    let owner = window.label().to_owned();
+    let state = app.state::<AppState>();
+    check_document_owner(&state, &project_id, &owner)?;
+    let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+    let source = project.source.as_ref().ok_or("Project has no preserved source map")?;
+    let title = format!("Choose the original map or runtime folder for {}", project.title);
+    let mut dialog = rfd::AsyncFileDialog::new().set_title(&title);
+    if let Some(parent) = source.original_path.parent() {
+        if parent.is_dir() { dialog = dialog.set_directory(parent); }
+    }
+    let Some(chosen) = dialog.pick_folder().await else { return Ok(None); };
     let folder = chosen.path().to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
+        core::library::validate_local_input_path(&folder).map_err(error)?;
         core::reject_links(&folder).map_err(error)?;
         let state = app.state::<AppState>();
-        let mut p = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let s = p.source.as_mut().ok_or("Project has no source map")?;
-        s.resource_sha256 = project::resource_hashes(&folder).map_err(error)?;
-        s.resource_directory = Some(folder);
-        lock(&state.inspections)?.remove(&project_id);
-        let i = (*inspect(&state, &p)?).clone();
-        p.modified_at = chrono::Utc::now().to_rfc3339();
-        lock(&state.library)?.save(&p, Some(&i)).map_err(error)?;
-        Ok(Some(OpenProject {
-            project: p,
-            inspection: Some(i),
-        }))
-    })
-    .await
-    .map_err(error)?
+        check_document_owner(&state, &project_id, &owner)?;
+        let before = serde_json::to_vec(&project).map_err(error)?;
+        let inspection = inspect(&state, &project)?;
+        let mut next = project;
+        let source = next.source.as_mut().ok_or("Source disappeared")?;
+        let sound_candidates = [
+            folder.clone(), folder.join("sound/pc"), folder.join("halo1/sound/pc"),
+            folder.parent().unwrap_or(&folder).join("sound/pc"),
+        ];
+        if source.cache_version == 13 && source.audio_resources.is_none() {
+            source.audio_resources = sound_candidates.iter().find_map(|path| core::mcc_audio::pin_mcc(path).ok());
+        }
+        let map_candidates = [folder.clone(), folder.join("maps"), folder.join("maps_ce"), folder.join("halo1/maps")];
+        let mut reason = "Choose a map or runtime folder with the preserved source map's original resources.".to_owned();
+        for directory in map_candidates {
+            if !directory.is_dir() || core::reject_links(&directory).is_err() { continue; }
+            let hashes = project::resource_hashes(&directory).map_err(error)?;
+            if hashes.is_empty() { continue; }
+            let mut candidate = source.clone();
+            candidate.resource_directory = Some(directory.clone());
+            candidate.resource_sha256 = hashes;
+            if ["bitmaps.map","sounds.map","loc.map"].into_iter().any(|name|
+                source.resource_sha256.get(name).is_some_and(|expected| candidate.resource_sha256.get(name) != Some(expected))) {
+                reason = "A resource file differs from the preserved source's recorded checksum.".into();
+                continue;
+            }
+            if [6, 7, 609].contains(&source.cache_version) {
+                if let Err(error) = core::native_resources::review(&candidate, &inspection, &directory) {
+                    reason = error.to_string();
+                    continue;
+                }
+            } else if inspection.resources.iter().any(|resource| resource.required &&
+                !candidate.resource_sha256.contains_key(&resource.name) &&
+                !(resource.name == "sounds.map" && source.cache_version == 13 && candidate.audio_resources.is_some())) {
+                reason = "The selected folder does not contain the source map's required native resource files.".into();
+                continue;
+            }
+            *source = candidate;
+            next.modified_at = chrono::Utc::now().to_rfc3339();
+            return texture_resources_native::save_binding(&app, &owner, &before, next).map(Some);
+        }
+        Err(reason)
+    }).await.map_err(error)?
 }
 fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -> Reply<()> {
     if settings.invader_directory.is_none(){settings.invader_directory=find_local_invader(state);}

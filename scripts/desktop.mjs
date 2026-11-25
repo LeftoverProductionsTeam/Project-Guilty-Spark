@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -6,6 +8,7 @@ import {
   runDevelopmentCommand,
   embeddedFrontendConfig,
   exportDevelopmentBuild,
+  promoteValidatedPlaytest,
 } from './native-qa-storage.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const local = path.join(root, '.toolchain');
@@ -49,6 +52,25 @@ export function prepareDesktopArguments(input, config, { owned = false } = {}) {
   if (['build', 'dev'].includes(args[0])) args.push('--config', config);
   return { args: [...args, ...cargo], exportTo };
 }
+async function validateAndPromote(context, releaseDir, verifyMonitor) {
+  const destination = path.join(context.directory, 'playtest-candidate');
+  const smoke = path.join(context.directory, 'playtest-startup');
+  const executable = path.join(destination, 'GuiltySpark.exe');
+  const exported = await exportDevelopmentBuild(releaseDir, destination);
+  if (exported.workingTreeDirty) throw Error('Commit the candidate source before validating it');
+  await runDevelopmentCommand(process.execPath, [
+    'scripts/release/smoke-windows.mjs', executable, exported.sourceCommit, smoke,
+  ], context);
+  if (verifyMonitor) await runDevelopmentCommand(process.execPath, [
+    'scripts/test-native-monitor-portrait.mjs', executable, path.join(context.directory, 'playtest-monitor'),
+  ], context);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
+  if (git('rev-parse', 'HEAD') !== exported.sourceCommit || git('status', '--porcelain'))
+    throw Error('Candidate source changed during native validation');
+  await fs.writeFile(path.join(destination, 'BUILD.json'), JSON.stringify(exported, null, 2), { flag: 'wx' });
+  await fs.copyFile(path.join(smoke, 'startup.json'), path.join(destination, 'startup.json'));
+  return promoteValidatedPlaytest(destination);
+}
 async function main() {
   try {
     await withDevelopmentWorkspace('desktop', async (context) => {
@@ -63,7 +85,12 @@ async function main() {
         CARGO_INCREMENTAL: env.CARGO_INCREMENTAL,
       };
       const config = JSON.stringify(embeddedFrontendConfig(context.env.SPARK_FRONTEND_DIST));
-      const { args, exportTo } = prepareDesktopArguments(process.argv.slice(2), config, {
+      const request = process.argv.slice(2);
+      const playtest = request[0] === 'playtest';
+      const verifyMonitor = request[1] === '--verify-monitor';
+      if (playtest && (process.platform !== 'win32' || request.length !== (verifyMonitor ? 2 : 1)))
+        throw Error('Use desktop playtest [--verify-monitor] on Windows');
+      const { args, exportTo } = prepareDesktopArguments(playtest ? ['build', '--no-bundle'] : request, config, {
         owned: Boolean(process.env.SPARK_BUILD_WORKSPACE),
       });
       await runDevelopmentCommand(
@@ -71,6 +98,8 @@ async function main() {
         [path.join(root, 'node_modules/@tauri-apps/cli/tauri.js'), ...args],
         context,
       );
+      if (playtest)
+        console.log(JSON.stringify({ promoted: await validateAndPromote(context, path.join(context.env.CARGO_TARGET_DIR, 'release'), verifyMonitor) }));
       if (exportTo)
         console.log(
           JSON.stringify({

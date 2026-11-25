@@ -266,6 +266,10 @@ pub(crate) fn compile_native(
     }
     Ok(())
 }
+fn collision_warnings(log: &str) -> impl Iterator<Item = &str> {
+    log.lines().filter(|line| line.to_ascii_lowercase().contains("will not be collidable"))
+}
+
 /// Diagnose actual missing files without treating Tool's zero exit as success.
 pub fn native_compile_failure(log:&str)->String {
     let mut missing=std::collections::BTreeSet::new();
@@ -279,6 +283,17 @@ pub fn native_compile_failure(log:&str)->String {
         if tag.len()>512||tag.is_empty()||tag.chars().any(|c|c.is_control()||":*?<>|\"".contains(c))||tag.split('/').any(|part|part.is_empty()||part=="."||part==".."){continue;}
         missing.insert(tag.to_ascii_lowercase());
     }
+    if missing.is_empty() && collision_warnings(log).next().is_some() {
+        let dropped = collision_warnings(log).filter_map(|line| {
+            let (_, tail) = line.split_once('\'')?;
+            let (name, _) = tail.split_once('\'')?;
+            let path = name.replace('\\', "/");
+            (path.len() <= 512 && safe_relative(&path).is_ok()).then_some(path)
+        }).collect::<std::collections::BTreeSet<_>>();
+        let names = dropped.iter().take(8).map(String::as_str).collect::<Vec<_>>().join(", ");
+        let scope = if names.is_empty() { String::new() } else { format!(" for {names}") };
+        return format!("MCC Tool dropped collision{scope}. Match the collision node hierarchy to the render model before rebuilding. No playable output was accepted.");
+    }
     if missing.is_empty(){return "MCC Tool did not confirm successful cache compilation. Its zero exit code alone is not success; inspect the conversion log".into();}
     let list=missing.iter().take(8).cloned().collect::<Vec<_>>().join("; ");
     let remaining=if missing.len()>8{format!(" (+{} more)",missing.len()-8)}else{String::new()};
@@ -289,6 +304,7 @@ pub fn native_compile_succeeded(log: &str) -> bool {
     s.contains("successfully built cache file.")
         && !s.contains("### failed")
         && !s.contains("exception halt")
+        && collision_warnings(log).next().is_none()
 }
 /// Inspect the installed SDK's archive listing before extracting tag data.
 /// Executables/data outside tags/ are never selected for extraction.
@@ -490,6 +506,14 @@ mod tests {
         assert!(!native_compile_succeeded(
             "successfully built cache file.\nEXCEPTION halt"
         ));
+    }
+    #[test]
+    fn native_collision_loss_blocks_successful_cache_compilation() {
+        let log = "successfully built cache file.\nthe object 'scenery\\example\\example' will not be collidable";
+        assert!(!native_compile_succeeded(log));
+        let message = native_compile_failure(log);
+        assert!(message.contains("scenery/example/example"));
+        assert!(message.contains("node hierarchy"));
     }
     #[test]
     fn missing_native_tags_report_exact_dependencies_and_matching_resource_guidance() {

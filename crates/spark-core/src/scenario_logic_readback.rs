@@ -129,6 +129,8 @@ pub struct ScenarioGameplayBudget {
     mcc13_regional_flags: ScenarioPlacementBudget,
     mcc13_regional_starts: ScenarioPlacementBudget,
     mcc13_regional_equipment: ScenarioPlacementBudget,
+    pub(crate) vehicles: ScenarioPlacementBudget,
+    mcc13_vehicles: ScenarioPlacementBudget,
 }
 
 // Published Forerunner MCC loader bound. Invader's native ScenarioNetgameFlags
@@ -149,11 +151,12 @@ pub(crate) fn netgame_equipment_limit(cache_version: u32) -> usize {
 }
 
 // Standard HEK scenario reflexives. Extra BSP references share these arrays.
-fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 3]> {
+fn native_gameplay_counts(reader: &Reader, space: &Space, scenario: usize) -> Result<[usize; 4]> {
     Ok([
         space.block(reader, scenario + 0x354, 52, 32767)?.1,
         space.block(reader, scenario + 0x384, 144, 32767)?.1,
         space.block(reader, scenario + 0x378, 148, 32767)?.1,
+        space.block(reader, scenario + 0x240, 120, 32767)?.1,
     ])
 }
 
@@ -176,6 +179,8 @@ pub fn scenario_gameplay_merge_budget(
         mcc13_regional_flags: row(2, MCC13_REGIONAL_FLAG_LIMIT),
         mcc13_regional_starts: row(0, player_start_limit(13)),
         mcc13_regional_equipment: row(1, netgame_equipment_limit(13)),
+        vehicles: row(3, crate::bsp_vehicles::limit(609)),
+        mcc13_vehicles: row(3, crate::bsp_vehicles::limit(13)),
     })
 }
 
@@ -314,6 +319,70 @@ pub(crate) fn scenario_region_starts(path: &Path, inspection: &MapInspection) ->
             Ok(NativeRegionStart { position, facing, team_index: reader.u16(row + 16)? as i16,
                 bsp_index: reader.u16(row + 18)? as i16,
                 spawn_types: [reader.u16(row + 20)?, reader.u16(row + 22)?, reader.u16(row + 24)?, reader.u16(row + 26)?] })
+        }).collect()
+    })
+}
+
+/// Scenario vehicle fields retained across a donor import. Native BSP membership
+/// is rebuilt from the transformed placement by the cache compiler.
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NativeVehicle {
+    pub tag: Option<String>,
+    pub name: Option<String>,
+    pub position: [f32; 3],
+    pub rotation: [f32; 3],
+    pub not_placed: u16,
+    pub permutation: i16,
+    pub appearance_player: u8,
+    pub body_vitality: f32,
+    pub unit_flags: u32,
+    pub team: i8,
+    pub spawn_flags: u16,
+}
+
+pub(crate) fn scenario_vehicles(path: &Path, map: &MapInspection) -> Result<Vec<NativeVehicle>> {
+    with_scenario(path, map, |reader, space, scenario| {
+        let names = parse_names(reader, space, scenario)?;
+        let (rows, count) = space.block(reader, scenario + 0x240, 120, 4096)?;
+        let (palette, palettes) = space.block(reader, scenario + 0x24c, 48, 4096)?;
+        (0..count).map(|index| {
+            let row = rows + index * 120;
+            let slot = reader.u16(row)? as usize;
+            let tag = if slot == u16::MAX as usize {
+                None
+            } else {
+                if slot >= palettes {
+                    return invalid(format!("Native vehicle {index} has an invalid palette index"));
+                }
+                let entry = palette + slot * 48;
+                let id = reader.u32(entry + 12)?;
+                let tag = map.tags.iter().find(|tag| tag.id == id && tag.class == "vehi" && !tag.external)
+                    .filter(|_| reader.fourcc(entry).is_ok_and(|class| class == "vehi"))
+                    .ok_or_else(|| SparkError::Invalid(format!("Native vehicle {index} has no valid vehicle tag")))?;
+                Some(tag.path.replace('\\', "/").to_ascii_lowercase() + ".vehicle")
+            };
+            let name_index = reader.u16(row + 2)? as usize;
+            let name = if name_index == u16::MAX as usize {
+                None
+            } else {
+                Some(names.get(name_index)
+                    .filter(|name| name.object_type == 1 && usize::try_from(name.object_index) == Ok(index))
+                    .ok_or_else(|| SparkError::Invalid(format!("Native vehicle {index} has an invalid object name binding")))?
+                    .name.clone())
+            };
+            Ok(NativeVehicle {
+                tag, name,
+                position: vec3(reader, row + 8)?,
+                rotation: vec3(reader, row + 20)?,
+                not_placed: reader.u16(row + 4)?,
+                permutation: reader.u16(row + 6)? as i16,
+                appearance_player: if map.header.version == 13 { reader.bytes(row + 36, 1)?[0] } else { 0 },
+                body_vitality: reader.f32(row + 72)?,
+                unit_flags: reader.u32(row + 76)?,
+                team: reader.bytes(row + 88, 1)?[0] as i8,
+                spawn_flags: reader.u16(row + 90)?,
+            })
         }).collect()
     })
 }

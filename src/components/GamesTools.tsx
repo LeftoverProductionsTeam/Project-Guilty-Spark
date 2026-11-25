@@ -57,6 +57,25 @@ export default function GamesTools({
   function openFolders(){chooseSection('setup');if(runtime==='mccSteam')onSetup(runtime);else setFoldersFor(runtime);}
 
   const selectedReport=reports.find(report=>report.id===runtime);
+  const forerunner = profiles.find(profile=>profile.reviewedCompanion?.capabilities.engine==='Forerunner');
+  const forerunnerActive = runtime==='openCe' && !!forerunner &&
+    selectedReport?.installation?.registrationId===forerunner.id;
+  const forerunnerConnected = forerunnerActive && selectedReport?.installation?.validation==='pass';
+  const [showForerunner,setShowForerunner]=useState(false);
+  function openForerunner() {
+    setRuntime('openCe');
+    setShowForerunner(true);
+    if (forerunner) {
+      void call('activate_runtime_registration',{registrationId:forerunner.id})
+        .then(()=>window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed')))
+        .catch(error=>setFlavorError(String(error)));
+    } else {
+      writeMapSession('global','tools.enginePackage','forerunner');
+      writeMapSession('global','tools.downloadOpen',false);
+      setFoldersFor('openCe');
+      chooseSection('setup');
+    }
+  }
   const reveal = useRevealWorkspacePanel();
   const installation = reports.find((report) => report.id === runtime)?.installation;
   const candidate = detected.find(item => item.runtimeId === runtime);
@@ -71,8 +90,17 @@ export default function GamesTools({
         </button>
       </header>
       {error && <Notice tone="error">{error}</Notice>}
-      <div className="halo-runtime-grid" role="group" aria-label="Halo versions">
-        {primaryRuntimes.map((id) => {
+      {(['flagship','compatibility'] as const).map(group => (
+      <div key={group} className="halo-runtime-grid" role="group" aria-label={group==='flagship'?'Flagship Halo runtimes':'Compatibility runtimes'}>
+        {group==='compatibility'&&<span className="halo-runtime-group-label">Compatibility</span>}
+        {(group==='flagship' ? ['chupathingyCe','forerunner','mccSteam'] as const :
+          primaryRuntimes.filter(id=>id!=='chupathingyCe'&&id!=='mccSteam')).map((id) => {
+          if(id==='forerunner') return <button key={id} className="halo-runtime-card" data-connected={forerunnerConnected}
+            aria-pressed={forerunnerActive||showForerunner} title={forerunner?.root??'Connect a reviewed Forerunner build'}
+            onClick={openForerunner}>
+            <Gamepad2 size={16}/><strong>Forerunner</strong>
+            <span>{forerunnerConnected&&<Check size={11}/>} {forerunnerConnected?'Connected':forerunner?'Choose profile':'Connect build'}</span>
+          </button>;
           const found = reports.find((report) => report.id === id)?.installation;
           const available = detected.find(item => item.runtimeId === id);
           const connected = found?.validation === 'pass';
@@ -90,14 +118,23 @@ export default function GamesTools({
               key={id}
               className="halo-runtime-card"
               data-connected={connected}
-              aria-pressed={runtime === id}
+              aria-pressed={runtime === id && !(id==='openCe'&&(forerunnerActive||showForerunner))}
               aria-label={`${runtimeNames[id]} · ${status}`}
               title={
                 found || available
                   ? `${runtimeNames[id]}: ${found?.root ?? available?.root}`
                   : `Connect ${runtimeNames[id]} to use its installed tools and content`
               }
-              onClick={() => setRuntime(id)}
+              onClick={() => {
+                setShowForerunner(false);
+                setRuntime(id);
+                if(id==='openCe'&&forerunnerActive){
+                  const projectProfile=profiles.find(profile=>profile.runtimeId==='openCe'&&!profile.reviewedCompanion);
+                  if(projectProfile)void call('activate_runtime_registration',{registrationId:projectProfile.id})
+                    .then(()=>window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed')))
+                    .catch(error=>setFlavorError(String(error)));
+                }
+              }}
             >
               <Gamepad2 size={17} />
               <strong>{runtimeNames[id]}</strong>
@@ -108,6 +145,7 @@ export default function GamesTools({
           );
         })}
       </div>
+      ))}
       {['openCe','chupathingyCe'].includes(runtime)&&<label className="games-tools-flavors">OpenCE flavors · community engines
         <select aria-label="Community engine flavor" value={profiles.find(item=>item.id===installation?.registrationId)?.id??''} onChange={event=>{const id=event.target.value;if(id.startsWith('setup:')){const flavor=id.slice(6);writeMapSession('global','tools.enginePackage',flavor);writeMapSession('global','tools.downloadOpen',flavor!=='forerunner');if(flavor==='forerunner'){setRuntime('openCe');setFoldersFor('openCe');}chooseSection('setup');return;}const candidate=detected.find(item=>item.executableSha256===id);if(candidate){void connect(candidate);return;}const profile=profiles.find(item=>item.id===id);if(profile)void call('activate_runtime_registration',{registrationId:id}).then(()=>{setRuntime(profile.runtimeId);window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));}).catch(error=>setFlavorError(String(error)));}}>
           <option value="" disabled>Choose an engine or connect one…</option>

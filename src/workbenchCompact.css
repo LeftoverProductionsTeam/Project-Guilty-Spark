@@ -144,6 +144,16 @@
 .application .dependency-item p {font-size:11px;line-height:1.4;margin:3px 0;}
 .application .dependency-item .dependency-actions {margin-top:5px;}
 .application .gs-settings-tabs {padding:6px 12px;gap:5px;}
+.application .gs-settings-tabs {display:flex;flex-wrap:wrap;column-gap:4px;row-gap:3px;padding-block:4px;}
+.application .gs-settings-tabs > button {min-height:25px;font-size:11px;white-space:normal;}
+.application .dependency-target {display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 7px;}
+.application .dependency-target select {width:auto;max-width:100%;min-height:26px;}
+.application .gs-settings-workspace :is(.settings-page,.interface-studio,.games-tools-page) {padding:8px 10px;}
+.application .gs-settings-workspace .dependency-panel {grid-template-columns:repeat(auto-fit,minmax(min(245px,100%),1fr));gap:6px;padding:6px 0;}
+.application .gs-settings-workspace .dependency-item {padding:6px 8px;}
+.application .gs-panel-content :is(fieldset,.card,.inspector-section) {min-width:0;margin-block:4px;}
+.application .gs-panel-content :is(.button-row,.toolbar,.analysis-actions,.inspector-actions) {flex-wrap:wrap;gap:4px;}
+.application .gs-panel-content :is(select,input:not([type=checkbox],[type=radio]),textarea) {min-width:0;max-width:100%;}
 .application .interface-studio {display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:10px;align-content:start;}
 .application .interface-studio > .page-title {grid-column:1/-1;}
 .application .interface-studio > .analysis-card {margin:0;}

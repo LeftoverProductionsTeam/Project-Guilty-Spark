@@ -28,11 +28,10 @@ export async function chooseTool(page: Page, name: string) {
   await revealPagedControl(command);await command.click();
 }
 
-/** A real File/New gesture, shared by browser and embedded Windows acceptance. */
+/** Use the library’s in-window creator for tests that continue editing that same view. */
 export async function createMultiplayerMap(page:Page,title:string,runtime='mccSteam'){
- await page.getByLabel('File menu',{exact:true}).click();
- await page.getByRole('menuitem',{name:'New',exact:true}).click();
- await page.getByRole('menuitem',{name:'Multiplayer Map',exact:true}).click();
+ await chooseTool(page,'Map library');
+ await page.getByRole('button',{name:'Create a map',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'New Multiplayer Map',exact:true});
  await dialog.getByLabel('New map name',{exact:true}).fill(title);
  await dialog.getByLabel('New map runtime',{exact:true}).selectOption(runtime);

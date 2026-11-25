@@ -35,3 +35,9 @@ __pycache__/
 /opencehalo-windows-release/
 /chupathingyce-windows64-release/
 /test-results.zip
+
+# Managed Win64 playtest delivery slots and transaction staging.
+/Latest/
+/Previous/
+/.spark-playtest-*/
+/.spark-playtest.lock

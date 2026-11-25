@@ -21,13 +21,22 @@ export async function prepareAssetImport(
   );
   // The backend checks current source drafts and the owned receipt on reuse.
   // A cached frontend binding cannot authorize ignoring a later source edit.
-  return call<NativeAssetImport>('prepare_native_asset_import', {
+  const prepare = () => call<NativeAssetImport>('prepare_native_asset_import', {
       projectId: project.id,
       sourceProjectId: asset.sourceProjectId,
       sourceSha256: asset.sourceSha256,
       tagId: asset.tagId,
       existing: existing ?? null,
     });
+  try { return await prepare(); }
+  catch (error) {
+    if (!/Extraction requires the source runtime resource|No complete compiler resource set was verified/.test(String(error))) throw error;
+    const selected = await call<OpenProject | null>('choose_project_resources', { projectId: asset.sourceProjectId });
+    if (!selected) throw error;
+    if (selected.project.source?.sha256 !== asset.sourceSha256)
+      throw Error('The selected source map changed. Drag the asset again from the current source.');
+    return prepare();
+  }
 }
 export function attachAssetImport(project: Project, binding: NativeAssetImport): Project {
   const imports = project.nativeAssetImports ?? [];
