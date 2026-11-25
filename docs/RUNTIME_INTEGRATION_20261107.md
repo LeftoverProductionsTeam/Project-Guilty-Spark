@@ -3278,3 +3278,11 @@ The first exact route build hit eight occupied scenario sky slots. Independent I
 ### Tenth-commit Win64 preview, 25 November
 
 The local Win64 startup preview was compiled from clean 78990b23fe9ae0c8e0e7e51916cddc46e3047f20. The exact 60,725,248-byte executable SHA-256 is 4fbf43882f3df3a64c85b4a699d54009032f177f2f7d16e70f84e4da99f3a641. It is retained with BUILD.json and startup.json under %TEMP%/GuiltySpark-Traversal-Handoff/win64-spark-78990b23-ClOYbI/ready. Unmocked Windows WebView startup reached the initial workspace in 1,243 ms, native bootstrap returned and the loaded frontend script matched the compiled asset hash. The first trace used a separate fetch blocked by the WebView; the replacement trace read the loaded source directly. The earlier preview and installed runtime remain available. Native offline map evidence for exact d29437a7 accompanies this delivery under ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.
+
+### Model-based control mounting, 25 November
+
+Existing controls now measure an upright render model’s base from its exact compiled cache during the BSP ground review. Use model base offset fills the existing editable offset. A second ground check still requires an explicit surface and draft application. Tilted or unavailable models retain manual offset entry. Source review and Save remain separate.
+
+TypeScript, the Windows desktop compilation check, and three browser workflows passed, including measured and manual offsets, stale review invalidation, device source review and switch linkage. Independent native Rust readback of Black Echo d113e9db measured the compiled terminal model base at approximately 0.0995 world units below its origin. The exact source cache rehashed unchanged. This verifies native geometry and editing controls. The installed mission was not remounted in this pass.
+
+Separately, Forerunner b9ba76e0f resolved the original Zombie Apocalypse grenade vitality divergence on unchanged d29437a7. Two private peers with Win64 694be0b7 matched 4.00 healed vitality and 3.35 after a pistol hit. The authored map is unchanged. Legacy Chupathingy authority, full Survival, and replay remain open.

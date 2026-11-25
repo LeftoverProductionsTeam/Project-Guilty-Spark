@@ -815,11 +815,19 @@ pub(super) struct CommandGeometryReview {
     tag_sha256: String,
     output_sha256: String,
     ground_drop: Option<f32>,
+    control_mount: Option<ControlMountReview>,
     #[serde(flatten)]
     geometry: maps::BspGeometryReview,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ControlMountReview {
+    tag_path: String,
+    offset: Option<f32>,
+    issue: Option<String>,
+}
 #[tauri::command]
-pub(super) async fn native_scenario_geometry(app:tauri::AppHandle,project_id:String,expected_build_id:String,expected_tag_sha256:String,points:Vec<[f32;3]>,ground_drop:Option<f32>,command_route:Option<recipes::NativeCommandList>,route_origin:Option<[f32;3]>)->Reply<CommandGeometryReview>{
+pub(super) async fn native_scenario_geometry(app:tauri::AppHandle,project_id:String,expected_build_id:String,expected_tag_sha256:String,points:Vec<[f32;3]>,ground_drop:Option<f32>,command_route:Option<recipes::NativeCommandList>,route_origin:Option<[f32;3]>,control_mount_tag:Option<String>)->Reply<CommandGeometryReview>{
  tauri::async_runtime::spawn_blocking(move||{
   if points.is_empty()||points.len()>64||expected_tag_sha256.len()!=64||!expected_tag_sha256.bytes().all(|v|v.is_ascii_hexdigit()){return Err("Invalid native source-point review".into());}
   let state=app.state::<AppState>();let _guard=source_guard()?;require_idle(&state)?;let selected=source(&state,&project_id,None)?;
@@ -828,9 +836,28 @@ pub(super) async fn native_scenario_geometry(app:tauri::AppHandle,project_id:Str
   if maps::hash_file(&file).map_err(error)?!=expected_tag_sha256{return Err("Native scenario changed after route selection; refresh source".into());}
   let output=selected.build.output.as_ref().ok_or("Compiled BSP reference is unavailable")?;core::reject_links(output).map_err(error)?;
   let map=maps::inspect_map(output,None).map_err(error)?;if selected.build.sha256.as_deref()!=Some(map.sha256.as_str()){return Err("Compiled BSP reference no longer matches its validated build".into());}
+  let control_mount = if let Some(tag_path) = control_mount_tag {
+      let normalized = tag_path.replace('\\', "/");
+      if points.len() != 1 || command_route.is_some() || normalized.len() > 240
+          || core::safe_relative(&normalized).is_err() {
+          return Err("Invalid native terminal model review".into());
+      }
+      let readback = (|| -> Reply<f32> {
+          let mut tags = map.tags.iter().filter(|tag| tag.class == "ctrl" && !tag.external
+              && tag.path.replace('\\', "/").eq_ignore_ascii_case(&normalized));
+          let tag = tags.next().ok_or("This control model is unavailable in the compiled reference")?;
+          if tags.next().is_some() { return Err("The compiled control tag is ambiguous".into()); }
+          let (_, mesh) = core::render::preview_owned_object_model(output, &map.sha256, &map, tag.id).map_err(error)?;
+          core::render::upright_model_base_offset(&mesh).map_err(error)
+      })();
+      Some(match readback {
+          Ok(offset) => ControlMountReview { tag_path, offset: Some(offset), issue: None },
+          Err(issue) => ControlMountReview { tag_path, offset: None, issue: Some(issue) },
+      })
+  } else { None };
   let geometry=maps::bsp_geometry_review(output,&map,&points,ground_drop,command_route.as_ref(),route_origin).map_err(error)?;
   if maps::hash_file(&file).map_err(error)?!=expected_tag_sha256||lock(&state.library)?.get(&project_id).map_err(error)?.fingerprint().map_err(error)?!=selected.project.fingerprint().map_err(error)?{return Err("Native source changed during BSP review; no result was accepted".into());}
-  Ok(CommandGeometryReview{build_id:expected_build_id,tag_sha256:expected_tag_sha256,output_sha256:map.sha256,ground_drop,geometry})
+  Ok(CommandGeometryReview{build_id:expected_build_id,tag_sha256:expected_tag_sha256,output_sha256:map.sha256,ground_drop,control_mount,geometry})
  }).await.map_err(error)?
 }
 #[derive(Serialize)]

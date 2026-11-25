@@ -517,6 +517,24 @@ fn cached_model_variant_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:
     Ok(mesh)
 }
 
+/// Height from the lowest referenced render vertex to the upright model origin.
+pub fn upright_model_base_offset(mesh: &MeshData) -> Result<f32> {
+    let mut lowest = f32::INFINITY;
+    for &index in &mesh.indices {
+        let index = index as usize;
+        let point = mesh.positions.get(index.saturating_mul(3)..index.saturating_mul(3).saturating_add(3))
+            .ok_or_else(|| crate::SparkError::Invalid("Native model has an invalid vertex reference".into()))?;
+        if !point.iter().all(|axis| axis.is_finite()) {
+            return invalid("Native model contains a nonfinite position");
+        }
+        lowest = lowest.min(point[2]);
+    }
+    if !lowest.is_finite() || lowest.abs() > 64.0 {
+        return invalid("Model base is outside the supported ground offset range");
+    }
+    Ok(-lowest)
+}
+
 /// Resolve an exact object datum (or a selected item-collection permutation)
 /// to its world model. First-person weapon models are a different dependency.
 pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32,permutation:usize)->Result<(u32,MeshData)>{
@@ -699,6 +717,21 @@ mod tests {
 
 #[cfg(test)]
 mod geometry_tests {
+    use std::path::PathBuf;
+
+    #[test]
+    #[ignore = "requires the exact owner-supplied Black Echo cache"]
+    fn native_control_mount_uses_the_compiled_terminal_model() {
+        let source = PathBuf::from(std::env::var_os("SPARK_QA_EXTRACTION_CACHE").unwrap());
+        let map = crate::maps::inspect_map(&source, None).unwrap();
+        assert_eq!(map.sha256, "d113e9dbec1bae9554e7d4df3843ecc2bb6d40b4ee2c7cdf5f81831fc7b29b09");
+        let terminal = map.tags.iter().find(|tag| tag.class == "ctrl"
+            && tag.path.to_ascii_lowercase().ends_with("b40_holo control")).unwrap();
+        let (_, mesh) = preview_owned_object_model(&source, &map.sha256, &map, terminal.id).unwrap();
+        let offset = upright_model_base_offset(&mesh).unwrap();
+        assert!((offset - 0.0995).abs() < 0.001, "measured native base: {offset}");
+        assert_eq!(crate::maps::hash_file(&source).unwrap(), map.sha256);
+    }
     use super::*;
     fn put32(b:&mut [u8],at:usize,v:u32){b[at..at+4].copy_from_slice(&v.to_le_bytes());}
     fn put16(b:&mut [u8],at:usize,v:u16){b[at..at+2].copy_from_slice(&v.to_le_bytes());}

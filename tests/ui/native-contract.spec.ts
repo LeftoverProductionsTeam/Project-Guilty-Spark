@@ -4926,10 +4926,14 @@ test('native control support uses the reviewed ground and mounting offset in the
  await form.getByRole('checkbox',{name:'Find ground below points'}).check();
  await form.getByRole('button',{name:'Check control ground',exact:true}).click();
  await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('No collision surface within ±0.5');
- await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0',exact:true}).click();
- await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0');
- await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
  const offset=form.getByRole('spinbutton',{name:'Origin offset from ground',exact:true});
+ await form.getByRole('button',{name:'Use model base offset',exact:true}).click();
+ await expect(offset).toHaveValue('0.1');
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toHaveCount(0);
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.1',exact:true}).click();
+ await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0.1');
+ await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
  await offset.fill('0.12');
  await offset.press('Enter');
  await form.getByRole('button',{name:'Check control ground',exact:true}).click();
@@ -5720,7 +5724,7 @@ for(const mode of ['shared','flags','objects','covenant','insertion','covenant-i
 
 async function mockNativePointReview(page:Page){await page.evaluate(()=>{const w=window as any,m=w.__sparkMock,invoke=w.__TAURI_INTERNALS__.invoke;m.geometryCalls=[];m.geometryStale=false;m.geometryDeferred=false;
  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
-  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[])=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};
+  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={...(args.controlMountTag?{controlMount:{tagPath:args.controlMountTag,offset:0.1,issue:null}}:{}),buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[])=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};
    if(args.commandRoute){
     const destinations=args.commandRoute.commands.flatMap((step:any,action:number)=>step.atom.startsWith('go_to')?[{point:step.point1,action}]:[]);
     let from:number|null=null;

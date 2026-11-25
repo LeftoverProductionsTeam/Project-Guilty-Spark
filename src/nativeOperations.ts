@@ -262,6 +262,7 @@ export interface NativeFlightLeg {
 }
 export interface NativeCommandGeometryReview {
  buildId:string;tagSha256:string;outputSha256:string;groundDrop?:number|null;
+ controlMount?:{tagPath:string;offset:number|null;issue:string|null}|null;
  points:{point:[number,number,number];bsps:number[];nearPartition:boolean;supports:{bsp:number;z:number}[];ground?:{bsp:number;z:number}[]}[];
  route?:{origin:[number,number,number]|null;issue:string|null;legs:NativeFlightLeg[]}|null;
 }

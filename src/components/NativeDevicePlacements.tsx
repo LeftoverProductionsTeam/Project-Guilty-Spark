@@ -12,8 +12,10 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  const groups=context.scenarioDeviceGroups;
  const [groupIndex,setGroupIndex]=useState(-1);
  const [mount,setMount]=useState<{key:string;offset:number}|null>(null);
- const mountingKey=JSON.stringify([context.buildId,context.tagSha256,original?.class,original?.index]);
+ const mountingKey=JSON.stringify([context.buildId,context.tagSha256,original?.class,original?.index,pose?.rotationRadians.slice(1)]);
  const mountOffset=mount?.key===mountingKey?mount.offset:0;
+ const upright=!!pose&&pose.rotationRadians.slice(1).every(angle=>Math.abs(angle)<1e-4);
+ const setMountOffset=(offset:number)=>setMount({key:mountingKey,offset});
  const group=groups?.find(row=>row.index===groupIndex);
  const groupBindings=group?rows.filter(row=>[row.powerGroup,row.positionGroup].includes(group.index)):[];
  const groupLocked=!!group&&(group.reserved||groupBindings.some(row=>/^extraction_/i.test(row.name)));
@@ -79,12 +81,14 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  {original.class==='ctrl'&&<details>
   <summary>Ground support for control</summary>
   <NumberField label="Origin offset from ground" value={mountOffset} min={-64} max={64}
-   step={0.001} disabled={!!blocked} onCommit={offset=>setMount({key:mountingKey,offset})}/>
-  <small>Use the model base to choose the offset. A positive value raises the origin above the selected ground; zero places the origin on the surface.</small>
+   step={0.001} disabled={!!blocked} onCommit={setMountOffset}/>
+  <small>{upright?'Check the compiled control to measure its model base, or enter an offset.':'Enter an offset for this tilted control.'} A positive value raises the origin above the selected ground.</small>
   <NativeBspPointCheck context={context}
    selectionKey={original.class+':'+original.index}
    subject="Control origin"
    mountOffset={mountOffset}
+   controlMountTag={upright?original.tagPath:undefined}
+   onMountOffset={setMountOffset}
    points={pose?[pose.position]:[]}
    disabled={!!blocked||!pose}
    label="Check control ground"
