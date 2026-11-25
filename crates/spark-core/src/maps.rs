@@ -829,7 +829,8 @@ pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> 
     reader.bytes(begin, size)?;
     let bsp = Space { begin, end: begin + size, address: reader.u32(reference + 8)? };
     let root = bsp.pointer(reader.u32(begin)?, 648)?;
-    let (portals, count) = bsp.block(&reader, root + 0x154, 64, 128)?;
+    // The 128-reference limit applies to one cluster, not the BSP portal table.
+    let (portals, count) = bsp.block(&reader, root + 0x154, 64, 512)?;
     let mut rings = Vec::with_capacity(count);
     for index in 0..count {
         let row = portals + index * 64;
@@ -2264,6 +2265,25 @@ pub fn read_range(path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {
 }
 pub(crate) fn validate_ui_layout(project:&crate::project::Project,inspection:&MapInspection)->Result<()> {
     ui_tags::validate_layout(project,inspection)
+}
+
+#[cfg(test)]
+mod portal_readback_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires the verified owner-installed Death Island CE609 cache"]
+    fn installed_structure_reads_portals_above_the_per_cluster_limit() {
+        let path = std::path::PathBuf::from(std::env::var_os("SPARK_STOCK_PORTAL_MAP").expect("Set the exact owned fixture"));
+        let source_sha = "f9684cb7e5436fd2901b7ea226726a6089957b91459923421264a5436f743244";
+        let map = inspect_map(&path, path.parent()).unwrap();
+        assert_eq!(map.sha256, source_sha);
+        let portals = compiled_portal_rings(&path, &map).unwrap();
+        assert_eq!(portals.len(), 240);
+        assert_eq!(portals.iter().map(|(_, ring)| ring.len()).sum::<usize>(), 2183);
+        assert!(portals.iter().all(|(flags, ring)| *flags == 0 && (3..=27).contains(&ring.len())));
+        assert_eq!(hash_file(&path).unwrap(), source_sha);
+    }
 }
 
 #[cfg(test)]
