@@ -19,6 +19,44 @@ fn main() -> Result<()> {
         if !offset.is_finite() || offset.abs() > 64. { return spark_core::invalid("Section offset must be finite and within 64 units"); }
         a.remove(1); Some(offset)
     } else { None };
+    if a.len() >= 3 && a[1] == "--review-pickup-support" {
+        for source in &a[2..] {
+            let path = Path::new(source);
+            let map = maps::inspect_map(path, None)?;
+            let pickups: Vec<_> = map.objects.iter().filter(|row| row.kind == "Netgame item").collect();
+            if pickups.is_empty() {
+                println!("{}", serde_json::json!({"cacheSha256":map.sha256,"scenario":map.scenario_path,"pickups":0}));
+                continue;
+            }
+            let points: Vec<_> = pickups.iter().map(|row| row.position).collect();
+            let regions = (map.mesh.parts.len() > 1).then(|| maps::native_bsp_placements(path, &map)).transpose()?;
+            let review = maps::bsp_point_locations(path, &map, &points, Some(64.))?;
+            let region_names = map.mesh.parts.iter().map(|part| &part.name).collect::<Vec<_>>();
+            let mut no_owner = 0;
+            let mut no_floor = 0;
+            let mut elevated = 0;
+            let mut examples = Vec::new();
+            for (pickup, result) in pickups.iter().zip(review) {
+                let mask = regions.as_ref().map_or(1, |regions| pickup.source_offset
+                    .and_then(|offset| regions.memberships.get(&offset).copied()).unwrap_or(0));
+                let floor = result.ground.iter().filter(|support| mask & (1u16 << support.bsp) != 0)
+                    .max_by(|a, b| a.z.total_cmp(&b.z));
+                let height = floor.map(|support| pickup.position[2] - support.z);
+                no_owner += usize::from(mask == 0);
+                no_floor += usize::from(mask != 0 && height.is_none());
+                elevated += usize::from(height.is_some_and(|gap| gap > 2.));
+                if (height.is_none() || height.is_some_and(|gap| gap > 2.)) && examples.len() < 24 {
+                    examples.push(serde_json::json!({"id":pickup.id,"name":pickup.name,"point":pickup.position,
+                        "owners":mask,"floorBsp":floor.map(|support| support.bsp),"height":height,
+                        "nearbySurfaces":result.supports,"anyFloor":result.ground}));
+                }
+            }
+            println!("{}", serde_json::json!({"cacheSha256":map.sha256,"scenario":map.scenario_path,
+                "pickups":pickups.len(),"noClusterOwner":no_owner,"noOwnerFloorWithin64":no_floor,
+                "ownerFloorOver2Below":elevated,"regions":region_names,"examples":examples}));
+        }
+        return Ok(());
+    }
     if a.len() == 4 && a[1] == "--verify-walkthrough" {
         let p = spark_core::project::load_project(Path::new(&a[3]))?;
         let route = p.bsp_assembly.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Project has no connection route".into()))?;
@@ -119,6 +157,7 @@ fn main() -> Result<()> {
         eprintln!("qa_bsp_assembly [--plan-only] [--direction <degrees>] [--terrain | --edge-section <branch offset>] <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
         eprintln!("qa_bsp_assembly --export-partitions <connection-project.gsproject> <fresh output directory>");
         eprintln!("qa_bsp_assembly --read-native-transitions <compiled.map>");
+        eprintln!("qa_bsp_assembly --review-pickup-support <compiled.map> [...]");
         eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
         eprintln!("qa_bsp_assembly --verify-walkthrough <compiled.map> <connection-project.gsproject>");
         std::process::exit(2);

@@ -332,6 +332,7 @@ function Scene({
   grid,
   viewMode,
   previewMesh,
+  floorBsp,
   ortho,
   fly,
   frame,
@@ -358,6 +359,7 @@ function Scene({
   grid: boolean;
   viewMode: ViewMode;
   previewMesh: MeshData | null;
+  floorBsp: number;
   ortho: boolean;
   fly: boolean;
   frame: number;
@@ -428,7 +430,10 @@ function Scene({
     const source=object.sourceModel?{projectId:object.sourceModel.projectId,sourceSha256:object.sourceModel.sourceSha256,tagId:object.sourceModel.tagId}:project.source&&object.tagId!==null?{projectId:project.id,sourceSha256:project.source.sha256,tagId:object.tagId}:undefined;
     return {id:object.id,name:object.name,preview,source,collision:object.assetId?preview:undefined,matrix:new THREE.Matrix4().compose(new THREE.Vector3(...object.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(object.rotation[2],object.rotation[1],object.rotation[0],'ZYX')),new THREE.Vector3(...object.scale))};
   };
-  useEndToFloor({enabled:!fly&&!cinematic&&!cameraLocked&&!transformLocked,revision:JSON.stringify(project.scene),selected:chosen?[dropBody(chosen)]:[],others:all.filter(o=>o.id!==selected&&o.kind!=='Player spawn').map(dropBody),terrain:inspection?.mesh,onDrop:delta=>{if(chosen)onTransform({...chosen,position:[chosen.position[0],chosen.position[1],chosen.position[2]+delta]},false,sourceScope);},onError:onSnapError});
+  const floorTerrain=useMemo(()=>resolveBspMesh(inspection,'collision',floorBsp),[inspection,floorBsp]);
+  useEndToFloor({enabled:!fly&&!cinematic&&!cameraLocked&&!transformLocked&&!pickTarget,
+    revision:JSON.stringify([inspection?.sha256,floorBsp,project.scene]),
+    selected:chosen?[dropBody(chosen)]:[],others:all.filter(o=>o.id!==selected&&o.kind!=='Player spawn').map(dropBody),terrain:floorTerrain,onDrop:delta=>{if(chosen)onTransform({...chosen,position:[chosen.position[0],chosen.position[1],chosen.position[2]+delta]},false,sourceScope);},onError:onSnapError});
   const cameraStartId=startId||project.scene.find(o=>o.kind==='Player spawn')?.id;
   return (
     <>
@@ -1741,6 +1746,7 @@ export default function World({
                     grid,
                     viewMode,
                     previewMesh,
+                    floorBsp:bsp,
                     ortho,
                     fly,
                     frame,

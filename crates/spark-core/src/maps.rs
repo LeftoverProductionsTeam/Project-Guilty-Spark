@@ -2155,8 +2155,7 @@ pub fn bsp_geometry_review(
   let entry=table+index*32;let begin=r.u32(entry)? as usize;let size=r.u32(entry+4)? as usize;r.bytes(begin,size)?;
   if size<24{return invalid("Compiled BSP region is too small");}let bsp_space=Space{begin,end:begin+size,address:r.u32(entry+8)?};let bsp=bsp_space.pointer(r.u32(begin)?,648)?;
   let(blocks,n)=bsp_space.block(&r,bsp+0xb0,96,16)?;if n!=1{return invalid("Point membership requires one standard collision tree per native BSP");}
-  let part=mesh.parts.get(index).ok_or_else(||SparkError::Invalid("Compiled BSP collision part is unavailable".into()))?;
-  let selected=MeshData{positions:mesh.positions.clone(),indices:mesh.indices[part.index_start..part.index_start+part.index_count].to_vec(),..Default::default()};let checker=crate::bsp_clearance::RouteChecker::new(&selected)?;
+  let checker=crate::bsp_clearance::RouteChecker::for_part(&mesh,index)?;
   for row in &mut rows{
    if let Some(z)=checker.native_surface_z(row.point){row.supports.push(BspPointSupport{bsp:index as u16,z});}
    if let Some(z)=ground_drop.and_then(|drop|checker.native_ground_z(row.point,drop)){row.ground.push(BspPointSupport{bsp:index as u16,z});}

@@ -7078,6 +7078,43 @@ test('creator batch import seeds a reviewed selection and changing the value ret
   await expect(batch.getByRole('button', { name: 'Build and verify batch' })).toHaveCount(0);
 });
 
+test('End grounds a pickup on the visible BSP instead of another region above it',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,base=w.__sparkMock.projects.a,original=w.__TAURI_INTERNALS__.invoke;
+    base.project.source.cacheVersion=13;
+    base.inspection.header.version=13;
+    const points=[[-3,-3],[3,-3],[3,3],[-3,3]];
+    base.inspection.mesh={label:'Stacked BSPs',source:'fixture',
+      positions:[0,5].flatMap(z=>points.flatMap(([x,y])=>[x,y,z])),
+      indices:[0,1,2,0,2,3,4,5,6,4,6,7],
+      parts:[{name:'Lower region',indexStart:0,indexCount:6},{name:'Upper region',indexStart:6,indexCount:6}]};
+    base.inspection.renderMesh=null;
+    const pickup={id:'netgame-equipment-0',name:'Floating test pickup',kind:'Netgame item',tagId:null,
+      position:[0,0,8],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:96,rotationOffset:108,assetId:null};
+    base.inspection.objects=[pickup];
+    base.project.scene=structuredClone(base.inspection.objects);
+    w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='inspect_native_bsp_placements'
+      ? Promise.resolve({cacheSha256:base.inspection.sha256,bspCount:2,memberships:{96:1}})
+      : original(command,args);
+  });
+  await openFixture(page);await chooseTool(page,'Level editor');
+  await page.getByRole('combobox',{name:'Visible BSP',exact:true}).selectOption('0');
+  await openDrawer(page,'Objects');
+  const pickup=page.getByRole('button',{name:'Floating test pickup',exact:true,includeHidden:true});
+  await revealPagedControl(pickup);await pickup.click();
+  await page.keyboard.press('End');
+  const height=()=>page.evaluate(()=>(window as any).__sparkMock.staged?.scene[0].position[2]);
+  await expect.poll(height).toBeCloseTo(0.0001,4);
+  await openDrawer(page,'Inspector');
+  const panel=page.getByRole('region',{name:'Inspector panel',exact:true});
+  const z=panel.getByRole('spinbutton',{name:'Position Z',exact:true,includeHidden:true});
+  await revealPagedControl(z);
+  expect(Number(await z.inputValue())).toBeCloseTo(0,2);
+  await page.keyboard.press('Control+z');
+  await expect(z).toHaveValue('8');
+});
+
 test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {
   await mockDesktop(page);
   await page.evaluate(async () => {
