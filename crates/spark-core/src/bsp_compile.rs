@@ -761,6 +761,7 @@ pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
     pub switches: Vec<bsp_assembly::PartitionSwitch>,
     pub intact_overlaps: Option<[[[f64; 3]; 2]; 2]>,
+    pub intact_sky_offset: Option<u8>,
     pub overlap: [[f64; 3]; 2],
     pub structure_tags: Vec<String>,
     pub scenery: Vec<crate::bsp_scenery::Placement>,
@@ -896,7 +897,7 @@ fn extract_intact_donor(
 fn bind_intact_skies(
     edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
     scenario: &str, donor: &str, donor_skies: &[String],
-) -> Result<()> {
+) -> Result<u8> {
     let run = |tag: &str, fields: Vec<String>| {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         args.extend(fields);
@@ -911,7 +912,7 @@ fn bind_intact_skies(
         value.trim().parse::<usize>().ok().filter(|&index| index == 65535 || index < donor_skies.len())
             .ok_or_else(|| SparkError::Invalid("A native donor cluster references an invalid sky slot".into()))
     }).collect::<Result<Vec<_>>>()?;
-    if donor_skies.is_empty() { return Ok(()); }
+    if donor_skies.is_empty() { return Ok(0); }
     let mut args = vec!["-I".into(), "skies".into(), donor_skies.len().to_string(), "end".into()];
     for (index, sky) in donor_skies.iter().enumerate() {
         args.extend(["-S".into(), format!("skies[{}].sky", base_count + index),
@@ -932,7 +933,7 @@ fn bind_intact_skies(
     if !after.lines().map(|s| s.trim().parse::<usize>().ok()).eq(expected.into_iter().map(Some)) {
         return invalid("Intact donor sky remap did not survive native readback");
     }
-    Ok(())
+    Ok(base_count as u8)
 }
 
 /// Stage each native structure. Only the explicit scenario probe binds the
@@ -995,11 +996,13 @@ pub(crate) fn prepare_partition_structure(
     } else {
         original_structures.iter().cloned().chain(built.iter().map(|(tag, _, _)| tag.clone())).collect()
     };
+    let mut intact_sky_offset = None;
     if plan.preserve_donor_bsp {
         let donor_path = format!("gsbsp_{}_1\\{}", &runner.id[..8], donor_source_bsp);
         let donor_tag = format!("{donor_path}.scenario_structure_bsp");
         if bind {
-            bind_intact_skies(&edit, runner, workspace, tags, &format!("{}.scenario", inspection.scenario_path), &donor_tag, skies)?;
+            intact_sky_offset = Some(bind_intact_skies(&edit, runner, workspace, tags,
+                &format!("{}.scenario", inspection.scenario_path), &donor_tag, skies)?);
         }
         let file = tags.join(safe_relative(&donor_tag)?);
         retained.push((file.clone(), maps::hash_file(&file)?));
@@ -1104,7 +1107,7 @@ pub(crate) fn prepare_partition_structure(
         "retainedStructureTags": retained.len(),
         "overlap": overlap, "overlapSamples": overlap_samples, "maxFloorDelta": max_floor_delta, "intactOverlaps": intact_overlaps,
         "switches": switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(

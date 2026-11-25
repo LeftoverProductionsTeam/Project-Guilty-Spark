@@ -346,6 +346,21 @@ fn build_partition_cache(
             runner.run(&edit, &args, workspace, "partition-environment-readback", 91)
         })?;
     }
+    if let Some(sky_offset) = prepared.intact_sky_offset {
+        let base_environment = crate::bsp_audio::inspect(preserved_path, &source.sha256)?;
+        let donor_environment = crate::bsp_audio::inspect(&plan.donor_source.preserved_path, &plan.donor_source.sha256)?;
+        if base_environment.bsps.len() != old_count || donor_environment.bsps.len() != 1 {
+            return invalid("Intact environmental readback did not find the reviewed source regions");
+        }
+        for (original, compiled) in base_environment.bsps.iter().zip(&world.bsps) {
+            crate::bsp_audio::verify_intact_region(original, compiled, [0.; 3], "", 0)?;
+        }
+        let namespace = format!("gsbsp_{}_1/", &runner.id[..8]);
+        crate::bsp_audio::verify_intact_region(
+            &donor_environment.bsps[0], &world.bsps[expected_count - 1],
+            plan.translation, &namespace, sky_offset,
+        )?;
+    }
     let lightmap_pages = if bake {
         crate::native_lighting::verify_cache(project, &path, &map)?;
         Some((0..map.mesh.parts.len()).map(|slot| crate::native_lighting::verify_bsp_lightmaps(&path, &map, slot))
@@ -354,7 +369,8 @@ fn build_partition_cache(
     if maps::hash_file(&path)? != map.sha256 { return invalid("Compiled partition cache changed during validation"); }
     let receipt = serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
         "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "bspTagPaths": transitions.bsp_tag_paths, "lightmapPages": lightmap_pages,
-        "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
+        "donorEnvironmentVerified": prepared.donor_environment.is_some() || prepared.intact_sky_offset.is_some(),
+        "retainedEnvironmentsVerified": prepared.intact_sky_offset.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
         "netgameFlags": native_flags, "playerStarts": native_starts,
         "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if old_count > 1 { old_count } else { 0 }});
     Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })

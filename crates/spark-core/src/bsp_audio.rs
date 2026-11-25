@@ -548,6 +548,56 @@ pub fn validate(
 pub fn normalize(path: &str) -> String {
     path.replace('\\', "/").to_ascii_lowercase()
 }
+/// Compare an intact BSP before and after native staging. Only the authored
+/// translation, namespace and scenario sky-slot offset may differ.
+pub(crate) fn verify_intact_region(
+    before: &Bsp,
+    after: &Bsp,
+    translation: [f64; 3],
+    namespace: &str,
+    sky_offset: u8,
+) -> Result<()> {
+    let tag = |path: &str| format!("{namespace}{}", normalize(path));
+    if tag(&before.tag_path) != normalize(&after.tag_path)
+        || before.clusters.len() != after.clusters.len()
+        || before.portal_count != after.portal_count
+        || before.max_cluster_subclusters != after.max_cluster_subclusters
+        || before.pvs_sha256 != after.pvs_sha256
+        || before.pas_sha256 != after.pas_sha256
+    {
+        return invalid(format!("Intact BSP {} changed native visibility or cluster topology", before.tag_path));
+    }
+    for (a, b) in [
+        (&before.background_palette, &after.background_palette),
+        (&before.environment_palette, &after.environment_palette),
+    ] {
+        if a.len() != b.len() || a.iter().zip(b).any(|(original, compiled)| {
+            original.name != compiled.name
+                || original.tag_path.as_deref().map(tag) != compiled.tag_path.as_deref().map(normalize)
+        }) {
+            return invalid(format!("Intact BSP {} changed its native ambience palettes", before.tag_path));
+        }
+    }
+    for (a, b) in before.clusters.iter().zip(&after.clusters) {
+        let sky = if a.sky == -1 { -1 } else { a.sky + i16::from(sky_offset) };
+        let moved_bounds = a.bounds.map(|bounds| bounds.map(|point|
+            std::array::from_fn::<_, 3, _>(|axis| f64::from(point[axis]) + translation[axis])));
+        let same_bounds = match (moved_bounds, b.bounds) {
+            (Some(expected), Some(actual)) => expected.iter().flatten().zip(actual.iter().flatten())
+                .all(|(expected, actual)| (*expected - f64::from(*actual)).abs() <= 0.0005),
+            (None, None) => true,
+            _ => false,
+        };
+        if (a.index, sky, a.fog, a.weather, a.transition_bsp, a.background, a.environment)
+            != (b.index, b.sky, b.fog, b.weather, b.transition_bsp, b.background, b.environment)
+            || !same_bounds
+        {
+            return invalid(format!("Intact BSP {} changed native environment or bounds in cluster {}", before.tag_path, a.index));
+        }
+    }
+    Ok(())
+}
+
 pub fn verify_output(before: &Inspection, after: &Inspection, request: &Request) -> Result<()> {
     if before.bsps.len() != after.bsps.len() {
         return invalid("BSP audio rebuild changed the BSP count");
@@ -1012,6 +1062,33 @@ pub(crate) fn apply(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    #[ignore = "Requires the exact owned Death Island and private MegaWorld handoff caches"]
+    fn intact_environment_preserves_original_death_island_and_parent() {
+        use std::path::PathBuf;
+        let paths = ["SPARK_INTACT_DONOR_MAP", "SPARK_INTACT_BASE_MAP", "SPARK_INTACT_COMPILED_MAP"];
+        let [donor, base, compiled] = paths.map(|key| {
+            let path = PathBuf::from(std::env::var_os(key).expect(key));
+            inspect(&path, &maps::hash_file(&path).unwrap()).unwrap()
+        });
+        let original = &donor.bsps[0];
+        let outcome = compiled.bsps.last().unwrap();
+        let namespace = format!("{}/", normalize(&outcome.tag_path).split('/').next().unwrap());
+        assert_eq!((base.bsps.len(), compiled.bsps.len()), (3, 5));
+        for (a, b) in base.bsps.iter().zip(&compiled.bsps) {
+            verify_intact_region(a, b, [0.; 3], "", 0).unwrap();
+        }
+        let relocation = [-104., 0., 72.];
+        verify_intact_region(original, outcome, relocation, &namespace, 1).unwrap();
+        let mut changed = outcome.clone();
+        changed.clusters[0].weather ^= 1;
+        assert!(verify_intact_region(original, &changed, relocation, &namespace, 1).is_err());
+        let mut changed = outcome.clone();
+        changed.pas_sha256.clear();
+        assert!(verify_intact_region(original, &changed, relocation, &namespace, 1).is_err());
+        assert!(verify_intact_region(original, outcome, relocation, &namespace, 0).is_err());
+    }
     use super::*;
 
     #[test]
