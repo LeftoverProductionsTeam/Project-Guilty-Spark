@@ -565,9 +565,15 @@ fn tunnel_sides(points: &[V], width: f64) -> Result<Vec<V>> {
 fn tunnel_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize) -> Result<Manifold> {
     passage_solid(a, b, side_a, side_b, height, material, None)
 }
-fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize, sky: Option<usize>) -> Result<Manifold> {
+const LEVEL_PASSAGE_TRIANGLES: [[usize; 3]; 12] = [
+    [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
+    [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5],
+    [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7],
+];
+
+fn passage_corners(a: V, b: V, side_a: V, side_b: V, height: f64) -> [V; 8] {
     let up = [0., 0., height];
-    let mut p = vec![
+    [
         sub(a, side_a),
         add(a, side_a),
         add(b, side_b),
@@ -576,7 +582,12 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
         add(add(a, side_a), up),
         add(add(b, side_b), up),
         add(sub(b, side_b), up),
-    ];
+    ]
+}
+
+fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize, sky: Option<usize>) -> Result<Manifold> {
+    let up = [0., 0., height];
+    let mut p = passage_corners(a, b, side_a, side_b, height).to_vec();
     let mut gl = MeshGL64 {
         num_prop: 5,
         ..Default::default()
@@ -593,7 +604,7 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
              1,2,6,1,6,5,
              2,9,11,2,11,6,9,3,7,9,7,11,
              3,0,4,3,4,7]
-    }else{vec![0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7]};
+    }else{LEVEL_PASSAGE_TRIANGLES.into_iter().flatten().collect()};
     for t in triangles.chunks_exact(3) {
         let points = [p[t[0]], p[t[2]], p[t[1]]];
         let n = normal(points[0], points[1], points[2]);
@@ -1319,6 +1330,9 @@ pub fn generate_preserved_connector(
         || donor.header.scenario_type != 1 || donor.mesh.parts.len() != 1 {
         return invalid("The exact standard single-BSP Custom Edition multiplayer donor is required");
     }
+    if plan.translation != [0.; 3] {
+        maps::preflight_bsp_relocation(&plan.donor_source.preserved_path, &donor, plan.translation)?;
+    }
     let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
     let delta = sub(end, start);
     let length = delta[0].hypot(delta[1]);
@@ -1353,46 +1367,6 @@ pub fn generate_preserved_connector(
         .map_err(|error| SparkError::Invalid(format!("Donor connector landing: {error}")))?;
     let landings = [base_landing, donor_landing];
     let overlaps = [landings[0].0, landings[1].0];
-    let points = intact_floor_points(overlaps, forward);
-    review.tunnel_points = points[1..3].to_vec();
-    review.validate()?;
-
-    let height = f64::from(plan.tunnel_height);
-    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, None));
-    let mut body = solids.next().unwrap()?;
-    for solid in solids {
-        if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
-        body = checked(body.boolean_with_engine_and_token(&solid?, OpType::Add, BooleanEngine::Auto, None), "Intact BSP connector")?;
-    }
-    let mut render = body.get_mesh_gl64(-1);
-    let mut materials = vec![AssemblyMaterial {
-        name: format!("gsconnector{}x", &base.sha256[..8]),
-        source: 0, shader_path: Some(plan.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
-        flags: 0, collision_only: false,
-    }];
-    let (mut mesh, mut triangle_materials) = collision_layer(&render, &mut materials)?;
-    for point in mesh.positions.chunks_exact(3) {
-        validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
-    }
-    review.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
-    let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
-    let route_clearance = checker.verify_details(&review)?;
-    checker.verify_return(&review)?;
-    for overlap in overlaps {
-        if checker.floor_profile(overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
-            return invalid("Connector surface does not match a reviewed landing");
-        }
-    }
-    crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
-    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials)?;
-    mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
-    let report = AssemblyReport {
-        input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
-        generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
-        portal_count: 0, route_clearance, donor_scenery: 0,
-        warnings: vec![format!("Shared floor spans {:.2} and {:.2} units. Maximum floor difference is {:.3} units. Runtime travel requires playtesting.",
-            2. * landings[0].1, 2. * landings[1].1, landings[0].2.max(landings[1].2))],
-    };
     let corridor = base.mesh.parts.len();
     let island = corridor + 1;
     let trigger = |from, to, center, distance: f64| partition_switch(
@@ -1407,11 +1381,116 @@ pub fn generate_preserved_connector(
         trigger(corridor, island, end, donor_switch),
         trigger(island, corridor, end, -donor_switch),
     ];
+    let prior = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
+    let volumes = maps::scenario_volume_readback(&source.preserved_path, base)?;
+    verify_intact_switch_spacing(&switches, &prior.transitions, &volumes)?;
+    let points = intact_floor_points(overlaps, forward);
+    review.tunnel_points = points[1..3].to_vec();
+    review.validate()?;
+
+    let height = f64::from(plan.tunnel_height);
+    for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
+        let position = add(pickup.position.map(f64::from), plan.translation);
+        if intact_connector_contains_pickup(points, forward, f64::from(plan.tunnel_width), height, position) {
+            return invalid(format!("Donor pickup {index} at {position:?} lies inside the new connector; move the passage clear of the original pickup"));
+        }
+    }
+    let collision_source = intact_connector_solid(points, side, height, cancel)?.get_mesh_gl64(-1);
+    let mut materials = vec![AssemblyMaterial {
+        name: format!("gsconnector{}x", &base.sha256[..8]),
+        source: 0, shader_path: Some(plan.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
+        flags: 0, collision_only: false,
+    }];
+    let (mut mesh, mut triangle_materials) = collision_layer(&collision_source, &mut materials)?;
+    for point in mesh.positions.chunks_exact(3) {
+        validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
+    }
+    review.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
+    let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
+    let route_clearance = checker.verify_details(&review)?;
+    checker.verify_return(&review)?;
+    for overlap in overlaps {
+        if checker.floor_profile(overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
+            return invalid("Connector surface does not match a reviewed landing");
+        }
+    }
+    let mut render = if points[0][2] == points[3][2] {
+        level_connector_charts(points[0], points[3], side, height)
+    } else {
+        collision_source
+    };
+    crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
+    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials)?;
+    mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
+    let report = AssemblyReport {
+        input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
+        generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
+        portal_count: 0, route_clearance, donor_scenery: 0,
+        warnings: vec![format!("Shared floor spans {:.2} and {:.2} units. Maximum floor difference is {:.3} units. Runtime travel requires playtesting.",
+            2. * landings[0].1, 2. * landings[1].1, landings[0].2.max(landings[1].2))],
+    };
     Ok(PreservedConnector {
         geometry: AssemblyGeometry { mesh, materials, triangle_materials, report },
         switches,
         overlaps,
     })
+}
+
+fn intact_connector_contains_pickup(points: [V; 4], forward: V, width: f64, height: f64, position: V) -> bool {
+    let sideways = [-forward[1], forward[0], 0.];
+    if dot(sub(position, points[0]), sideways).abs() > width / 2. {
+        return false;
+    }
+    let along = dot(position, forward);
+    for [start, end] in points.windows(2).map(|pair| [pair[0], pair[1]]) {
+        let (lo, hi) = (dot(start, forward), dot(end, forward));
+        if !(lo..=hi).contains(&along) { continue; }
+        let floor = start[2] + (end[2] - start[2]) * (along - lo) / (hi - lo);
+        // Match native placement membership, including origins on a floor plane.
+        return position[2] <= floor + height && position[2] >= floor - 0.05;
+    }
+    false
+}
+
+fn level_connector_charts(start: V, end: V, side: V, height: f64) -> MeshGL64 {
+    let delta = sub(end, start);
+    let count = (dot(delta, delta).sqrt() / 48.).ceil() as usize;
+    let point = |index| if index == count { end } else { add(start, mul(delta, index as f64 / count as f64)) };
+    let full = passage_corners(start, end, side, side, height);
+    let mut render = MeshGL64 { num_prop: 5, ..Default::default() };
+    for panel in 0..count {
+        let corners = passage_corners(point(panel), point(panel + 1), side, side, height);
+        for (index, [a, c, b]) in LEVEL_PASSAGE_TRIANGLES.into_iter().enumerate() {
+            if ((4..=5).contains(&index) && panel > 0) || ((8..=9).contains(&index) && panel + 1 < count) {
+                continue; // Only the two exterior caps are part of the surface.
+            }
+            let uv_normal = normal(full[a], full[b], full[c]);
+            let first = render.num_vert() as u64;
+            for corner in [corners[a], corners[b], corners[c]] {
+                render.vert_properties.extend(corner);
+                render.vert_properties.extend(planar_uv(corner, uv_normal));
+            }
+            render.tri_verts.extend([first, first + 1, first + 2]);
+            render.face_id.push(0);
+        }
+    }
+    render
+}
+
+fn intact_connector_solid(points: [V; 4], side: V, height: f64, cancel: &AtomicBool) -> Result<Manifold> {
+    if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
+    // A level passage needs no coplanar joins at the landing zones. Unioning
+    // them adds needless narrow charts when the corridor is oblique.
+    if points[0][2] == points[3][2] {
+        return passage_solid(points[0], points[3], side, side, height, 0, None);
+    }
+    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, None));
+    let mut body = solids.next().unwrap()?;
+    for solid in solids {
+        if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
+        body = checked(body.boolean_with_engine_and_token(&solid?, OpType::Add, BooleanEngine::Auto, None), "Intact BSP connector")?;
+    }
+    Ok(body)
 }
 
 fn choose_intact_landing(
@@ -1440,6 +1519,27 @@ fn choose_intact_landing(
         }
     }
     Err(first_error.unwrap())
+}
+
+fn verify_intact_switch_spacing(
+    proposed: &[PartitionSwitch], retained: &[maps::NativeBspTransition], volumes: &[maps::ScenarioLogicVolume],
+) -> Result<()> {
+    for switch in proposed {
+        let (source, _) = maps::native_bsp_switch_name(&switch.name)
+            .ok_or_else(|| SparkError::Invalid("Invalid new native BSP switch name".into()))?;
+        for existing in retained.iter().filter(|existing| existing.source_bsp == source) {
+            let geometry = volumes.get(existing.trigger_index).and_then(|volume| volume.geometry.as_ref())
+                .filter(|geometry| geometry.valid())
+                .ok_or_else(|| SparkError::Invalid(format!("Cannot verify retained native BSP switch {}", existing.trigger_name)))?;
+            if geometry.intersects(&switch.geometry) {
+                return invalid(format!(
+                    "New switch {} overlaps retained switch {} in BSP {source}; move the landing clear of its entrance",
+                    switch.name, existing.trigger_name,
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn intact_switch_distance(span: f64) -> f64 {
@@ -2113,6 +2213,49 @@ mod tests {
             point[axis] += 0.01;
             assert!(validate_native_bsp_point(point).is_err());
         }
+    }
+
+    #[test]
+    fn native_pickup_clearance_checks_the_whole_connecting_passage() {
+        use std::f64::consts::FRAC_1_SQRT_2 as DIAG;
+        let end = [1382.361813213609, -626.9062963984237, -18.20604133605957];
+        let forward = [DIAG, -DIAG, 0.];
+        let point = |distance| add(end, mul(forward, distance));
+        let route = [point(-840.), point(-830.), point(-2.), point(2.5)];
+        let pickup = [1376.3582, -619.83777, -18.205042];
+        assert!(intact_connector_contains_pickup(route, forward, 2., 1.6, pickup));
+        assert!(!intact_connector_contains_pickup(route, forward, 2., 1.6, add(pickup, [1.5, 1.5, 0.])));
+        assert!(!intact_connector_contains_pickup(route, forward, 2., 1.6, add(pickup, [0., 0., 2.])));
+    }
+
+    #[test]
+    fn a_long_diagonal_level_connector_bakes_charts_without_collision_slivers() {
+        let forward = [std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2, 0.];
+        let start = [732., 52., -18.];
+        let end = add(start, mul(forward, 900.));
+        let points = [start, add(start, mul(forward, 5.)), sub(end, mul(forward, 5.)), end];
+        let side = [-forward[1], forward[0], 0.];
+        let body = intact_connector_solid(points, side, 1.6, &AtomicBool::new(false)).unwrap();
+        assert_eq!(body.get_mesh_gl64(-1).num_tri(), 12);
+        let mut render = level_connector_charts(start, end, side, 1.6);
+        assert_eq!(render.num_tri(), 156);
+        assert_eq!(crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES).unwrap(), 0);
+
+    }
+
+    #[test]
+    fn overlapping_outgoing_switches_cannot_compete_for_the_same_source() {
+        use std::f64::consts::FRAC_1_SQRT_2 as DIAG;
+        let old = partition_switch(1, 5, [0., 0., 0.], [1., 0., 0.], 2., 1.6);
+        let fields = [maps::ScenarioLogicVolume { name: old.name.clone(), kind: 1, geometry: Some(old.geometry) }];
+        let retained = [maps::NativeBspTransition { trigger_index: 0, trigger_name: old.name,
+            source_bsp: 1, destination_bsp: 5, arrival_marker: None }];
+        let overlapping = partition_switch(1, 7, [0.2, 0.2, 0.], [DIAG, -DIAG, 0.], 2., 1.6);
+        assert!(verify_intact_switch_spacing(&[overlapping], &retained, &fields).unwrap_err().to_string().contains("bsp1,5"));
+        let independent = partition_switch(2, 7, [0.2, 0.2, 0.], [DIAG, -DIAG, 0.], 2., 1.6);
+        verify_intact_switch_spacing(&[independent], &retained, &fields).unwrap();
+        let clear = partition_switch(1, 7, [4., 4., 0.], [DIAG, -DIAG, 0.], 2., 1.6);
+        verify_intact_switch_spacing(&[clear], &retained, &fields).unwrap();
     }
 
     #[test]

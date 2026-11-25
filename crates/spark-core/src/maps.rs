@@ -29,6 +29,7 @@ pub use shader_transparent::{ShaderAnimation, ShaderStage};
 pub use decals::SceneDecal;
 #[path = "bsp_relocation.rs"]
 mod bsp_relocation;
+pub(crate) use bsp_relocation::preflight_bsp_relocation;
 pub use bsp_relocation::{translate_bsp_extraction_input, BspRelocation};
 
 pub const MAX_CACHE_BYTES: u64 = 768 * 1024 * 1024;

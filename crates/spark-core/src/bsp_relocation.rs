@@ -1,6 +1,6 @@
 //! Rigid translation of a standard CE609 BSP for extraction into owned native tags.
 //! Topology, directions, lightmap coordinates and non-spatial data stay intact.
-use super::{cache_tag_space, read_cache_snapshot_shared, vec3, MapInspection, Space};
+use super::{cache_tag_space, read_cache_snapshot_shared, vec3, MapHeader, MapInspection, Space};
 use crate::{binary::Reader, invalid, Result, SparkError};
 use serde::Serialize;
 use std::path::Path;
@@ -270,17 +270,19 @@ fn projection_axes(normal: [f32; 3], designator: u32) -> (usize, usize) {
     }
 }
 
-/// Returns a derived extractor input. Its scenario placements and cache
-/// checksum are untouched, so the returned bytes are not a playable export.
-pub fn translate_bsp_extraction_input(
-    path: &Path,
-    inspection: &MapInspection,
-    delta: [f64; 3],
-) -> Result<(Vec<u8>, BspRelocation)> {
+pub(crate) fn preflight_bsp_relocation(path: &Path, inspection: &MapInspection, delta: [f64; 3]) -> Result<()> {
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    checked_relocation_root(&Reader(&bytes), &header, &hash, inspection, delta)?;
+    Ok(())
+}
+
+fn checked_relocation_root(
+    reader: &Reader<'_>, header: &MapHeader, source_sha256: &str,
+    inspection: &MapInspection, delta: [f64; 3],
+) -> Result<(Space, usize)> {
     if delta.iter().any(|v| !v.is_finite() || v.abs() > 1500.) || delta == [0.; 3] {
         return invalid("Choose a finite nonzero BSP translation within 1500 world units");
     }
-    let (header, bytes, source_sha256) = read_cache_snapshot_shared(path)?;
     if header.version != 609
         || header.extended
         || inspection.header.extended
@@ -288,8 +290,7 @@ pub fn translate_bsp_extraction_input(
     {
         return invalid("BSP relocation requires the exact inspected stock CE609 source");
     }
-    let reader = Reader(&bytes);
-    let tags = cache_tag_space(&reader, &header)?;
+    let tags = cache_tag_space(reader, header)?;
     let scenario = inspection
         .tags
         .iter()
@@ -297,7 +298,7 @@ pub fn translate_bsp_extraction_input(
         .and_then(|tag| tag.data_offset)
         .ok_or_else(|| SparkError::Invalid("Stock scenario tag is unavailable".into()))?
         as usize;
-    let (reference, count) = tags.block(&reader, scenario + 0x5a4, 32, 16)?;
+    let (reference, count) = tags.block(reader, scenario + 0x5a4, 32, 16)?;
     if count != 1 {
         return invalid("This relocation requires a single donor BSP");
     }
@@ -322,6 +323,19 @@ pub fn translate_bsp_extraction_input(
             return invalid("Relocated structure bounds exceed the reviewed 1500-world-unit limit");
         }
     }
+    Ok((region, root))
+}
+
+/// Returns a derived extractor input. Its scenario placements and cache
+/// checksum are untouched, so the returned bytes are not a playable export.
+pub fn translate_bsp_extraction_input(
+    path: &Path,
+    inspection: &MapInspection,
+    delta: [f64; 3],
+) -> Result<(Vec<u8>, BspRelocation)> {
+    let (header, bytes, source_sha256) = read_cache_snapshot_shared(path)?;
+    let reader = Reader(&bytes);
+    let (region, root) = checked_relocation_root(&reader, &header, &source_sha256, inspection, delta)?;
     let (collision, count) = region.block(&reader, root + 0xb0, 96, 1)?;
     if count != 1 {
         return invalid("Donor does not have one checked native collision BSP");
@@ -380,6 +394,7 @@ mod tests {
             inspection.sha256,
             "f9684cb7e5436fd2901b7ea226726a6089957b91459923421264a5436f743244"
         );
+        preflight_bsp_relocation(&source, &inspection, [-104., 0., 72.]).unwrap();
         let (translated, report) =
             translate_bsp_extraction_input(&source, &inspection, [-104., 0., 72.]).unwrap();
         assert_eq!(
@@ -395,6 +410,7 @@ mod tests {
             (2_358, 23_427, 86_378)
         );
         assert!(translate_bsp_extraction_input(&source, &inspection, [1500., 0., 0.]).is_err());
+        assert!(preflight_bsp_relocation(&source, &inspection, [1500., 0., 0.]).is_err());
         assert_eq!(hash_file(&source).unwrap(), inspection.sha256);
     }
 }
