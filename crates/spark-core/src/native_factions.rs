@@ -97,6 +97,45 @@ impl From<&NativeFactionKit> for HubControl {
         }
     }
 }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeFactionService {
+    pub faction: String,
+    pub service: String,
+    pub control_tag_path: String,
+    pub position: [f32; 3],
+    pub rotation_radians: [f32; 3],
+}
+impl NativeFactionService {
+    fn name(&self) -> String {
+        format!("extraction_{}_{}", self.faction, self.service)
+    }
+    pub(super) fn validate(&self) -> Result<()> {
+        if faction_service_owner(&self.name()).is_none() {
+            return invalid("Choose UNSC or Covenant deployment, loadout or debrief");
+        }
+        validate_hub_pose(&self.control_tag_path, self.position, self.rotation_radians)
+    }
+}
+const FACTION_SERVICES: [&str; 3] = ["deploy", "loadout", "debrief"];
+pub fn faction_service_owner(name: &str) -> Option<usize> {
+    let name = name.strip_prefix("extraction_")?;
+    let (faction, service) = name.split_once('_')?;
+    if !FACTION_SERVICES.contains(&service) { return None; }
+    ["unsc", "covenant"].iter().position(|value| *value == faction)
+}
+
+impl HubControl {
+    fn group_name(&self, suffix: &str) -> String {
+        let suffix = match (faction_service_owner(&self.name), suffix) {
+            (Some(_), "power") => "pwr",
+            (Some(_), "position") => "pos",
+            _ => suffix,
+        };
+        format!("{}_{suffix}", self.name)
+    }
+}
+
 fn control_layout(
     fields: &str,
     kits: &[HubControl],
@@ -127,9 +166,9 @@ fn control_layout(
             .chain(&profiles)
             .any(|old| old.eq_ignore_ascii_case(&name))
             || group.iter().any(|(old, _, _)| {
-                old.eq_ignore_ascii_case(&(name.clone() + "_power"))
-                    || old.eq_ignore_ascii_case(&(name.clone() + "_position"))
-                    || kit.readiness && old.eq_ignore_ascii_case(&(name.clone() + "_ready"))
+                old.eq_ignore_ascii_case(&kit.group_name("power"))
+                    || old.eq_ignore_ascii_case(&kit.group_name("position"))
+                    || kit.readiness && old.eq_ignore_ascii_case(&kit.group_name("ready"))
             })
         {
             return invalid("A faction control/profile/group name already exists; preserve it and edit its source instead of appending duplicates");
@@ -160,7 +199,9 @@ fn control_layout(
         }
     }
     let volumes = scenario_volume_choices(fields)?;
-    let regional = if added_profiles > 0 { regional_faction_hubs(&volumes)? } else { None };
+    let regional = if added_profiles > 0 || kits.iter().any(|kit| faction_service_owner(&kit.name).is_some()) {
+        regional_faction_hubs(&volumes)?
+    } else { None };
     for kit in kits {
         validate_terminal_point(&volumes, regional, &kit.name, kit.position)?;
     }
@@ -225,7 +266,7 @@ fn append_hub_controls(
             let key = group + offset;
             insert(&mut args, "device_groups");
             for (field, value) in [
-                ("name", format!("{}_{suffix}", entry.name)),
+                ("name", entry.group_name(suffix)),
                 ("initial_value", value.into()),
                 ("flags.can_change_only_once", "0".into()),
             ] {
@@ -800,6 +841,59 @@ pub(super) fn review_profile_replacements(before: &str, after: &str, kits: &[Nat
     }).collect())
 }
 
+
+fn service_control(fields: &str, service: &NativeFactionService) -> Result<HubControl> {
+    service.validate()?;
+    let volumes = scenario_volume_choices(fields)?;
+    if regional_faction_hubs(&volumes)?.is_none() {
+        return invalid("Faction services require the paired MegaWorld hubs");
+    }
+    let kits = snapshots(fields)?;
+    if kits.len() != 2 || kits.iter().any(|kit| kit.body.is_none()) {
+        return invalid("Bind both native faction terminals, kits and player bodies before adding services");
+    }
+    Ok(HubControl {
+        name: service.name(),
+        control_tag_path: service.control_tag_path.clone(),
+        position: service.position,
+        rotation_radians: service.rotation_radians,
+        readiness: false,
+    })
+}
+
+pub fn service_arguments(tags: &Path, tag: &str, before: &str, service: &NativeFactionService) -> Result<Vec<String>> {
+    append_hub_controls(tags, tag, before, &[service_control(before, service)?], 0)
+}
+
+pub fn review_service(before: &str, after: &str, service: &NativeFactionService) -> Result<Vec<FieldDifference>> {
+    let entry = service_control(before, service)?;
+    let (name, control, group, _, palette) = control_layout(before, std::slice::from_ref(&entry), 0)?;
+    transport::preserved_arrays(before, after, &[
+        ("object_names", 1), ("controls", 1), ("device_groups", 2),
+        ("control_palette", palette.len() - array_listing(before, "control_palette")?.count),
+    ])?;
+    let rows = scenario_device_choices(after)?;
+    let mut matches = rows.iter().filter(|row| row.name.eq_ignore_ascii_case(&entry.name));
+    let row = matches.next().ok_or_else(|| crate::SparkError::Invalid("Native faction service is missing".into()))?;
+    let actual_groups = groups(after)?;
+    let expected_groups = [(entry.group_name("power"), 1., false), (entry.group_name("position"), 0., false)];
+    if matches.next().is_some() || row.name != entry.name || row.class != "ctrl"
+        || row.name_index as usize != name || row.index as usize != control
+        || row.power_group != Some(group as i16) || row.position_group != Some((group + 1) as i16)
+        || row.initially_off != Some(false) || row.interaction_disabled != Some(false)
+        || actual_groups.get(group..group + 2) != Some(expected_groups.as_slice())
+        || !row.tag_path.replace('\\', "/").eq_ignore_ascii_case(&entry.control_tag_path.replace('\\', "/"))
+        || !positions_close(row.position, entry.position)
+        || row.rotation_radians.iter().zip(entry.rotation_radians).any(|(a,b)| !facings_close(*a,b))
+    {
+        return invalid("The appended native service differs from the reviewed control, pose or isolated groups");
+    }
+    Ok(vec![FieldDifference {
+        before: format!("No {} control", entry.name),
+        after: format!("Append {} at {:?}, powered with separate repeatable groups", entry.name, entry.position),
+    }])
+}
+
 pub fn reviewed(
     before: &str,
     after: &str,
@@ -1003,7 +1097,7 @@ fn validate_terminal_point(
     position: [f32; 3],
 ) -> Result<()> {
     if let Some(hubs) = regional {
-        let faction = faction_index(name)?;
+        let faction = faction_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
         if !hubs[faction].contains(position) || hubs[1 - faction].contains(position) {
             return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
         }
@@ -1029,6 +1123,15 @@ pub struct MegaWorldHubStarts {
     pub start_indices: Vec<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal_index: Option<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub services: Vec<MegaWorldHubService>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MegaWorldHubService {
+    pub service: String,
+    pub control_index: usize,
 }
 
 /// Read the faction starts from the exact MCC13 cache. Stock starts outside
@@ -1095,8 +1198,41 @@ pub fn megaworld_hub_starts(
             }
             Some(terminal.index)
         } else { None };
+
+        let mut services = Vec::new();
+        for kind in FACTION_SERVICES {
+            let service_name = format!("{terminal_name}_{kind}");
+            let mut names = logic.names.iter().enumerate().filter(|(_, row)| row.name.eq_ignore_ascii_case(&service_name));
+            let Some((name_index, row)) = names.next() else { continue; };
+            if terminal_index.is_none() || row.name != service_name || row.object_type != 8
+                || row.object_index < 0 || names.next().is_some()
+            {
+                return invalid(format!("Invalid or duplicate native faction service {service_name}"));
+            }
+            let service = logic.devices.iter().find(|device| device.class == "ctrl"
+                && device.name_index as usize == name_index && device.index == row.object_index as usize)
+                .ok_or_else(|| crate::SparkError::Invalid(format!("Missing native faction service {service_name}")))?;
+            let power = service.power_group.filter(|&group| group >= 0);
+            let position = service.position_group.filter(|&group| group >= 0);
+            let ready = |group: Option<i16>, expected| group.and_then(|index| logic.groups.get(index as usize))
+                .is_some_and(|row| row.initial_value == expected && row.flags == 0);
+            if service.initially_off != Some(false) || service.interaction_disabled != Some(false)
+                || power == position || !ready(power, 1.) || !ready(position, 0.)
+                || logic.devices.iter().any(|other| (other.class != "ctrl" || other.index != service.index)
+                    && [other.power_group, other.position_group].into_iter().flatten()
+                        .any(|group| Some(group) == power || Some(group) == position))
+            {
+                return invalid(format!("Native faction service {service_name} needs independent live groups"));
+            }
+            validate_terminal_point(&volumes, Some(hubs), &service_name, service.position)?;
+            let membership = crate::maps::bsp_point_locations(path, map, &[service.position], Some(1.))?;
+            if membership[0].bsps != [bsp] || !membership[0].ground.iter().any(|ground| ground.bsp == bsp) {
+                return invalid(format!("Native faction service {service_name} needs grounded BSP {bsp} placement"));
+            }
+            services.push(MegaWorldHubService { service: kind.to_owned(), control_index: service.index });
+        }
         Ok(MegaWorldHubStarts {
-            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index,
+            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services,
             start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
         })
     };
@@ -1372,6 +1508,223 @@ mod tests {
             "hubs": hubs,
         })).unwrap(), false).unwrap();
         eprintln!("Nineteen-region faction hub readback: {} · {:?}", map.sha256, hubs);
+    }
+
+    #[test]
+    #[ignore = "Requires the exact retained MegaWorld faction cache and disposable native tags"]
+    fn megaworld_faction_deployment_controls_compile() {
+        use crate::{maps, render};
+        let path = |key| std::path::PathBuf::from(std::env::var_os(key).unwrap());
+        let work = path("SPARK_BUILD_WORKSPACE");
+        let tags = path("SPARK_FACTION_QA_TAGS");
+        let invader = path("SPARK_FACTION_QA_INVADER");
+        let parent = path("SPARK_NATIVE_MEGAWORLD_CACHE");
+        assert!(tags.canonicalize().unwrap().starts_with(work.canonicalize().unwrap()));
+        let map = maps::inspect_map(&parent, None).unwrap();
+        assert_eq!(map.sha256, "dda73a1985462b681ec1205f566ff2f6424afa77460b6642de4c15a9050066ac");
+        let scenario = format!("{}.scenario", map.scenario_path.replace('\\', "/"));
+        let run = |tool: &str, args: &[String]| {
+            let result = std::process::Command::new(invader.join(format!("{tool}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {}", String::from_utf8_lossy(&result.stderr).chars().rev().take(2500).collect::<String>().chars().rev().collect::<String>());
+            String::from_utf8(result.stdout).unwrap()
+        };
+        let read = |root: &Path, action: &str, item: &str, tag: &str| {
+            run("invader-edit", &["-t".into(), root.to_string_lossy().into_owned(), action.into(), item.into(), tag.into()])
+        };
+        let list = || run("invader-edit", &["-t".into(), tags.to_string_lossy().into_owned(), "-L".into(), scenario.clone()]);
+        let repaired_derelict = path("SPARK_NATIVE_DERELICT_REPAIR");
+        let repaired = maps::inspect_map(&repaired_derelict, None).unwrap();
+        assert_eq!(repaired.sha256, "5df5d9ba0f7559da9de2a71b0eaf0e6bb22f8803dfd698ef4dc184fc86858b8e");
+        let reviewed_object = repaired.objects.iter().find(|row| row.id=="Scenery-550").unwrap();
+        let original_object = map.objects.iter().find(|row| row.id=="Scenery-550").unwrap();
+        assert!(positions_close(original_object.position, [783.9776,-39.457672,-17.941757]));
+        assert_eq!(original_object.rotation, reviewed_object.rotation);
+        let tag_path = |map:&maps::MapInspection, id| map.tags.iter().find(|tag| Some(tag.id)==id).unwrap().path.replace('\\',"/");
+        let full_tag = tag_path(&map, original_object.tag_id);
+        let reviewed_tag = tag_path(&repaired, reviewed_object.tag_id);
+        let suffix = "levels/b40/scenery/b40_metal_tall/metal_tall";
+        assert!(full_tag.ends_with(suffix) && reviewed_tag.ends_with(suffix));
+        let component_original = [783.88055,104.362694,-31.634438];
+        let relocated = std::array::from_fn(|i| original_object.position[i]+(reviewed_object.position[i]-component_original[i]));
+        let fit = maps::bsp_point_locations(&parent,&map,&[relocated],Some(1.)).unwrap();
+        assert_eq!(fit[0].bsps,[2],"Derelict scenery must remain in the full world's existing Derelict slot");
+        assert!(fit[0].ground.iter().any(|floor| floor.bsp==2));
+        let mut placement_project = crate::project::Project::new("Consolidated Derelict repair");
+        placement_project.scene = map.objects.clone();
+        placement_project.scene.iter_mut().find(|row|row.id==original_object.id).unwrap().position = relocated;
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let runner = crate::build::Runner{id:"reviewed-derelict",project:&placement_project.id,cancel:&cancel,event:&|_|{}};
+        let placement_receipt = crate::bsp_compile::apply_base_transforms(&placement_project,&map,
+            &invader.join("invader-edit.exe"),&runner,tags.parent().unwrap(),&tags).unwrap();
+        let mut source = list();
+
+        let original_kits = snapshots(&source).unwrap();
+        let sha = || maps::hash_file(&tags.join(&scenario)).unwrap();
+        let hubs = megaworld_hub_starts(&parent, &map).unwrap().unwrap();
+        let mut volumes = maps::scenario_volume_readback(&parent, &map).unwrap();
+        let original_hub = &hubs[1];
+        let covenant_geometry = volumes[original_hub.volume_index].geometry.as_mut().unwrap();
+        assert_eq!(covenant_geometry.forward,[1.,0.,0.]);
+        covenant_geometry.corner[0] -= 0.7;
+        covenant_geometry.corner[1] -= 0.7;
+        covenant_geometry.dimensions[0] += 1.4;
+        covenant_geometry.dimensions[1] += 1.4;
+        let operation = Operation::TriggerVolume {
+            index: original_hub.volume_index as u16, name: original_hub.name.clone(),
+            geometry: covenant_geometry.clone(), source_sha256:sha(), append:false,
+        };
+        run("invader-edit", &operation.arguments_with_fields(&tags,"scnr",&scenario,&source).unwrap());
+        let next=list();
+        reviewed_difference(&source,&next,&operation).unwrap();
+        source=next;
+        let starts = maps::scenario_region_starts(&parent, &map).unwrap();
+
+        let mut authored = Vec::new();
+        for kit in &original_kits {
+            let index = faction_index(&kit.kit.name()).unwrap();
+            let hub = &hubs[index];
+            let volume = volumes[hub.volume_index].geometry.as_ref().unwrap();
+            let existing = kit.kit.position;
+            let control = format!("{}.device_control", kit.kit.control_tag_path);
+            let control_fields = run("invader-edit", &["-t".into(), tags.to_string_lossy().into_owned(), "-L".into(), control.clone()]);
+            validate_control_source(&control_fields).unwrap();
+            let id = map.tags.iter().find(|tag| tag.class == "ctrl" && tag.path.replace('\\', "/") == kit.kit.control_tag_path).unwrap().id;
+            let (_, model) = render::preview_owned_object_model(&parent, &map.sha256, &map, id).unwrap();
+            let offset = render::upright_model_base_offset(&model).unwrap();
+            let points = (-9..=9).flat_map(|x| (-9..=9).map(move |y|
+                [existing[0]+x as f32*0.4, existing[1]+y as f32*0.4, existing[2]+0.8]))
+                .filter(|point| volume.contains([point[0], point[1], existing[2]])
+                    && (point[0]-existing[0]).hypot(point[1]-existing[1]) >= 1.)
+                .collect::<Vec<_>>();
+            let surveyed = maps::bsp_point_locations(&parent, &map, &points, Some(2.)).unwrap();
+            let position = surveyed.iter().filter_map(|row| {
+                if row.bsps != [hub.bsp_index] { return None; }
+                let floor = row.ground.iter().find(|ground| ground.bsp == hub.bsp_index)?.z;
+                let point = [row.point[0], row.point[1], floor+offset];
+                let away_from_spawn = |start: &maps::NativeRegionStart| start.bsp_index != hub.bsp_index as i16
+                    || (point[0]-start.position[0]).hypot(point[1]-start.position[1]) >= 0.8;
+                (volume.contains(point) && !volumes.iter().any(|volume| volume.name.starts_with("bsp")
+                    && volume.geometry.as_ref().is_some_and(|geometry| geometry.contains(point)))
+                    && starts.iter().all(away_from_spawn)).then_some(point)
+            }).min_by(|a,b| {
+                let distance = |p: &[f32;3]| (p[0]-existing[0]).hypot(p[1]-existing[1]);
+                distance(a).total_cmp(&distance(b))
+            }).unwrap_or_else(|| panic!("No supported deployment position in {}", hub.name));
+            let service = NativeFactionService { faction: kit.kit.faction.clone(), service: "deploy".into(),
+                control_tag_path: kit.kit.control_tag_path.clone(), position, rotation_radians: kit.kit.rotation_radians };
+            let wrong_hub = NativeFactionService { position: original_kits[1-index].kit.position, ..service.clone() };
+            assert!(service_arguments(&tags, &scenario, &source, &wrong_hub).is_err());
+            let operation = Operation::FactionService { service: service.clone(), source_sha256: sha() };
+            run("invader-edit", &operation.arguments_with_fields(&tags, "scnr", &scenario, &source).unwrap());
+            let next = list();
+            assert_eq!(reviewed_difference(&source, &next, &operation).unwrap().len(), 1);
+            assert!(service_arguments(&tags, &scenario, &next, &service).is_err());
+            source = next;
+            authored.push(service);
+        }
+
+
+        let covenant = &volumes[hubs[1].volume_index].geometry.as_ref().unwrap();
+        let bsp = hubs[1].bsp_index;
+        let template_index = hubs[1].start_indices[0];
+        let template = &starts[template_index];
+        let base = template.position;
+        let (collision, _) = maps::collision_source(&parent, &map).unwrap();
+        let clearance = crate::bsp_clearance::RouteChecker::for_part(&collision, bsp as usize).unwrap();
+        let points = (-8..=8).flat_map(|x|(-8..=8).map(move |y|[base[0]+x as f32*0.32,base[1]+y as f32*0.32,base[2]+0.6]))
+            .filter(|point| covenant.contains(*point)).collect::<Vec<_>>();
+        let mut placements = maps::bsp_point_locations(&parent,&map,&points,Some(1.6)).unwrap();
+        placements.sort_by(|a,b| {
+            let distance = |point: [f32; 3]|(point[0]-base[0]).hypot(point[1]-base[1]);
+            distance(a.point).total_cmp(&distance(b.point))
+        });
+        let mut new_starts = Vec::new();
+        for row in placements {
+            if row.bsps != [bsp] { continue; }
+            let Some(floor)=row.ground.iter().find(|ground| ground.bsp==bsp) else { continue };
+            let position = [row.point[0], row.point[1], floor.z+0.06];
+            let separated = |other: [f32;3]| (position[0]-other[0]).hypot(position[1]-other[1])>=0.82;
+            if !covenant.contains(position) || (position[2]-base[2]).abs()>0.65
+                || !starts.iter().filter(|start|start.bsp_index==bsp as i16).all(|start| separated(start.position))
+                || !authored.iter().all(|service| separated(service.position))
+                || !original_kits.iter().all(|kit| separated(kit.kit.position))
+                || !new_starts.iter().copied().all(separated)
+                || clearance.verify_start(position.map(f64::from)).is_err()
+            { continue; }
+            let operation=Operation::PlayerStartPosition {index:(starts.len()+new_starts.len()) as u16,
+                copy_from:Some(template_index as u16),position,facing_radians:template.facing,source_sha256:sha()};
+            assert!(operation.check_player_start_capacity(609).is_err());
+            operation.check_player_start_capacity(map.header.version).unwrap();
+            run("invader-edit",&operation.arguments_with_fields(&tags,"scnr",&scenario,&source).unwrap());
+            let next=list();
+            reviewed_difference(&source,&next,&operation).unwrap();
+            source=next;
+            new_starts.push(position);
+            if new_starts.len()==5 { break; }
+        }
+        assert_eq!(new_starts.len(),5,"Covenant hub needs six reviewed starts");
+        let output = tags.parent().unwrap().join("reviewed-world-services");
+        std::fs::create_dir(&output).unwrap();
+        run("invader-build", &["-t".into(), tags.to_string_lossy().into_owned(), "-g".into(), "mcc-cea".into(),
+            "-T".into(), "67108864".into(), "-m".into(), output.to_string_lossy().into_owned(),
+            "--resource-usage".into(), "none".into(), scenario.strip_suffix(".scenario").unwrap().into()]);
+        let cache = output.join("gsmegaroad.map");
+        let built = maps::inspect_map(&cache, None).unwrap();
+        let reviewed = megaworld_hub_starts(&cache, &built).unwrap().unwrap();
+        let actual_starts = maps::scenario_region_starts(&cache, &built).unwrap();
+        assert_eq!(actual_starts.len(), starts.len()+new_starts.len());
+        assert!(starts.iter().zip(&actual_starts).all(|(a,b)| (a.position,a.facing,a.bsp_index,a.team_index,a.spawn_types)
+            == (b.position,b.facing,b.bsp_index,b.team_index,b.spawn_types)));
+        for (index, service) in authored.iter().enumerate() {
+            let result = &reviewed[index];
+            assert_eq!(result.bsp_index, hubs[index].bsp_index);
+            assert_eq!(result.terminal_index, hubs[index].terminal_index);
+            if index==0 { assert_eq!(result.start_indices,hubs[0].start_indices); }
+            else { assert!(result.start_indices.len()>=6); assert!(result.start_indices.ends_with(&(starts.len()..actual_starts.len()).collect::<Vec<_>>())); }
+            assert_eq!(result.services.len(), 1);
+            assert_eq!(result.services[0].service, "deploy");
+            assert_eq!(result.services[0].control_index, 2+index);
+            assert!(!service.position.iter().any(|v| !v.is_finite()));
+        }
+        for (observed,expected) in actual_starts[starts.len()..].iter().zip(&new_starts) {
+            assert!(positions_close(observed.position,*expected));
+            assert_eq!((observed.bsp_index,observed.team_index,observed.spawn_types),(template.bsp_index,template.team_index,template.spawn_types));
+        }
+        let actual_object = built.objects.iter().find(|row| row.id == original_object.id).unwrap();
+        assert!(positions_close(actual_object.position,relocated));
+        assert_eq!(actual_object.rotation,original_object.rotation);
+        let raw=std::fs::read(&cache).unwrap();
+        let offset=actual_object.source_offset.unwrap()+24;
+        assert_eq!(u16::from_le_bytes(raw[offset..offset+2].try_into().unwrap()),1<<2);
+        verify_cache(&original_kits, &cache, &built).unwrap();
+        assert_eq!(run("invader-info", &["-T".into(),"crc32_mismatched".into(),cache.to_string_lossy().into_owned()]).trim(), "0");
+
+        let independent = output.join("readback");
+        std::fs::create_dir(&independent).unwrap();
+        let control = format!("{}.device_control", authored[0].control_tag_path.replace('/', "\\"));
+        run("invader-extract", &["-n".into(),"-s".into(),scenario.replace('/', "\\"),"-s".into(),control.clone(),
+            "-t".into(),independent.to_string_lossy().into_owned(),cache.to_string_lossy().into_owned()]);
+        let compiled_control = independent.join(crate::safe_relative(&control).unwrap());
+        assert!(compiled_control.is_file());
+        for hub in &reviewed {
+            let index = hub.services[0].control_index;
+            let trigger = read(&independent, "-G", "triggers_when", &control);
+            let off = read(&independent, "-G", &format!("controls[{index}].device_flags.initially_off"), &scenario);
+            verify_control_values(&trigger, &off).unwrap();
+        }
+        let previous_switches = maps::scenario_bsp_transitions(&parent, &map).unwrap();
+        let new_switches = maps::scenario_bsp_transitions(&cache, &built).unwrap();
+        assert_eq!(previous_switches.bsp_tag_paths, new_switches.bsp_tag_paths);
+        assert_eq!(serde_json::to_value(previous_switches.transitions).unwrap(), serde_json::to_value(new_switches.transitions).unwrap());
+        assert_eq!(map.mesh.indices, built.mesh.indices);
+        assert_eq!(map.mesh.positions, built.mesh.positions);
+        assert_eq!(maps::hash_file(&parent).unwrap(), map.sha256);
+        crate::project::atomic_write(&output.join("service-review.json"), &serde_json::to_vec_pretty(&serde_json::json!({
+            "sourceSha256": map.sha256, "cacheSha256": built.sha256, "cacheVersion": built.header.version,
+            "scenarioType": built.header.scenario_type, "scenarioSourceSha256": sha(), "hubs": reviewed,
+            "authored": authored, "bspCount":new_switches.bsp_count,"startCount":actual_starts.len(),"extractionPlayable": false,
+            "derelictRepair":placement_receipt,"acceptedDerelictComponent":repaired.sha256,"newCovenantStarts":new_starts
+        })).unwrap(), false).unwrap();
     }
 
     #[test]

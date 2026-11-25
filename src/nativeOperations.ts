@@ -89,6 +89,7 @@ export interface NativeDevicePlacement {class:'ctrl'|'mach'|'vehi';index:number;
 export interface NativeDeviceGroup {index:number;name:string;initialValue:number;changeOnce:boolean;reserved:boolean}
 export interface NativeVehicleFlight {throttle:number;avoidanceDistance:number;pathfindingRadius:number}
 export interface NativeTransportAppend {name:'extraction_pelican'|'extraction_spirit';tagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
+export interface NativeFactionService {faction:"unsc"|"covenant";service:"deploy"|"loadout"|"debrief";controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number]}
 export interface NativeFactionBody {faction:'unsc'|'covenant';bipedTagPath:string;permutation:number;includeFirstPersonArms?:boolean;usePlayerPhysics?:boolean}
 export interface NativeFactionKit {faction:'unsc'|'covenant';controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];profile:import('./firefight').NativePlayerProfile}
 export interface NativeSquadTerminal {number:number;controlTagPath:string;position:[number,number,number];rotationRadians:[number,number,number];readiness:boolean}
@@ -107,6 +108,7 @@ export type NativeOperation =
   | {kind:'controlSettings';settings:NativeControlSettings;sourceSha256:string}
   | {kind:'playerStartPosition';index:number;copyFrom?:number;position:[number,number,number];facingRadians:number;sourceSha256:string}
   | {kind:'squadTerminals';terminals:NativeSquadTerminal[];sourceSha256:string}
+  | {kind:'factionService';service:NativeFactionService;sourceSha256:string}
   | {kind:'factionBody';body:NativeFactionBody;sourceSha256:string;replaceExisting?:boolean}
   | {kind:'factionKits';kits:NativeFactionKit[];sourceSha256:string;replaceExistingProfiles?:boolean} | {kind:'vehicleFlight';tuning:NativeVehicleFlight;sourceSha256:string} | {kind:'appendTransport';transport:NativeTransportAppend;sourceSha256:string} | {kind:'commandList';list:NativeCommandList;sourceSha256:string;append?:boolean} | {kind:'deviceGroupAppend';name:string;initialValue:number;changeOnce:boolean;sourceSha256:string} | {kind:'deviceGroupSettings';index:number;name:string;initialValue:number;changeOnce:boolean;sourceSha256:string} | {kind:'devicePlacement';device:NativeDevicePlacement;sourceSha256:string}| {kind:'triggerVolume';index:number;name:string;geometry:NativeVolumeGeometry;sourceSha256:string;append?:boolean}|{kind:'cutsceneFlag';point:NativeCutsceneFlag;sourceSha256:string;append?:boolean}|{kind:'cutsceneCamera';point:NativeCameraPoint;sourceSha256:string;append?:boolean}| { kind: 'boundingRadius'; value: number } | { kind: 'lensFlareScaleRepair' } | {kind:'hudDuplicate';array:string;index:number;sourceSha256:string}
   | ({kind:'encounterSquadCounts';sourceSha256:string}&NativeSquadCountEdit)
@@ -138,7 +140,7 @@ export interface NativeTagContext {
   factionKits?:{kit:NativeFactionKit;body?:{bipedTagPath:string;permutation:number;firstPersonArms?:boolean}|null}[];factionBodyIssue?:string|null;
   scenarioSquads?:NativeScenarioSquad[];
   scenarioStartSquads?:NativeScenarioSquad[];
-  scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];
+  playerStartLimit?:number;scenarioPlayerStarts?:{index:number;position:[number,number,number];facingRadians?:number|null}[];
   playerStartEditIssue?:string|null;
   scenarioDevices?:NativeDevicePlacement[];
   scenarioDeviceGroups?:NativeDeviceGroup[]|null;

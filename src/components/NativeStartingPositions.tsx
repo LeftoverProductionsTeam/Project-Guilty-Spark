@@ -31,7 +31,7 @@ export default function NativeStartingPositions({context,busy,dirty,onPreview,on
   const facingChanged=hasFacing&&facing!==null&&!nativeAiFacingClose(point!.facingRadians!,facing);
   const changed=valid&&(positionChanged||facingChanged||commandChanged||firing&&group!==point?.group);
   const playerStarts=player ? context.scenarioPlayerStarts??[] : [];
-  const canCopy=player&&valid&&hasFacing&&playerStarts.length<256&&!!position
+  const canCopy=player&&valid&&hasFacing&&playerStarts.length<(context.playerStartLimit??256)&&!!position
     &&playerStarts.every(start=>start.position.some((value,index)=>Math.abs(value-position[index])>Math.max(1e-6,Math.abs(value)*2**-22)));
   const protectedGroup=!player&&!!squad&&context.protectedSquadEncounters?.includes(squad.encounterName.replace(/[A-Z]/g,char=>char.toLowerCase()));
   const issue=(player?context.playerStartEditIssue:firing?context.combatEditIssue:context.startEditIssue)??(protectedGroup?'This group has a preserved source recipe. Edit it in its original authoring workflow; direct overrides require source reconciliation.':null);

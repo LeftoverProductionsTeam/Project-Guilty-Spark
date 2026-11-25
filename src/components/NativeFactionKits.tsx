@@ -1,17 +1,20 @@
 import {useEffect,useId,useState} from 'react';
-import type {NativeFactionKit,NativeOperation,NativeTagContext} from '../nativeOperations';
+import type {NativeFactionKit,NativeFactionService,NativeOperation,NativeTagContext} from '../nativeOperations';
 import {defaultNativePlayerProfile} from '../firefight';
 import {Notice} from './ui';
 import NativeControlGroundCheck from './NativeControlGroundCheck';
 type Role=NativeFactionKit['faction'];
+type Service=NativeFactionService['service'];
 interface Draft {included:boolean;control:string;position:[string,string,string];rotation:[string,string,string];profile:NativeFactionKit['profile']}
 const initial=(faction:Role):Draft=>({included:faction==='unsc',control:'',position:['','',''],rotation:['0','0','0'],profile:{...defaultNativePlayerProfile(),primaryWeapon:faction==='unsc'?'weapons/assault rifle/assault rifle':'weapons/plasma pistol/plasma pistol',primaryLoaded:faction==='unsc'?60:0,primaryReserved:faction==='unsc'?180:0,secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0,health:0,shields:0,fragmentationGrenades:faction==='unsc'?1:0,plasmaGrenades:faction==='covenant'?1:0}});
 /** The existing protected native Preview/Accept owns writes and restoration. */
 export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftChange}:{context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void}){
  const [body,setBody]=useState({faction:'covenant' as Role,bipedTagPath:null as string|null,permutation:null as string|null,includeFirstPersonArms:false,usePlayerPhysics:false});
+ const [service,setService]=useState({faction:'unsc' as Role,service:'deploy' as Service,control:'',position:['','',''] as Draft['position'],rotation:['0','0','0'] as Draft['rotation']});
  const [squad,setSquad]=useState({number:1,control:'',position:['','',''] as [string,string,string],rotation:['0','0','0'] as [string,string,string],readiness:false});
  const [role,setRole]=useState<Role>('unsc'),[drafts,setDrafts]=useState<Record<Role,Draft>>({unsc:initial('unsc'),covenant:initial('covenant')});const id=useId(),draft=drafts[role];
  useEffect(()=>{setDrafts({unsc:{...initial('unsc'),control:context.controlSources?.[0]??''},covenant:{...initial('covenant'),control:context.controlSources?.[0]??''}});},[context.projectId,context.buildId,context.tag]);
+ useEffect(()=>setService(current=>({...current,control:context.controlSources?.[0]??"",position:["","",""],rotation:["0","0","0"]})),[context.projectId,context.buildId,context.tag]);
  useEffect(()=>{setSquad({number:1,control:context.controlSources?.[0]??"",position:["","",""],rotation:["0","0","0"],readiness:false});},[context.projectId,context.buildId,context.tag]);
  useEffect(()=>{setBody(current=>({...current,bipedTagPath:null,permutation:null,includeFirstPersonArms:false,usePlayerPhysics:false}));},[context.projectId,context.buildId,context.tag,context.tagSha256]);
  const kits=context.factionKits??[];
@@ -20,7 +23,7 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const sourceKey=JSON.stringify([context.projectId,context.tag,context.tagSha256]);
  const editedProfiles=profileDraft?.sourceKey===sourceKey?profileDraft.profiles:undefined;
  const equipment=existingKit?(editedProfiles?.[role]??existingKit.profile):draft.profile;
- useEffect(()=>onDraftChange(),[drafts,squad,body,profileDraft,context.tagSha256]);
+ useEffect(()=>onDraftChange(),[drafts,squad,body,service,profileDraft,context.tagSha256]);
  const update=(patch:Partial<Draft>)=>setDrafts(current=>({...current,[role]:{...current[role],...patch}}));
  const profile=(patch:Partial<Draft['profile']>)=>{
    const next={...equipment,...patch,health:0,shields:0};
@@ -38,6 +41,9 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const sourceSha256=context.tagSha256??'';
  const hasSourceHash=/^[a-f0-9]{64}$/i.test(sourceSha256);
  const selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
+ const serviceName="extraction_"+service.faction+"_"+service.service;
+ const installedService=context.scenarioDevices?.find(row=>row.name.toLowerCase()===serviceName);
+ const servicesBlocked=blocked||kits.filter(row=>row.body).length!==2;
  const bipedSources=context.bipedSources??[];
  const currentBody=selectedKit?.body;
  const elitePath='characters/elite/elite';
@@ -102,7 +108,28 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
      onClick={()=>selectedKit&&onPreview({kind:'factionBody',sourceSha256:context.tagSha256!,...(currentBody?{replaceExisting:true}:{}),body:{faction:selectedKit.kit.faction,bipedTagPath:bipedPath,permutation,...(includeArms?{includeFirstPersonArms:true}:{}),...(usePlayerPhysics?{usePlayerPhysics:true}:{})}})}>{currentBody?'Preview faction body rebind':'Preview faction player body'}</button>
   </fieldset>
   <p className="subtle">Preview → Accept → Save → Build working tag edits. New Covenant bindings suggest an available Elite. Enable player physics on a separate copy if the character needs native player movement. Use any compatible biped from working source. Players choose their personal armor color in Forerunner Player Setup. Test the body, equipment and intended aircraft seats in the game.</p>
+
  </details>
+  {context.regionalFactionSource&&<details className="native-faction-services">
+   <summary>Faction deployment, loadout and debrief</summary>
+   <p className="subtle">Place a deployment control in each faction’s hub. Add loadout and debrief controls where players can reach them. Multiplayer use requires a compatible Forerunner build.</p>
+   <fieldset disabled={servicesBlocked}>
+    <label>Service faction<select value={service.faction} onChange={event=>setService({...service,faction:event.target.value as Role})}><option value="unsc">UNSC</option><option value="covenant">Covenant</option></select></label>
+    <label>Service action<select value={service.service} onChange={event=>setService({...service,service:event.target.value as Service})}><option value="deploy">Deploy</option><option value="loadout">Choose loadout</option><option value="debrief">Review debrief</option></select></label>
+    {installedService?<p className="subtle">{serviceName} is already placed (native control {installedService.index}). Select it under existing controls to review its pose.</p>:<>
+     <label>Touched control tag<input aria-label="Service control tag" list={id+'-controls'} value={service.control} onChange={event=>setService({...service,control:event.target.value})}/></label>
+     <div className="native-encounter-position">{service.position.map((value,index)=><label key={index}>Service {['X','Y','Z'][index]}<input type="number" step="any" value={value} onChange={event=>setService({...service,position:service.position.map((item,i)=>i===index?event.target.value:item) as Draft['position']})}/></label>)}</div>
+     <label>Service yaw · degrees<input type="number" min={-360} max={360} step="any" value={service.rotation[0]} onChange={event=>setService({...service,rotation:[event.target.value,'0','0']})}/></label>
+     <NativeControlGroundCheck context={context} selectionKey={serviceName} tagPath={service.control}
+       position={groundPosition(service)} upright disabled={servicesBlocked}
+       onGround={position=>setService({...service,position:position.map(String) as Draft['position']})}/>
+     <button type="button" disabled={!validPose(service)||!hasSourceHash||!context.controlSources?.includes(service.control)}
+       onClick={()=>{const position=groundPosition(service);if(position)onPreview({kind:'factionService',sourceSha256,service:{faction:service.faction,service:service.service,controlTagPath:service.control,position,rotationRadians:[Number(service.rotation[0])*Math.PI/180,0,0]}})}}>Preview faction service</button>
+    </>}
+   </fieldset>
+   {kits.filter(row=>row.body).length!==2&&<p className="subtle">Bind both faction player bodies before adding faction services.</p>}
+   <p className="subtle">Preview, Accept, Save, then Build working tag edits. Compiled readback checks the control’s BSP, activation type and device groups.</p>
+  </details>}
  <details className="native-squad-terminals"><summary>Forerunner squad terminals &amp; objective gates</summary>
   <p className="subtle">Append one native squad-selection control inside the return hub. Forerunner owns membership, six-member limits, faction compatibility and durable banking. No loadout profile or inventory writer is added.</p>
   <fieldset disabled={squadBlocked}>

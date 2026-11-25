@@ -7,7 +7,7 @@ use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
 #[path="native_factions.rs"] mod factions;
-pub use factions::{NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
+pub use factions::{faction_service_owner,NativeFactionService,NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
 pub fn native_squad_terminal_snapshots(fields:&str)->Result<Vec<NativeSquadTerminalSnapshot>>{factions::squad_snapshots(fields)}
 pub fn verify_native_squad_terminals(expected:&[NativeSquadTerminalSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_squad_cache(expected,cache,map)}
 pub fn verify_faction_arms_source(body:&NativeFactionBody,profile:&crate::firefight::NativePlayerProfile,read:impl FnMut(&str)->Result<String>)->Result<Vec<String>>{factions::verify_arms_source(body,profile,read)}
@@ -210,6 +210,7 @@ pub fn native_vehicle_pilot_seats(fields:&str)->Result<Vec<String>>{
 pub enum Operation {
     VehicleFlight {tuning:VehicleFlightTuning,#[serde(rename="sourceSha256")] source_sha256:String},
     SquadTerminals {terminals:Vec<NativeSquadTerminal>,#[serde(rename="sourceSha256")] source_sha256:String},
+    FactionService {service:NativeFactionService,#[serde(rename="sourceSha256")] source_sha256:String},
     FactionBody {body:NativeFactionBody,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(rename="replaceExisting",default,skip_serializing_if="command_append_is_false")] replace_existing:bool},
     FactionKits {kits:Vec<NativeFactionKit>,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(rename="replaceExistingProfiles",default,skip_serializing_if="command_append_is_false")] replace_existing_profiles:bool},
     AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String},
@@ -373,11 +374,11 @@ fn actor_spacing()->f32{0.75}
 impl Operation {
     /// One exhaustive source binding for preview, retained reviews and readback.
     pub fn expected_source_sha256(&self)->Option<&str>{match self{
-        Self::MachineSettings{source_sha256,..}|Self::ControlSettings{source_sha256,..}|Self::SquadTerminals{source_sha256,..}|Self::FactionKits{source_sha256,..}|Self::FactionBody{source_sha256,..}|Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::PlayerStartPosition{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::DeviceGroupAppend{source_sha256,..}|Self::DeviceGroupSettings{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneFlag{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
+        Self::MachineSettings{source_sha256,..}|Self::ControlSettings{source_sha256,..}|Self::SquadTerminals{source_sha256,..}|Self::FactionKits{source_sha256,..}|Self::FactionService{source_sha256,..}|Self::FactionBody{source_sha256,..}|Self::VehicleFlight{source_sha256,..}|Self::AppendTransport{source_sha256,..}|Self::CommandList{source_sha256,..}|Self::PlayerStartPosition{source_sha256,..}|Self::DevicePlacement{source_sha256,..}|Self::DeviceGroupAppend{source_sha256,..}|Self::DeviceGroupSettings{source_sha256,..}|Self::TriggerVolume{source_sha256,..}|Self::CutsceneFlag{source_sha256,..}|Self::CutsceneCamera{source_sha256,..}|Self::HudDuplicate{source_sha256,..}|Self::EncounterSquadCounts{source_sha256,..}|Self::EncounterSquadCountsBatch{source_sha256,..}|Self::EncounterStartPosition{source_sha256,..}|Self::EncounterSquadPatrol{source_sha256,..}|Self::EncounterSquadBehavior{source_sha256,..}|Self::EncounterFiringPosition{source_sha256,..}|Self::EncounterSquadFiringGroups{source_sha256,..}=>Some(source_sha256),
         Self::Dependencies|Self::AppendEncounter{..}|Self::AppendEncounters{..}|Self::BoundingRadius{..}|Self::LensFlareScaleRepair=>None,
     }}
     pub fn is_vehicle_flight(&self)->bool{matches!(self,Self::VehicleFlight{..})}
-    pub fn is_faction_edit(&self)->bool{matches!(self,Self::FactionKits{..}|Self::FactionBody{..}|Self::SquadTerminals{..})}
+    pub fn is_faction_edit(&self)->bool{matches!(self,Self::FactionKits{..}|Self::FactionService{..}|Self::FactionBody{..}|Self::SquadTerminals{..})}
     pub fn is_transport_append(&self)->bool{matches!(self,Self::AppendTransport{..})}
     pub fn is_command_edit(&self)->bool{matches!(self,Self::CommandList{..})}
     pub fn is_device_edit(&self)->bool{matches!(self,Self::DevicePlacement{..}|Self::DeviceGroupAppend{..}|Self::DeviceGroupSettings{..})}
@@ -387,6 +388,15 @@ impl Operation {
 
     pub fn is_squad_start_edit(&self)->bool{matches!(self,Self::EncounterStartPosition{..})}
     pub fn is_player_start_edit(&self)->bool{matches!(self,Self::PlayerStartPosition{..})}
+    pub fn check_player_start_capacity(&self, cache_version: u32) -> Result<()> {
+        if let Self::PlayerStartPosition { index, copy_from: Some(_), .. } = self {
+            let limit = native_player_start_limit(cache_version);
+            if usize::from(*index) >= limit {
+                return invalid(format!("This native cache target admits at most {limit} player starts"));
+            }
+        }
+        Ok(())
+    }
     pub fn is_scenario_ai_edit(&self)->bool{self.is_squad_count_edit()||self.is_squad_start_edit()||self.combat_target_key().is_some()&&!self.is_player_start_edit()}
     pub fn combat_target_key(&self)->Option<(u8,u16,u16)>{match self{Self::PlayerStartPosition{index,..}=>Some((4,*index,0)),Self::EncounterSquadPatrol{encounter,squad,..}=>Some((3,*encounter,*squad)),Self::EncounterSquadBehavior{encounter,squad,..}=>Some((2,*encounter,*squad)),Self::EncounterFiringPosition{encounter,point,..}=>Some((0,*encounter,*point)),Self::EncounterSquadFiringGroups{encounter,squad,..}=>Some((1,*encounter,*squad)),_=>None}}
     pub fn combat_encounter_name(&self)->Option<&str>{match self{Self::EncounterSquadPatrol{encounter_name,..}|Self::EncounterSquadBehavior{encounter_name,..}|Self::EncounterFiringPosition{encounter_name,..}|Self::EncounterSquadFiringGroups{encounter_name,..}=>Some(encounter_name),_=>None}}
@@ -415,20 +425,20 @@ impl Operation {
     pub fn tool_id(&self) -> &'static str {
         match self {
             Self::Dependencies => "invaderDependency",
-            Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
+            Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionService { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::BoundingRadius { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => "invaderNative",
             Self::LensFlareScaleRepair => "invaderRepair",
         }
     }
     pub fn field(&self) -> Option<&'static str> {
         match self {
-            Self::Dependencies | Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionService { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { .. } => Some("bounding_radius"),
             Self::LensFlareScaleRepair => Some("rotation_function_scale"),
         }
     }
     pub fn target(&self) -> Option<f64> {
         match self {
-            Self::Dependencies | Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
+            Self::Dependencies | Self::MachineSettings { .. } | Self::ControlSettings { .. } | Self::SquadTerminals { .. } | Self::FactionKits { .. } | Self::FactionService { .. } | Self::FactionBody { .. } | Self::VehicleFlight { .. } | Self::AppendTransport { .. } | Self::CommandList { .. } | Self::PlayerStartPosition { .. } | Self::DevicePlacement { .. } | Self::DeviceGroupAppend { .. } | Self::DeviceGroupSettings { .. } | Self::TriggerVolume { .. } | Self::CutsceneFlag { .. } | Self::CutsceneCamera { .. } | Self::EncounterSquadPatrol { .. } | Self::EncounterSquadBehavior { .. } | Self::EncounterFiringPosition { .. } | Self::EncounterSquadFiringGroups { .. } | Self::EncounterStartPosition { .. } | Self::EncounterSquadCounts { .. } | Self::EncounterSquadCountsBatch { .. } | Self::HudDuplicate { .. } | Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => None,
             Self::BoundingRadius { value } => Some(*value),
             Self::LensFlareScaleRepair => Some(0.0),
         }
@@ -441,6 +451,12 @@ impl Operation {
         match self {
             Self::VehicleFlight{tuning,source_sha256}=>{if class!="vehi"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Vehicle flight editing needs an exact native vehicle source hash");}tuning.validate()?;}
             Self::SquadTerminals{terminals,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Squad terminals need a reviewed scenario source hash");}factions::validate_squad_batch(terminals)?;},
+            Self::FactionService{service,source_sha256}=>{
+                if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){
+                    return invalid("Faction services require the exact reviewed MegaWorld scenario");
+                }
+                service.validate()?;
+            },
             Self::FactionBody{body,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction body requires its exact reviewed scenario");}body.validate()?;},
             Self::FactionKits{kits,source_sha256,..}=>{if class!="scnr"||kits.is_empty()||kits.len()>2||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction kits require a reviewed scenario source hash and one or two kits");}factions::validate_batch(kits)?;},
             Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
@@ -511,7 +527,7 @@ impl Operation {
             Self::EncounterSquadFiringGroups{encounter,squad,encounter_name,squad_name,groups,source_sha256}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||[encounter_name,squad_name].iter().any(|n|n.len()>32||n.chars().any(char::is_control))||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Tactical-group editing needs exact native squad/source identities");}groups.masks()?;
             }
-            Self::PlayerStartPosition{index,copy_from,position,facing_radians,source_sha256}=>{if class!="scnr"||*index>=4096||copy_from.is_some_and(|source|source>=*index||usize::from(*index)>=MAX_NATIVE_PLAYER_STARTS)||position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing_radians.is_finite()||facing_radians.abs()>std::f32::consts::TAU+1e-6||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Player start editing needs an exact scenario/source identity, native index and finite XYZ/yaw");}}
+            Self::PlayerStartPosition{index,copy_from,position,facing_radians,source_sha256}=>{if class!="scnr"||*index>=4096||copy_from.is_some_and(|source|source>=*index||usize::from(*index)>=native_player_start_limit(13))||position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing_radians.is_finite()||facing_radians.abs()>std::f32::consts::TAU+1e-6||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Player start editing needs an exact scenario/source identity, native index and finite XYZ/yaw");}}
             Self::EncounterStartPosition{encounter,squad,start,encounter_name,squad_name,position,source_sha256,facing_radians,command_list}=>{
                 if class!="scnr"||*encounter>=128||*squad>=4096||*start>=4096||
                     [encounter_name,squad_name].iter().any(|name|name.len()>32||name.chars().any(char::is_control))||
@@ -570,7 +586,7 @@ impl Operation {
                 for (key, value) in settings.values() { args.extend(["-S".into(), key.into(), value]); }
             }
             Self::ControlSettings{settings,..}=>{for(key,value)in settings.values(){args.extend(["-S".into(),key.into(),value]);}}
-            Self::SquadTerminals{..}|Self::FactionKits{..}|Self::FactionBody{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::PlayerStartPosition{..}|Self::DevicePlacement{..}|Self::DeviceGroupAppend{..}|Self::DeviceGroupSettings{..}|Self::TriggerVolume{..}|Self::CutsceneFlag{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("This native edit requires the original scenario or asset field inventory"),
+            Self::SquadTerminals{..}|Self::FactionKits{..}|Self::FactionService{..}|Self::FactionBody{..}|Self::VehicleFlight{..}|Self::AppendTransport{..}|Self::CommandList{..}|Self::PlayerStartPosition{..}|Self::DevicePlacement{..}|Self::DeviceGroupAppend{..}|Self::DeviceGroupSettings{..}|Self::TriggerVolume{..}|Self::CutsceneFlag{..}|Self::CutsceneCamera{..}|Self::EncounterSquadPatrol{..}|Self::EncounterSquadBehavior{..}|Self::EncounterFiringPosition{..}|Self::EncounterSquadFiringGroups{..}|Self::EncounterStartPosition{..}|Self::EncounterSquadCounts{..}|Self::EncounterSquadCountsBatch{..}=>return invalid("This native edit requires the original scenario or asset field inventory"),
             Self::HudDuplicate{..}=>return invalid("HUD duplication requires the original native array inventory"),
             Self::AppendEncounter { .. } | Self::AppendEncounters { .. } => return invalid("Encounter append needs the original scenario array inventory"),
             Self::BoundingRadius { value } => {
@@ -721,6 +737,7 @@ impl Operation {
         self.validate(class,tag)?;
         if let Self::VehicleFlight{tuning,..}=self{return transport::flight_arguments(tags,tag,before,tuning);}
         if let Self::SquadTerminals{terminals,..}=self{return factions::squad_arguments(tags,tag,before,terminals);}
+        if let Self::FactionService{service,..}=self{return factions::service_arguments(tags,tag,before,service);}
         if let Self::FactionBody{body,replace_existing,..}=self{return factions::body_arguments(tags,tag,before,body,*replace_existing);}
         if let Self::FactionKits{kits,replace_existing_profiles,..}=self{
             return if *replace_existing_profiles { factions::replace_profile_arguments(tags,tag,before,kits) }
@@ -1137,6 +1154,7 @@ pub fn reviewed_difference(
 ) -> Result<Vec<FieldDifference>> {
     if let Operation::VehicleFlight{tuning,..}=operation{return transport::reviewed_flight(before,after,tuning);}
     if let Operation::SquadTerminals{terminals,..}=operation{return factions::reviewed_squads(before,after,terminals);}
+    if let Operation::FactionService{service,..}=operation{return factions::review_service(before,after,service);}
     if let Operation::FactionBody{body,replace_existing,..}=operation{return factions::review_body(before,after,body,*replace_existing);}
     if let Operation::FactionKits{kits,replace_existing_profiles,..}=operation{
         return if *replace_existing_profiles { factions::review_profile_replacements(before,after,kits) }
@@ -1336,12 +1354,13 @@ pub fn scenario_player_start_choices(fields:&str)->Result<Vec<ScenarioStartChoic
  let array=array_listing(fields,"player_starting_locations")?;if array.count>4096{return invalid("Native player start inventory exceeds4096");}let mut line=array.start+1;let mut result=vec![];
  for(index,item)in array_items(&array,"player_starting_locations")?.iter().enumerate(){let root=direct_struct_fields(item)?;let(position,position_line)=native_vector(&root,"position")?;let facing=number(&root,"facing")? as f32;let facing_line=root.lines().position(|l|l.starts_with("facing (")).ok_or_else(||crate::SparkError::Invalid("Native player facing is unavailable".into()))?;if position.iter().any(|v|!v.is_finite()||v.abs()>1e6)||!facing.is_finite(){return invalid("Native player start pose is invalid");}result.push(ScenarioStartChoice{index:index as u16,position,facing_radians:Some(facing.to_radians()),command_list:None,command_line:None,position_line:line+1+position_line,facing_line:Some(line+1+facing_line)});line+=item.len();}Ok(result)
 }
-// The standard Halo 1 scenario block admits 256 starts.
-const MAX_NATIVE_PLAYER_STARTS: usize = 256;
+pub fn native_player_start_limit(cache_version: u32) -> usize {
+    crate::maps::player_start_limit(cache_version)
+}
 
 fn check_player_start_copy(fields: &str, index: u16, source: u16, position: [f32; 3]) -> Result<()> {
     let starts = scenario_player_start_choices(fields)?;
-    if starts.len() >= MAX_NATIVE_PLAYER_STARTS || usize::from(index) != starts.len() || source >= index {
+    if starts.len() >= native_player_start_limit(13) || usize::from(index) != starts.len() || source >= index {
         return invalid("Choose an existing start and refresh the native start inventory before appending a copy");
     }
     if starts.iter().any(|start| positions_close(start.position, position)) {
@@ -1798,13 +1817,15 @@ fn combat_arguments(op:&Operation,tags:&Path,tag:&str,before:&str)->Result<Vec<S
     if let Operation::PlayerStartPosition {index, copy_from: Some(source), position, facing_radians, ..} = op {
         check_player_start_copy(before, *index, *source, *position)?;
         let array = "player_starting_locations";
-        return Ok(vec![
-            "-t".into(), tags.to_string_lossy().into_owned(),
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+        if usize::from(*index) >= native_player_start_limit(609) { args.push("-n".into()); }
+        args.extend([
             "-c".into(), format!("{array}[{source}]"), "end".into(),
             "-S".into(), format!("{array}[{index}].position"), position.map(|value| value.to_string()).join(","),
             "-S".into(), format!("{array}[{index}].facing"), facing_radians.to_string(),
             tag.into(),
         ]);
+        return Ok(args);
     }
     let current=current_combat_targets(before,"",std::slice::from_ref(op))?.remove(0);let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned()];match(op,&current){
         (Operation::PlayerStartPosition{index,position,facing_radians,..},Operation::PlayerStartPosition{position:old,facing_radians:old_facing,..})=>{let prefix=format!("player_starting_locations[{index}]");if !positions_close(*position,*old){args.extend(["-S".into(),format!("{prefix}.position"),position.map(|v|v.to_string()).join(",")]);}if !facings_close(*facing_radians,*old_facing){args.extend(["-S".into(),format!("{prefix}.facing"),facing_radians.to_string()]);}},

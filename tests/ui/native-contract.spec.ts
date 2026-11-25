@@ -6031,7 +6031,7 @@ async function mockNativeHubSource(page:Page){
    if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
    if(command==='native_tag_context')return{projectId:args.projectId,buildId:'faction-source',tag:'levels/test.scenario',class:'scnr',sourceTarget:'gbx-custom',tagsDirectory:'owned/tags',tagSha256:m.factionSha,canEdit:false,canRepair:false,history:[],canAppendFactionKits:true,scenarioDevices:m.hubDevices,factionKits:m.factionKits,bipedSources:[...new Set(['characters/grunt/grunt','characters/elite/elite',...m.factionKits.flatMap((row:any)=>row.body?[row.body.bipedTagPath]:[])])],controlSources:['levels/b40/devices/holo control/b40_holo control'],weaponSources:['weapons/assault rifle/assault rifle','weapons/plasma pistol/plasma pistol']};
    if(command==='native_operation_preview'){if(args.operation.sourceSha256!==m.factionSha)throw Error('Source changed');m.factionPreviews.push(structuredClone(args.operation));const id='faction-preview-'+m.factionPreviews.length,after=String.fromCharCode(97+m.factionPreviews.length).repeat(64);m.hubReceipts[id]={operation:structuredClone(args.operation),before:m.factionSha,after,devices:structuredClone(m.hubDevices),kits:structuredClone(m.factionKits)};return{id,tag:'levels/test.scenario',toolId:'synthetic-writer',beforeSha256:m.factionSha,afterSha256:after,changedBytes:200,fieldChanges:[{before:'Original controls and profiles',after:args.operation.kind==='factionBody'?'Bind dormant faction biped':'Append paired faction terminals and equipment profiles'}],detail:'Synthetic contract only',currentState:'before'};}
-   if(command==='native_operation_accept'){const receipt=m.hubReceipts[args.operationId];m.factionSha=args.restore?receipt.before:receipt.after;if(receipt.operation.kind==='squadTerminals')m.hubDevices=args.restore?structuredClone(receipt.devices):[...receipt.devices,...receipt.operation.terminals.map((terminal:any,index:number)=>({class:'ctrl',index:receipt.devices.length+index,nameIndex:receipt.devices.length+index,name:'extraction_squad_'+String(terminal.number).padStart(2,'0'),tagPath:terminal.controlTagPath,position:terminal.position,rotationRadians:terminal.rotationRadians}))];if(args.restore)m.factionKits=structuredClone(receipt.kits);else if(receipt.operation.kind==='factionKits')m.factionKits=receipt.operation.replaceExistingProfiles?m.factionKits.map((row:any)=>({...row,kit:receipt.operation.kits.find((kit:any)=>kit.faction===row.kit.faction)??row.kit})):[...receipt.kits,...receipt.operation.kits.map((kit:any)=>({kit}))];else if(receipt.operation.kind==='factionBody')m.factionKits=m.factionKits.map((row:any)=>row.kit.faction===receipt.operation.body.faction?{...row,body:{index:4,nameIndex:16,position:row.kit.position,...row.body,...receipt.operation.body,bipedTagPath:receipt.operation.body.bipedTagPath+(receipt.operation.body.usePlayerPhysics?'_gs_player_'+row.kit.faction:''),firstPersonArms:receipt.operation.body.includeFirstPersonArms??false}}:row);return{operationId:args.operationId,revisionId:'faction-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic source revision'};}
+   if(command==='native_operation_accept'){const receipt=m.hubReceipts[args.operationId];m.factionSha=args.restore?receipt.before:receipt.after;if(receipt.operation.kind==='factionService'){const service=receipt.operation.service;m.hubDevices=args.restore?structuredClone(receipt.devices):[...receipt.devices,{class:'ctrl',index:receipt.devices.length,nameIndex:receipt.devices.length,name:'extraction_'+service.faction+'_'+service.service,tagPath:service.controlTagPath,position:service.position,rotationRadians:service.rotationRadians}];}if(receipt.operation.kind==='squadTerminals')m.hubDevices=args.restore?structuredClone(receipt.devices):[...receipt.devices,...receipt.operation.terminals.map((terminal:any,index:number)=>({class:'ctrl',index:receipt.devices.length+index,nameIndex:receipt.devices.length+index,name:'extraction_squad_'+String(terminal.number).padStart(2,'0'),tagPath:terminal.controlTagPath,position:terminal.position,rotationRadians:terminal.rotationRadians}))];if(args.restore)m.factionKits=structuredClone(receipt.kits);else if(receipt.operation.kind==='factionKits')m.factionKits=receipt.operation.replaceExistingProfiles?m.factionKits.map((row:any)=>({...row,kit:receipt.operation.kits.find((kit:any)=>kit.faction===row.kit.faction)??row.kit})):[...receipt.kits,...receipt.operation.kits.map((kit:any)=>({kit}))];else if(receipt.operation.kind==='factionBody')m.factionKits=m.factionKits.map((row:any)=>row.kit.faction===receipt.operation.body.faction?{...row,body:{index:4,nameIndex:16,position:row.kit.position,...row.body,...receipt.operation.body,bipedTagPath:receipt.operation.body.bipedTagPath+(receipt.operation.body.usePlayerPhysics?'_gs_player_'+row.kit.faction:''),firstPersonArms:receipt.operation.body.includeFirstPersonArms??false}}:row);return{operationId:args.operationId,revisionId:'faction-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic source revision'};}
    return invoke(command,args);
   };
  });
@@ -6126,6 +6126,38 @@ test('verified MegaWorld hubs enable faction kits while squad authoring stays so
  await revealPagedControl(kits.locator('> summary'));await kits.locator('> summary').click();
  await expect(kits).toContainText('inside that faction’s named hub');
  await expect(kits.getByRole('combobox',{name:'Faction kit',exact:true})).toBeEnabled();
+ const services=panel.locator('.native-faction-services');
+ await revealPagedControl(services.locator('> summary'));await services.locator('> summary').click();
+ await expect(services.getByRole('combobox',{name:'Service faction'})).toBeDisabled();
+ await page.evaluate(()=>{
+  const mock=(window as any).__sparkMock;
+  mock.factionKits=['unsc','covenant'].map(faction=>({kit:{faction,controlTagPath:'levels/b40/devices/holo control/b40_holo control',position:[49,-87,1],rotationRadians:[0,0,0],
+   profile:{primaryWeapon:'weapons/plasma pistol/plasma pistol',primaryLoaded:0,primaryReserved:0,secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0,health:0,shields:0,fragmentationGrenades:0,plasmaGrenades:1}},
+   body:{bipedTagPath:'characters/elite/elite_gs_player_'+faction,permutation:0,index:4,nameIndex:16,position:[49,-87,1]}}));
+ });
+ const refresh=panel.getByRole('button',{name:'Refresh source',exact:true});
+ await revealPagedControl(refresh);await refresh.click();
+ if(await services.getAttribute('open')===null){await revealPagedControl(services.locator('> summary'));await services.locator('> summary').click();}
+ const faction=services.getByRole('combobox',{name:'Service faction'});
+ await expect(faction).toBeEnabled();await revealPagedControl(faction);await faction.selectOption('covenant');
+ const action=services.getByRole('combobox',{name:'Service action'});
+ await revealPagedControl(action);await action.selectOption('loadout');
+ const preview=services.getByRole('button',{name:'Preview faction service'});
+ await expect(preview).toBeDisabled();
+ for(const [field,value] of [['Service X','1318.125'],['Service Y','572.5'],['Service Z','-12.8'],['Service yaw · degrees','90']]){
+  const valueInput=services.getByRole('spinbutton',{name:field,exact:true});await revealPagedControl(valueInput);await valueInput.fill(value);
+ }
+ await revealPagedControl(preview);await preview.click();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.factionPreviews.at(-1))).toEqual({
+  kind:'factionService',sourceSha256:'a'.repeat(64),service:{faction:'covenant',service:'loadout',
+   controlTagPath:'levels/b40/devices/holo control/b40_holo control',position:[1318.125,572.5,-12.8],rotationRadians:[Math.PI/2,0,0]}
+ });
+ const accept=panel.getByRole('button',{name:'Accept as new source revision',exact:true});
+ await revealPagedControl(accept);await accept.click();
+ await expect(services).toContainText('extraction_covenant_loadout is already placed');
+ const restore=panel.getByRole('button',{name:'Restore before-edit tag',exact:true});
+ await revealPagedControl(restore);await restore.click();
+ await expect(preview).toBeVisible();
  const squad=panel.locator('.native-squad-terminals');
  await revealPagedControl(squad.locator('> summary'));await squad.locator('> summary').click();
  await expect(squad.getByRole('spinbutton',{name:'Squad terminal number',exact:true})).toBeDisabled();

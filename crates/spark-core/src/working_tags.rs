@@ -755,7 +755,7 @@ fn prepare(
         if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native squad reader exceeds its identity limit");}
         tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
     }
-    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())||!s.machine_settings.is_empty()) {
+    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())||!s.machine_settings.is_empty()||s.devices.iter().flatten().any(|row|crate::native_operations::faction_service_owner(&row.name).is_some())) {
         let extract=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-extract.exe"}else{"invader-extract"}))?;
         if fs::metadata(&extract)?.len()>256*1024*1024{return invalid("Native device extractor exceeds its identity limit");}
         tools.insert("invaderExtract".into(),maps::hash_file(&extract)?);
@@ -1165,8 +1165,11 @@ fn verify_device_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapsh
     invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)
     -> Result<(Vec<serde_json::Value>,Vec<serde_json::Value>)> {
     let kits=snapshot.faction_kits.as_deref().unwrap_or(&[]);let squads=snapshot.extraction_squads.as_deref().unwrap_or(&[]);
-    if kits.is_empty()&&squads.is_empty()&&snapshot.machine_settings.is_empty(){return Ok((vec![],vec![]));}
-    let controls=kits.iter().map(|row|(row.kit.name(),row.kit.control_tag_path.clone(),row.control_index)).chain(squads.iter().map(|row|(row.terminal.name(),row.terminal.control_tag_path.clone(),row.control_index))).collect::<Vec<_>>();
+    let services=snapshot.devices.iter().flatten().filter(|row|row.class=="ctrl" && crate::native_operations::faction_service_owner(&row.name).is_some());
+    let controls=kits.iter().map(|row|(row.kit.name(),row.kit.control_tag_path.clone(),row.control_index))
+        .chain(squads.iter().map(|row|(row.terminal.name(),row.terminal.control_tag_path.clone(),row.control_index)))
+        .chain(services.map(|row|(row.name.clone(),row.tag_path.clone(),row.index))).collect::<Vec<_>>();
+    if controls.is_empty()&&snapshot.machine_settings.is_empty(){return Ok((vec![],vec![]));}
     snapshot.validate()?;recheck_tools(input,&prepared.tools)?;
     let recovered=workspace.join("faction-readback-tags");crate::reject_links(&recovered)?;
     if recovered.try_exists()?{return invalid("Faction readback output is occupied; no files were replaced");}fs::create_dir(&recovered)?;
@@ -1742,9 +1745,10 @@ fn run_with(
         if let Some(snapshot)=&receipt.scenario_squad_readback{
             snapshot.verify_cache(&output,&inspected)?;
             let (faction_controls,machines)=verify_device_native_output(input,&prepared,snapshot,&output,&inspected,&workspace,&runner,&invoke)?;
+            let faction_hubs=crate::native_operations::megaworld_hub_starts(&output,&inspected)?;
             project::atomic_write(&directory.join("native-squad-readback.json"),&serde_json::to_vec_pretty(&serde_json::json!({
                 "reviewedSourceSha256":snapshot.source_sha256,"outputSha256":inspected.sha256,"squads":snapshot.squads,"includeStarts":snapshot.include_starts,"combat":snapshot.combat,"cameras":snapshot.cameras,"volumes":snapshot.volumes,"devices":snapshot.devices,"commandLists":snapshot.command_lists,
-                "extractionSquads":snapshot.extraction_squads,"factionKits":snapshot.faction_kits,"factionControls":faction_controls,"machines":machines,
+                "extractionSquads":snapshot.extraction_squads,"factionKits":snapshot.faction_kits,"factionControls":faction_controls,"factionHubs":faction_hubs,"machines":machines,
                 "scope":"All reviewed native squad identities/counts and starting coordinates where includeStarts is true. Optional native command lists/actions/parameters/references/points, device identity/pose, trigger bounds and camera inventory/pose/lens are read from the compiled cache. This is not AI/cinematic/gameplay acceptance."
             }))?,false)?;
         }
