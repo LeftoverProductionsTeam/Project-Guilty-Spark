@@ -631,10 +631,22 @@ async fn inspect_native_bsp_placements(
 #[tauri::command]
 async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>,native_bsp_index:Option<usize>,intact_connector:Option<bool>)->Reply<serde_json::Value>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
-        if let Some(draft)=draft {
-            let saved=p.bsp_assembly.as_ref().ok_or("Apply the donor identity before previewing seam drafts")?;
-            if draft.donor_project_id!=saved.donor_project_id||draft.donor_bsp_index!=saved.donor_bsp_index||draft.base_bsp_index!=saved.base_bsp_index||serde_json::to_value(&draft.donor_source).map_err(error)?!=serde_json::to_value(&saved.donor_source).map_err(error)?||draft.donor_tags_directory!=saved.donor_tags_directory {return Err("Draft preview cannot replace its saved donor/source identity".into());}
-            draft.validate().map_err(error)?;p.bsp_assembly=Some(draft);
+        if let Some(draft) = draft {
+            draft.validate().map_err(error)?;
+            if p.id == draft.donor_project_id {
+                return Err("Choose a different donor for this native source map".into());
+            }
+            let donor = match core::bsp_assembly::referenced_donor(&p, &draft.donor_project_id).map_err(error)? {
+                Some(donor) => donor,
+                None => lock(&state.library)?.get(&draft.donor_project_id).map_err(error)?,
+            };
+            let source = donor.source.as_ref().ok_or("Donor has no compiled map source")?;
+            if serde_json::to_value(source).map_err(error)? != serde_json::to_value(&draft.donor_source).map_err(error)? {
+                return Err("The selected donor source changed. Plan the connection again.".into());
+            }
+            // The geometry preview reads the verified cache. It never opens
+            // the draft's native build tag directory or writes the project.
+            p.bsp_assembly = Some(draft);
         }
         let i=inspect(&state,&p)?;
         let cancel = AtomicBool::new(false);
@@ -659,8 +671,11 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
         if let Some(report) = partition_report { result["nativePartitions"] = report; }
         if let Some(switches) = intact_switches { result["intactSwitches"] = serde_json::json!(switches); }
-        if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No saved BSP connection")?;
+        if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No BSP connection to preview")?;
             let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref()).map_err(error)?;
+            if donor.sha256 != plan.donor_source.sha256 {
+                return Err("Donor map bytes changed while preparing the preview".into());
+            }
             if let Some(source) = &p.source {
                 let standard_multiplayer = [&i, &donor].into_iter().all(|map| {
                     matches!(map.header.version, 609 | 13) && !map.header.extended && map.header.scenario_type == 1

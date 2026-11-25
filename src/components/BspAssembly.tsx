@@ -333,11 +333,11 @@ export default function BspAssembly({
     setEdgePicks(previous=>({...previous,[edgeTarget]:edge}));setEdgeTarget(edgeTarget==='base'?'donor':null);setPickedSurface(null);
   },[pickedSurface,edgeTarget,pickingLanding,project.source?.sha256,draft?.donorSource.sha256,draft?.donorBspIndex,draft?.baseBspIndex]);
   async function previewDraft(value:Plan|null=draftNow.current, intactConnector = false){
-    if(!value||!project.bspAssembly||busy)return;
+    if(!value||!selectionMatches||busy)return;
     await perform(async current=>{
       const signature=assemblySignature(value);
       const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector ? { intactConnector: true } : {})});
-      if(current()&&latest.current.signature===signature){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
+      if(current()&&latest.current.signature===signature&&latest.current.donor===value.donorProjectId&&latest.current.index===value.donorBspIndex&&latest.current.baseIndex===(value.baseBspIndex??0)){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
   function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
@@ -577,8 +577,8 @@ export default function BspAssembly({
               )}
               <ol className="bsp-workflow" aria-label="Connection steps">
                 <li data-done={selectionMatches}>1 · Plan</li>
-                <li data-done={applied && selectionMatches}>2 · Apply</li>
-                <li data-done={!!report && selectionMatches}>3 · Check source</li>
+                <li data-done={!!report && selectionMatches}>2 · Preview</li>
+                <li data-done={applied && selectionMatches}>3 · Apply</li>
                 <li>4 · Build &amp; test in Halo</li>
               </ol>
               <p>
@@ -591,7 +591,7 @@ export default function BspAssembly({
                 <label>Width <output>{routeDraft!.tunnelWidth.toFixed(1)}</output><input type="range" aria-label="Seam preview width" min={routeDraft!.openRoad?3:.8} max={16} step={.1} value={routeDraft!.tunnelWidth} onChange={e=>updateRoute({tunnelWidth:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
                 <label>Head clearance <output>{routeDraft!.tunnelHeight.toFixed(1)}</output><input type="range" aria-label="Seam preview height" min={routeDraft!.openRoad?3:1} max={16} step={.1} value={routeDraft!.tunnelHeight} onChange={e=>updateRoute({tunnelHeight:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
                 {routeDraft!.archSegments&&<label>Arch facets <output>{routeDraft!.archSegments}</output><input type="range" aria-label="Seam arch facets" min={2} max={12} step={1} value={routeDraft!.archSegments} onChange={e=>updateRoute({archSegments:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>}
-                <button disabled={busy||!native||!project.bspAssembly||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
+                <button disabled={busy||!native||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
                 <span>Release a slider or adjust it with the arrow, Home/End or Page Up/Down keys to rebuild the exact preview and triangle count. Apply keeps it as one undoable source edit; native compilation is still required.</span>
               </div>
               <div className="bsp-settings">
@@ -744,7 +744,7 @@ export default function BspAssembly({
                   {canExtend && baseParts.length <= 14 && <div>
                     <label><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
                       onChange={event => update({ preserveDonorBsp: event.target.checked })} /> Preserve donor BSP in native build</label>
-                    <button type="button" disabled={busy || !native || !project.bspAssembly || !selectionMatches || draft.yawDegrees !== 0}
+                    <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
                     <div className="bsp-actions">
                       <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', true); }}>Pick current BSP landing</button>

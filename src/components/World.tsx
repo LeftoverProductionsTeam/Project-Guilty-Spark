@@ -341,7 +341,7 @@ function Scene({
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
-  ownedModels,assembly,joinedPreview,additionalBounds,focusBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
+  ownedModels,assembly,assemblyPlan,joinedPreview,additionalBounds,focusBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -369,6 +369,7 @@ function Scene({
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;greenScreen?:boolean;
   ownedModels:Record<string,OwnedModelView>;
   assembly:AssemblyViewportSource|null;
+  assemblyPlan:Project['bspAssembly'];
   joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
   focusBounds?:THREE.Box3|null;
@@ -483,8 +484,8 @@ function Scene({
         </group>
       ) : null}
       {(!joinedPreview || joinedPreview.retainsBase)&&!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
-      {assembly&&project.bspAssembly&&(()=>{
-        const plan=joinedPreview?.assembly??project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
+      {assembly&&assemblyPlan&&(()=>{
+        const plan=assemblyPlan,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         return <group name="gs-assembly-donor" userData={{assetSurface:true}} position={plan.translation} rotation={[0,0,plan.yawDegrees*Math.PI/180]}>
           {(!joinedPreview||joinedPreview.retainsDonor)&&<Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures} onSurfaceClick={!cinematic&&onPickSurface&&pickTarget==='donor'?(triangle,point)=>{const pick=nativeEdgePick(assembly.terrain,source.inspection!.sha256,triangle,donorPoint(point,plan,true));if(pick)onPickSurface(pick);}:undefined}/>}
           {(!joinedPreview||joinedPreview.retainsDonor)&&!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
@@ -694,7 +695,7 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
-  const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.preview?.assembly??project.bspAssembly;
+  const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const joinedBaseMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===0)?.mesh;
   const joinedDonorMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===1)?.mesh;
@@ -1753,7 +1754,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked:cameraLocked||xrActive,
                     externalCameraAuthority:externalCameraAuthority||xrActive,
-                    ownedModels,assembly,joinedPreview:pickTarget?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
+                    ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}
@@ -1918,7 +1919,7 @@ export default function World({
           </div>
         </div>
         <div className="viewport-status">
-          {project.bspAssembly&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'Source regions · Preview the connection in Construction')}</span>}
+          {assemblyPlan&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading verified donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'Source regions · Preview the connection in Construction')}</span>}
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
           <span aria-label="Viewport object count">{viewportProject.scene.length} objects</span>

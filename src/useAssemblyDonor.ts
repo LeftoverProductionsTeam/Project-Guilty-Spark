@@ -22,5 +22,5 @@ export function useAssemblyDonor(project:Project){
  void call<OpenProject>('open_bsp_assembly_donor',{projectId:project.id,donorProjectId:plan?.donorProjectId,donorSourceSha256:plan?.donorSource.sha256}).then(open=>{if(!live)return;if(open.inspection?.sha256!==plan?.donorSource.sha256)throw Error('Selected donor source identity changed');publishTextureResources(open.project);setState({key,open,error:''});}).catch(error=>{if(live)setState({key,open:null,error:String(error)});});
  return()=>{live=false;};},[key]);
  const donor=useMemo(()=>{if(!plan||state.key!==key||!state.open)return {source:null,error:state.key===key?state.error:'',loading:!!plan&&native&&!(state.key===key&&state.error)};try{return {source:assemblyViewportSource(state.open,plan),error:'',loading:false};}catch(error){return {source:null,error:String(error),loading:false};}},[state,key,plan?.donorBspIndex,plan?.includeDonorScenery]);
- return {...donor,preview:joined};
+ return {...donor,plan,preview:joined};
 }

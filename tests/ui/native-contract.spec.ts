@@ -557,8 +557,9 @@ async function mockDesktop(page: Page, preferredHalo: 'mccSteam' | null = 'mccSt
           return plan;
         }
         if (command === 'preview_bsp_assembly') {
-          if(!projects[args.projectId].project.bspAssembly)throw new Error('Assembly was not saved');
-          const report={inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,donorScenery:projects[args.projectId].project.bspAssembly.includeDonorScenery?3:0,warnings:['Synthetic clearance only; no game was run.']};
+          const assembly=args.draft??projects[args.projectId].project.bspAssembly;
+          if(!assembly)throw new Error('No connection to preview');
+          const report={inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,donorScenery:assembly.includeDonorScenery?3:0,warnings:['Synthetic clearance only; no game was run.']};
           if(w.__sparkMock.deferBspPreview) return new Promise((resolve,reject)=>{w.__sparkMock.finishBspPreview=(success=true)=>success?resolve(report):reject(new Error('Synthetic stale clearance failure'));});
           return report;
         }
@@ -2938,7 +2939,7 @@ test('BSP donor choices do not silently replace a draft and entrance rotation pr
   await revealPagedControl(width);await width.fill('4'); await revealPagedControl(width);await width.press('Tab');
   await (await constructionControl(page,'button','Apply connection')).click();
   await (await constructionControl(page,'button','Preview joined seam & clearance')).click();
-  await expect(page.locator('.bsp-workflow')).toContainText('Check source');
+  await expect(page.locator('.bsp-workflow li').filter({hasText:'2 · Preview'})).toHaveAttribute('data-done','true');
   await (await constructionControl(page,'combobox','BSP donor map')).selectOption('c');
   await expect(page.locator('.bsp-selection-warning')).toContainText('This draft connects Synthetic candidate');
   await expect(page.getByRole('button',{name:'Preview joined seam & clearance',exact:true,includeHidden:true})).toBeDisabled();
@@ -3864,7 +3865,12 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
   if(command==='preview_bsp_assembly')return {...value,connectorTriangles:60,outputTriangles:240};return value;
  };});
  await chooseTool(page,'Level editor');await openDrawer(page,'Construction');const panel=page.getByRole('region',{name:'Construction panel',exact:true}),summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
- await (await constructionControl(page,'button','Plan connected tunnel')).click();await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');
+ await (await constructionControl(page,'button','Plan connected tunnel')).click();
+ const beforePreview=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='save_project'||call.command==='update_project').length);
+ await (await constructionControl(page,'button','Preview draft & triangles')).click();
+ await expect(panel.getByLabel('Connector triangle budget',{exact:true})).toContainText('Connector: 60 triangles');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='save_project'||call.command==='update_project').length)).toBe(beforePreview);
+ await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');
  await (await constructionControl(page,'combobox','Connection route')).selectOption('section:fixture-section');
  const width=await constructionControl(page,'slider','Seam preview width');await width.focus();await width.press('ArrowRight');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].width)).toBe(4.1);
