@@ -897,7 +897,7 @@ fn generate_end(
         return invalid("Boolean lost source material or vertex-property provenance");
     }
     crate::bsp_triangulate::improve(&mut gl);
-    for material in passage_materials.into_iter().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
+    for material in passage_materials.iter().copied().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
     // The base half does not contain the donor boundary to be sealed.
     if !matches!(partition, Some((_, PartitionEnd::Base))) {
@@ -930,7 +930,27 @@ fn generate_end(
         *value = f64::from(*value as f32);
     }
     crate::bsp_triangulate::improve_native_render(&mut gl);
-    append_render_faces(&gl, &materials, &mut mesh, &mut triangle_materials)?;
+    let ridge_projection = assembly.high_ground.as_ref().and_then(|ridge| {
+        let seam = assembly.terrain_seam.as_ref()?;
+        let ribbon = terrain_ribbon.as_ref()?;
+        if !ridge.shader_path.replace('\\', "/").eq_ignore_ascii_case(&seam.base_shader_path.replace('\\', "/")) {
+            return None;
+        }
+        let slot = passage_materials[1 + usize::from(assembly.infantry_tunnel.is_some())];
+        Some((slot, ribbon.base_projection()))
+    });
+    append_render_faces(&gl, &materials, &mut mesh, &mut triangle_materials, ridge_projection)?;
+    let connector_triangles = triangle_materials.iter().filter(|&&slot|
+        slot >= first_connector_material && materials[slot].shader_path.is_some() && !materials[slot].collision_only
+    ).count();
+    if !matches!(partition, Some((_, PartitionEnd::Donor))) {
+        append_source_surface_effects(base, assembly.base_bsp_index, 0, [0.; 3], 0.,
+            &mut mesh, &mut materials, &mut triangle_materials)?;
+    }
+    if !matches!(partition, Some((_, PartitionEnd::Base))) {
+        append_source_surface_effects(&donor, assembly.donor_bsp_index, 1, assembly.translation, assembly.yaw_degrees,
+            &mut mesh, &mut materials, &mut triangle_materials)?;
+    }
     mesh.parts.push(maps::MeshPart {
         name: "Connected world".into(),
         index_start: 0,
@@ -949,7 +969,7 @@ fn generate_end(
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
-    let connector_triangles=triangle_materials.iter().filter(|&&slot|slot>=first_connector_material&&materials[slot].shader_path.is_some()&&!materials[slot].collision_only).count();
+
     let rebuild_scope = if partition.is_some() {
         "Separate BSPs rebuild collision, portals and lightmaps. The build imports donor multiplayer pickups. MCC13 also imports donor starts and teleporters. Review per-cluster ambience, scenery and other gameplay separately."
     } else {
@@ -957,11 +977,93 @@ fn generate_end(
     };
     Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials}, overlap_floor))
 }
+fn is_source_surface_effect(tag: &maps::Tag) -> bool {
+    if tag.class == "swat" {
+        return true;
+    }
+    if !matches!(tag.class.as_str(), "schi" | "scex") {
+        return false;
+    }
+    let name = tag.path.rsplit(['/', '\\']).next().unwrap_or_default().to_ascii_lowercase();
+    ["waterfall", "water fall", "light", "glow", "gseffect"].iter().any(|part| name.contains(part))
+}
+
+// Visual water and illuminated panels can be entirely absent from the source
+// collision shell. Keep its native material, normals and UVs in the existing
+// render-only JMS layer. This adds no walkable floor or blocking collision.
+fn append_source_surface_effects(
+    inspection: &MapInspection,
+    bsp_index: usize,
+    source: usize,
+    translation: V,
+    yaw: f64,
+    mesh: &mut MeshData,
+    materials: &mut Vec<AssemblyMaterial>,
+    slots: &mut Vec<usize>,
+) -> Result<()> {
+    let Some(render) = inspection.render_mesh.as_ref() else { return Ok(()); };
+    let restored: BTreeSet<_> = materials.iter().filter(|m| m.source == source).filter_map(|m| m.shader_path.clone()).collect();
+    let mut effect_slots = BTreeMap::new();
+    for range in render.material_ranges.iter().filter(|range| range.bsp_index == bsp_index) {
+        let Some(tag) = inspection.tags.iter().find(|tag| tag.id == range.shader_tag_id) else { continue; };
+        if !is_source_surface_effect(tag) || restored.contains(&tag.path) {
+            continue;
+        }
+        if range.shader_permutation != 0 {
+            return invalid(format!("Source surface effect shader {} uses an unsupported shader permutation", tag.path));
+        }
+        let end = range.index_start.checked_add(range.index_count)
+            .ok_or_else(|| SparkError::Invalid("Source surface effect triangle range exceeds the source mesh".into()))?;
+        let indices = render.indices.get(range.index_start..end)
+            .filter(|indices| indices.len() % 3 == 0)
+            .ok_or_else(|| SparkError::Invalid("Source surface effect has incomplete source triangles".into()))?;
+        if slots.len() + indices.len() / 3 > MAX_OUTPUT_TRIANGLES {
+            return invalid("Preserving native surface effects would exceed the BSP output triangle budget");
+        }
+        let slot = *effect_slots.entry(tag.id).or_insert_with(|| {
+            let slot = materials.len();
+            materials.push(AssemblyMaterial {
+                // Keep an identifiable alias when this build becomes a subsequent donor.
+                name: format!("gseffect{}m{}x", &inspection.sha256[..8], slot),
+                source,
+                shader_path: Some(tag.path.clone()),
+                shader_class: Some(tag.class.clone()),
+                flags: 0,
+                collision_only: false,
+            });
+            slot
+        });
+        for triangle in indices.chunks_exact(3) {
+            for &id in triangle {
+                let id = id as usize;
+                let point = render.positions.get(id*3..id*3+3);
+                let normal = render.normals.get(id*3..id*3+3);
+                let uv = render.uvs.get(id*2..id*2+2);
+                let (Some(point), Some(normal), Some(uv)) = (point, normal, uv) else {
+                    return invalid("Source surface effect is missing its original render vertices, normals or UVs");
+                };
+                let world = transform([point[0].into(), point[1].into(), point[2].into()], translation, yaw);
+                validate_native_bsp_point(world)?;
+                let rotated = transform([normal[0].into(), normal[1].into(), normal[2].into()], [0.; 3], yaw);
+                if rotated.iter().any(|value| !value.is_finite()) || uv.iter().any(|value| !value.is_finite()) {
+                    return invalid("Source surface effect has non-finite native normals or UVs");
+                }
+                mesh.indices.push((mesh.positions.len()/3) as u32);
+                mesh.positions.extend(world.map(|value| value as f32));
+                mesh.normals.extend(rotated.map(|value| value as f32));
+                mesh.uvs.extend_from_slice(uv);
+            }
+            slots.push(slot);
+        }
+    }
+    Ok(())
+}
 fn append_render_faces(
     gl: &MeshGL64,
     materials: &[AssemblyMaterial],
     mesh: &mut MeshData,
     slots: &mut Vec<usize>,
+    terrain_projection: Option<(usize, &RenderTri)>,
 ) -> Result<()> {
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
         let slot = gl.face_id[face] as usize;
@@ -980,10 +1082,16 @@ fn append_render_faces(
         for (v, p) in points.iter().enumerate() {
             mesh.positions.extend(p.map(|x| x as f32));
             mesh.normals.extend(n.map(|x| x as f32));
-            mesh.uvs.extend([
-                gl.vert_properties[order[v] as usize * 5 + 3] as f32,
-                gl.vert_properties[order[v] as usize * 5 + 4] as f32,
-            ]);
+            let uv = match terrain_projection {
+                Some((terrain_slot, projection)) if slot == terrain_slot => {
+                    terrain::ridge_uv(*p, n, projection)?.map(|value| value as f32)
+                }
+                _ => [
+                    gl.vert_properties[order[v] as usize * 5 + 3] as f32,
+                    gl.vert_properties[order[v] as usize * 5 + 4] as f32,
+                ],
+            };
+            mesh.uvs.extend(uv);
         }
         mesh.indices
             .extend([first as u32, first as u32 + 1, first as u32 + 2]);
@@ -1416,7 +1524,7 @@ pub fn generate_preserved_connector(
         collision_source
     };
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
-    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials)?;
+    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
     let report = AssemblyReport {
         input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
@@ -2827,6 +2935,48 @@ mod tests {
  use super::*;
  fn inspected(id:u32)->MapInspection{
   MapInspection{header:maps::MapHeader{version:609,engine:"fixture".into(),name:"fixture".into(),build:"fixture".into(),scenario_type:1,file_size:2048,declared_size:2048,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},sha256:format!("{id:064x}"),tag_checksum:None,tags:vec![maps::Tag{id,index:0,class:"senv".into(),path:"native/floor".into(),data_offset:None,external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],decals:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()}
+ }
+ #[test]
+ fn water_rebuild_keeps_world_transform_material_and_original_uvs_in_render_layer() {
+    let mut source = inspected(10);
+    source.tags[0].class = "scex".into();
+    source.tags[0].path = "native/timberland_waterfall".into();
+    let range = maps::MeshMaterialRange {
+        shader_tag_id: 10, shader_permutation: 0, bsp_index: 0, lightmap_index: 0,
+        lightmap_page: -1, has_lightmap_uvs: false, has_incident_radiosity: false,
+        lightmap_bitmap_tag_id: None, index_start: 0, index_count: 3,
+    };
+    source.render_mesh = Some(MeshData {
+        positions: vec![1.,0.,0., 1.,1.,0., 1.,0.,1.],
+        normals: vec![1.,0.,0., 1.,0.,0., 1.,0.,0.],
+        uvs: vec![0.125,0.25, 0.75,0.25, 0.125,0.9],
+        indices: vec![0,1,2],
+        material_ranges: vec![range],
+        ..Default::default()
+    });
+    let (mut mesh, mut materials, mut slots) = (MeshData::default(), vec![], vec![]);
+    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots).unwrap();
+    assert_eq!(mesh.positions, [2.,4.,4., 1.,4.,4., 2.,4.,5.]);
+    assert!(mesh.normals.chunks_exact(3).all(|n| n[0].abs() < 1e-6 && n[1] == 1. && n[2] == 0.));
+    assert_eq!(mesh.uvs, source.render_mesh.as_ref().unwrap().uvs);
+    assert_eq!(slots, [0]);
+    let saved = &materials[0];
+    let mut panel = source.tags[0].clone();
+    panel.class = "schi".into();
+    panel.path = "native/timberland_base_lights_blue".into();
+    assert!(is_source_surface_effect(&panel));
+    panel.path = "native/gseffect12345678m1x".into();
+    assert!(is_source_surface_effect(&panel));
+    panel.path = "native/paint".into();
+    assert!(!is_source_surface_effect(&panel));
+    assert!(!saved.collision_only);
+    assert_eq!(saved.source, 1);
+    assert_eq!(saved.shader_path.as_deref(), Some("native/timberland_waterfall"));
+    assert_eq!(saved.shader_class.as_deref(), Some("scex"));
+
+    let (mut mesh, mut slots) = (MeshData::default(), vec![]);
+    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots).unwrap();
+    assert!(slots.is_empty());
  }
  #[test] fn joined_preview_keeps_each_native_shader_owner_world_positions_uvs_and_unbaked_status(){
   let mesh=MeshData{positions:vec![0.,0.,0.,1.,0.,0.,0.,1.,0.],normals:vec![0.,0.,1.,0.,0.,1.,0.,0.,1.],uvs:vec![0.,0.,1.,0.,0.,1.],indices:vec![0,1,2,0,1,2,0,1,2],..Default::default()};

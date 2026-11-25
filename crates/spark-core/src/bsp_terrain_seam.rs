@@ -103,6 +103,10 @@ pub(super) struct Ribbon {
     source_boundary:f64,
 }
 impl Ribbon {
+    pub(super) fn base_projection(&self) -> &RenderTri {
+        &self.projections[0]
+    }
+
     pub fn new(base:&MapInspection,a:&MeshData,af:&[CollisionFace],donor:&MapInspection,b:&MeshData,bf:&[CollisionFace],plan:&BspAssembly)->Result<Self>{
         let seam=plan.terrain_seam.as_ref().unwrap();seam.validate(plan)?;
         let min_b=render_edge(donor,plan.donor_bsp_index,false)?-0.25+plan.translation[0];
@@ -144,9 +148,7 @@ impl Ribbon {
             let first=gl.num_vert() as u64;
             for p in points {
                 let local=if source==1{sub(p,plan.translation)}else{p};
-                let tri=&self.projections[source];let weights=bary(local,tri).ok_or_else(||SparkError::Invalid("Terrain UV projection is degenerate".into()))?;
-                let uv:[f64;2]=std::array::from_fn(|k|(0..3).map(|i|weights[i]*tri.uv[i][k]).sum());
-                if uv.iter().any(|v|!v.is_finite()||v.abs()>100_000.){return invalid("Terrain UV projection exceeds native bounds");}
+                let uv = project_uv(local, &self.projections[source])?;
                 gl.vert_properties.extend(p);gl.vert_properties.extend(uv);
             }
             gl.tri_verts.extend([first,first+1,first+2]);gl.face_id.push(material as u64);Ok(())
@@ -167,6 +169,31 @@ impl Ribbon {
         }}
         gl.merge();checked(Manifold::from_mesh_gl64(&gl),"Source-profile terrain seam")
     }
+}
+
+fn project_uv(point: V, projection: &RenderTri) -> Result<[f64; 2]> {
+    let weights = bary(point, projection)
+        .ok_or_else(|| SparkError::Invalid("Terrain UV projection is degenerate".into()))?;
+    let uv = std::array::from_fn(|axis| (0..3).map(|i| weights[i] * projection.uv[i][axis]).sum::<f64>());
+    if uv.iter().any(|v| !v.is_finite() || v.abs() > 100_000.) {
+        return invalid("Terrain UV projection exceeds native bounds");
+    }
+    Ok(uv)
+}
+
+/// Continue the native outdoor chart across generated ridge tops and ramps.
+/// On steep faces fold vertical distance into the chart so cliffs retain the
+/// same texture scale without collapsing to a line in the lightmap baker.
+pub(super) fn ridge_uv(point: V, normal: V, projection: &RenderTri) -> Result<[f64; 2]> {
+    let origin = projection.p[0];
+    let mut projected = point;
+    if normal[2].abs() < 0.5 {
+        let axis = usize::from(normal[1].abs() > normal[0].abs());
+        projected[axis] = origin[axis] + (point[2] - origin[2]) * normal[axis].signum();
+    }
+    let offset = sub(projected, origin);
+    projected[2] = origin[2] - (projection.n[0] * offset[0] + projection.n[1] * offset[1]) / projection.n[2];
+    project_uv(projected, projection)
 }
 
 /// Terrain cuts span the verified source sky closure, not the small tunnel
@@ -198,6 +225,22 @@ mod tests{
         assert_eq!(p,[[1.,-11.,-23.],[1.,11.,-23.],[1.,11.,58.],[1.,-11.,58.]]);
         assert!(portal([2047.,0.,0.],[0.,1.,0.],22.,58.).is_err());
         assert!(portal([0.,0.,0.],[1.,0.,0.],f64::NAN,58.).is_err());
+    }
+    #[test]
+    fn ridge_uses_native_ground_scale_and_has_two_uv_axes_on_cliffs() {
+        let projection = RenderTri {
+            p: [[0., 0., 0.], [100., 0., 10.], [0., 100., 0.]],
+            uv: [[0.15, 0.25], [1.15, 0.25], [0.15, 1.25]],
+            n: normal([0., 0., 0.], [100., 0., 10.], [0., 100., 0.]),
+        };
+        let at = |point, face| ridge_uv(point, face, &projection).unwrap();
+        let close = |a: [f64; 2], b: [f64; 2]| {
+            assert!((a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9);
+        };
+        close(at([30., 20., 12.], [0., 0., 1.]), [0.45, 0.45]);
+        close(at([30., 20., 12.], [1., 0., 0.]), [0.27, 0.45]);
+        close(at([30., 40., 20.], [1., 0., 0.]), [0.35, 0.65]);
+        close(at([30., 40., 20.], [0., -1., 0.]), [0.45, 0.05]);
     }
     #[test]
     fn ribbon_is_closed_and_uses_source_uv_scale_on_both_sides(){
