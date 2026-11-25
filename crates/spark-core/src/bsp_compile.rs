@@ -770,7 +770,7 @@ pub(crate) struct PreparedPartitions {
 
 fn bind_partition_scenario(
     inspection: &MapInspection, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    original_structures: &[String], structures: &[String], switches: &[bsp_assembly::PartitionSwitch; 2],
+    original_structures: &[String], structures: &[String], switches: &[bsp_assembly::PartitionSwitch],
 ) -> Result<()> {
     let scenario = format!("{}.scenario", inspection.scenario_path);
     let scenario_file = tags.join(safe_relative(&scenario)?);
@@ -793,8 +793,23 @@ fn bind_partition_scenario(
         }
         Ok(())
     };
+    let additions = structures.len().checked_sub(original_structures.len())
+        .filter(|count| (1..=2).contains(count) && structures.len() <= 16)
+        .ok_or_else(|| SparkError::Invalid("Invalid native BSP extension size".into()))?;
+    if additions == 2 && (!structures.starts_with(original_structures) || switches.len() != 4) {
+        return invalid("An intact extension must retain the original BSP slots and bind four switches");
+    }
+    let mut reviewed = BTreeSet::new();
+    for transition in switches {
+        if maps::native_bsp_switch_name(&transition.name)
+            .is_none_or(|(from, to)| from >= structures.len() || to >= structures.len())
+            || !reviewed.insert(transition.name.as_str())
+        {
+            return invalid("Native BSP extension has an invalid or duplicate directional switch");
+        }
+    }
     verify_slots(original_structures)?;
-    let mut args = vec!["-I".into(), "structure_bsps".into(), "1".into(), "end".into()];
+    let mut args = vec!["-I".into(), "structure_bsps".into(), additions.to_string(), "end".into()];
     for (index, bsp) in structures.iter().enumerate().filter(|(index, bsp)| original_structures.get(*index) != Some(*bsp)) {
         args.extend(["-S".into(), format!("structure_bsps[{index}].structure_bsp"), format!("{bsp}.scenario_structure_bsp")]);
     }

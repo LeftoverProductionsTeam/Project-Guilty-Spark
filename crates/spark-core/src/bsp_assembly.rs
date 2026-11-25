@@ -646,6 +646,27 @@ pub struct PartitionSwitch {
     pub geometry: maps::ScenarioLogicVolumeGeometry,
 }
 
+fn partition_switch(
+    from: usize, to: usize, front: V, forward: V, width: f32, height: f32,
+) -> PartitionSwitch {
+    let sideways = [-forward[1], forward[0], 0.];
+    let corner = add(front, mul(sideways, -f64::from(width) / 2.));
+    PartitionSwitch {
+        name: format!("bsp{from},{to}"),
+        geometry: maps::ScenarioLogicVolumeGeometry {
+            forward: forward.map(|x| x as f32), up: [0., 0., 1.],
+            corner: [corner[0] as f32, corner[1] as f32, corner[2] as f32 - 0.2],
+            dimensions: [0.9, width, height + 0.4],
+        },
+    }
+}
+
+pub struct PreservedConnector {
+    pub geometry: AssemblyGeometry,
+    pub switches: [PartitionSwitch; 4],
+    pub overlaps: [[V; 2]; 2],
+}
+
 pub struct PartitionedAssembly {
     pub base: Option<AssemblyGeometry>,
     pub donor: AssemblyGeometry,
@@ -1264,19 +1285,13 @@ pub fn generate_partitioned_project(
         return invalid(&format!("The shared floors differ by {max_floor_delta:.3} world units. Align the two passage profiles before compiling"));
     }
     let forward = [direction[0], direction[1], 0.];
-    let sideways = [-forward[1], forward[0], 0.];
-    let triggers = |name: &str, distance: f64| {
-        let corner = add(offset(distance - 0.45), mul(sideways, -f64::from(assembly.tunnel_width) / 2.));
-        PartitionSwitch { name: name.into(), geometry: maps::ScenarioLogicVolumeGeometry {
-            forward: forward.map(|x| x as f32), up: [0., 0., 1.],
-            corner: [corner[0] as f32, corner[1] as f32, corner[2] as f32 - 0.2],
-            dimensions: [0.9, assembly.tunnel_width, assembly.tunnel_height + 0.4],
-        } }
-    };
+    let trigger = |from, to, distance: f64| partition_switch(
+        from, to, offset(distance - 0.45), forward, assembly.tunnel_width, assembly.tunnel_height,
+    );
     Ok(PartitionedAssembly {
         base: left, donor: right,
-        switches: [triggers(&format!("bsp{},{base_count}", assembly.base_bsp_index), 1.3),
-                  triggers(&format!("bsp{base_count},{}", assembly.base_bsp_index), -1.3)],
+        switches: [trigger(assembly.base_bsp_index, base_count, 1.3),
+                   trigger(base_count, assembly.base_bsp_index, -1.3)],
         overlap, overlap_samples, max_floor_delta,
     })
 }
@@ -1285,7 +1300,7 @@ pub fn generate_partitioned_project(
 /// consulted as collision inputs only.
 pub fn generate_preserved_connector(
     project: &Project, base: &MapInspection, cancel: &AtomicBool,
-) -> Result<AssemblyGeometry> {
+) -> Result<PreservedConnector> {
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a BSP connection first".into()))?;
     let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
     plan.validate()?;
@@ -1381,7 +1396,22 @@ pub fn generate_preserved_connector(
         portal_count: 0, route_clearance, donor_scenery: 0,
         warnings: vec![format!("Shared level floor differs by at most {:.3} units across both landings. Donor extraction, scenario binding and runtime travel are separate checks.", landings[0].max(landings[1]))],
     };
-    Ok(AssemblyGeometry { mesh, materials, triangle_materials, report })
+    let corridor = base.mesh.parts.len();
+    let island = corridor + 1;
+    let trigger = |from, to, center, distance: f64| partition_switch(
+        from, to, offset(center, distance - 0.45), forward, plan.tunnel_width, plan.tunnel_height,
+    );
+    let switches = [
+        trigger(plan.base_bsp_index, corridor, start, 1.3),
+        trigger(corridor, plan.base_bsp_index, start, -1.3),
+        trigger(corridor, island, end, 1.3),
+        trigger(island, corridor, end, -1.3),
+    ];
+    Ok(PreservedConnector {
+        geometry: AssemblyGeometry { mesh, materials, triangle_materials, report },
+        switches,
+        overlaps: [overlap(start), overlap(end)],
+    })
 }
 
 pub(crate) fn verify_bound_partition_collision(

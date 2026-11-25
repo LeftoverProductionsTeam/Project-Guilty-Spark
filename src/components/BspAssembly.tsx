@@ -820,6 +820,7 @@ export default function BspAssembly({
                   {(report.donorScenery ?? 0) > 0 && (
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
+                  {!!report.intactSwitches?.length && <p>Planned native switches: {report.intactSwitches.join(' · ')}</p>}
                   {report.nativePartitions && <p>BSP {report.nativePartitions.selected} · {report.nativePartitions.overlapSamples} shared corridor-floor samples · Largest floor difference {report.nativePartitions.maxFloorDelta.toFixed(4)} world units.</p>}
                   {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget}
                     cacheTarget={draft.separateNativeBsps && (canExtend || buildRuntime === 'mccSteam') ? 'MCC13'

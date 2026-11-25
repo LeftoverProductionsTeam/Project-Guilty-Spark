@@ -604,8 +604,11 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         let i=inspect(&state,&p)?;
         let cancel = AtomicBool::new(false);
         let preserve_donor = intact_connector.unwrap_or(false);
+        let mut intact_switches = None;
         let (geometry, partition_report) = if preserve_donor {
-            (core::bsp_assembly::generate_preserved_connector(&p, &i, &cancel).map_err(error)?, None)
+            let connector = core::bsp_assembly::generate_preserved_connector(&p, &i, &cancel).map_err(error)?;
+            intact_switches = Some(connector.switches.map(|transition| transition.name));
+            (connector.geometry, None)
         } else if p.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
             let selected = native_bsp_index.unwrap_or(0);
             if selected > 1 { return Err("Choose native BSP 0 or 1".into()); }
@@ -620,6 +623,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         };
         let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
         if let Some(report) = partition_report { result["nativePartitions"] = report; }
+        if let Some(switches) = intact_switches { result["intactSwitches"] = serde_json::json!(switches); }
         if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No saved BSP connection")?;
             let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref()).map_err(error)?;
             if let Some(source) = &p.source {

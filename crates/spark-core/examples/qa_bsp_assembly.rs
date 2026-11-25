@@ -75,9 +75,13 @@ fn main() -> Result<()> {
         let output = Path::new(&a[3]);
         spark_core::reject_links(output)?;
         fs::create_dir(output)?;
-        fs::write(output.join("connector.jms"), bsp_assembly::export_jms(&connector)?)?;
-        fs::write(output.join("connector-materials.json"), serde_json::to_vec(&connector.materials)?)?;
-        println!("{}", serde_json::to_string(&connector.report)?);
+        fs::write(output.join("connector.jms"), bsp_assembly::export_jms(&connector.geometry)?)?;
+        fs::write(output.join("connector-materials.json"), serde_json::to_vec(&connector.geometry.materials)?)?;
+        let receipt = serde_json::json!({
+            "report": connector.geometry.report, "switches": connector.switches, "overlaps": connector.overlaps,
+        });
+        fs::write(output.join("connector-scenario.json"), serde_json::to_vec_pretty(&receipt)?)?;
+        println!("{receipt}");
         return Ok(());
     }
     if a.len() == 4 && a[1] == "--export-partitions" {
