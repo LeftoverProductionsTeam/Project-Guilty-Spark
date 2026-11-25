@@ -280,12 +280,14 @@ export default function BspAssembly({
       if (current()) setBusy(false);
     }
   }
+  const [regionalPreset,setRegionalPreset]=useMapState<''|'surfaceLandBridge'|'undergroundTunnel'|'undergroundInfantryTunnel'>(project.id,'bsp.regionalPreset','');
   async function proposeConnection(terrainSeam:boolean){
     await perform(async(current)=>{
       const request={...latest.current};
       const matches=()=>current()&&latest.current.signature===request.signature&&latest.current.donor===request.donor&&latest.current.index===request.index&&latest.current.baseIndex===request.baseIndex;
       await onSave();if(!matches())return;
-      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,baseBspIndex:canExtend?baseIndex:undefined,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{})});
+      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,baseBspIndex:canExtend?baseIndex:undefined,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{}),
+        ...(!terrainSeam&&canExtend&&baseParts.length<=14&&regionalPreset?{regionalPreset}:{})});
       if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
     });
   }
@@ -472,13 +474,22 @@ export default function BspAssembly({
                 <option value={300}>Southeast</option>
               </select>
             </label>}
+            {canExtend&&baseParts.length<=14&&<label>Connection preset
+              <select aria-label="Connection preset" value={regionalPreset} disabled={busy}
+                onChange={e=>setRegionalPreset(e.target.value as typeof regionalPreset)}>
+                <option value="">Connected tunnel</option>
+                <option value="surfaceLandBridge">Surface land bridge</option>
+                <option value="undergroundTunnel">Underground vehicle tunnel</option>
+                <option value="undergroundInfantryTunnel">Underground infantry tunnel</option>
+              </select>
+            </label>}
             <button
               disabled={!native || busy || !donor || !options.some((option) => option.index === index)}
-              onClick={() =>
-                void proposeConnection(false)
-              }
+              onClick={() => void proposeConnection(false)}
             >
-              {busy ? 'Working…' : 'Plan connected tunnel'}
+              {busy?'Working…':canExtend&&baseParts.length<=14&&regionalPreset
+                ?({surfaceLandBridge:'Plan surface land bridge',undergroundTunnel:'Plan underground vehicle tunnel',undergroundInfantryTunnel:'Plan underground infantry tunnel'}[regionalPreset])
+                :'Plan connected tunnel'}
             </button>
             {!canExtend && <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>}
           </div>
@@ -491,6 +502,7 @@ export default function BspAssembly({
             <>
               <div className="bsp-draft-heading">
                 <strong>Connection draft · {draft.donorTitle}</strong>
+                {draft.preserveDonorBsp&&<span>{draft.openRoad?'Surface land bridge':'Enclosed native tunnel'} · {draft.tunnelWidth.toFixed(1)} wide</span>}
                 <span>
                   {routeDraft!.tunnelPoints
                     .slice(1)
@@ -682,15 +694,16 @@ export default function BspAssembly({
                   />
                 </label>
                 <label>
-                  Tunnel width
+                  {routeDraft!.archSegments?'Arch radius':'Tunnel width'}
                   <NumberField
-                    value={routeDraft!.tunnelWidth}
-                    min={0.8}
-                    max={16}
+                    value={routeDraft!.archSegments?routeDraft!.tunnelWidth/2:routeDraft!.tunnelWidth}
+                    min={routeDraft!.archSegments?0.4:0.8}
+                    max={routeDraft!.archSegments?8:16}
                     step={0.1}
-                    label="Tunnel width"
-                    onCommit={(v) => updateRoute({ tunnelWidth: v })}
+                    label={routeDraft!.archSegments?'Tunnel arch radius':'Tunnel width'}
+                    onCommit={(v) => updateRoute({ tunnelWidth:routeDraft!.archSegments?v*2:v })}
                   />
+                  {routeDraft!.archSegments&&<small>Horizontal radius. Clear height controls the roof above the route.</small>}
                 </label>
                 <label>
                   Clear height

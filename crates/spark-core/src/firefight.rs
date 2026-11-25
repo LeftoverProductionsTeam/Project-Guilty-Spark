@@ -1422,18 +1422,30 @@ fn profile_arguments(profile:&NativePlayerProfile,index:usize,name:&str,equipmen
     }
     let p=format!("player_starting_profile[{index}]");
     let mut args=vec!["-I".into(),"player_starting_profile".into(),"1".into(),"end".into()];
-    let mut fields=vec![
+    for (key,value) in profile_values(profile,name).into_iter().filter(|(key,_)|profile.secondary_weapon.is_some()||!key.starts_with("secondary_")) {
+        args.extend(["-S".into(),format!("{p}.{key}"),value]);
+    }
+    Ok(args)
+}
+
+fn profile_values(profile:&NativePlayerProfile,name:&str)->[(&'static str,String);11] {
+    [
         ("name",name.into()),("starting_health_modifier",profile.health.to_string()),("starting_shield_modifier",profile.shields.to_string()),
         ("primary_weapon",format!("{}.weapon",profile.primary_weapon.replace('\\',"/"))),
         ("primary_rounds_loaded",profile.primary_loaded.to_string()),("primary_rounds_reserved",profile.primary_reserved.to_string()),
         ("starting_fragmentation_grenade_count",profile.fragmentation_grenades.to_string()),("starting_plasma_grenade_count",profile.plasma_grenades.to_string()),
-    ];
-    if let Some(weapon)=&profile.secondary_weapon {
-        fields.extend([("secondary_weapon",format!("{}.weapon",weapon.replace('\\',"/"))),
-            ("secondary_rounds_loaded",profile.secondary_loaded.to_string()),("secondary_rounds_reserved",profile.secondary_reserved.to_string())]);
-    }
-    for(key,value)in fields{args.extend(["-S".into(),format!("{p}.{key}"),value]);}
-    Ok(args)
+        ("secondary_weapon",format!("{}.weapon",profile.secondary_weapon.as_deref().unwrap_or_default().replace('\\',"/"))),
+        ("secondary_rounds_loaded",profile.secondary_loaded.to_string()),("secondary_rounds_reserved",profile.secondary_reserved.to_string()),
+    ]
+}
+
+pub(crate) fn native_equipment_profile_changes(
+    before:&NativePlayerProfile, after:&NativePlayerProfile,
+)->Result<Vec<(&'static str,String,String)>> {
+    validate_profile_fields(before,true)?;
+    validate_profile_fields(after,true)?;
+    Ok(profile_values(before,"").into_iter().zip(profile_values(after,""))
+        .filter_map(|((_,old),(key,new))|(old!=new).then_some((key,old,new))).collect())
 }
 /// Resolve weapon identities in independently decoded output, never by datum reuse.
 pub fn verify_native_player_profile(expected:&NativePlayerProfile,name:&str,index:usize,map:&MapInspection)->Result<()> {verify_profile_fields(expected,name,index,map,false)}

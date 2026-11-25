@@ -14,15 +14,29 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  useEffect(()=>{setDrafts({unsc:{...initial('unsc'),control:context.controlSources?.[0]??''},covenant:{...initial('covenant'),control:context.controlSources?.[0]??''}});},[context.projectId,context.buildId,context.tag]);
  useEffect(()=>{setSquad({number:1,control:context.controlSources?.[0]??"",position:["","",""],rotation:["0","0","0"],readiness:false});},[context.projectId,context.buildId,context.tag]);
  useEffect(()=>{setBody(current=>({...current,bipedTagPath:null,permutation:null,includeFirstPersonArms:false}));},[context.projectId,context.buildId,context.tag,context.tagSha256]);
- useEffect(()=>onDraftChange(),[drafts,squad,body,context.tagSha256]);
+ const kits=context.factionKits??[];
+ const existingKit=kits.find(row=>row.kit.faction===role)?.kit;
+ const [profileDraft,setProfileDraft]=useState<{sourceKey:string;profiles:Partial<Record<Role,Draft['profile']>>}|null>(null);
+ const sourceKey=JSON.stringify([context.projectId,context.tag,context.tagSha256]);
+ const editedProfiles=profileDraft?.sourceKey===sourceKey?profileDraft.profiles:undefined;
+ const equipment=existingKit?(editedProfiles?.[role]??existingKit.profile):draft.profile;
+ useEffect(()=>onDraftChange(),[drafts,squad,body,profileDraft,context.tagSha256]);
  const update=(patch:Partial<Draft>)=>setDrafts(current=>({...current,[role]:{...current[role],...patch}}));
- const profile=(patch:Partial<Draft['profile']>)=>update({profile:{...draft.profile,...patch,health:0,shields:0}});
+ const profile=(patch:Partial<Draft['profile']>)=>{
+   const next={...equipment,...patch,health:0,shields:0};
+   if(!next.secondaryWeapon){next.secondaryLoaded=0;next.secondaryReserved=0;}
+   if(existingKit)setProfileDraft({sourceKey,profiles:{...editedProfiles,[role]:next}});
+   else update({profile:next});
+ };
  const validPose=(entry:Pick<Draft,'control'|'position'|'rotation'>)=>entry.control.trim().length>0&&entry.control.length<=230&&!entry.control.startsWith('-')&&[...entry.position,...entry.rotation].every(value=>value.trim()!==''&&Number.isFinite(Number(value)))&&entry.position.every(value=>Math.abs(Number(value))<=2048)&&entry.rotation.every(value=>Math.abs(Number(value))<=360);
  const groundPosition=(entry:Pick<Draft,'control'|'position'|'rotation'>)=>validPose(entry)?entry.position.map(Number) as [number,number,number]:null;
  const upright=(entry:Pick<Draft,'rotation'>)=>entry.rotation.slice(1).every(value=>value.trim()!==''&&Math.abs(Number(value)*Math.PI/180)<1e-4);
- const valid=(entry:Draft)=>validPose(entry)&&entry.profile.primaryWeapon.length>0&&[entry.profile.primaryLoaded,entry.profile.primaryReserved,entry.profile.secondaryLoaded,entry.profile.secondaryReserved].every(value=>Number.isInteger(value)&&value>=0&&value<=32767)&&[entry.profile.fragmentationGrenades,entry.profile.plasmaGrenades].every(value=>Number.isInteger(value)&&value>=0&&value<=4)&&!!(entry.profile.secondaryWeapon||entry.profile.secondaryLoaded===0&&entry.profile.secondaryReserved===0);
- const included=(['unsc','covenant'] as Role[]).filter(faction=>drafts[faction].included),blocked=busy||dirty||!context.canAppendFactionKits;
- const kits=context.factionKits??[],selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
+ const validEquipment=(kit:Draft['profile'])=>kit.primaryWeapon.length>0&&[kit.primaryLoaded,kit.primaryReserved,kit.secondaryLoaded,kit.secondaryReserved].every(value=>Number.isInteger(value)&&value>=0&&value<=32767)&&[kit.fragmentationGrenades,kit.plasmaGrenades].every(value=>Number.isInteger(value)&&value>=0&&value<=4)&&!!(kit.secondaryWeapon||kit.secondaryLoaded===0&&kit.secondaryReserved===0);
+ const included=(['unsc','covenant'] as Role[]).filter(faction=>drafts[faction].included&&!kits.some(row=>row.kit.faction===faction));
+ const blocked=busy||dirty||!context.canAppendFactionKits;
+ const sourceSha256=context.tagSha256??'';
+ const hasSourceHash=/^[a-f0-9]{64}$/i.test(sourceSha256);
+ const selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
  const bipedSources=context.bipedSources??[];
  const currentBody=selectedKit?.body;
  const elitePath='characters/elite/elite';
@@ -38,10 +52,11 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const unchangedBody=!!currentBody&&currentBody.bipedTagPath===bipedPath&&currentBody.permutation===permutation&&!includeArms;
  const squadName="extraction_squad_"+String(squad.number).padStart(2,"0"),squadExists=!!context.scenarioDevices?.some(row=>row.name.toLowerCase()===squadName);
  return <><details className="native-faction-kits"><summary>Forerunner faction terminals &amp; kits</summary>
-  <p className="subtle">Append faction terminals and matching equipment profiles together. Originals, player starts and existing source stay. Forerunner owns selection, gear reservation, deployment and persistence; these are not gear-grant scripts.</p>
+  <p className="subtle">Add a new faction terminal and starter kit, or revise the equipment on an existing faction. Forerunner handles deployment, saved loadouts and banking.</p>
   {!context.canAppendFactionKits&&<Notice tone="info">Requires unshared CE609 solo working source, a readable Extraction hub and activation area, and existing native control/weapon dependencies.</Notice>}
   <fieldset disabled={blocked}>
    <label>Faction kit<select aria-label="Faction kit" value={role} onChange={event=>setRole(event.target.value as Role)}><option value="unsc">UNSC</option><option value="covenant">Covenant</option></select></label>
+   {existingKit?<p className="subtle">Editing the existing starter kit. The terminal placement, respawn biped and faction indices stay in place.</p>:<>
    <label><input type="checkbox" checked={draft.included} onChange={event=>update({included:event.target.checked})}/>Include {role==='unsc'?'UNSC':'Covenant'} terminal and kit</label>
    <label>Touched control tag<input aria-label="Faction control tag" list={id+'-controls'} value={draft.control} onChange={event=>update({control:event.target.value})}/><datalist id={id+'-controls'}>{context.controlSources?.map(path=><option key={path} value={path}/>)}</datalist></label>
    <p className="subtle">Choose an existing touched-by-player control without .device_control. Preview pins its real closure; unsupported controls are not repaired or replaced.</p>
@@ -50,12 +65,18 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
    <NativeControlGroundCheck context={context} selectionKey={JSON.stringify([role,draft.rotation.slice(1)])}
     tagPath={draft.control.trim()} position={groundPosition(draft)} upright={upright(draft)} disabled={blocked}
     onGround={point=>update({position:point.map(String) as Draft['position']})}/>
-   <label>Primary weapon<input aria-label="Faction primary weapon" list={id+'-weapons'} value={draft.profile.primaryWeapon} onChange={event=>profile({primaryWeapon:event.target.value})}/></label>
-   <label>Secondary weapon · optional<input aria-label="Faction secondary weapon" list={id+'-weapons'} value={draft.profile.secondaryWeapon??''} onChange={event=>profile({secondaryWeapon:event.target.value||null})}/></label><datalist id={id+'-weapons'}>{context.weaponSources?.map(path=><option key={path} value={path}/>)}</datalist>
-   <div className="native-field-edit">{([['primaryLoaded','Primary loaded'],['primaryReserved','Primary reserve'],['secondaryLoaded','Secondary loaded'],['secondaryReserved','Secondary reserve'],['fragmentationGrenades','Fragmentation grenades'],['plasmaGrenades','Plasma grenades']] as const).map(([key,label])=><label key={key}>{label}<input aria-label={'Faction '+label.toLowerCase()} type="number" min={0} max={key.endsWith('Grenades')?4:32767} step={1} value={draft.profile[key]} onChange={event=>profile({[key]:event.target.value===''?0:Number(event.target.value)})}/></label>)}</div>
+   </>}
+   <label>Primary weapon<input aria-label="Faction primary weapon" list={id+'-weapons'} value={equipment.primaryWeapon} onChange={event=>profile({primaryWeapon:event.target.value})}/></label>
+   <label>Secondary weapon · optional<input aria-label="Faction secondary weapon" list={id+'-weapons'} value={equipment.secondaryWeapon??''} onChange={event=>profile({secondaryWeapon:event.target.value||null})}/></label><datalist id={id+'-weapons'}>{context.weaponSources?.map(path=><option key={path} value={path}/>)}</datalist>
+   <div className="native-field-edit">{([['primaryLoaded','Primary loaded'],['primaryReserved','Primary reserve'],['secondaryLoaded','Secondary loaded'],['secondaryReserved','Secondary reserve'],['fragmentationGrenades','Fragmentation grenades'],['plasmaGrenades','Plasma grenades']] as const).map(([key,label])=><label key={key}>{label}<input aria-label={'Faction '+label.toLowerCase()} type="number" min={0} max={key.endsWith('Grenades')?4:32767} step={1} disabled={key.startsWith('secondary')&&!equipment.secondaryWeapon} value={equipment[key]} onChange={event=>profile({[key]:event.target.value===''?0:Number(event.target.value)})}/></label>)}</div>
    <p className="subtle">Equipment-only: native health/shield modifiers stay zero. No extra grenade types, duplicate primary/secondary or ammunition for an empty secondary. Keep mission technology out of every kit.</p>
-   <button type="button" disabled={!included.length||included.some(faction=>!valid(drafts[faction]))||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>onPreview({kind:'factionKits',sourceSha256:context.tagSha256!,kits:included.map(faction=>{const entry=drafts[faction];return {faction,controlTagPath:entry.control.trim(),position:entry.position.map(Number) as NativeFactionKit['position'],rotationRadians:entry.rotation.map(value=>Number(value)*Math.PI/180) as NativeFactionKit['rotationRadians'],profile:entry.profile};})})}>Preview faction terminals &amp; kits</button>
-  </fieldset><p className="subtle">Included: {included.join(', ')||'None'}. Place each terminal on usable hub geometry, outside activation. Review → Accept → Save → Build working tag edits, then inspect profiles and control bindings. Native Restore recovers the preceding source; project Undo is separate. Unaccepted settings stay in this window. Existing faction names refuse append. Use Forerunner faction player bodies to bind a character after the kit is accepted. Missions, boarding and gear behavior need runtime checks.</p>
+   {existingKit?<button type="button" disabled={!hasSourceHash||!validEquipment(equipment)||JSON.stringify(equipment)===JSON.stringify(existingKit.profile)}
+      onClick={()=>onPreview({kind:'factionKits',sourceSha256,replaceExistingProfiles:true,kits:[{...existingKit,profile:equipment}]})}>Preview faction equipment changes</button>
+    :<button type="button" disabled={!hasSourceHash||!included.length||included.some(faction=>!validPose(drafts[faction])||!validEquipment(drafts[faction].profile))}
+      onClick={()=>onPreview({kind:'factionKits',sourceSha256,kits:included.map(faction=>{const entry=drafts[faction];return {faction,controlTagPath:entry.control.trim(),position:entry.position.map(Number) as NativeFactionKit['position'],rotationRadians:entry.rotation.map(value=>Number(value)*Math.PI/180) as NativeFactionKit['rotationRadians'],profile:entry.profile};})})}>Preview faction terminals &amp; kits</button>}
+  </fieldset>
+  {!existingKit&&<p className="subtle">Included: {included.join(', ')||'None'}. Place each terminal on usable hub geometry outside the activation area.</p>}
+  <p className="subtle">Preview → Accept → Save → Build working tag edits. Native Restore recovers the preceding source. Use Forerunner faction player bodies to bind a character and the native device editor to move a terminal. Verify the resulting loadout in Forerunner.</p>
  </details>
  <details className="native-faction-bodies"><summary>Forerunner faction player bodies</summary>
   <p className="subtle">Bind a native character to an existing faction terminal and kit. The placement stays dormant. Forerunner changes the player character when the faction is selected.</p>

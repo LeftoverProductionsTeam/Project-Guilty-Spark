@@ -44,6 +44,17 @@ fn main()->Result<()>{
     let partition_scenario = a.first().is_some_and(|arg| arg == "--partition-scenario-probe");
     let partition_lighting = a.first().is_some_and(|arg| arg == "--partition-lighting-probe");
     if partition_structure || partition_scenario || partition_lighting { a.remove(0); }
+    let regional_preset = if a.first().is_some_and(|arg| arg == "--regional-preset") {
+        if a.len() < 2 { return spark_core::invalid("Missing regional connection preset"); }
+        a.remove(0);
+        let value = match a.remove(0).as_str() {
+            "surface" => bsp_assembly::RegionalConnectionPreset::SurfaceLandBridge,
+            "underground" => bsp_assembly::RegionalConnectionPreset::UndergroundTunnel,
+            "underground-infantry" => bsp_assembly::RegionalConnectionPreset::UndergroundInfantryTunnel,
+            _ => return spark_core::invalid("Choose surface, underground or underground-infantry"),
+        };
+        Some(value)
+    } else { None };
     let donor_tags_override = if a.first().is_some_and(|arg| arg == "--donor-tags") {
         if a.len() < 2 { return spark_core::invalid("Missing reviewed donor tags path"); }
         a.remove(0);
@@ -51,7 +62,7 @@ fn main()->Result<()>{
         spark_core::reject_links(Path::new(&path))?;
         Some(fs::canonicalize(path)?)
     } else { None };
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--regional-preset <surface|underground|underground-infantry>] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -122,10 +133,23 @@ fn main()->Result<()>{
                 spark_core::reject_links(&known.donor_tags_directory)?;
                 known.donor_tags_directory = fs::canonicalize(&known.donor_tags_directory)?;
             }
-            known
+            if regional_preset.is_some() {
+                let [start, end] = [known.tunnel_points[0], *known.tunnel_points.last().unwrap()];
+                let direction = (end[1] - start[1]).atan2(end[0] - start[0]).to_degrees();
+                let mut fresh = bsp_assembly::plan_from_bsp(
+                    &p, &i, &donor, &j, known.base_bsp_index, 0, known.donor_tags_directory, direction, regional_preset,
+                )?;
+                fresh.include_donor_scenery = known.include_donor_scenery;
+                fresh
+            } else {
+                known
+            }
         }
     };
     if matches!(a[6].as_str(), "auto" | "terrain") { plan.include_donor_scenery = true; }
+    if regional_preset.is_some() && matches!(a[6].as_str(),"auto"|"terrain") {
+        return spark_core::invalid("Use a reviewed inherited connection recipe to exercise a regional preset");
+    }
     plan.validate()?;
     p.title = format!("{} + {} · CE", p.title, plan.donor_title);
     while p.title.len() > 180 { p.title.pop(); }

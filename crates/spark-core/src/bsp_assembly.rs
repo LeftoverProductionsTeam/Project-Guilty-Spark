@@ -2049,12 +2049,13 @@ pub fn plan_in_direction(
     tags: PathBuf,
     direction_degrees: f64,
 ) -> Result<BspAssembly> {
-    plan_from_bsp(base_project, base, donor_project, donor, 0, index, tags, direction_degrees)
+    plan_from_bsp(base_project, base, donor_project, donor, 0, index, tags, direction_degrees, None)
 }
 
 pub fn plan_from_bsp(
     base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
     base_index: usize, index: usize, tags: PathBuf, direction_degrees: f64,
+    regional_preset: Option<RegionalConnectionPreset>,
 ) -> Result<BspAssembly> {
     if !direction_degrees.is_finite() || direction_degrees.abs() > 360. {
         return invalid("Tunnel direction must be a finite angle within 360 degrees");
@@ -2090,8 +2091,11 @@ pub fn plan_from_bsp(
             .map(|o| o.position.map(f64::from))
             .collect::<Vec<_>>()
     };
-    let (start, face) = playable_anchor(&base_mesh, &faces, base_index, toward, &starts(base))?;
-    let (end, _) = playable_anchor(&donor_mesh, &donor_faces, index, mul(toward, -1.), &starts(donor))?;
+    let radius = if regional_preset.is_some() { 96. } else { 32. };
+    let base_anchors=playable_anchor_candidates(&base_mesh,&faces,base_index,toward,&starts(base),radius)?;
+    let donor_anchors=playable_anchor_candidates(&donor_mesh,&donor_faces,index,mul(toward,-1.),&starts(donor),radius)?;
+    let (start,face)=base_anchors[0];
+    let (end,_)=donor_anchors[0];
     let donor_part = &donor_mesh.parts[index];
     let donor_min = donor_mesh.indices
         [donor_part.index_start..donor_part.index_start + donor_part.index_count]
@@ -2099,15 +2103,16 @@ pub fn plan_from_bsp(
         .map(|i| dot(vertex(&donor_mesh, *i), toward))
         .fold(f64::INFINITY, f64::min);
     let base_max = projected_bounds(&base_mesh, base_index, [0.; 3], 0., toward)?[1];
-    let translation = add(
+    let place = |start: V, end: V| add(
         mul(toward, base_max + 64. - donor_min),
         add(mul(crosswise, dot(sub(start, end), crosswise)), [0., 0., start[2] - end[2]]),
     );
+    let translation = place(start,end);
     let shader = connection_shader(&base.tags, faces[face].shader, &base.header.name)
         .ok_or_else(|| {
             SparkError::Invalid("Choose a real environment shader for the tunnel".into())
         })?;
-    let plan = BspAssembly {
+    let mut plan = BspAssembly {
         schema_version: 1,
         donor_project_id: donor_project.id.clone(),
         donor_title: donor_project.title.clone(),
@@ -2133,9 +2138,132 @@ pub fn plan_from_bsp(
         visibility_zones: vec![],
         native_seals: vec![],
     };
+    if let Some(preset) = regional_preset {
+        if !retaining || base.mesh.parts.len() > 14 {
+            return invalid("Regional presets need a retained MCC13 world with two available BSP slots");
+        }
+        let mut review = plan.clone();
+        review.separate_native_bsps = false;
+        review.base_bsp_index = 0;
+        review.open_road = matches!(preset,RegionalConnectionPreset::SurfaceLandBridge);
+        if !matches!(preset,RegionalConnectionPreset::UndergroundInfantryTunnel) {
+            review.tunnel_width = 6.;
+            review.tunnel_height = 4.;
+        }
+        let donor_pickups=maps::scenario_netgame_pickups(&plan.donor_source.preserved_path,donor)?;
+        let mut pick = |mesh:&MeshData, part, candidates:Vec<(V,usize)>, label, check_pickups:bool| {
+            let checker=crate::bsp_clearance::RouteChecker::for_part(mesh,part)?;
+            for candidate in candidates.into_iter().take(32) {
+                if let Ok((overlap,_,_))=choose_intact_landing(&checker, &mut review, candidate.0, [0.; 3], toward) {
+                    let donor_cap=[
+                        sub(overlap[0],mul(toward,1.)),
+                        add(overlap[1],mul(toward,0.7)),
+                    ];
+                    if check_pickups && donor_pickups.iter().any(|row|intact_connector_contains_pickup(
+                        &donor_cap,toward,f64::from(review.tunnel_width),f64::from(review.tunnel_height),row.position.map(f64::from),
+                    )) { continue; }
+                    return Ok((candidate,overlap));
+                }
+            }
+            invalid(format!("No unobstructed level {label} landing fits this direction and passage width. Try another heading or pick both floors with the regular tunnel planner."))
+        };
+        let ((start,face),base_overlap)=pick(&base_mesh,base_index,base_anchors,"surface-side",false)?;
+        let ((end,_),donor_overlap)=pick(&donor_mesh,index,donor_anchors,"donor-side",true)?;
+        plan.translation=place(start,end);
+        plan.tunnel_points=vec![start,add(end,plan.translation)];
+        if let Some(shader)=connection_shader(&base.tags,faces[face].shader,&base.header.name) {
+            plan.tunnel_shader_path=shader.path.clone();
+        }
+        let count=base.mesh.parts.len();
+        let draft=apply_regional_connection_preset(plan,count,donor,preset)?;
+        // Existing regions may occupy the projected route. Keep the reviewed
+        // local landing points and search farther in the requested direction.
+        let mut first_problem=None;
+        for advance in [0.,8.,16.,32.,48.,64.,96.,128.] {
+            let mut placed=draft.clone();
+            placed.translation=add(placed.translation,mul(toward,advance));
+            placed.tunnel_points[1]=add(end,placed.translation);
+            let overlaps=[base_overlap,donor_overlap.map(|point|add(point,placed.translation))];
+            let checked=(|| {
+                placed.validate()?;
+                let points=intact_floor_points(overlaps,toward,placed.open_road)?;
+                for point in &points {validate_native_bsp_point(*point)?;}
+                if donor_pickups.iter().any(|row|intact_connector_contains_pickup(
+                    &points,toward,f64::from(placed.tunnel_width),f64::from(placed.tunnel_height),
+                    add(row.position.map(f64::from),placed.translation),
+                )) {
+                    return invalid("The planned passage overlaps a native donor pickup. Choose another heading or move the landing clear of the original item.");
+                }
+                if !intact_common_separation(&base.mesh,count,&donor.mesh,index,placed.translation,toward)? {
+                    verify_intact_neighborhood((&base.mesh,&base_mesh),(&donor.mesh,&donor_mesh),
+                        index,placed.translation,count,&placed,&points)?;
+                }
+                Ok(())
+            })();
+            match checked {
+                Ok(())=>return Ok(placed),
+                Err(error)=>{first_problem.get_or_insert(error);}
+            }
+        }
+        return Err(first_problem.unwrap());
+    }
     plan.validate()?;
     Ok(plan)
 }
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RegionalConnectionPreset {
+    SurfaceLandBridge,
+    UndergroundTunnel,
+    UndergroundInfantryTunnel,
+}
+
+/// Fit a new connection using the existing intact-donor plan and native BSP slots.
+fn apply_regional_connection_preset(
+    mut plan: BspAssembly,
+    base_bsp_count: usize,
+    donor: &MapInspection,
+    preset: RegionalConnectionPreset,
+) -> Result<BspAssembly> {
+    if !plan.separate_native_bsps || !(2..=14).contains(&base_bsp_count) || plan.yaw_degrees != 0.
+        || donor.header.extended || donor.header.version != 609 || donor.header.scenario_type != 1
+        || donor.sha256 != plan.donor_source.sha256 || donor.mesh.parts.len() != 1
+    {
+        return invalid("A surface bridge or underground tunnel needs a retained MCC13 world with two free BSP slots and an original single-BSP CE multiplayer donor");
+    }
+    plan.validate()?;
+    plan.preserve_donor_bsp = true;
+    plan.open_road = matches!(preset, RegionalConnectionPreset::SurfaceLandBridge);
+    plan.tunnel_bake_fill = !plan.open_road;
+    if matches!(preset, RegionalConnectionPreset::UndergroundInfantryTunnel) {
+        plan.tunnel_width = 2.;
+        plan.tunnel_height = 1.6;
+    } else {
+        plan.tunnel_width = plan.tunnel_width.max(6.);
+        plan.tunnel_height = plan.tunnel_height.max(4.);
+    }
+    if !plan.open_road {
+        let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
+        let roof = projected_bounds(&donor.mesh, plan.donor_bsp_index, plan.translation, 0., [0., 0., 1.])?;
+        // Reserve terrain above the donor's entire native collision hull and enough
+        // approach distance for the landing caps and a moderate vehicle grade.
+        let lower_by = (roof[1] - (start[2] - 8.)).max(0.);
+        let gap = sub(end, start);
+        let run = gap[0].hypot(gap[1]);
+        let grade_run = (end[2] - lower_by - start[2]).abs() / 0.25 + 24.;
+        let additional_run = (grade_run - run).max(0.);
+        let shift = [gap[0] / run * additional_run, gap[1] / run * additional_run, -lower_by];
+        plan.translation = add(plan.translation, shift);
+        plan.tunnel_points[1] = add(end, shift);
+        let donor_z = roof.map(|z| z - lower_by);
+        for z in donor_z {
+            validate_native_bsp_point([plan.tunnel_points[1][0], plan.tunnel_points[1][1], z])?;
+        }
+    }
+    plan.validate()?;
+    Ok(plan)
+}
+
 /// A new adjacent terrain proposal; saved corridor plans are not rewritten.
 pub fn plan_terrain(base_project:&Project,base:&MapInspection,donor_project:&Project,donor:&MapInspection,index:usize,tags:PathBuf)->Result<BspAssembly>{
     terrain::plan(&base_project.source.as_ref().ok_or_else(||SparkError::Invalid("Destination source is missing".into()))?.preserved_path,base,donor,plan(base_project,base,donor_project,donor,index,tags)?)
@@ -2221,6 +2349,7 @@ pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<Com
         route_clearance,
     })
 }
+#[cfg(test)]
 fn playable_anchor(
     mesh: &MeshData,
     faces: &[CollisionFace],
@@ -2228,6 +2357,12 @@ fn playable_anchor(
     toward: V,
     starts: &[V],
 ) -> Result<(V, usize)> {
+    Ok(playable_anchor_candidates(mesh,faces,part,toward,starts,32.)?.into_iter().next().unwrap())
+}
+
+fn playable_anchor_candidates(
+    mesh:&MeshData, faces:&[CollisionFace], part:usize, toward:V, starts:&[V], radius:f64,
+) -> Result<Vec<(V,usize)>> {
     let fallback = anchor(mesh, faces, part, toward)?;
     let range = &mesh.parts[part];
     let mut candidates = vec![];
@@ -2272,16 +2407,13 @@ fn playable_anchor(
             // Bound the search in the map plane. A nearby playable floor can
             // sit far above a closed BSP's bottom. Rank admitted floors in
             // three dimensions to favor the nearest supported elevation.
-            if delta[0].hypot(delta[1]) <= 32. {
+            if delta[0].hypot(delta[1]) <= radius {
                 candidates.push((point, face, dot(delta, delta)));
             }
         }
     }
-    Ok(candidates
-        .into_iter()
-        .min_by(|a, b| a.2.total_cmp(&b.2))
-        .map(|(p, f, _)| (p, f))
-        .unwrap_or(fallback))
+    candidates.sort_by(|a,b|a.2.total_cmp(&b.2));
+    Ok(candidates.into_iter().map(|(p,f,_)|(p,f)).chain([fallback]).collect())
 }
 // Simplification can leave two sides of a sub-float miter fin distinct in
 // f64 but coincident in the exported f32 mesh. Rebuild that rounded closed
@@ -3091,6 +3223,32 @@ mod tests {
  fn inspected(id:u32)->MapInspection{
   MapInspection{header:maps::MapHeader{version:609,engine:"fixture".into(),name:"fixture".into(),build:"fixture".into(),scenario_type:1,file_size:2048,declared_size:2048,tag_offset:0,tag_size:0,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},sha256:format!("{id:064x}"),tag_checksum:None,tags:vec![maps::Tag{id,index:0,class:"senv".into(),path:"native/floor".into(),data_offset:None,external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],decals:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()}
  }
+ #[test]
+ fn regional_preset_keeps_native_slots_and_reserves_terrain_above_the_donor() {
+    let mut donor=inspected(12);
+    donor.mesh=MeshData { positions:vec![-4.,-5.,0.,4.,5.,20.,-4.,5.,0.], indices:vec![0,1,2],
+        parts:vec![maps::MeshPart {name:"Indoor".into(),index_start:0,index_count:3}], ..Default::default() };
+    let plan: BspAssembly=serde_json::from_value(serde_json::json!({
+        "schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Indoor",
+        "donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":donor.sha256,
+            "cacheVersion":609,"engine":"fixture","scenarioPath":"fixture"},
+        "donorTagsDirectory":"fixture","donorBspIndex":0,"baseBspIndex":1,"separateNativeBsps":true,
+        "translation":[64.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[0.,0.,0.],[64.,0.,0.]],
+        "tunnelWidth":2.,"tunnelHeight":1.6,"tunnelShaderPath":"fixture/metal",
+    })).unwrap();
+    let surface=apply_regional_connection_preset(plan.clone(),13,&donor,RegionalConnectionPreset::SurfaceLandBridge).unwrap();
+    assert_eq!(surface.translation, plan.translation);
+    assert!(surface.preserve_donor_bsp&&surface.open_road&&!surface.tunnel_bake_fill);
+    assert_eq!((surface.tunnel_width,surface.tunnel_height),(6.,4.));
+    let buried=apply_regional_connection_preset(plan.clone(),13,&donor,RegionalConnectionPreset::UndergroundInfantryTunnel).unwrap();
+    assert_eq!(buried.base_bsp_index,1);
+    assert!(buried.preserve_donor_bsp&&!buried.open_road&&buried.tunnel_bake_fill);
+    assert_eq!(buried.translation[2]+20.,-8.);
+    assert_eq!((buried.tunnel_width,buried.tunnel_height),(2.,1.6));
+    assert_eq!(buried.tunnel_points,vec![[0.,0.,0.],[136.,0.,-28.]]);
+    assert!(apply_regional_connection_preset(plan,15,&donor,RegionalConnectionPreset::UndergroundTunnel).is_err());
+ }
+
  #[test]
  fn water_rebuild_keeps_world_transform_material_and_original_uvs_in_render_layer() {
     let mut source = inspected(10);

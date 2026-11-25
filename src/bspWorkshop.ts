@@ -476,15 +476,49 @@ function primitiveWorkshopBrushes(b: ForgeBrush): BspBrush[] {
       );
     return [{ ...mesh, name: b.name, position: [...b.position] as Vec3, rotation: [...b.rotation] as Vec3 }];
 }
-export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs';
+export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs' | 'sphere';
+
+const sphereRadius = 3;
+function sphereCave(id: string, position: Vec3, material: string): BspBrush {
+  const sides = 12;
+  const vertices: Vec3[] = [[0, 0, -sphereRadius]];
+  for (const latitude of [-Math.PI/4, 0, Math.PI/4]) {
+    const ring = sphereRadius*Math.cos(latitude);
+    for (let i=0; i<sides; i++) {
+      const angle=2*Math.PI*i/sides;
+      vertices.push([ring*Math.cos(angle),ring*Math.sin(angle),sphereRadius*Math.sin(latitude)]);
+    }
+  }
+  const top=vertices.length;
+  vertices.push([0,0,sphereRadius]);
+  const faces: BspFace[] = [];
+  const addFace=(indices:number[])=>faces.push(face('face-'+faces.length,indices,material));
+  for (let i=0;i<sides;i++) {
+    const next=(i+1)%sides;
+    addFace([0,1+next,1+i]);
+    for (const ring of [1,1+sides]) {
+      addFace([ring+i,ring+next,ring+sides+next,ring+sides+i]);
+    }
+    addFace([top,1+2*sides+i,1+2*sides+next]);
+  }
+  return {id,name:'Sphere cave',role:'space',position:[...position],rotation:[0,0,0],scale:[1,1,1],
+    worldUv:true,vertices,faces};
+}
 export function placeWorkshopPrimitive(doc:QuickForgeDocument,kind:WorkshopPrimitive,point:Vec3,materialId:string) {
   if(!doc.workshop||doc.native)throw Error('Open editable Workshop source before placing geometry.');
-  if(!['room','box','wall','ramp','stairs'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
+  if(!['room','box','wall','ramp','stairs','sphere'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
   if(!doc.materials.some(material=>material.id===materialId))throw Error('Select a source material first');
-  const primitive=createBrush(kind as BrushKind,point,materialId);
-  primitive.name=nextWorkshopName(doc.workshop.brushes,primitive.name);
-  if(kind==='stairs')primitive.steps=8;
-  const brushes=primitiveWorkshopBrushes(primitive).map(brush=>({...brush,worldUv:true}));
+  let brushes: BspBrush[];
+  if (kind==='sphere') {
+    const cave=sphereCave(crypto.randomUUID(),point,materialId);
+    cave.name=nextWorkshopName(doc.workshop.brushes,cave.name);
+    brushes=[cave];
+  } else {
+    const primitive=createBrush(kind as BrushKind,point,materialId);
+    primitive.name=nextWorkshopName(doc.workshop.brushes,primitive.name);
+    if(kind==='stairs')primitive.steps=8;
+    brushes=primitiveWorkshopBrushes(primitive).map(brush=>({...brush,worldUv:true}));
+  }
   if(doc.workshop.brushes.length+brushes.length>64)throw Error('Workshop supports at most64 source volumes.');
   return {document:{...structuredClone(doc),workshop:{...structuredClone(doc.workshop),brushes:[...doc.workshop.brushes,...brushes]}},brushId:brushes[0].id};
 }

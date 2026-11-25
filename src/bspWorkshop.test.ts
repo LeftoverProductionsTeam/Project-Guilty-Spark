@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   placeWorkshopPrimitive,
+  pointInsideWorkshop,
   boxBrush,
   clipBrush,
   extrudeFace,
@@ -206,6 +207,21 @@ it('drop-in Workshop stairs preserve material density, have eight finite solid t
   for(const kind of ['room','wall','ramp','box'] as const){const next=placeWorkshopPrimitive(doc,kind,[2,3,0],'metal');expect(next.document.workshop!.brushes).toHaveLength(2);expect(next.document.workshop!.brushes[1].role).toBe(kind==='room'?'space':'solid');}
   expect(()=>placeWorkshopPrimitive(doc,'wall',[NaN,0,0],'metal')).toThrow(/position/);
   expect(()=>placeWorkshopPrimitive(doc,'wall',[0,0,0],'missing')).toThrow(/material/);
+});
+
+it('sphere cave extends playable space through a room wall with closed convex source',()=>{
+  const doc={workshop:{schemaVersion:1,brushes:[boxBrush('room','space',[-6,-6,-4],[6,6,4],'metal')],portals:[]},
+    materials:[{id:'metal'}],geometry:[]} as unknown as QuickForgeDocument;
+  const sphere=placeWorkshopPrimitive(doc,'sphere',[6.3,0,0],'metal').document.workshop!;
+  const cave=sphere.brushes[1];
+  expect(cave.role).toBe('space');
+  expect(cave.vertices).toHaveLength(38);
+  expect(cave.faces).toHaveLength(48);
+  expect(volume(cave)).toBeGreaterThan(0);
+  expect(pointInsideWorkshop(doc.workshop!,[8,0,0])).toBe(false);
+  expect(pointInsideWorkshop(sphere,[8,0,0])).toBe(true);
+  expect(pointInsideWorkshop(sphere,[9.4,0,0])).toBe(false);
+  expect(sphere.brushes[0]).toEqual(doc.workshop!.brushes[0]);
 });
 
 it('Workshop shape placement respects the native64-volume limit without changing prior source',()=>{

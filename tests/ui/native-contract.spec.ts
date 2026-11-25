@@ -3371,6 +3371,13 @@ test('BSP Shapes drops editable source stairs and preserves one-action Undo and 
  await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue(/Stairs.*step 1/);await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.length)).toBe(8);
  await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect(workshop.locator('.bsp-source-list button')).toHaveCount(0);await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.length)).toBe(0);
  await page.keyboard.press('Control+y');await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
+ await workshop.locator('.bsp-shape-toolbar summary').click();
+ await workshop.getByRole('button',{name:'Place BSP sphere',exact:true}).click();
+ await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue('Sphere cave 1');
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.at(-1)?.vertices.length)).toBe(38);
+ await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');
+ await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
 });
 
 
@@ -3919,11 +3926,13 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
  await expect(panel.getByLabel('Connector triangle budget',{exact:true})).toContainText('Connector: 60 triangles');
  const facets=await constructionControl(page,'slider','Seam arch facets');await facets.focus();await facets.press('ArrowUp');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].archSegments)).toBe(7);
+ const radius=await constructionControl(page,'spinbutton','Tunnel arch radius');await radius.fill('2.3');await radius.press('Enter');
  const height=await constructionControl(page,'slider','Seam preview height');await height.focus();await height.press('ArrowDown');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].height)).toBe(2.9);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='preview_bsp_assembly').at(-1)?.args.draft?.sections[0].width)).toBe(4.6);
  const beforeApply=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);
  expect(beforeApply.width).toBe(4);expect(beforeApply.archSegments).toBe(6);expect(beforeApply.height).toBe(3);
- await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4.1);
+ await (await constructionControl(page,'button','Apply connection')).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4.6);
  const appliedSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(appliedSection.archSegments).toBe(7);expect(appliedSection.height).toBe(2.9);
  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0].width)).toBe(4);
  const restoredSection=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.sections[0]);expect(restoredSection.archSegments).toBe(6);expect(restoredSection.height).toBe(3);
@@ -5970,11 +5979,44 @@ async function mockNativeHubSource(page:Page){
    if(command==='native_tag_inventory')return[{id:0,class:'scnr',path:'levels/test'}];
    if(command==='native_tag_context')return{projectId:args.projectId,buildId:'faction-source',tag:'levels/test.scenario',class:'scnr',sourceTarget:'gbx-custom',tagsDirectory:'owned/tags',tagSha256:m.factionSha,canEdit:false,canRepair:false,history:[],canAppendFactionKits:true,scenarioDevices:m.hubDevices,factionKits:m.factionKits,bipedSources:['characters/grunt/grunt','characters/elite/elite'],controlSources:['levels/b40/devices/holo control/b40_holo control'],weaponSources:['weapons/assault rifle/assault rifle','weapons/plasma pistol/plasma pistol']};
    if(command==='native_operation_preview'){if(args.operation.sourceSha256!==m.factionSha)throw Error('Source changed');m.factionPreviews.push(structuredClone(args.operation));const id='faction-preview-'+m.factionPreviews.length,after=String.fromCharCode(97+m.factionPreviews.length).repeat(64);m.hubReceipts[id]={operation:structuredClone(args.operation),before:m.factionSha,after,devices:structuredClone(m.hubDevices),kits:structuredClone(m.factionKits)};return{id,tag:'levels/test.scenario',toolId:'synthetic-writer',beforeSha256:m.factionSha,afterSha256:after,changedBytes:200,fieldChanges:[{before:'Original controls and profiles',after:args.operation.kind==='factionBody'?'Bind dormant faction biped':'Append paired faction terminals and equipment profiles'}],detail:'Synthetic contract only',currentState:'before'};}
-   if(command==='native_operation_accept'){const receipt=m.hubReceipts[args.operationId];m.factionSha=args.restore?receipt.before:receipt.after;if(receipt.operation.kind==='squadTerminals')m.hubDevices=args.restore?structuredClone(receipt.devices):[...receipt.devices,...receipt.operation.terminals.map((terminal:any,index:number)=>({class:'ctrl',index:receipt.devices.length+index,nameIndex:receipt.devices.length+index,name:'extraction_squad_'+String(terminal.number).padStart(2,'0'),tagPath:terminal.controlTagPath,position:terminal.position,rotationRadians:terminal.rotationRadians}))];if(args.restore)m.factionKits=structuredClone(receipt.kits);else if(receipt.operation.kind==='factionKits')m.factionKits=receipt.operation.kits.map((kit:any)=>({kit}));else if(receipt.operation.kind==='factionBody')m.factionKits=m.factionKits.map((row:any)=>row.kit.faction===receipt.operation.body.faction?{...row,body:{index:4,nameIndex:16,position:row.kit.position,...row.body,...receipt.operation.body,firstPersonArms:receipt.operation.body.includeFirstPersonArms??false}}:row);return{operationId:args.operationId,revisionId:'faction-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic source revision'};}
+   if(command==='native_operation_accept'){const receipt=m.hubReceipts[args.operationId];m.factionSha=args.restore?receipt.before:receipt.after;if(receipt.operation.kind==='squadTerminals')m.hubDevices=args.restore?structuredClone(receipt.devices):[...receipt.devices,...receipt.operation.terminals.map((terminal:any,index:number)=>({class:'ctrl',index:receipt.devices.length+index,nameIndex:receipt.devices.length+index,name:'extraction_squad_'+String(terminal.number).padStart(2,'0'),tagPath:terminal.controlTagPath,position:terminal.position,rotationRadians:terminal.rotationRadians}))];if(args.restore)m.factionKits=structuredClone(receipt.kits);else if(receipt.operation.kind==='factionKits')m.factionKits=receipt.operation.replaceExistingProfiles?m.factionKits.map((row:any)=>({...row,kit:receipt.operation.kits.find((kit:any)=>kit.faction===row.kit.faction)??row.kit})):[...receipt.kits,...receipt.operation.kits.map((kit:any)=>({kit}))];else if(receipt.operation.kind==='factionBody')m.factionKits=m.factionKits.map((row:any)=>row.kit.faction===receipt.operation.body.faction?{...row,body:{index:4,nameIndex:16,position:row.kit.position,...row.body,...receipt.operation.body,firstPersonArms:receipt.operation.body.includeFirstPersonArms??false}}:row);return{operationId:args.operationId,revisionId:'faction-revision',tagsDirectory:'owned/tags',files:1,restored:args.restore,detail:'Synthetic source revision'};}
    return invoke(command,args);
   };
  });
 }
+test('revise an existing faction kit without replacing its body or terminal',async({page})=>{
+ await mockNativeHubSource(page);
+ await page.evaluate(()=>{
+  const mock=(window as any).__sparkMock;
+  mock.factionKits=[{kit:{faction:'unsc',controlTagPath:'levels/b40/devices/holo control/b40_holo control',position:[49,-87,1],rotationRadians:[0,0,0],
+   profile:{primaryWeapon:'weapons/assault rifle/assault rifle',primaryLoaded:30,primaryReserved:90,secondaryWeapon:'weapons/plasma pistol/plasma pistol',
+    secondaryLoaded:5,secondaryReserved:10,health:0,shields:0,fragmentationGrenades:1,plasmaGrenades:0}},
+    body:{bipedTagPath:'characters/elite/elite',permutation:4}}];
+ });
+ await openFixture(page);await chooseTool(page,'AI & scenario');
+ const native=page.locator('.scenario-page .native-tag-operations');
+ if(await native.getAttribute('open')===null){await revealPagedControl(native.locator(':scope > summary'));await native.locator(':scope > summary').click();}
+ const form=native.locator('.native-faction-kits');
+ await revealPagedControl(form.locator('> summary'));await form.locator('> summary').click();
+ const preview=form.getByRole('button',{name:'Preview faction equipment changes',exact:true});
+ await expect(preview).toBeDisabled();
+ const ammo=form.getByRole('spinbutton',{name:'Faction primary reserve',exact:true});
+ await revealPagedControl(ammo);await ammo.fill('144');
+ const secondary=form.getByLabel('Faction secondary weapon',{exact:true});
+ await revealPagedControl(secondary);await secondary.clear();
+ await expect(form.getByRole('spinbutton',{name:'Faction secondary loaded',exact:true})).toHaveValue('0');
+ await revealPagedControl(preview);await preview.click();
+ const accept=native.getByRole('button',{name:'Accept as new source revision',exact:true});
+ const restore=native.getByRole('button',{name:'Restore before-edit tag',exact:true});
+ await revealPagedControl(accept);await accept.click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.factionKits[0])).toMatchObject({
+  body:{bipedTagPath:'characters/elite/elite',permutation:4},kit:{position:[49,-87,1],profile:{primaryReserved:144,secondaryWeapon:null,secondaryLoaded:0,secondaryReserved:0}}
+ });
+ await expect(preview).toBeDisabled();
+ await revealPagedControl(restore);await restore.click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.factionKits[0].kit.profile.secondaryLoaded)).toBe(5);
+});
+
 test('native faction kits and bodies preserve reviewed profiles, poses and source restoration',async({page},testInfo)=>{
  await mockNativeHubSource(page);await openFixture(page);await chooseTool(page,'AI & scenario');const native=page.locator('.scenario-page .native-tag-operations');if(await native.getAttribute('open')===null){await revealPagedControl(native.locator(':scope > summary'));await native.locator(':scope > summary').click();}
  const form=native.locator('.native-faction-kits');await revealPagedControl(form.locator('> summary'));await form.locator('> summary').click();const preview=form.getByRole('button',{name:'Preview faction terminals & kits',exact:true});await expect(preview).toBeDisabled();
@@ -7198,6 +7240,12 @@ test('creator intact BSP preview preserves both sources and reports only connect
           {sourceBsp:1,destinationBsp:0,triggerIndex:3,triggerName:'bsp1,0'},
         ],
       };
+      if (command === 'plan_bsp_assembly' && args.regionalPreset === 'undergroundInfantryTunnel') {
+        w.__regionalPlanArgs = args;
+        const draft = await original(command, args);
+        return {...draft,separateNativeBsps:true,preserveDonorBsp:true,openRoad:false,tunnelBakeFill:true,
+          translation:[80,0,-20],tunnelPoints:[[0,0,0],[100,0,-20]],tunnelWidth:2,tunnelHeight:1.6};
+      }
       if (command !== 'preview_bsp_assembly' || !args.intactConnector) return original(command, args);
       w.__intactPreviewArgs = args;
       return {
@@ -7268,4 +7316,14 @@ test('creator intact BSP preview preserves both sources and reports only connect
     const plan = (window as any).__sparkMock.saved?.bspAssembly;
     return [plan?.preserveDonorBsp, plan?.openRoad, plan?.tunnelWidth, plan?.tunnelHeight, !!plan?.tunnelBakeFill];
   })).toEqual([true, true, 6, 4, false]);
+  const preset=await constructionControl(page,'combobox','Connection preset');
+  await preset.selectOption('undergroundInfantryTunnel');
+  await (await constructionControl(page,'button','Plan underground infantry tunnel')).click();
+  await expect(assembly.getByText('Enclosed native tunnel · 2.0 wide',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__regionalPlanArgs.regionalPreset)).toBe('undergroundInfantryTunnel');
+  await (await constructionControl(page,'button','Preview connector with donor intact')).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__intactPreviewArgs.draft.tunnelPoints[1][2])).toBe(-20);
+  await (await constructionControl(page,'button','Apply connection')).click();
+  await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.translation)).toEqual([80,0,-20]);
 });

@@ -73,7 +73,7 @@ pub(super) fn validate_batch(kits: &[NativeFactionKit]) -> Result<()> {
     for kit in kits {
         kit.validate()?;
         if !names.insert(&kit.faction) {
-            return invalid("Each faction can be appended once");
+            return invalid("Each faction can be reviewed once per edit");
         }
     }
     Ok(())
@@ -701,6 +701,87 @@ pub fn snapshots(fields: &str) -> Result<Vec<NativeFactionSnapshot>> {
     }
     Ok(result)
 }
+struct ProfileReplacement {
+    index: usize,
+    faction_name: String,
+    fields: Vec<(&'static str, String, String)>,
+}
+
+fn replace_profiles(before: &str, kits: &[NativeFactionKit]) -> Result<(Vec<NativeFactionSnapshot>, Vec<ProfileReplacement>)> {
+    validate_batch(kits)?;
+    let mut expected = snapshots(before)?;
+    let mut replacements = Vec::new();
+    for kit in kits {
+        let row = expected.iter_mut().find(|row| row.kit.faction == kit.faction)
+            .ok_or_else(|| crate::SparkError::Invalid(format!("{} has no existing native profile", kit.name())))?;
+        if kit.control_tag_path != row.kit.control_tag_path || kit.position != row.kit.position
+            || kit.rotation_radians != row.kit.rotation_radians || row.profile_index >= 256 {
+            return invalid("The faction terminal binding differs from source. Refresh the kit before reviewing its equipment.");
+        }
+        let mut profile = kit.profile.clone();
+        profile.primary_weapon = profile.primary_weapon.replace('\\', "/");
+        profile.secondary_weapon = profile.secondary_weapon.map(|path| path.replace('\\', "/"));
+        let fields = crate::firefight::native_equipment_profile_changes(&row.kit.profile, &profile)?;
+        if fields.is_empty() {
+            return invalid(format!("{} equipment already matches its source profile", kit.name()));
+        }
+        row.kit.profile = profile;
+        replacements.push(ProfileReplacement { index: row.profile_index, faction_name: kit.name(), fields });
+    }
+    Ok((expected, replacements))
+}
+
+pub(super) fn replace_profile_arguments(tags: &Path, tag: &str, before: &str, kits: &[NativeFactionKit]) -> Result<Vec<String>> {
+    let (_, replacements) = replace_profiles(before, kits)?;
+    let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+    for replacement in replacements {
+        for (key, _, value) in replacement.fields {
+            args.extend(["-S".into(), format!("player_starting_profile[{}].{key}", replacement.index), value]);
+        }
+    }
+    args.push(tag.into());
+    Ok(args)
+}
+
+fn mask_profile_changes(fields: &str, replacements: &[ProfileReplacement]) -> Result<String> {
+    let table = array_listing(fields, "player_starting_profile")?;
+    let rows = array_items(&table, "player_starting_profile")?;
+    let mut lines: Vec<_> = fields.lines().collect();
+    for replacement in replacements {
+        let index = replacement.index;
+        let row = rows.get(index)
+            .ok_or_else(|| crate::SparkError::Invalid("Reviewed equipment profile is missing".into()))?;
+        let start = table.start + 1 + rows[..index].iter().map(|row| row.len()).sum::<usize>();
+        for &(key, _, _) in &replacement.fields {
+            let mut offsets = row.iter().enumerate().filter_map(|(offset, line)| {
+                let field = line.strip_prefix("        ")?;
+                field.strip_prefix(key).filter(|tail| tail.starts_with(' ')).map(|_| offset)
+            });
+            let offset = offsets.next()
+                .ok_or_else(|| crate::SparkError::Invalid(format!("Missing native equipment field {key}")))?;
+            if offsets.next().is_some() {
+                return invalid(format!("Ambiguous native equipment field {key}"));
+            }
+            lines[start + offset] = key;
+        }
+    }
+    Ok(lines.join("\n"))
+}
+
+pub(super) fn review_profile_replacements(before: &str, after: &str, kits: &[NativeFactionKit]) -> Result<Vec<FieldDifference>> {
+    let (expected, replacements) = replace_profiles(before, kits)?;
+    if mask_profile_changes(before, &replacements)? != mask_profile_changes(after, &replacements)?
+        || snapshots(after)? != expected {
+        return invalid("Native faction equipment or unrelated scenario fields differ from the reviewed edit");
+    }
+    Ok(replacements.iter().flat_map(|replacement| {
+        replacement.fields.iter().map(move |(key, before, after)| {
+            let label = format!("{} · profile {} · {key}", replacement.faction_name, replacement.index);
+            FieldDifference { before: format!("{label} = {before}"), after: format!("{label} = {after}") }
+        })
+    }).collect())
+}
+
 pub fn reviewed(
     before: &str,
     after: &str,
@@ -903,6 +984,62 @@ mod tests {
             },
         }
     }
+    #[test]
+    #[ignore = "Requires a disposable native tag tree extracted from the reviewed Extraction cache"]
+    fn revise_existing_faction_kit_compiles_and_preserves_native_bindings() {
+        use std::{path::PathBuf, process::Command};
+        let root = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let tags = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_TAGS").unwrap());
+        assert!(tags.canonicalize().unwrap().starts_with(root.canonicalize().unwrap()));
+        let invader = PathBuf::from(std::env::var_os("SPARK_FACTION_QA_INVADER").unwrap());
+        let scenario = std::env::var("SPARK_FACTION_QA_SCENARIO").unwrap();
+        let file = tags.join(crate::safe_relative(&scenario).unwrap());
+        let run = |tool: &str,args:&[String]| {
+            let result = Command::new(invader.join(format!("{tool}.exe"))).args(args).output().unwrap();
+            assert!(result.status.success(), "{tool}: {} {}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+            String::from_utf8(result.stdout).unwrap()
+        };
+        let read = || run("invader-edit",&["-t".into(),tags.to_string_lossy().into_owned(),"-L".into(),scenario.clone()]);
+        let original = read();
+        let mut kit = snapshots(&original).unwrap().into_iter().find(|row|row.kit.faction=="unsc").unwrap().kit;
+        kit.profile.secondary_weapon = Some("weapons/pistol/pistol".into());
+        kit.profile.secondary_loaded = 6;
+        kit.profile.secondary_reserved = 12;
+        let add = replace_profile_arguments(&tags,&scenario,&original,&[kit.clone()]).unwrap();
+        run("invader-edit",&add);
+        let before = read();
+        review_profile_replacements(&original,&before,&[kit.clone()]).unwrap();
+        kit.profile.secondary_weapon = None;
+        kit.profile.secondary_loaded = 0;
+        kit.profile.secondary_reserved = 0;
+        kit.profile.primary_reserved = 144;
+        let operation = Operation::FactionKits {
+            kits:vec![kit.clone()], replace_existing_profiles:true, source_sha256:crate::maps::hash_file(&file).unwrap(),
+        };
+        operation.validate("scnr",&scenario).unwrap();
+        let edit = operation.arguments_with_fields(&tags,"scnr",&scenario,&before).unwrap();
+        assert!(!edit.contains(&"-I".into()));
+        run("invader-edit",&edit);
+        let after = read();
+        let review = reviewed_difference(&before,&after,&operation).unwrap();
+        assert!(review.iter().any(|row|row.before.contains("secondary_weapon")&&row.after.ends_with(".weapon")));
+        assert!(reviewed_difference(&before,&after.replacen("extraction_deploy","renamed_deploy",1),&operation).is_err());
+        assert!(operation.arguments_with_fields(&tags,"scnr",&scenario,&after).is_err());
+        let output = tempfile::tempdir_in(&root).unwrap();
+        let base = scenario.strip_suffix(".scenario").unwrap();
+        run("invader-build",&["-t".into(),tags.to_string_lossy().into_owned(),"-g".into(),"gbx-custom".into(),
+            "-m".into(),output.path().to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),base.into()]);
+        let name = base.rsplit(['/', '\\']).next().unwrap();
+        let cache = output.path().join(format!("{name}.map"));
+        let map = crate::maps::inspect_map(&cache,None).unwrap();
+        let expected = snapshots(&after).unwrap();
+        verify_cache(&expected,&cache,&map).unwrap();
+        assert!(expected.iter().any(|row| row.kit == kit));
+        let crc = run("invader-info",&["-T".into(),"crc32_mismatched".into(),cache.to_string_lossy().into_owned()]);
+        assert_eq!(crc.trim(),"0");
+        eprintln!("Updated faction kit native CE609 readback verified: {}", map.sha256);
+    }
+
     #[test]
     fn faction_body_uses_signed_native_selection_and_requires_a_matching_kit() {
         let body = NativeFactionBody { faction: "covenant".into(), biped_tag_path: "characters/grunt/grunt".into(), permutation: -1, include_first_person_arms: false };
