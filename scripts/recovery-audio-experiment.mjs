@@ -24,11 +24,13 @@ const repairCarrierInertia = args.includes('--repair-carrier-inertia');
 const repairLegacyTitle = args.includes('--repair-legacy-title');
 const repairVorbisTail = args.includes('--repair-vorbis-tail');
 const stageLegacySpawners = args.includes('--stage-legacy-spawners');
+const compileClassicCe = args.includes('--compile-classic-ce');
 if (repairStandardCarrier && !nativeMccTool) throw new Error('Standard carrier repair requires the reviewed native MCC Tool');
 if (repairCarrierInertia && !repairStandardCarrier) throw new Error('Carrier inertia repair requires the reviewed original carrier build');
 if (repairLegacyTitle && !repairCarrierInertia) throw new Error('Legacy title repair requires the reviewed inertia-corrected cache');
 if (repairVorbisTail && !repairLegacyTitle) throw new Error('Vorbis tail recovery requires the reviewed title-corrected cache');
 if (stageLegacySpawners && !repairVorbisTail) throw new Error('Legacy spawner staging requires the full reviewed source recovery');
+if (compileClassicCe && !stageLegacySpawners) throw new Error('Classic CE recovery requires the reviewed audio, carrier and legacy spawner overlays');
 const mccPinIndex = args.indexOf('--mcc-tool-sha256');
 const mccPin = mccPinIndex < 0 ? null : args[mccPinIndex + 1];
 if (args.includes('--mcc-tool-sha256') !== Boolean(nativeMccTool)
@@ -52,6 +54,7 @@ if (repairMixedPalettes && (resourceHashes['bitmaps.map'] !== '5357828124ed03b9b
 }
 const invaderCommands = nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit'];
 if (repairCarrierInertia) invaderCommands.push('crc');
+if (compileClassicCe) invaderCommands.push('bitmap');
 const executables = Object.fromEntries(invaderCommands.map((name) => {
   const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`);
   return [name, { path: exe, sha256: hashFile(exe) }];
@@ -317,10 +320,10 @@ function recoverRoundsHud() {
   save();
 }
 
-function hashTagInventory() {
+function hashTagInventory(directory = tags) {
   const hashes = {};
-  if (!fs.lstatSync(tags).isDirectory()) throw new Error('Derived tag root is not a regular directory');
-  const root = fs.realpathSync(tags);
+  if (!fs.lstatSync(directory).isDirectory()) throw new Error('Derived tag root is not a regular directory');
+  const root = fs.realpathSync(directory);
   const pending = [root];
   while (pending.length) {
     const directory = pending.pop();
@@ -644,6 +647,285 @@ function stageReviewedLegacySpawners() {
   save();
 }
 
+function prepareClassicCeTags() {
+  const before = hashTagInventory();
+  const directory = path.join(output, 'classic-ce-tags');
+  fs.cpSync(tags, directory, { recursive: true, force: false, errorOnExist: true });
+  const audio = manifest.results.find(row => row.step === 'repair-vorbis-tail');
+  const spawners = manifest.results.find(row => row.step === 'stage-legacy-spawners');
+  const stage = (source, tag, expected) => {
+    const from = path.join(source, tag), to = path.join(directory, tag);
+    if (!inside(from, source) || !inside(to, directory) || !fs.lstatSync(from).isFile() ||
+        !inside(fs.realpathSync(from), source) || hashFile(from) !== expected) {
+      throw new Error('Classic CE overlay differs from its reviewed native tag: ' + tag);
+    }
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.copyFileSync(from, to);
+    if (hashFile(to) !== expected) throw new Error('Native overlay copy did not verify: ' + tag);
+  };
+  for (const row of audio.restored) stage(audio.sourceOverlay, row.tag, row.exportedTagSha256);
+  for (const row of spawners.spawners) {
+    for (const [tag, expected] of Object.entries(row.overlaySha256)) stage(spawners.directory, tag, expected);
+  }
+  const edit = (tag, args, phase) => editTag(tag, args, phase, directory);
+  const get = (tag, fields, phase) => edit(tag, fields.flatMap(field => ['-G', field]), phase);
+  const expect = (actual, expected, phase) => {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Classic CE native readback differs: ' + phase);
+  };
+  const restoredBuffers = audio.restored.map(row => {
+    const permutation = 'pitch_ranges[0].permutations[0]';
+    const bufferSize = permutation + '.buffer_size';
+    const fields = ['format', 'channel_count', permutation + '.format', bufferSize];
+    const original = get(row.tag, fields, 'classic-sound-before-' + path.basename(row.tag));
+    if (!['ogg_vorbis', '16-bit_pcm'].includes(original[0]) ||
+        original[1] !== 'stereo' || row.channels !== 2 || original[2] !== 'ogg_vorbis') {
+      throw new Error('Unexpected restored sound format: ' + row.tag);
+    }
+    expect(edit(row.tag, ['-C', 'pitch_ranges', '-C', 'pitch_ranges[0].permutations'], 'classic-sound-count'),
+      ['1', '1'], 'single restored sound permutation');
+    const filename = path.join(directory, row.tag);
+    const originalBytes = fs.readFileSync(filename);
+    const oggAt = originalBytes.indexOf('OggS');
+    const sample = originalBytes.subarray(oggAt, oggAt + row.length);
+    if (oggAt < 0 || sha(sample) !== row.afterSha256) throw new Error('Restored Vorbis bytes differ: ' + row.tag);
+    const decodedBytes = String(row.verifiedFrames * row.channels * 2);
+    const args = ['-n', '-S', bufferSize, decodedBytes];
+    if (original[0] !== 'ogg_vorbis') args.push('-S', 'format', 'ogg_vorbis');
+    edit(row.tag, args, 'classic-sound-buffer-' + path.basename(row.tag));
+    expect(get(row.tag, fields, 'classic-sound-after-' + path.basename(row.tag)),
+      ['ogg_vorbis', 'stereo', 'ogg_vorbis', decodedBytes], 'decoded 16-bit buffer size');
+    const current = fs.readFileSync(filename);
+    if (current.length !== originalBytes.length || !current.subarray(oggAt, oggAt + row.length).equals(sample)) {
+      throw new Error('Buffer metadata edit changed Vorbis data: ' + row.tag);
+    }
+    return {tag: row.tag, decodedBytes: Number(decodedBytes), sampleSha256: row.afterSha256};
+  });
+
+  const effect = 'weapons/pistol/melee.damage_effect';
+  const sound = 'sound/dialog/flood/pain.sound';
+  expect(get('weapons/fuel rod gun/explosion.damage_effect', ['sound'], 'classic-melee-linked-sound')
+    .map(normalizeNativePath), [sound], 'authored nested sound');
+  const meleeFields = ['type', 'maximum_intensity', 'high_frequency_vibrate_frequency', 'sound',
+    'duration', 'color', 'damage_lower_bound', 'damage_upper_bound', 'radius'];
+  const meleeBefore = ['lighten', '3.000000', '3.000000', 'weapons/fuel rod gun/explosion.damage_effect',
+    '3.000000', '0.000000,1.000000,0.090196,0.113725', '400.000000', '400.000000,400.000000', '4.000000,4.000000'];
+  expect(get(effect, meleeFields, 'classic-melee-before').map(normalizeNativePath), meleeBefore, 'original melee');
+  const fieldsWithout = (rows, fields) => rows.filter(row => !fields.some(field => row.trimStart().startsWith(field + ' ')));
+  const meleeListing = edit(effect, ['-L'], 'classic-melee-fields-before');
+  edit(effect, ['-S', 'maximum_intensity', '1', '-S', 'high_frequency_vibrate_frequency', '1', '-S', 'sound', sound], 'classic-melee-rebind');
+  const meleeAfter = [meleeBefore[0], '1.000000', '1.000000', sound, ...meleeBefore.slice(4)];
+  expect(get(effect, meleeFields, 'classic-melee-after').map(normalizeNativePath), meleeAfter, 'target melee');
+  const changedMelee = ['maximum_intensity', 'high_frequency_vibrate_frequency', 'sound'];
+  expect(fieldsWithout(edit(effect, ['-L'], 'classic-melee-fields-after'), changedMelee),
+    fieldsWithout(meleeListing, changedMelee), 'unchanged melee fields');
+
+  const hunterMelee = 'characters/hunter/melee.damage_effect';
+  const hunterFields = ['maximum_intensity', 'damage_stun', 'damage_maximum_stun'];
+  expect(get(hunterMelee, ['type', ...hunterFields], 'classic-hunter-melee-before'), ['darken', '10.000000', '3.000000', '3.000000'], 'original Hunter flash');
+  const hunterListing = edit(hunterMelee, ['-L'], 'classic-hunter-melee-fields-before');
+  edit(hunterMelee, hunterFields.flatMap(field => ['-S', field, '1']), 'classic-hunter-melee-cap');
+  expect(get(hunterMelee, ['type', ...hunterFields], 'classic-hunter-melee-after'), ['darken', '1.000000', '1.000000', '1.000000'], 'CE Hunter flash');
+  expect(fieldsWithout(edit(hunterMelee, ['-L'], 'classic-hunter-melee-fields-after'), hunterFields),
+    fieldsWithout(hunterListing, hunterFields), 'unchanged Hunter melee fields');
+
+  const turret = 'mgm/fonzie/sparky/tags/weapons/undead demolisher turret.actor_variant';
+  if (hashFile(path.join(directory, turret)) !== '0b283abfa21831e05ecbb5065aed2f33f4505c11cb5b9e0bfcc270af90af1f0f') {
+    throw new Error('Demolisher turret differs from the audited source');
+  }
+  const grenadeFields = ['grenade_type', 'trajectory_type', 'grenade_stimulus'];
+  const inactiveGrenades = ['grenade_chance', 'grenade_count', 'grenade_velocity', 'grenade_ranges'];
+  const disabled = ['0.000000', '0,0', '0.000000', '0.000000,0.000000'];
+  expect(get(turret, inactiveGrenades, 'classic-turret-before'), disabled, 'zero turret grenade chance and inventory');
+  const legalEnums = ['human_fragmentation', 'toss', 'never'];
+  edit(turret, grenadeFields.flatMap((field, i) => ['-S', field, legalEnums[i]]), 'classic-turret-enums');
+  expect(get(turret, [...grenadeFields, ...inactiveGrenades], 'classic-turret-after'),
+    [...legalEnums, ...disabled], 'inactive turret grenade values');
+
+  const vehicleFields = ['vehicle_palette[*].name', 'vehicles[*].type'];
+  const [palette, types] = vehicleFields.map((field, i) => get(scenarioTag, [field], 'classic-vehicles-before-' + i));
+  const empty = palette.flatMap((tag, i) => tag === '' || tag === '.vehicle' ? [i] : []);
+  expect(empty, [1, 2], 'unused vehicle palette entries');
+  expect(types, ['0', '3', '3', '3', '3', '4', '0'], 'original vehicle placements');
+  const placements = types.map(type => Number(type));
+  const remapped = placements.map(type => type - empty.filter(slot => slot < type).length);
+  edit(scenarioTag, [...empty.slice().reverse().flatMap(i => ['-E', 'vehicle_palette[' + i + ']']),
+    ...remapped.flatMap((type, i) => ['-S', 'vehicles[' + i + '].type', String(type)])], 'classic-vehicles-reindex');
+  expect(get(scenarioTag, [vehicleFields[0]], 'classic-vehicles-palette-after'),
+    palette.filter((_, i) => !empty.includes(i)), 'remaining vehicle palette');
+  expect(get(scenarioTag, [vehicleFields[1]], 'classic-vehicles-placements-after'), remapped.map(String), 'remapped vehicle placements');
+  // The original model uses fifteen light-class references in shader slots
+  // and is intentionally unrendered. Keep the geometry, rig and collision,
+  // with a native transparent material for engines that require shader tags.
+  const model = 'vehicles/rwarthog/rwarthog.gbxmodel';
+  const shader = 'spark_recovery/classic_ce/invisible_carrier.shader_transparent_chicago';
+  const bitmapStem = 'spark_recovery/classic_ce/invisible_carrier';
+  const bitmap = bitmapStem + '.bitmap';
+  const originalModel = get(model, ['shaders[*].shader'], 'classic-carrier-shaders-before').map(normalizeNativePath);
+  expect(originalModel, Array(15).fill('effects/lights/coop teleport.light'), 'original Evolved carrier shader bindings');
+  const data = path.join(output, 'classic-ce-data');
+  const image = path.join(data, bitmapStem + '.tga');
+  fs.mkdirSync(path.dirname(image), { recursive: true });
+  const pixels = Buffer.alloc(18 + 16 * 16 * 4);
+  pixels[2] = 2; // Uncompressed BGRA TGA, including eight alpha bits.
+  pixels.writeUInt16LE(16, 12);
+  pixels.writeUInt16LE(16, 14);
+  pixels[16] = 32;
+  pixels[17] = 0x28;
+  // Invader removes entirely transparent plates. Opaque black contributes
+  // zero RGB with the native additive framebuffer blend.
+  for (let offset = 21; offset < pixels.length; offset += 4) pixels[offset] = 255;
+  fs.writeFileSync(image, pixels, { flag: 'wx' });
+  fs.mkdirSync(path.dirname(path.join(directory, bitmap)), { recursive: true });
+  const texture = run('bitmap', ['-t', directory, '-d', data, '-F', '32-bit', '-u', 'alpha_blend',
+    bitmapStem], 'classic-carrier-transparent-bitmap');
+  if (texture.exitCode !== 0 || texture.incomplete || !fs.lstatSync(path.join(directory, bitmap)).isFile()) {
+    throw new Error('Native tool did not compile the transparent carrier texture');
+  }
+  edit(shader, ['-N', '-S', 'framebuffer_blend_function', 'add', '-I', 'maps', '1', 'end',
+    '-S', 'maps[0].map', bitmap, '-S', 'maps[0].map_u_scale', '1', '-S', 'maps[0].map_v_scale', '1'],
+    'classic-carrier-transparent-shader');
+  expect(get(shader, ['framebuffer_blend_function', 'maps[0].map'], 'classic-carrier-transparent-readback')
+    .map(normalizeNativePath), ['add', bitmap], 'native zero-color material');
+  edit(model, originalModel.flatMap((_, i) => ['-S', 'shaders[' + i + '].shader', shader]), 'classic-carrier-rebind-shaders');
+  expect(get(model, ['shaders[*].shader'], 'classic-carrier-shaders-after').map(normalizeNativePath),
+    originalModel.map(() => shader), 'target Evolved carrier shader bindings');
+  const physics = 'fzero/zombie/zombiephysics.physics';
+  const moment = ['-G', 'moment_scale', '-G', 'mass', '-C', 'mass_points'];
+  expect(edit(physics, moment, 'classic-carrier-inertia-before'),
+    ['0.000000', '10000.000000', '15'], 'original zero moment scale and authored mass points');
+  const originalPhysics = fieldsWithout(edit(physics, ['-L'], 'classic-carrier-physics-fields-before'), ['moment_scale']);
+  // The MCC repair reconstructed the unit-scale tensor from those same
+  // mass points. Classic Tool data requires that scale to be explicit.
+  edit(physics, ['-S', 'moment_scale', '1'], 'classic-carrier-unit-moment-scale');
+  expect(edit(physics, moment, 'classic-carrier-inertia-after'),
+    ['1.000000', '10000.000000', '15'], 'unit moment scale and unchanged mass points');
+  expect(fieldsWithout(edit(physics, ['-L'], 'classic-carrier-physics-fields-after'), ['moment_scale']),
+    originalPhysics, 'unchanged authored carrier physics fields');
+  const rotationalBitmaps = [
+    ['halo3/weapons/fire-grenade/bitmaps/fire-ball1+.bitmap', '533325045c53df2811f1c08e3c2bac6cca3ad7413e0e6b9250aa2063284e642f', 344064, 1],
+    ['halo3/weapons/fire-grenade/bitmaps/flame+.bitmap', 'bca0242071cca2a98dfacd14ee226296f7a1b41b026c61a146aea87828e991ff', 344064, 1],
+    ['h2/effects/particles/smoke_soft/smoke_soft+.bitmap', '7f6291b95c91f79087320e94b4c3a437b95350199a8cb2b6370fa2ac8c8179c9', 86016, 1],
+    ['halo3/weapons/fire-grenade/bitmaps/burning-fire_animated+.bitmap', '265e32c90f1071074a8baef2f967d320931cfc8ff6cf1c470ba091d60585a0fa', 1376256, 6],
+  ];
+  const [ball, flame, smoke, burning] = rotationalBitmaps.map(([tag]) => tag);
+  const parent = 'halo3/weapons/fire-grenade/effects/particle-system/';
+  const state = 'particle_types[0].particle_states';
+  for (const [name, bitmaps] of [
+    ['fire-explosion+', [ball, flame, flame, flame, smoke]],
+    ['single_fire-cloud+', [burning, flame, flame, smoke, smoke]],
+  ]) {
+    expect(get(parent + name + '.particle_system', ['particle_types[0].complex_sprite_render_mode',
+      state + '[*].bitmaps', state + '[*].sequence_index'], 'classic-fire-state-bindings-' + name).map(normalizeNativePath),
+      ['rotational', ...bitmaps, ...bitmaps.map(() => '0')], 'original rotational states of ' + name);
+  }
+  for (const [sprite, expectedSha, pixelBytes, frames] of rotationalBitmaps) {
+    const frameCount = String(frames);
+    const spriteFile = path.join(directory, sprite);
+    const originalSprite = fs.readFileSync(spriteFile);
+    if (sha(originalSprite) !== expectedSha) {
+      throw new Error('The original fire sprite differs from the audited native layout');
+    }
+    const sequence = 'bitmap_group_sequence';
+    expect(edit(sprite, ['-C', sequence, '-C', sequence + '[0].sprites'], 'classic-fire-sprite-before'), ['1', frameCount], 'original fire sequence');
+    // Use the engine's existing same-sequence fallback as an explicit second
+    // rotational slot. The typed edit touches only the disposable CE tag.
+    edit(sprite, ['-n', '-c', sequence + '[0]', 'end'], 'classic-fire-sprite-rotation-slot');
+    expect(edit(sprite, ['-V', '-C', sequence, '-C', sequence + '[0].sprites', '-C', sequence + '[1].sprites'],
+      'classic-fire-sprite-after'), ['matched', '2', frameCount, frameCount], 'two checksum-valid references to the original sprite');
+    const copied = fs.readFileSync(spriteFile);
+    const sequenceStart = 172 + pixelBytes, sequenceSize = 64, spriteSize = 32 * frames;
+    const originalSequence = originalSprite.subarray(sequenceStart, sequenceStart + sequenceSize);
+    const originalFrame = originalSprite.subarray(sequenceStart + sequenceSize, sequenceStart + sequenceSize + spriteSize);
+    const frameStart = sequenceStart + 2 * sequenceSize;
+    const prefix = Buffer.from(copied.subarray(0, sequenceStart));
+    originalSprite.copy(prefix, 40, 40, 44); // Tag writer updates checksum.
+    if (copied.readUInt32BE(148) !== 2) throw new Error('Unexpected native sequence count');
+    prefix.writeUInt32BE(1, 148);
+    if (!prefix.equals(originalSprite.subarray(0, sequenceStart))
+        || !copied.subarray(sequenceStart, frameStart).equals(Buffer.concat([originalSequence, originalSequence]))
+        || !copied.subarray(frameStart, frameStart + 2 * spriteSize).equals(Buffer.concat([originalFrame, originalFrame]))
+        || !copied.subarray(frameStart + 2 * spriteSize).equals(originalSprite.subarray(sequenceStart + sequenceSize + spriteSize))) {
+      throw new Error('Rotational slot changed original pixel bytes or sprite fields');
+    }
+  }
+  const feignDeath = [
+    ['evolved zombie', '4.000000', '0.800000', 'halo3/weapons/fire-grenade/fire.effect'],
+    ['alpha zombieorig', '2.000000', '0.300000', 'effects/coop teleport.effect'],
+    ['alpha zombieorigshot', '2.000000', '0.300000', 'effects/coop teleport.effect'],
+  ];
+  const chance = 'feign_death_chance';
+  for (const [name, originalChance, threshold, dormantEffect] of feignDeath) {
+    const biped = 'mgm/fonzie/sparky/tags/zombies/' + name + '.biped';
+    const fields = [chance, 'feign_death_threshold', 'feign_death_time', 'spawned_actor', 'spawned_actor_count'];
+    const changed = [chance, 'spawned_actor'];
+    const reads = fields.flatMap(field => ['-G', field]);
+    const original = fieldsWithout(edit(biped, ['-L'], 'classic-feign-fields-before-' + name), changed);
+    expect(edit(biped, reads, 'classic-feign-before-' + name).map(normalizeNativePath),
+      [originalChance, threshold, '1.000000', dormantEffect, '0,0'], 'original feign behavior of ' + name);
+    edit(biped, ['-S', chance, '1', '-S', 'spawned_actor', '.actor_variant'], 'classic-biped-compatibility-' + name);
+    expect(edit(biped, reads, 'classic-feign-after-' + name),
+      ['1.000000', threshold, '1.000000', '.actor_variant', '0,0'], 'CE feign behavior of ' + name);
+    expect(fieldsWithout(edit(biped, ['-L'], 'classic-feign-fields-after-' + name), changed),
+      original, 'unchanged biped fields of ' + name);
+  }
+  const carrierActor = 'mgm/fonzie/sparky/tags/zombies/evolved zombie orig.actor_variant';
+  const tracking = 'target_tracking';
+  const aimFields = ['weapon', 'major_variant', tracking];
+  const unarmed = ['.weapon', '.actor_variant'];
+  expect(get(carrierActor, aimFields, 'classic-evolved-aim-before'),
+    [...unarmed, '2.000000'], 'original unarmed Evolved actor tracking');
+  const actorListing = edit(carrierActor, ['-L'], 'classic-evolved-fields-before');
+  edit(carrierActor, ['-S', tracking, '1'], 'classic-evolved-inactive-tracking-cap');
+  expect(get(carrierActor, aimFields, 'classic-evolved-aim-after'),
+    [...unarmed, '1.000000'], 'CE unarmed Evolved actor tracking');
+  expect(fieldsWithout(edit(carrierActor, ['-L'], 'classic-evolved-fields-after'), [tracking]),
+    fieldsWithout(actorListing, [tracking]), 'unchanged Evolved actor fields');
+  expect(hashTagInventory(), before, 'preserved MCC source tree');
+
+  manifest.results.push({
+    step: 'stage-classic-ce', state: 'native-source-reviewed', playable: false,
+    restoredBuffers,
+    melee: { original: meleeBefore, target: meleeAfter, fields: meleeFields },
+    hunterMelee: { tag: hunterMelee, cappedFields: hunterFields },
+    inactiveTurretGrenadeFields: legalEnums,
+    removedUnusedVehicleSlots: empty,
+    invisibleCarrier: { model, shader, bitmap },
+    physics: { tag: physics, momentScale: 1 },
+    rotationalSprites: { tags: [ball, flame, smoke, burning], unchangedPixelBytes: true },
+    normalizedZombieBipeds: feignDeath.map(([name]) => name),
+    unarmedCarrierTracking: carrierActor,
+    unchangedRecoveredSource: true,
+  });
+  save();
+  return directory;
+}
+
+function buildReviewedClassicCe() {
+  const directory = prepareClassicCeTags();
+  const destination = path.join(output, 'classic-ce');
+  fs.mkdirSync(destination);
+  const result = run('build', ['-g', 'gbx-custom', '-t', directory, '-m', destination,
+    '--resource-usage', 'none', "fonzie's zombie apocalypse"], 'compile-classic-ce');
+  const fatal = result.log.split(/\r?\n/).findIndex(line => /FATAL ERROR:|^Error:/i.test(line));
+  const diagnostic = fatal < 0 ? null : result.log.split(/\r?\n/).slice(fatal, fatal + 8).join(' ');
+  if (result.exitCode !== 0 || result.incomplete || diagnostic) {
+    manifest.results.push({step:'compile-classic-ce', target:'gbx-custom', state:'blocked', diagnostic, playable:false});
+    save();
+    throw new Error(diagnostic ?? 'Classic CE compiler did not complete');
+  }
+  const candidate = path.join(destination, "fonzie's zombie apocalypse.map");
+  const info = field => run('info', ['-T', field, candidate], 'classic-ce-cache-' + field);
+  const engine = info('engine'), crc = info('crc32_mismatched');
+  if (engine.exitCode !== 0 || crc.exitCode !== 0 || engine.incomplete || crc.incomplete ||
+      engine.stdout.trim() !== 'Halo Custom Edition (Gearbox)' || !['0','false'].includes(crc.stdout.trim().toLowerCase()) ||
+      fs.readFileSync(candidate).readUInt32LE(4) !== 609) {
+    throw new Error('Independent readback rejected the Classic CE cache format or CRC');
+  }
+  manifest.results.push({step:'compile-classic-ce', target:'gbx-custom', state:'compiled-cache-verified',
+    cacheSha256:hashFile(candidate), path:candidate, playable:false});
+  save();
+}
+
 function compileOfficialMcc(carrierReadback) {
   const scenario = "fonzie's zombie apocalypse";
   const effect = 'weapons/pistol/melee.damage_effect';
@@ -777,6 +1059,7 @@ try {
   const carrierReadback = repairStandardCarrier ? recoverStandardCarrier() : null;
   if (nativeMccTool) compileOfficialMcc(carrierReadback);
   if (stageLegacySpawners) stageReviewedLegacySpawners();
+  if (compileClassicCe) buildReviewedClassicCe();
 } catch (error) {
   manifest.error = String(error); process.exitCode = 1;
 } finally {
