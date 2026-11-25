@@ -8,6 +8,7 @@ export interface BspAssembly {
   donorSource: NonNullable<Project['source']>;
   donorTagsDirectory: string;
   donorBspIndex: number;
+  baseBspIndex?: number;
   includeDonorScenery?: boolean;
   separateNativeBsps?: boolean;
   translation: Vec3;
@@ -53,7 +54,7 @@ export interface AssemblyReport {
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];
   warnings: string[];
-  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;surfaces:{source:number;mesh:import('./types').MeshData}[]};
+  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;surfaces:{source:number;mesh:import('./types').MeshData}[]};
 }
 /** Semantic identity across IPC object-key ordering and old omitted options. */
 export function assemblySignature(plan: BspAssembly | null): string {
@@ -71,7 +72,7 @@ export function assemblySignature(plan: BspAssembly | null): string {
   // f64 world coordinates and source identities must retain full precision.
   const route=(value:BspAssembly['infantryTunnel'])=>value?{...value,width:Math.fround(value.width),height:Math.fround(value.height)}:undefined;
   return JSON.stringify(
-    ordered(plan ? { ...plan, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), nativeSeals: plan.nativeSeals?.length ? plan.nativeSeals : undefined, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, separateNativeBsps: plan.separateNativeBsps || undefined, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
+    ordered(plan ? { ...plan, baseBspIndex: plan.baseBspIndex || undefined, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), nativeSeals: plan.nativeSeals?.length ? plan.nativeSeals : undefined, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, separateNativeBsps: plan.separateNativeBsps || undefined, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
   );
 }
 export function nativeSealVertices(text: string): Vec3[] {

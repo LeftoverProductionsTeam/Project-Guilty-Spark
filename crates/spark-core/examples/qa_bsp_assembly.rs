@@ -74,11 +74,11 @@ fn main() -> Result<()> {
         let parts = bsp_assembly::generate_partitioned_project(&p, &i, &AtomicBool::new(false))?;
         let output = Path::new(&a[3]);
         fs::create_dir(output)?;
-        for (name, geometry) in [("base", &parts.base), ("donor", &parts.donor)] {
+        for (name, geometry) in parts.base.iter().map(|base| ("base", base)).chain(std::iter::once(("donor", &parts.donor))) {
             fs::write(output.join(format!("{name}.jms")), bsp_assembly::export_jms(geometry)?)?;
             fs::write(output.join(format!("{name}-materials.json")), serde_json::to_vec(&geometry.materials)?)?;
         }
-        let receipt = serde_json::json!({"base":parts.base.report,"donor":parts.donor.report,"overlap":parts.overlap,"overlapSamples":parts.overlap_samples,"maxFloorDelta":parts.max_floor_delta,"switches":parts.switches});
+        let receipt = serde_json::json!({"base":parts.base.as_ref().map(|base| &base.report),"donor":parts.donor.report,"overlap":parts.overlap,"overlapSamples":parts.overlap_samples,"maxFloorDelta":parts.max_floor_delta,"switches":parts.switches});
         fs::write(output.join("partitions.json"), serde_json::to_vec_pretty(&receipt)?)?;
         println!("{receipt}");
         return Ok(());

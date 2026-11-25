@@ -447,6 +447,7 @@ mod tests {
             },
             donor_tags_directory: "fixture-tags".into(),
             donor_bsp_index: 0,
+            base_bsp_index: 0,
             separate_native_bsps: false,
             include_donor_scenery: false,
             translation: [0.; 3],
@@ -537,6 +538,19 @@ mod tests {
         assert_eq!(checker.verify(&road).unwrap(), checker.verify_return(&road).unwrap());
         road.tunnel_points.reverse();
         assert!(checker.verify_return(&road).unwrap_err().to_string().contains("east/west boundaries"));
+    }
+    #[test]
+    fn saved_assembly_can_reopen_a_compiled_mcc_world_with_inherited_connections() {
+        let mut source = plan().donor_source;
+        source.cache_version = 13;
+        let mut project = crate::project::Project::new("Retained MCC world");
+        project.source = Some(source);
+        project.inherited_bsp_connections.push(plan());
+        let serialized = serde_json::to_vec(&project).unwrap();
+        let mut reopened: crate::project::Project = serde_json::from_slice(&serialized).unwrap();
+        reopened.validate().unwrap();
+        reopened.source.as_mut().unwrap().cache_version = 7;
+        assert!(reopened.validate().is_err());
     }
     #[test]
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {

@@ -49,6 +49,8 @@ pub struct BspAssembly {
     /// Explicit matching editable tags for donor materials and their dependencies.
     pub donor_tags_directory: PathBuf,
     pub donor_bsp_index: usize,
+    #[serde(default, skip_serializing_if = "is_zero_index")]
+    pub base_bsp_index: usize,
     #[serde(default, skip_serializing_if = "is_false")]
     pub separate_native_bsps: bool,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -93,9 +95,12 @@ impl NativeSeal {
 }
 
 fn is_false(value: &bool) -> bool { !*value }
+fn is_zero_index(value: &usize) -> bool { *value == 0 }
 impl BspAssembly {
     pub fn validate(&self) -> Result<()> {
-        if self.schema_version != 1 || self.donor_bsp_index > 15 || self.donor_title.len() > 256 {
+        if self.schema_version != 1 || self.donor_bsp_index > 15 || self.base_bsp_index > 15
+            || (!self.separate_native_bsps && self.base_bsp_index != 0) || self.donor_title.len() > 256
+        {
             return invalid("Unsupported BSP assembly");
         }
         uuid::Uuid::parse_str(&self.donor_project_id)
@@ -617,7 +622,7 @@ pub struct PartitionSwitch {
 }
 
 pub struct PartitionedAssembly {
-    pub base: AssemblyGeometry,
+    pub base: Option<AssemblyGeometry>,
     pub donor: AssemblyGeometry,
     pub switches: [PartitionSwitch; 2],
     pub overlap: [V; 2],
@@ -639,8 +644,10 @@ fn generate_end(
     partition: Option<(&PartitionRoute, PartitionEnd)>, inherited: &[BspAssembly],
 ) -> Result<(AssemblyGeometry, Option<Vec<f64>>)> {
     assembly.validate()?;
-    if base.mesh.parts.len() != 1 {
-        return invalid("The destination must currently have one BSP; importing a donor must not discard destination BSPs");
+    if assembly.base_bsp_index >= base.mesh.parts.len()
+        || (base.mesh.parts.len() != 1 && !matches!(partition, Some((_, PartitionEnd::Donor))))
+    {
+        return invalid("Choose an existing base BSP. A multi-BSP source can only receive a separate donor BSP.");
     }
     let mut donor = maps::inspect_map(
         &assembly.donor_source.preserved_path,
@@ -674,7 +681,7 @@ fn generate_end(
     let routes = assembly.connection_routes();
     for (index, route) in routes.iter().enumerate() {
         let label = assembly.route_label(index);
-        verify_entrance(&base_mesh, &base_faces, 0, [0.;3], 0., route.tunnel_points[0])
+        verify_entrance(&base_mesh, &base_faces, assembly.base_bsp_index, [0.;3], 0., route.tunnel_points[0])
             .map_err(|e| SparkError::Invalid(format!("{label} entrance: {e}")))?;
         verify_entrance(&donor_mesh, &donor_faces, route.donor_bsp_index, route.translation,
             route.yaw_degrees, *route.tunnel_points.last().unwrap())
@@ -1144,19 +1151,43 @@ pub fn generate_partitioned_project(
     let donor = maps::inspect_map(&assembly.donor_source.preserved_path, assembly.donor_source.resource_directory.as_deref())?;
     if donor.sha256 != assembly.donor_source.sha256 { return invalid("The preserved donor changed"); }
     if donor.mesh.parts.len() != 1 { return invalid("Choose a donor map with exactly one native BSP"); }
-    let port = projected_bounds(&base.mesh, 0, [0.; 3], 0., aim)?[1].max(dot(start, aim));
+    let base_count = base.mesh.parts.len();
+    let retaining = base_count > 1;
+    if base_count == 0 || base_count >= 16 || assembly.base_bsp_index >= base_count
+        || (retaining && !can_extend_partitions(project, base))
+    {
+        return invalid("Choose a retained MCC13 assembly with fewer than sixteen native BSPs and an existing entrance slot");
+    }
+    let port = projected_bounds(&base.mesh, assembly.base_bsp_index, [0.; 3], 0., aim)?[1].max(dot(start, aim));
     let arrival = projected_bounds(&donor.mesh, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, aim)?[0].min(dot(end, aim));
     if arrival - port < 8. {
         return invalid("Leave at least eight world units between the projected region bounds for the overlap, caps and visibility cuts");
     }
-    let center = add(start, mul(direction, (port + arrival) * 0.5 - dot(start, aim)));
+    // A new corridor enters the existing floor before the retained wall.
+    // Its first authored point is the center of the shared switch area.
+    let center = if retaining { start } else { add(start, mul(direction, (port + arrival) * 0.5 - dot(start, aim))) };
     let offset = |distance| add(center, mul(direction, distance));
     let seam = PartitionRoute {
         start, end, cap_before: offset(-3.), cap_after: offset(3.),
         overlap_before: offset(-2.3), overlap_after: offset(2.3),
     };
-    let (mut left, left_floor) = generate_end(&source.preserved_path, base, assembly, cancel, Some((&seam, PartitionEnd::Base)), &project.inherited_bsp_connections)?;
-    retain_base_portals(project, base, &mut left)?;
+    let overlap = [seam.overlap_before, seam.overlap_after];
+    let (left, left_floor) = if retaining {
+        let (collision, _) = maps::collision_source(&source.preserved_path, base)?;
+        let checker = crate::bsp_clearance::RouteChecker::for_part(&collision, assembly.base_bsp_index)?;
+        let mut approach = assembly.clone();
+        // This is a bounded clearance sample, not another authored connection.
+        approach.separate_native_bsps = false;
+        approach.base_bsp_index = 0;
+        approach.tunnel_points = overlap.to_vec();
+        checker.verify(&approach).map_err(|e| SparkError::Invalid(format!("Shared passage in retained BSP {}: {e}", assembly.base_bsp_index)))?;
+        checker.verify_return(&approach)?;
+        (None, Some(checker.floor_profile(overlap)?))
+    } else {
+        let (mut geometry, floor) = generate_end(&source.preserved_path, base, assembly, cancel, Some((&seam, PartitionEnd::Base)), &project.inherited_bsp_connections)?;
+        retain_base_portals(project, base, &mut geometry)?;
+        (Some(geometry), floor)
+    };
     let (right, right_floor) = generate_end(&source.preserved_path, base, assembly, cancel, Some((&seam, PartitionEnd::Donor)), &[])?;
     let (left_floor, right_floor) = left_floor.zip(right_floor).ok_or_else(|| SparkError::Invalid("Both partitions require shared floor measurements".into()))?;
     let overlap_samples = left_floor.len();
@@ -1176,22 +1207,25 @@ pub fn generate_partitioned_project(
         } }
     };
     Ok(PartitionedAssembly {
-        base: left, donor: right, switches: [triggers("bsp0,1", 1.3), triggers("bsp1,0", -1.3)],
-        overlap: [seam.overlap_before, seam.overlap_after], overlap_samples, max_floor_delta,
+        base: left, donor: right,
+        switches: [triggers(&format!("bsp{},{base_count}", assembly.base_bsp_index), 1.3),
+                  triggers(&format!("bsp{base_count},{}", assembly.base_bsp_index), -1.3)],
+        overlap, overlap_samples, max_floor_delta,
     })
 }
 pub(crate) fn verify_bound_partition_collision(
-    cache: &Path, map: &MapInspection, plan: &BspAssembly, inherited: &[BspAssembly], overlap: [V; 2],
+    cache: &Path, map: &MapInspection, plan: &BspAssembly, inherited: &[BspAssembly], overlap: [V; 2], original_count: usize,
 ) -> Result<serde_json::Value> {
     let (collision, _) = maps::collision_source(cache, map)?;
-    if collision.parts.len() != 2 || plan.tunnel_points.len() != 2 {
-        return invalid("Partition readback requires the authored straight passage and exactly two native BSPs");
+    if collision.parts.len() != original_count + 1 || plan.tunnel_points.len() != 2 {
+        return invalid("Compiled partition count or straight passage differs from the source");
     }
-    let original = crate::bsp_clearance::RouteChecker::for_part(&collision, 0)?;
-    let extension = crate::bsp_clearance::RouteChecker::for_part(&collision, 1)?;
+    let original = crate::bsp_clearance::RouteChecker::for_part(&collision, plan.base_bsp_index)?;
+    let extension = crate::bsp_clearance::RouteChecker::for_part(&collision, original_count)?;
     let mut approach = plan.clone();
     approach.separate_native_bsps = false;
-    approach.tunnel_points = vec![plan.tunnel_points[0], overlap[1]];
+    approach.base_bsp_index = 0;
+    approach.tunnel_points = vec![if original_count == 1 { plan.tunnel_points[0] } else { overlap[0] }, overlap[1]];
     let base_samples = [original.verify(&approach)?, original.verify_return(&approach)?];
     approach.tunnel_points = vec![overlap[0], plan.tunnel_points[1]];
     let donor_samples = [extension.verify(&approach)?, extension.verify_return(&approach)?];
@@ -1200,7 +1234,9 @@ pub(crate) fn verify_bound_partition_collision(
     let overlap_samples = floor_a.len();
     let max_delta = floor_a.into_iter().zip(floor_b).map(|(a, b)| (a-b).abs()).fold(0., f64::max);
     if max_delta > 0.02 { return invalid("The two compiled corridor floors are misaligned"); }
-    let inherited_samples = inherited.iter().map(|route| original.verify(route)).collect::<Result<Vec<_>>>()?;
+    let inherited_samples = if original_count == 1 {
+        inherited.iter().map(|route| original.verify(route)).collect::<Result<Vec<_>>>()?
+    } else { Vec::new() }; // Existing geometry and native switches are independently compared to the parent.
     Ok(serde_json::json!({"bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
         "baseSamples": base_samples, "donorSamples": donor_samples, "overlapSamples": overlap_samples,
         "maxFloorDelta": max_delta, "inheritedSamples": inherited_samples}))
@@ -1357,6 +1393,11 @@ pub fn plan(
     plan_in_direction(base_project, base, donor_project, donor, index, tags, 0.)
 }
 
+pub fn can_extend_partitions(project: &Project, map: &MapInspection) -> bool {
+    map.header.version == 13 && map.header.scenario_type == 1 && (2..16).contains(&map.mesh.parts.len())
+        && project.inherited_bsp_connections.iter().any(|route| route.separate_native_bsps)
+}
+
 /// Seed a physical tunnel on a chosen side of the existing world.
 /// Both supports come from the same native collision selection as the default.
 pub fn plan_in_direction(
@@ -1368,6 +1409,13 @@ pub fn plan_in_direction(
     tags: PathBuf,
     direction_degrees: f64,
 ) -> Result<BspAssembly> {
+    plan_from_bsp(base_project, base, donor_project, donor, 0, index, tags, direction_degrees)
+}
+
+pub fn plan_from_bsp(
+    base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
+    base_index: usize, index: usize, tags: PathBuf, direction_degrees: f64,
+) -> Result<BspAssembly> {
     if !direction_degrees.is_finite() || direction_degrees.abs() > 360. {
         return invalid("Tunnel direction must be a finite angle within 360 degrees");
     }
@@ -1375,8 +1423,12 @@ pub fn plan_in_direction(
     let toward = [x, y, 0.];
     let crosswise = [-y, x, 0.];
     if index >= donor.mesh.parts.len() {return invalid("Choose an existing donor BSP section");}
-    if base.mesh.parts.len() != 1 || base_project.id == donor_project.id {
-        return invalid("Choose a different donor map and a destination with one BSP");
+    let retaining = can_extend_partitions(base_project, base);
+    if base_index >= base.mesh.parts.len() || (base.mesh.parts.len() != 1 && !retaining) || base_project.id == donor_project.id {
+        return invalid("Choose a different donor and an existing destination BSP");
+    }
+    if retaining && (donor.header.version != 609 || donor.mesh.parts.len() != 1) {
+        return invalid("A retained MCC13 assembly requires a single-BSP Custom Edition donor");
     }
     let (base_mesh, faces) = maps::collision_source(
         &base_project
@@ -1398,7 +1450,7 @@ pub fn plan_in_direction(
             .map(|o| o.position.map(f64::from))
             .collect::<Vec<_>>()
     };
-    let (start, face) = playable_anchor(&base_mesh, &faces, 0, toward, &starts(base))?;
+    let (start, face) = playable_anchor(&base_mesh, &faces, base_index, toward, &starts(base))?;
     let (end, _) = playable_anchor(&donor_mesh, &donor_faces, index, mul(toward, -1.), &starts(donor))?;
     let donor_part = &donor_mesh.parts[index];
     let donor_min = donor_mesh.indices
@@ -1406,11 +1458,7 @@ pub fn plan_in_direction(
         .iter()
         .map(|i| dot(vertex(&donor_mesh, *i), toward))
         .fold(f64::INFINITY, f64::min);
-    let base_max = base_mesh
-        .positions
-        .chunks_exact(3)
-        .map(|p| dot([p[0] as f64, p[1] as f64, p[2] as f64], toward))
-        .fold(f64::NEG_INFINITY, f64::max);
+    let base_max = projected_bounds(&base_mesh, base_index, [0.; 3], 0., toward)?[1];
     let translation = add(
         mul(toward, base_max + 64. - donor_min),
         add(mul(crosswise, dot(sub(start, end), crosswise)), [0., 0., start[2] - end[2]]),
@@ -1426,7 +1474,8 @@ pub fn plan_in_direction(
         donor_source,
         donor_tags_directory: tags,
         donor_bsp_index: index,
-        separate_native_bsps: false,
+        base_bsp_index: base_index,
+        separate_native_bsps: retaining,
         include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,

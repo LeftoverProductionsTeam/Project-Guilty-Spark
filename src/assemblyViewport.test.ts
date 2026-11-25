@@ -49,3 +49,14 @@ it('unsaved seam previews remain fenced by the current saved revision and donor 
  expect(currentAssemblyDraftPreview({...project,bspAssembly:{...plan,yawDegrees:2}},draft,assemblySignature(plan),preview)).toBeUndefined();
  expect(currentAssemblyDraftPreview(project,{...draft,donorProjectId:'different'},assemblySignature(plan),preview)).toBeUndefined();
 });
+
+it('rejects a stale preview when the retained source BSP changes',()=>{
+ const {open,plan,mesh}=fixture();
+ const saved={...plan,separateNativeBsps:true,baseBspIndex:1};
+ const project={...open.project,bspAssembly:saved};
+ const first={...saved,baseBspIndex:0};
+ const preview={projectId:project.id,sourceSha256:sha,donorSha256:sha,assembly:first,surfaces:[{source:0,mesh}],retainsBase:true};
+ expect(assemblySignature(first)).toBe(assemblySignature({...first,baseBspIndex:undefined}));
+ expect(currentAssemblyPreview(project,preview)).toBeUndefined();
+ expect(currentAssemblyDraftPreview(project,first,assemblySignature(saved),preview)).toBeUndefined();
+});

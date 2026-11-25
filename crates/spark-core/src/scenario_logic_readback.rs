@@ -355,7 +355,7 @@ fn parse_recordings(r: &Reader, space: &Space, scenario: usize) -> Result<Vec<Na
 #[serde(rename_all="camelCase")]
 pub struct NativeScriptGlobal {pub name:String,pub value_type:u16}
 pub fn scenario_global_readback(path:&Path,map:&MapInspection)->Result<Vec<NativeScriptGlobal>>{with_scenario(path,map,|r,space,sc|{let(at,count)=space.block(r,sc+0x4a8,92,4096)?;(0..count).map(|index|{let p=at+index*92;Ok(NativeScriptGlobal{name:r.string(p,32)?,value_type:r.u16(p+32)?})}).collect()})}
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeBspTransition {
     pub trigger_index: usize,

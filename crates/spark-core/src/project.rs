@@ -286,10 +286,10 @@ impl Project {
         if !self.inherited_bsp_connections.is_empty() {
             let total = self.inherited_bsp_connections.len() + usize::from(self.bsp_assembly.is_some());
             if total > crate::bsp_assembly::MAX_COMPILED_CONNECTIONS
-                || self.source.as_ref().is_none_or(|source| source.cache_version != 609)
+                || self.source.as_ref().is_none_or(|source| !matches!(source.cache_version, 609 | 13))
                 || self.quick_forge.is_some()
             {
-                return invalid("Inherited connections require a preserved CE world within the native route limit");
+                return invalid("Inherited connections require a preserved CE609 or MCC13 world within the native route limit");
             }
             for route in &self.inherited_bsp_connections { route.validate()?; }
         }

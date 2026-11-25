@@ -42,6 +42,6 @@ export function currentAssemblyPreview(project:Project,preview:AssemblyReport['v
 
 /** Only this window's draft based on the present saved revision may own a preview. */
 export function currentAssemblyDraftPreview(project:Project,draft:BspAssembly|null,baseline:string,preview:AssemblyReport['viewport']){
- if(!draft||baseline!==assemblySignature(project.bspAssembly??null)||draft.donorProjectId!==project.bspAssembly?.donorProjectId||draft.donorSource.sha256!==project.bspAssembly?.donorSource.sha256)return undefined;
+ if(!draft||baseline!==assemblySignature(project.bspAssembly??null)||draft.donorProjectId!==project.bspAssembly?.donorProjectId||(draft.baseBspIndex??0)!==(project.bspAssembly?.baseBspIndex??0)||draft.donorSource.sha256!==project.bspAssembly?.donorSource.sha256)return undefined;
  return currentAssemblyPreview({...project,bspAssembly:draft},preview);
 }

@@ -49,7 +49,10 @@ function NativeBspTransitionReport({projectId, sourceSha256}: {projectId: string
   </section>;
 }
 
-function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['nativeGameplayBudget']> }) {
+function NativeGameplayBudget({ budget, cacheTarget }: {
+  budget: NonNullable<AssemblyReport['nativeGameplayBudget']>;
+  cacheTarget: 'CE609' | 'MCC13' | undefined;
+}) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
   useEffect(() => {
     if (!native) return;
@@ -60,14 +63,16 @@ function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['
     return () => { active = false; };
   }, []);
   const regional = budget.mcc13RegionalFlags;
+  const flags = cacheTarget === 'MCC13' && regional ? regional : budget.netgameFlags;
+  const classic = cacheTarget === 'CE609';
   const rows = [
-    { label: 'Player starts', ...budget.playerStarts },
+    { label: 'Player starts', ...budget.playerStarts, donor: classic ? 0 : budget.playerStarts.donor },
     { label: 'Multiplayer item placements', ...budget.netgameEquipment },
-    { label: 'Multiplayer flags and teleporter endpoints', ...budget.netgameFlags },
+    { label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor },
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
-    <summary>Native gameplay placement limits</summary>
-    <p>Projected counts if both maps’ gameplay placements are kept. Classic CE609 limits are shared across the entire scenario.</p>
+    <summary>Native gameplay placement limits{cacheTarget ? ' · ' + cacheTarget : ''}</summary>
+    <p>{classic ? 'This CE609 split build keeps the base player starts and flags, and adds donor pickups.' : 'Projected placement counts across the compiled scenario.'}</p>
     <ul>
       {rows.map(({ label, existing, donor, limit }) => {
         const total = existing + donor;
@@ -78,7 +83,7 @@ function NativeGameplayBudget({ budget }: { budget: NonNullable<AssemblyReport['
       })}
     </ul>
     {regional && <>
-      <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>
+      {cacheTarget !== 'MCC13' && <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>}
       {profiles.map(profile => {
         const capabilities = profile.reviewedCompanion?.capabilities;
         const target = capabilities?.map_targets?.find(row => row.cache_version === 13 && row.invader_engine === 'mcc-cea');
@@ -115,6 +120,13 @@ export default function BspAssembly({
   const sourceSha256 = project.source?.sha256;
   const nativePartitioned = sourceSha256 && inspection?.sha256 === sourceSha256
     && (inspection.mesh.parts?.length ?? 0) > 1 && [609, 13].includes(inspection.header.version);
+  const baseParts = inspection?.mesh.parts ?? [];
+  const canExtend = !!nativePartitioned && inspection.header.version === 13
+    && inspection.header.scenarioType === 1 && baseParts.length < 16
+    && !!project.inheritedBspConnections?.some(plan => plan.separateNativeBsps);
+  const buildRuntime = project.buildTargets?.find(target => target.id === project.activeBuildTarget)?.runtimeId;
+  const [baseIndex, setBaseIndex] = useMapState(project.id, 'bsp.baseSection', project.bspAssembly?.baseBspIndex ?? 0);
+  const [, setViewedBsp] = useMapState(project.id, 'world.bsp', 0);
   const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
@@ -125,7 +137,7 @@ export default function BspAssembly({
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
   const candidates = entries.filter(
-    (e) => e.id !== project.id && e.sha256 && [6, 7, 13, 609].includes(e.version ?? 0),
+    (e) => e.id !== project.id && e.sha256 && (canExtend ? e.version === 609 : [6, 7, 13, 609].includes(e.version ?? 0)),
   );
   const [open, setOpen] = useMapState(project.id, 'bsp.open', false),
     [donor, setDonor] = useMapState(
@@ -151,11 +163,11 @@ export default function BspAssembly({
   const draftNow=useRef(draft);draftNow.current=draft;
   const operation = useRef(0),
     mounted = useRef(false);
-  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index });
-  latest.current = { projectId: project.id, signature: assemblySignature(draft), donor, index };
+  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex });
+  latest.current = { projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex };
   const options = sectionList?.donor === donor ? sectionList.values : [];
   const loadingOptions = native && open && !!donor && sectionList?.donor !== donor && !optionsError;
-  const selectionMatches = !!draft && draft.donorProjectId === donor && draft.donorBspIndex === index;
+  const selectionMatches = !!draft && draft.donorProjectId === donor && draft.donorBspIndex === index && (draft.baseBspIndex ?? 0) === baseIndex;
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -191,7 +203,7 @@ export default function BspAssembly({
     let cancelled = false;
     setSectionList(null);
     setOptionsError('');
-    if (native && open && donor && !nativePartitioned)
+    if (native && open && donor && (!nativePartitioned || canExtend))
       void call<BspOption[]>('bsp_assembly_options', { projectId: donor, assemblyProjectId: project.id }).then(
         (value) => {
           if (!cancelled) {
@@ -206,7 +218,7 @@ export default function BspAssembly({
     return () => {
       cancelled = true;
     };
-  }, [donor, open, nativePartitioned]);
+  }, [donor, open, nativePartitioned, canExtend]);
   async function perform(action: (current: () => boolean) => Promise<void>) {
     const request = ++operation.current,
       owner = project.id;
@@ -226,9 +238,9 @@ export default function BspAssembly({
   async function proposeConnection(terrainSeam:boolean){
     await perform(async(current)=>{
       const request={...latest.current};
-      const matches=()=>current()&&latest.current.signature===request.signature&&latest.current.donor===request.donor&&latest.current.index===request.index;
+      const matches=()=>current()&&latest.current.signature===request.signature&&latest.current.donor===request.donor&&latest.current.index===request.index&&latest.current.baseIndex===request.baseIndex;
       await onSave();if(!matches())return;
-      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{})});
+      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,baseBspIndex:canExtend?baseIndex:undefined,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{})});
       if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
     });
   }
@@ -302,12 +314,13 @@ export default function BspAssembly({
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · full source: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
-          {nativePartitioned ? <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!}/> : <>
-          <p>
+          {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!}/>}
+          {(!nativePartitioned || canExtend) && <>
+          {canExtend ? <p>Connect a Custom Edition region to a compiled MCC world. Keep the entrance on an existing walkable floor. Build with MCC13 to keep the existing BSP slots and switches.</p> : <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one native world
             with collision and new lightmaps. Your original maps stay preserved. Campaign actors and scripts
             are separate.
-          </p>
+          </p>}
           {!native && <p>Open the desktop app to inspect and compile owned Halo geometry.</p>}
           {Boolean(project.inheritedBspConnections?.length) && (
             <p className="subtle">
@@ -316,6 +329,15 @@ export default function BspAssembly({
             </p>
           )}
           <div className="bsp-actions">
+            {canExtend && <label>Connect from BSP
+              <select value={baseIndex} onChange={event => {
+                const slot = Number(event.target.value);
+                setBaseIndex(slot);
+                setViewedBsp(slot);
+              }} disabled={busy}>
+                {baseParts.map((part, slot) => <option key={slot} value={slot}>BSP {slot} · {part.name}</option>)}
+              </select>
+            </label>}
             <label>
               Donor map
               <select
@@ -357,7 +379,10 @@ export default function BspAssembly({
                 ))}
               </select>
             </label>
-            <label>
+            {canExtend ? <label>Tunnel direction (degrees)
+              <NumberField label="Tunnel direction (degrees)" min={-360} max={360} step={1}
+                value={direction} onCommit={setDirection} disabled={busy}/>
+            </label> : <label>
               Tunnel direction
               <select value={direction} disabled={busy} onChange={(event) => setDirection(Number(event.target.value))}>
                 <option value={0}>East</option>
@@ -367,7 +392,7 @@ export default function BspAssembly({
                 <option value={240}>Southwest</option>
                 <option value={300}>Southeast</option>
               </select>
-            </label>
+            </label>}
             <button
               disabled={!native || busy || !donor || !options.some((option) => option.index === index)}
               onClick={() =>
@@ -376,7 +401,7 @@ export default function BspAssembly({
             >
               {busy ? 'Working…' : 'Plan connected tunnel'}
             </button>
-            <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>
+            {!canExtend && <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>}
           </div>
           {optionsError && (
             <p role="alert" className="bsp-error">
@@ -399,7 +424,7 @@ export default function BspAssembly({
                   world units · {routeDraft!.tunnelPoints.length - 2} bends
                 </span>
               </div>
-              <fieldset className="bsp-edge-controls"><legend>Edge-to-edge seam sections</legend>
+              {!draft.separateNativeBsps && <fieldset className="bsp-edge-controls"><legend>Edge-to-edge seam sections</legend>
                 <div className="bsp-actions">
                   <button disabled={busy||!applied} aria-pressed={edgeTarget==='base'} onClick={()=>armEdge('base')}>Pick edge in this BSP</button>
                   <button disabled={busy||!applied} aria-pressed={edgeTarget==='donor'} onClick={()=>armEdge('donor')}>Pick edge in donor BSP</button>
@@ -411,7 +436,7 @@ export default function BspAssembly({
                   {edgeTarget&&<button onClick={()=>setEdgeTarget(null)}>Cancel edge selection</button>}
                 </div>
                 <p role="status">{edgeTarget?`Click an edge on ${edgeTarget==='base'?'this region, then an edge on the donor':'the donor region'}.`:`Edges: ${edgePicks.base?'this BSP selected':'pick this BSP'} · ${edgePicks.donor?'donor selected':'pick donor'}.`} Apply the donor first. Each section keeps its own width, path and roof; original architecture stays intact outside the cut.</p>
-              </fieldset>
+              </fieldset>}
               <details>
                 <summary>Native boundary seals{draft.nativeSeals?.length ? ' · ' + draft.nativeSeals.length : ''}</summary>
                 <p>Enter the ordered vertices of the donor opening in world units. Divide raw WRL coordinates by 100. A nonzero apex offset raises or lowers the center of a triangular seal. Apply the connection and preview the donor BSP before building.</p>
@@ -439,6 +464,7 @@ export default function BspAssembly({
                   </button>)}
                 </div>
               </details>
+              {!draft.separateNativeBsps && <>
               <div className="bsp-actions" aria-label="Connection routes">
                 <label>Route <select aria-label="Connection route" value={selectedSection?`section:${selectedSection.id}`:infantry?'infantry':ridge?'highGround':'primary'} onChange={e=>setRouteView(e.target.value as typeof routeView)} disabled={busy}>
                   <option value="primary">{draft.openRoad?'Primary road':'Primary tunnel'}</option>
@@ -455,7 +481,8 @@ export default function BspAssembly({
               </div>
               <p className="subtle" aria-label="Seam route requirements">Player cave: {draft.infantryTunnel?'drafted':'missing'} · Warthog route: {draft.tunnelWidth>=6&&draft.tunnelHeight>=4?'design width set':'widen the primary passage'} · Canyon tops: {draft.highGround?'drafted':'missing'}. Drafts are not gameplay acceptance.</p>
               <p className="subtle">{ridge?'Open ridge with access ramps. Adjust its floor points onto walkable canyon tops on both maps; use bends for overlooks. Source checks must pass before compiling.':infantry?'Separate player cave. Keep both entrances on the original ground.':'Widen the primary passage for a Warthog cave or choose open sky for a canyon road.'} All routes rebuild together. Vehicle handling, continuous mountain access and sniper sightlines require a Halo playtest.</p>
-              {pickedSurface&&project.source?.sha256===pickedSurface.sourceHash&&pickedSurface.bspIndex===0&&<button disabled={busy} onClick={()=>updateRoute({tunnelPoints:routeDraft!.tunnelPoints.map((p,i)=>i===0?[...pickedSurface.point]:p)})}>Use selected landscape for entrance</button>}
+              </>}
+              {pickedSurface&&project.source?.sha256===pickedSurface.sourceHash&&pickedSurface.bspIndex===(draft.baseBspIndex??0)&&<button disabled={busy} onClick={()=>updateRoute({tunnelPoints:routeDraft!.tunnelPoints.map((p,i)=>i===0?[...pickedSurface.point]:p)})}>Use selected landscape for entrance</button>}
               {!selectionMatches && (
                 <div className="bsp-selection-warning" role="status">
                   <p>
@@ -467,6 +494,8 @@ export default function BspAssembly({
                     onClick={() => {
                       setDonor(draft.donorProjectId);
                       setIndex(draft.donorBspIndex);
+                      setBaseIndex(draft.baseBspIndex ?? 0);
+                      if (canExtend) setViewedBsp(draft.baseBspIndex ?? 0);
                     }}
                   >
                     Return to current draft
@@ -634,20 +663,20 @@ export default function BspAssembly({
               </div>
               <fieldset>
                 <legend>Build layout</legend>
-                <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy}
+                <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy || canExtend}
                   onChange={event => update({ separateNativeBsps: event.target.checked })} /> Separate native BSPs</label>
                 {draft.separateNativeBsps && <>
-                  <p>Use one straight enclosed passage between two single-BSP maps. Spark builds paired switch volumes and bakes each BSP. Pick MCC13 for donor starts and teleporters. Runtime crossing and simultaneous play require verification.</p>
-                  <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
+                  <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
+                  {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
                     onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
                     <option value={0}>BSP 0 · Current region</option>
                     <option value={1}>BSP 1 · Donor region</option>
-                  </select></label>
+                  </select></label>}
                 </>}
               </fieldset>
               <div className="bsp-actions">
                 <button
-                  disabled={busy || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
+                  disabled={busy || draft.separateNativeBsps || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
                   onClick={() => {
                     const a = routeDraft!.tunnelPoints.at(-2)!,
                       b = routeDraft!.tunnelPoints.at(-1)!;
@@ -717,6 +746,8 @@ export default function BspAssembly({
                       setDraft(saved);
                       setDonor(saved.donorProjectId);
                       setIndex(saved.donorBspIndex);
+                      setBaseIndex(saved.baseBspIndex ?? 0);
+                      if (canExtend) setViewedBsp(saved.baseBspIndex ?? 0);
                       setReport(null);
                       setError('');
                     }}
@@ -740,10 +771,12 @@ export default function BspAssembly({
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
                   {report.nativePartitions && <p>BSP {report.nativePartitions.selected} · {report.nativePartitions.overlapSamples} shared corridor-floor samples · Largest floor difference {report.nativePartitions.maxFloorDelta.toFixed(4)} world units.</p>}
-                  {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget} />}
+                  {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget}
+                    cacheTarget={draft.separateNativeBsps && (canExtend || buildRuntime === 'mccSteam') ? 'MCC13'
+                      : draft.separateNativeBsps && (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}
                   {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
-                  <p>{draft.separateNativeBsps ? 'Build next to check both compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>
+                  <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}

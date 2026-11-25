@@ -13,6 +13,7 @@ use std::path::Path;
 pub(crate) struct PreparedStarts {
     base: Vec<NativeRegionStart>,
     donor: Vec<NativeRegionStart>,
+    base_bsp_count: usize,
 }
 
 impl PreparedStarts {
@@ -26,6 +27,7 @@ impl PreparedStarts {
             .source
             .as_ref()
             .ok_or_else(|| SparkError::Invalid("Missing native base source".into()))?;
+        let base_map_bsp_count = base.mesh.parts.len();
         let mut base = maps::scenario_region_starts(&source.preserved_path, base)?;
         let mut donor = maps::scenario_region_starts(&assembly.donor_source.preserved_path, donor)?;
         if base.len() + donor.len() > maps::PLAYER_START_LIMIT {
@@ -34,12 +36,12 @@ impl PreparedStarts {
                 maps::PLAYER_START_LIMIT
             ));
         }
-        if base
-            .iter()
-            .chain(&donor)
-            .any(|row| !matches!(row.bsp_index, -1 | 0))
+        let base_bsp_count = base_map_bsp_count;
+        if base.iter().any(|row| !(0..base_bsp_count as i16).contains(&row.bsp_index)
+                && !(base_bsp_count == 1 && row.bsp_index == -1))
+            || donor.iter().any(|row| !matches!(row.bsp_index, -1 | 0))
         {
-            return invalid("A player start does not belong to its single-BSP source");
+            return invalid("A source player start has an invalid native BSP binding");
         }
         for (index, row) in base.iter_mut().enumerate() {
             let id = format!("spawn-{index}");
@@ -68,9 +70,9 @@ impl PreparedStarts {
             }
             row.position = position.map(|v| v as f32);
             row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
-            row.bsp_index = 1;
+            row.bsp_index = base_bsp_count as i16;
         }
-        Ok(Self { base, donor })
+        Ok(Self { base, donor, base_bsp_count })
     }
 
     pub(crate) fn append(
@@ -101,7 +103,7 @@ impl PreparedStarts {
             .base
             .iter()
             .enumerate()
-            .filter(|(_, row)| row.bsp_index != 0)
+            .filter(|(_, row)| self.base_bsp_count == 1 && row.bsp_index == -1)
             .flat_map(|(index, _)| {
                 [
                     "-S".into(),
@@ -162,23 +164,18 @@ impl PreparedStarts {
         path: &Path,
         map: &MapInspection,
         regional: bool,
-        trees: [&ListenerTree; 2],
+        trees: &[&ListenerTree],
     ) -> Result<serde_json::Value> {
         let donor = if regional { self.donor.as_slice() } else { &[] };
         let actual = maps::scenario_region_starts(path, map)?;
         if actual.len() != self.base.len() + donor.len() {
             return invalid("Compiled player start count differs from the reviewed target");
         }
-        let mut owned = [0usize; 2];
+        let mut owned = vec![0usize; trees.len()];
         for (index, (actual, expected)) in
             actual.iter().zip(self.base.iter().chain(donor)).enumerate()
         {
-            let bsp = usize::from(index >= self.base.len());
-            let expected_bsp = if regional {
-                bsp as i16
-            } else {
-                expected.bsp_index
-            };
+            let expected_bsp = if regional { expected.bsp_index.max(0) } else { expected.bsp_index };
             let yaw = actual.facing - expected.facing;
             if actual.bsp_index != expected_bsp
                 || actual.team_index != expected.team_index
@@ -195,7 +192,8 @@ impl PreparedStarts {
                 ));
             }
             if regional {
-                if !trees[bsp].contains_placement(actual.position) {
+                let bsp = expected_bsp as usize;
+                if !trees.get(bsp).is_some_and(|tree| tree.contains_placement(actual.position)) {
                     return invalid(format!(
                         "Player start {index} is outside its authored BSP {bsp}"
                     ));

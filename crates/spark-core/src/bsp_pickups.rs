@@ -36,7 +36,7 @@ impl PreparedPickups {
         &self,
         path: &Path,
         map: &MapInspection,
-        trees: [&crate::bsp_audio::ListenerTree; 2],
+        trees: &[&crate::bsp_audio::ListenerTree],
     ) -> Result<usize> {
         let actual = maps::scenario_netgame_pickups(path, map)?;
         if actual.len() != self.base.len() + self.donor.len() {
@@ -69,16 +69,17 @@ impl PreparedPickups {
                 "Compiled pickup collections changed ordered items, weights or spawn timing",
             );
         }
-        if self.donor.is_empty() {
-            return Ok(0);
+        let (donor_tree, retained) = trees.split_last()
+            .ok_or_else(|| SparkError::Invalid("Missing compiled pickup region".into()))?;
+        if retained.len() > 1 && actual[..self.base.len()].iter().any(|row| donor_tree.contains_placement(row.position)) {
+            return invalid("The donor overlaps an existing pickup. Move the shared passage clear of the item.");
         }
-        let [base_tree, donor_tree] = trees;
         for (index, (row, expected)) in actual[self.base.len()..]
             .iter()
             .zip(&self.donor_membership)
             .enumerate()
         {
-            if base_tree.contains_placement(row.position)
+            if retained.iter().any(|tree| tree.contains_placement(row.position))
                 || donor_tree.contains_placement(row.position) != *expected
             {
                 return invalid(format!(

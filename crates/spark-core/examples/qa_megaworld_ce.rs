@@ -44,7 +44,14 @@ fn main()->Result<()>{
     let partition_scenario = a.first().is_some_and(|arg| arg == "--partition-scenario-probe");
     let partition_lighting = a.first().is_some_and(|arg| arg == "--partition-lighting-probe");
     if partition_structure || partition_scenario || partition_lighting { a.remove(0); }
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    let donor_tags_override = if a.first().is_some_and(|arg| arg == "--donor-tags") {
+        if a.len() < 2 { return spark_core::invalid("Missing reviewed donor tags path"); }
+        a.remove(0);
+        let path = a.remove(0);
+        spark_core::reject_links(Path::new(&path))?;
+        Some(fs::canonicalize(path)?)
+    } else { None };
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -100,6 +107,8 @@ fn main()->Result<()>{
         } else { source };
         (tags, recover(&donor, &j, "sbsp")?)
     } else { let tags = fs::canonicalize(&a[2])?; (tags.clone(), tags) };
+    let use_selected_donor_tags = donor_tags_override.is_some();
+    let donor_tags = donor_tags_override.unwrap_or(donor_tags);
     let mut plan = match a[6].as_str() {
         "terrain" => bsp_assembly::plan_terrain(&p,&i,&donor,&j,0,donor_tags)?,
         "auto" => bsp_assembly::plan(&p,&i,&donor,&j,0,donor_tags)?,
@@ -107,7 +116,7 @@ fn main()->Result<()>{
             let mut known = reviewed.ok_or_else(|| SparkError::Invalid("Missing reviewed connection".into()))?;
             known.donor_project_id.clone_from(&donor.id);
             known.donor_source = donor.source.clone().ok_or_else(|| SparkError::Invalid("Missing donor source".into()))?;
-            if recovered || recipe_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
+            if recovered || use_selected_donor_tags || recipe_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
                 known.donor_tags_directory = donor_tags;
             } else {
                 spark_core::reject_links(&known.donor_tags_directory)?;

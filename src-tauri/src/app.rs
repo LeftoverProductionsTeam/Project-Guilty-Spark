@@ -418,12 +418,18 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             let mut title=base.clone();let mut ordinal=2;
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
             project.title=title;
-            if build.target=="mcc-cea" && inspection.header.version==13 {
-                if let Some(tags)=inherited_tags {
-                  if tags.is_dir() && tags.join(core::safe_relative(&format!("{}.scenario",inspection.scenario_path)).map_err(error)?).is_file() {
+        }
+        let mut bound_mcc_source = false;
+        if build.target == "mcc-cea" && inspection.header.version == 13 {
+            if let Some(tags) = inherited_tags {
+                let scenario = core::safe_relative(&format!("{}.scenario", inspection.scenario_path)).map_err(error)?;
+                if tags.is_dir() && tags.join(scenario).is_file() {
                     core::reject_links(&tags).map_err(error)?;
-                    if let Some(tools)=inherited_tools {if let Some(kit)=tools.h1a_directory {project.bind_compiled_mcc_tags(kit,tags,tools.invader_directory).map_err(error)?;}}
-                  }
+                    if let Some(tools) = inherited_tools {
+                        if let Some(kit) = tools.h1a_directory {
+                            bound_mcc_source = project.bind_compiled_mcc_tags(kit, tags, tools.invader_directory).map_err(error)?;
+                        }
+                    }
                 }
             }
         }
@@ -445,7 +451,7 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
                 bound_ce_source = true;
             }
         }
-        if !existed || inherited_routes || bound_ce_source {
+        if !existed || inherited_routes || bound_ce_source || bound_mcc_source {
             library.save(&project,Some(&inspection)).map_err(error)?;
         }
         // Every open-built-map entrypoint publishes the new library identity,
@@ -529,11 +535,11 @@ async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String,assembly_pr
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>,direction_degrees:Option<f64>)->Reply<core::bsp_assembly::BspAssembly>{
+async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>,direction_degrees:Option<f64>,base_bsp_index:Option<usize>)->Reply<core::bsp_assembly::BspAssembly>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};let tags=base.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==donor_project_id).map(|plan|plan.donor_tags_directory.clone()).or(editing_tools(&state,&donor)?.base_tags_directory).ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;if let Some(edges)=edges {
             let plan=base.bsp_assembly.as_ref().filter(|p|p.donor_project_id==donor_project_id&&p.donor_bsp_index==donor_bsp_index).ok_or("Apply the current donor connection before adding edge-selected sections")?;
             return core::bsp_assembly::append_edge_section(&base.source.as_ref().ok_or("Original destination source unavailable")?.preserved_path,&i,plan,edges).map_err(error);
-        }if terrain_seam.unwrap_or(false){core::bsp_assembly::plan_terrain(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}else{core::bsp_assembly::plan_in_direction(&base,&i,&donor,&j,donor_bsp_index,tags,direction_degrees.unwrap_or(0.)).map_err(error)}}).await.map_err(error)?
+        }if terrain_seam.unwrap_or(false){core::bsp_assembly::plan_terrain(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}else{core::bsp_assembly::plan_from_bsp(&base,&i,&donor,&j,base_bsp_index.unwrap_or(0),donor_bsp_index,tags,direction_degrees.unwrap_or(0.)).map_err(error)}}).await.map_err(error)?
 }
 #[tauri::command]
 async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<OpenProject>{
@@ -592,7 +598,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if let Some(draft)=draft {
             let saved=p.bsp_assembly.as_ref().ok_or("Apply the donor identity before previewing seam drafts")?;
-            if draft.donor_project_id!=saved.donor_project_id||draft.donor_bsp_index!=saved.donor_bsp_index||serde_json::to_value(&draft.donor_source).map_err(error)?!=serde_json::to_value(&saved.donor_source).map_err(error)?||draft.donor_tags_directory!=saved.donor_tags_directory {return Err("Draft preview cannot replace its saved donor/source identity".into());}
+            if draft.donor_project_id!=saved.donor_project_id||draft.donor_bsp_index!=saved.donor_bsp_index||draft.base_bsp_index!=saved.base_bsp_index||serde_json::to_value(&draft.donor_source).map_err(error)?!=serde_json::to_value(&saved.donor_source).map_err(error)?||draft.donor_tags_directory!=saved.donor_tags_directory {return Err("Draft preview cannot replace its saved donor/source identity".into());}
             draft.validate().map_err(error)?;p.bsp_assembly=Some(draft);
         }
         let i=inspect(&state,&p)?;
@@ -601,8 +607,11 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
             let selected = native_bsp_index.unwrap_or(0);
             if selected > 1 { return Err("Choose native BSP 0 or 1".into()); }
             let parts = core::bsp_assembly::generate_partitioned_project(&p, &i, &cancel).map_err(error)?;
-            let report = serde_json::json!({"selected": selected, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta});
-            (if selected == 0 { parts.base } else { parts.donor }, Some(report))
+            let retaining = parts.base.is_none();
+            let selected_slot = if retaining { i.mesh.parts.len() } else { selected };
+            let report = serde_json::json!({"selected": selected_slot, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta});
+            let geometry = if retaining || selected == 1 { parts.donor } else { parts.base.ok_or("The retained BSP is already visible in the source map")? };
+            (geometry, Some(report))
         } else {
             (core::bsp_assembly::generate_project(&p, &i, &cancel).map_err(error)?, None)
         };
@@ -621,7 +630,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
                     }
                 }
             }
-            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
         }
         Ok(result)
     }).await.map_err(error)?

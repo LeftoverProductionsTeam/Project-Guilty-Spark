@@ -461,7 +461,7 @@ function Scene({
           position={[0, 0, -0.02]}
         />
       )}
-      {!joinedPreview&&previewMesh?.positions.length ? (
+      {(!joinedPreview || joinedPreview.retainsBase)&&previewMesh?.positions.length ? (
         <group userData={{assetSurface:true}}>
         <Mesh
           data={previewMesh}
@@ -478,7 +478,7 @@ function Scene({
         />
         </group>
       ) : null}
-      {!joinedPreview&&!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
+      {(!joinedPreview || joinedPreview.retainsBase)&&!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
       {assembly&&project.bspAssembly&&(()=>{
         const plan=joinedPreview?.assembly??project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         return <group name="gs-assembly-donor" userData={{assetSurface:true}} position={plan.translation} rotation={[0,0,plan.yawDegrees*Math.PI/180]}>
@@ -1837,7 +1837,7 @@ export default function World({
           </div>
         </div>
         <div className="viewport-status">
-          {project.bspAssembly&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'2 source regions · Preview joined seam in Construction to display the connection')}</span>}
+          {project.bspAssembly&&<span data-testid="assembly-source-status" data-joined-triangles={assemblyDonor.preview?.surfaces.reduce((n,s)=>n+s.mesh.indices.length/3,0)??0} data-source-sha={assembly?.open.inspection?.sha256??''} data-ready={!!ownedModels[assemblyTerrainKey]?.ready} data-preview-id={assembly?.open.project.id??''} data-texture-id={Object.values(ownedModels[assemblyTerrainKey]?.shaderTextures??{})[0]?.uuid??''} data-shaders={Object.keys(ownedModels[assemblyTerrainKey]?.shaderTextures??{}).length} data-lightmaps={Object.keys(ownedModels[assemblyTerrainKey]?.lightmapTextures??{}).length} title="Original regions and validated joined source share one renderer. Preview joined seam in Construction displays the rebuilt connection. New native lightmaps and gameplay still require compilation and a Halo test.">{assemblyDonor.error||assembly?.warning||modelIssues[assemblyTerrainKey]||(assemblyDonor.loading?'Reading saved donor source…':!ownedModels[assemblyTerrainKey]?.ready?'Loading donor native materials…':assemblyDonor.preview?'Joined source geometry · native rebuild required':'Source regions · Preview the connection in Construction')}</span>}
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
           <span>{project.scene.length} objects</span>

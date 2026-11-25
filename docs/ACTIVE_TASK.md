@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: CE609 da222bf1 and MCC13 040b5da5 remain the twelve-region gameplay baseline. Normal Build MCC13 73aadc28 verified Chiron’s saved split layout, exact cache bytes, baked BSPs, both switches and regional placements across thirteen regions. Spark’s raised native seal now compiles the separate Chiron–Derelict fixture in lit CE609 12ff9fe6 and MCC13 d541a429.
-Next action: Attach Derelict to the assembled world while keeping the existing native BSP slots and switches. Use a reviewed walkable overlap, preserve prior source tags, and recheck the old corridor. Private Chiron crossings, regional combat and the Derelict ambience mapping remain open. The exact normal Chiron export and lit Derelict fixture were verified in disposable output.
+Latest verified revision: Native MCC13 Chiron ba57480a30c5121da3be111acc7d605a277b6809f5604b6e182bbf97c3f205af is retained and read-only in %TEMP%/GuiltySpark-Traversal-Handoff/thirteen-mcc13-YTz6Uc/ready. Two BSPs, 12 / 9 lightmap pages, 127 starts, 284 flags, 30 Chiron teleporter channels and 42 Chiron pickups passed independent readback. CE609 da222bf1 and MCC13 040b5da5 remain the twelve-region baselines.
+Next action: Author and check a Derelict overlap on retained outdoor BSP 0 using the exact lit Chiron cache. Keep the two original slots and switch rows. Forerunner can consume the pinned thirteen-region artifact now for Chiron crossings and guest-driven return.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 
@@ -148,6 +148,8 @@ Historical: releases/black-echo-native-crew-20261117 retains partial native cand
 - Firefight combat, score/HUD, defeat/victory, AI parity/real peers and human gameplay remain OPEN. Windows release-current-source, Linux/macOS/headset/physical displays/two-PC and all M3–M6 independent gates remain OPEN. Prior hosted CI failed a framebuffer assertion; local test-only repair awaits owner source sync/rerun. Do not revive older resolved atomic EIO diagnosis.
 
 ## Operations and safe checkpoint
+
+The exact twelve- and thirteen-region MCC13 caches are verified in the approved handoff. The lit build and all Chiron-adjacent Derelict diagnostic output were retired after the final receipt and retained copy checks. The known east approach and eight rotated or shifted Chiron approaches failed source clearance. The outdoor BSP alternative is the next scoped validation. See MEGAWORLD_SEAM_ROUTES_20261108.md for the native readback, placement budgets, and independent format and runtime acceptance gates.
 
 18Nov control-side run-w9uCnP closed. Owned native output of 1,008,128,495 logical bytes was disposed and the root is absent. Existing game trials are tracked by their Forerunner receipts.
 

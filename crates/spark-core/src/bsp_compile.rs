@@ -759,7 +759,7 @@ pub(crate) struct PreparedPartitions {
     pub receipt: serde_json::Value,
     pub switches: [bsp_assembly::PartitionSwitch; 2],
     pub overlap: [[f64; 3]; 2],
-    pub structure_tags: [String; 2],
+    pub structure_tags: Vec<String>,
     pub scenery: Vec<crate::bsp_scenery::Placement>,
     pub donor_tag: String,
     pub donor_environment: Option<crate::bsp_audio::DonorEnvironment>,
@@ -770,7 +770,7 @@ pub(crate) struct PreparedPartitions {
 
 fn bind_partition_scenario(
     inspection: &MapInspection, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    original_structure: &str, structures: &[String; 2], switches: &[bsp_assembly::PartitionSwitch; 2],
+    original_structures: &[String], structures: &[String], switches: &[bsp_assembly::PartitionSwitch; 2],
 ) -> Result<()> {
     let scenario = format!("{}.scenario", inspection.scenario_path);
     let scenario_file = tags.join(safe_relative(&scenario)?);
@@ -781,24 +781,25 @@ fn bind_partition_scenario(
         args.push(scenario.clone());
         runner.run(edit, &args, workspace, "partition-scenario", 58)
     };
-    let bsp_count = || run(vec!["-C".into(), "structure_bsps".into()]);
-    if bsp_count()?.trim() != "1" { return invalid("Partition binding needs the original single BSP scenario"); }
-    let original = run(vec!["-G".into(), "structure_bsps[0].structure_bsp".into()])?;
-    if !original.trim().eq_ignore_ascii_case(&format!("{original_structure}.scenario_structure_bsp")) {
-        return invalid("Staged scenario BSP does not match the preserved base slot");
-    }
+    let bsp_count = || run(vec!["-C".into(), "structure_bsps".into()])?.trim().parse::<usize>()
+        .map_err(|_| SparkError::Invalid("Native scenario BSP count is unreadable".into()));
+    let verify_slots = |paths: &[String]| {
+        if bsp_count()? != paths.len() { return invalid("Native scenario BSP count differs from the reviewed source"); }
+        for (index, path) in paths.iter().enumerate() {
+            let observed = run(vec!["-G".into(), format!("structure_bsps[{index}].structure_bsp")])?;
+            if !observed.trim().eq_ignore_ascii_case(&format!("{path}.scenario_structure_bsp")) {
+                return invalid(format!("Native scenario BSP slot {index} differs from the reviewed structure"));
+            }
+        }
+        Ok(())
+    };
+    verify_slots(original_structures)?;
     let mut args = vec!["-I".into(), "structure_bsps".into(), "1".into(), "end".into()];
-    for (index, bsp) in structures.iter().enumerate() {
+    for (index, bsp) in structures.iter().enumerate().filter(|(index, bsp)| original_structures.get(*index) != Some(*bsp)) {
         args.extend(["-S".into(), format!("structure_bsps[{index}].structure_bsp"), format!("{bsp}.scenario_structure_bsp")]);
     }
     run(args)?;
-    if bsp_count()?.trim() != "2" { return invalid("Native partition count did not match the staged pair"); }
-    for (index, bsp) in structures.iter().enumerate() {
-        let observed = run(vec!["-G".into(), format!("structure_bsps[{index}].structure_bsp")])?;
-        if !observed.trim().eq_ignore_ascii_case(&format!("{bsp}.scenario_structure_bsp")) {
-            return invalid("Native scenario did not bind the expected partition structure");
-        }
-    }
+    verify_slots(structures)?;
     let mut before = run(vec!["-L".into()])?;
     for transition in switches {
         let count = crate::native_operations::scenario_volume_choices(&before)?.len();
@@ -829,21 +830,43 @@ pub(crate) fn prepare_partition_structure(
     let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
     let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
-    let base_source_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
-    namespace_materials(tags, &base_source_bsp, 0, &parts.base, &[], tools, runner, workspace, tags, None)?;
+    let original_structures = maps::scenario_bsp_tag_paths(&base_source.preserved_path, inspection)?;
+    if original_structures.len() != inspection.mesh.parts.len() {
+        return invalid("A native source BSP is missing from its collision inspection");
+    }
+    let mut retained = Vec::new();
+    if let Some(base) = &parts.base {
+        namespace_materials(tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None)?;
+    } else {
+        for bsp in &original_structures {
+            let file = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
+            let sha = maps::hash_file(&file)?;
+            retained.push((file, sha));
+        }
+        namespace_materials(tags, &original_structures[plan.base_bsp_index], 0, &parts.donor, &[], tools, runner, workspace, tags, None)?;
+    }
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
     let donor_source_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;
     namespace_materials(&plan.donor_tags_directory, &donor_source_bsp, 1, &parts.donor, &scenery,
         tools, runner, workspace, tags, Some((&plan.donor_source, &donor)))?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
-    let regions = [("base", &parts.base), ("donor", &parts.donor)];
-    let compile = |index: usize| {
-        let (name, geometry) = regions[index];
-        compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)
+    let donor_name = if parts.base.is_some() { "donor".into() } else { format!("region_{}", original_structures.len()) };
+    if original_structures.iter().any(|tag| tag.rsplit(['\\', '/']).next().is_some_and(|name| name.eq_ignore_ascii_case(&donor_name)))
+        && parts.base.is_none()
+    {
+        return invalid("The generated donor BSP name already exists in the retained source");
+    }
+    let mut regions = Vec::with_capacity(2);
+    if let Some(base) = &parts.base { regions.push(("base", base)); }
+    regions.push((donor_name.as_str(), &parts.donor));
+    let built = regions.iter().map(|(name, geometry)| compile_structure(&tool, runner, workspace, tags, &parent, name, geometry))
+        .collect::<Result<Vec<_>>>()?;
+    let structure_tags = if parts.base.is_some() {
+        built.iter().map(|(tag, _, _)| tag.clone()).collect::<Vec<_>>()
+    } else {
+        original_structures.iter().cloned().chain(built.iter().map(|(tag, _, _)| tag.clone())).collect()
     };
-    let built = [compile(0)?, compile(1)?];
-    let structure_tags = [built[0].0.clone(), built[1].0.clone()];
     let netgame_flags = if bind {
         Some(crate::bsp_netgame_flags::PreparedFlags::from_sources(base_source, inspection, plan, &donor)?)
     } else { None };
@@ -851,7 +874,7 @@ pub(crate) fn prepare_partition_structure(
         Some(crate::bsp_player_starts::PreparedStarts::from_sources(project, inspection, plan, &donor)?)
     } else { None };
     let pickups = if bind {
-        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &base_source_bsp, &structure_tags, &parts.switches)?;
+        bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &parts.switches)?;
         append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
             project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing pickup base source".into()))?,
@@ -860,11 +883,11 @@ pub(crate) fn prepare_partition_structure(
     } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
-        for (name, _) in regions {
+        for (name, _) in &regions {
             bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
         }
     }
-    let donor_tag = format!("{}.scenario_structure_bsp", built[1].0);
+    let donor_tag = format!("{}.scenario_structure_bsp", structure_tags.last().unwrap());
     let donor_environment = if bind {
         let source = format!("gsbsp_{}_1\\{}.scenario_structure_bsp", &runner.id[..8], donor_source_bsp);
         let invoke = |tag: &str, fields: Vec<String>| {
@@ -890,7 +913,11 @@ pub(crate) fn prepare_partition_structure(
         Ok(serde_json::json!({"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
             "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": restored, "report": geometry.report}))
     }).collect::<Result<Vec<_>>>()?;
+    for (file, sha) in &retained {
+        if maps::hash_file(file)? != *sha { return invalid("A retained native BSP tag was modified by the extension build"); }
+    }
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": donor.sha256,
+        "retainedStructureTags": retained.len(),
         "overlap": parts.overlap, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta,
         "switches": parts.switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
     Ok(PreparedPartitions { receipt, switches: parts.switches, overlap: parts.overlap, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
