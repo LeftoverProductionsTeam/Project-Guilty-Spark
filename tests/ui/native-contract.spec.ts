@@ -7238,7 +7238,13 @@ test('creator intact BSP preview preserves both sources and reports only connect
   expect(await page.evaluate(() => (window as any).__intactPreviewArgs.intactConnector)).toBe(true);
   const preserve = await constructionControl(page, 'checkbox', 'Preserve donor BSP in native build');
   await preserve.check();
+  await (await constructionControl(page, 'checkbox', 'Open land bridge')).check();
+  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__intactPreviewArgs.draft.openRoad)).toBe(true);
   await (await constructionControl(page, 'button', 'Apply connection')).click();
   await page.keyboard.press('Control+s');
-  await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.bspAssembly?.preserveDonorBsp)).toBe(true);
+  await expect.poll(() => page.evaluate(() => {
+    const plan = (window as any).__sparkMock.saved?.bspAssembly;
+    return [plan?.preserveDonorBsp, plan?.openRoad, plan?.tunnelWidth, plan?.tunnelHeight];
+  })).toEqual([true, true, 6, 4]);
 });

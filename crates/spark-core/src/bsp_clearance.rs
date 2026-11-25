@@ -339,6 +339,13 @@ impl RouteChecker {
     pub(crate) fn verify_return(&self, assembly: &BspAssembly) -> Result<usize> {
         Ok(self.verify_details_in_order(assembly, true)?.iter().map(|route| route.walk_samples).sum())
     }
+    pub(crate) fn verify_land_bridge(&self, bridge: &BspAssembly) -> Result<[usize; 2]> {
+        bridge.validate()?;
+        let forward = self.verify_one(bridge, true)?;
+        let mut returning = bridge.clone();
+        returning.tunnel_points.reverse();
+        Ok([forward, self.verify_one(&returning, true)?])
+    }
     pub(crate) fn verify_details(&self, assembly: &BspAssembly) -> Result<Vec<crate::bsp_assembly::RouteClearance>> {
         self.verify_details_in_order(assembly, false)
     }

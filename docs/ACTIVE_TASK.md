@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: CE609 7377e900 compiled and baked the flat Timberland–Sidewinder land bridge, lower road and cave. Overlay 86cdc87e retained the exact BSP and lightmap. Two private Forerunner clients used normal controls to board stock Warthogs and drive across the deck and down opposite ramps.
-Next action: Extend reusable land-bridge construction to partitioned regions, then drive the full approaches and walk the cave in both directions. Keep the owner screenshot’s black faces, water rendering, regional teleporters, Damnation arrival and pickups open before promoting any nineteen-region replacement. Preserve previous-good, Zombie/Firefight and Black Echo work.
+Latest verified revision: Death Island open land bridge MCC13 bff59561 passed native compile, bake, independent cache readback, both landing checks and original pickup preservation. Two Forerunner clients admitted the pinned cache on private loopback. Timberland–Sidewinder CE609 7377e900 and the two-way Warthog deck replay on overlay 86cdc87e remain the driving baseline.
+Next action: Drive the exact Death Island bridge from both region approaches and capture its appearance before widening the rollout. For Infinity, compare the native secondary UV/radiosity streams and stock-vs-MCC runtime frames. Invader extracted the same bitmap and page bindings from both. Keep Damnation entrance, teleporters, floating placements, water and nineteen-region visual acceptance open. Preserve previous-good caches and original assets.
 
 Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
 

@@ -209,12 +209,15 @@ impl BspAssembly {
         Ok(())
     }
     fn validate_partition_route(&self) -> Result<()> {
-        if self.donor_bsp_index != 0 || self.tunnel_points.len() != 2 || self.open_road
+        if self.donor_bsp_index != 0 || self.tunnel_points.len() != 2 || (self.open_road && !self.preserve_donor_bsp)
             || self.terrain_seam.is_some() || self.arch_segments.is_some()
             || self.infantry_tunnel.is_some() || self.high_ground.is_some()
             || !self.sections.is_empty() || !self.visibility_zones.is_empty()
         {
-            return invalid("Separate native BSPs require a single-BSP donor and one straight enclosed passage without custom portal cuts.");
+            return invalid("Separate native BSPs require a single-BSP donor and one straight connector without custom portal cuts. Open land bridges require Preserve donor BSP.");
+        }
+        if self.open_road && (self.tunnel_width < 6. || self.tunnel_height < 4.) {
+            return invalid("An intact land bridge needs at least six world units of width and four of clearance");
         }
         let [start, end] = [self.tunnel_points[0], self.tunnel_points[1]];
         if (end[0] - start[0]).hypot(end[1] - start[1]) < 12. {
@@ -1523,42 +1526,55 @@ pub fn generate_preserved_connector(
     let prior = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
     let volumes = maps::scenario_volume_readback(&source.preserved_path, base)?;
     verify_intact_switch_spacing(&switches, &prior.transitions, &volumes)?;
-    let points = intact_floor_points(overlaps, forward);
+    let points = intact_floor_points(overlaps, forward, plan.open_road)?;
     if !common_separation {
         verify_intact_neighborhood((&base.mesh, &base_collision), (&donor.mesh, &donor_collision),
-            0, plan.translation, base.mesh.parts.len(), plan, points)?;
+            0, plan.translation, base.mesh.parts.len(), plan, &points)?;
     }
-    review.tunnel_points = points[1..3].to_vec();
+    review.tunnel_points = points[1..points.len() - 1].to_vec();
     review.validate()?;
 
     let height = f64::from(plan.tunnel_height);
     for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
         let position = add(pickup.position.map(f64::from), plan.translation);
-        if intact_connector_contains_pickup(points, forward, f64::from(plan.tunnel_width), height, position) {
+        if intact_connector_contains_pickup(&points, forward, f64::from(plan.tunnel_width), height, position) {
             return invalid(format!("Donor pickup {index} at {position:?} lies inside the new connector; move the passage clear of the original pickup"));
         }
     }
-    let collision_source = intact_connector_solid(points, side, height, cancel)?.get_mesh_gl64(-1);
     let mut materials = vec![AssemblyMaterial {
         name: format!("gsconnector{}x", &base.sha256[..8]),
         source: 0, shader_path: Some(plan.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
         flags: 0, collision_only: false,
     }];
+    let sky = plan.open_road.then(|| {
+        materials.push(AssemblyMaterial {
+            name: "+sky".into(), source: 0, shader_path: None, shader_class: None, flags: 0, collision_only: false,
+        });
+        materials.len() - 1
+    });
+    let collision_source = intact_connector_solid(&points, side, height, sky, cancel)?.get_mesh_gl64(-1);
     let (mut mesh, mut triangle_materials) = collision_layer(&collision_source, &mut materials)?;
     for point in mesh.positions.chunks_exact(3) {
         validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
     }
-    review.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
+    review.tunnel_points.insert(0, overlaps[0][0]);
+    review.tunnel_points.push(overlaps[1][1]);
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
-    let route_clearance = checker.verify_details(&review)?;
-    checker.verify_return(&review)?;
+    let route_clearance = if plan.open_road {
+        let [walk_samples, _] = checker.verify_land_bridge(&review)?;
+        vec![RouteClearance { label: "Open land bridge".into(), width: plan.tunnel_width,
+            clear_height: plan.tunnel_height, walk_samples }]
+    } else {
+        checker.verify_return(&review)?;
+        checker.verify_details(&review)?
+    };
     for overlap in overlaps {
         if checker.floor_profile(overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
             return invalid("Connector surface does not match a reviewed landing");
         }
     }
-    let mut render = if points[0][2] == points[3][2] {
-        level_connector_charts(points[0], points[3], side, height)
+    let mut render = if points[0][2] == points.last().unwrap()[2] {
+        level_connector_charts(points[0], *points.last().unwrap(), side, height, sky)
     } else {
         collision_source
     };
@@ -1602,7 +1618,7 @@ fn separated_bounds(left: [[f64; 2]; 3], right: [[f64; 2]; 3], clearance: f64) -
 /// the entire passage envelope against every nonparticipating BSP.
 fn verify_intact_neighborhood(
     base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
-    translation: V, count: usize, plan: &BspAssembly, points: [V; 4],
+    translation: V, count: usize, plan: &BspAssembly, points: &[V],
 ) -> Result<()> {
     let difference = sub(plan.tunnel_points[1], plan.tunnel_points[0]);
     let forward = mul([difference[0], difference[1], 0.], 1. / difference[0].hypot(difference[1]));
@@ -1620,7 +1636,7 @@ fn verify_intact_neighborhood(
     };
     let donor_bounds = box_for(donor, donor_index, translation)?;
     let corridor = axes.map(|axis| {
-        points.into_iter().flat_map(|point| {
+        points.iter().copied().flat_map(|point| {
             let upper = add(point, [0., 0., height]);
             [sub(point, side), add(point, side), sub(upper, side), add(upper, side)]
         }).map(|point| dot(point, axis)).fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| {
@@ -1639,7 +1655,7 @@ fn verify_intact_neighborhood(
     Ok(())
 }
 
-fn intact_connector_contains_pickup(points: [V; 4], forward: V, width: f64, height: f64, position: V) -> bool {
+fn intact_connector_contains_pickup(points: &[V], forward: V, width: f64, height: f64, position: V) -> bool {
     let sideways = [-forward[1], forward[0], 0.];
     if dot(sub(position, points[0]), sideways).abs() > width / 2. {
         return false;
@@ -1655,7 +1671,7 @@ fn intact_connector_contains_pickup(points: [V; 4], forward: V, width: f64, heig
     false
 }
 
-fn level_connector_charts(start: V, end: V, side: V, height: f64) -> MeshGL64 {
+fn level_connector_charts(start: V, end: V, side: V, height: f64, sky: Option<usize>) -> MeshGL64 {
     let delta = sub(end, start);
     let count = (dot(delta, delta).sqrt() / 48.).ceil() as usize;
     let point = |index| if index == count { end } else { add(start, mul(delta, index as f64 / count as f64)) };
@@ -1674,20 +1690,21 @@ fn level_connector_charts(start: V, end: V, side: V, height: f64) -> MeshGL64 {
                 render.vert_properties.extend(planar_uv(corner, uv_normal));
             }
             render.tri_verts.extend([first, first + 1, first + 2]);
-            render.face_id.push(0);
+            render.face_id.push(if (2..=3).contains(&index) { sky.unwrap_or(0) as u64 } else { 0 });
         }
     }
     render
 }
 
-fn intact_connector_solid(points: [V; 4], side: V, height: f64, cancel: &AtomicBool) -> Result<Manifold> {
+fn intact_connector_solid(points: &[V], side: V, height: f64, sky: Option<usize>, cancel: &AtomicBool) -> Result<Manifold> {
     if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
     // A level passage needs no coplanar joins at the landing zones. Unioning
     // them adds needless narrow charts when the corridor is oblique.
-    if points[0][2] == points[3][2] {
-        return passage_solid(points[0], points[3], side, side, height, 0, None);
+    let end = *points.last().unwrap();
+    if points[0][2] == end[2] {
+        return passage_solid(points[0], end, side, side, height, 0, sky);
     }
-    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, None));
+    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, sky));
     let mut body = solids.next().unwrap()?;
     for solid in solids {
         if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
@@ -1707,8 +1724,12 @@ fn choose_intact_landing(
         let local = world.map(|point| sub(point, displacement));
         review.tunnel_points = local.to_vec();
         let checked = (|| {
-            checker.verify(review)?;
-            checker.verify_return(review)?;
+            if review.open_road {
+                checker.verify_land_bridge(review)?;
+            } else {
+                checker.verify(review)?;
+                checker.verify_return(review)?;
+            }
             let difference = checker.floor_profile(local)?.into_iter()
                 .map(|z| (z + displacement[2] - center[2]).abs()).fold(0., f64::max);
             if difference > 0.02 {
@@ -1749,15 +1770,26 @@ fn intact_switch_distance(span: f64) -> f64 {
     (span - 0.75).min(1.3)
 }
 
-fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V) -> [V; 4] {
+fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool) -> Result<Vec<V>> {
     let outside = mul(forward, 0.7);
     let slope_margin = mul(forward, 0.2);
-    [
-        sub(overlaps[0][0], outside),
-        add(overlaps[0][1], slope_margin),
-        sub(overlaps[1][0], slope_margin),
-        add(overlaps[1][1], outside),
-    ]
+    let start = add(overlaps[0][1], slope_margin);
+    let end = sub(overlaps[1][0], slope_margin);
+    let mut points = vec![sub(overlaps[0][0], outside), start];
+    let rise = end[2] - start[2];
+    if open_road && rise != 0. {
+        // Keep the switches level and put the grade on the low end, leaving a flat deck.
+        let ramp_length = (rise.abs() / 0.25).max(0.5);
+        if dot(sub(end, start), forward) < ramp_length + 4. {
+            return invalid("The land bridge needs room for its level deck and an approach of at most 25% grade. Pick landings closer in elevation or farther apart.");
+        }
+        let (low, direction) = if rise > 0. { (start, forward) } else { (end, mul(forward, -1.)) };
+        let mut deck = add(low, mul(direction, ramp_length));
+        deck[2] = start[2].max(end[2]);
+        points.push(deck);
+    }
+    points.extend([end, add(overlaps[1][1], outside)]);
+    Ok(points)
 }
 
 pub(crate) fn verify_intact_connector_collision(
@@ -1778,7 +1810,8 @@ pub(crate) fn verify_intact_connector_collision(
     for (slot, overlap) in [plan.base_bsp_index, original_count + 1].into_iter().zip(overlaps) {
         let region = crate::bsp_clearance::RouteChecker::for_part(&collision, slot)?;
         route.tunnel_points = overlap.to_vec();
-        let both = [region.verify(&route)?, region.verify_return(&route)?];
+        let both = if plan.open_road { region.verify_land_bridge(&route)? }
+            else { [region.verify(&route)?, region.verify_return(&route)?] };
         let original = region.floor_profile(overlap)?;
         let added = connector.floor_profile(overlap)?;
         if original.len() != added.len() || original.is_empty() {
@@ -1792,16 +1825,18 @@ pub(crate) fn verify_intact_connector_collision(
     let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
     let delta = sub(end, start);
     let forward = mul([delta[0], delta[1], 0.], 1. / delta[0].hypot(delta[1]));
-    let points = intact_floor_points(overlaps, forward);
+    let points = intact_floor_points(overlaps, forward, plan.open_road)?;
     // Apply the identical neighboring-region proof to the exact compiled
     // geometry when the donor did not use a single separation plane.
     let donor_slot = original_count + 1;
     if !intact_common_separation(&compiled.mesh, original_count, &compiled.mesh, donor_slot, [0.; 3], forward)? {
         verify_intact_neighborhood((&compiled.mesh, &collision), (&compiled.mesh, &collision), donor_slot,
-            [0.; 3], original_count, plan, points)?;
+            [0.; 3], original_count, plan, &points)?;
     }
-    route.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
-    let corridor = [connector.verify(&route)?, connector.verify_return(&route)?];
+    route.tunnel_points = [overlaps[0][0]].into_iter()
+        .chain(points[1..points.len() - 1].iter().copied()).chain([overlaps[1][1]]).collect();
+    let corridor = if plan.open_road { connector.verify_land_bridge(&route)? }
+        else { [connector.verify(&route)?, connector.verify_return(&route)?] };
     Ok(serde_json::json!({
         "connectorSamples": corridor, "landingSamples": samples, "maxFloorDelta": max_delta,
         "bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
@@ -2433,9 +2468,9 @@ mod tests {
         let point = |distance| add(end, mul(forward, distance));
         let route = [point(-840.), point(-830.), point(-2.), point(2.5)];
         let pickup = [1376.3582, -619.83777, -18.205042];
-        assert!(intact_connector_contains_pickup(route, forward, 2., 1.6, pickup));
-        assert!(!intact_connector_contains_pickup(route, forward, 2., 1.6, add(pickup, [1.5, 1.5, 0.])));
-        assert!(!intact_connector_contains_pickup(route, forward, 2., 1.6, add(pickup, [0., 0., 2.])));
+        assert!(intact_connector_contains_pickup(&route, forward, 2., 1.6, pickup));
+        assert!(!intact_connector_contains_pickup(&route, forward, 2., 1.6, add(pickup, [1.5, 1.5, 0.])));
+        assert!(!intact_connector_contains_pickup(&route, forward, 2., 1.6, add(pickup, [0., 0., 2.])));
     }
 
     #[test]
@@ -2445,12 +2480,36 @@ mod tests {
         let end = add(start, mul(forward, 900.));
         let points = [start, add(start, mul(forward, 5.)), sub(end, mul(forward, 5.)), end];
         let side = [-forward[1], forward[0], 0.];
-        let body = intact_connector_solid(points, side, 1.6, &AtomicBool::new(false)).unwrap();
+        let body = intact_connector_solid(&points, side, 1.6, None, &AtomicBool::new(false)).unwrap();
         assert_eq!(body.get_mesh_gl64(-1).num_tri(), 12);
-        let mut render = level_connector_charts(start, end, side, 1.6);
+        let mut render = level_connector_charts(start, end, side, 1.6, None);
         assert_eq!(render.num_tri(), 156);
         assert_eq!(crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES).unwrap(), 0);
 
+    }
+
+    #[test]
+    fn intact_open_bridge_uses_sky_above_a_level_vehicle_deck_and_protected_landings() {
+        let forward = [1., 0., 0.];
+        let side = [0., 3., 0.];
+        for [west, east] in [[0., 0.], [0., 3.], [3., 0.]] {
+            let landings = [[[0., 0., west], [3., 0., west]], [[33., 0., east], [36., 0., east]]];
+            let points = intact_floor_points(landings, forward, true).unwrap();
+            assert_eq!(points.len(), if west == east { 4 } else { 5 });
+            assert_eq!([points[0][2], points[1][2]], [west, west]);
+            assert_eq!([points[points.len()-2][2], points[points.len()-1][2]], [east, east]);
+            assert!(points[1..points.len() - 1].windows(2).any(|pair|
+                pair[1][2] == pair[0][2] && pair[1][0] - pair[0][0] >= 4.));
+            for pair in points.windows(2) {
+                assert!((pair[1][2]-pair[0][2]).abs() / (pair[1][0]-pair[0][0]) <= 0.25);
+            }
+            let body = intact_connector_solid(&points, side, 4., Some(1), &AtomicBool::new(false)).unwrap();
+            assert!(body.get_mesh_gl64(-1).face_id.contains(&1));
+            let flat = level_connector_charts([0., 0., 0.], [36., 0., 0.], side, 4., Some(1));
+            assert_eq!(flat.face_id.iter().filter(|&&slot| slot == 1).count(), 2);
+        }
+        let too_steep = [[[0., 0., 0.], [3., 0., 0.]], [[11., 0., 3.], [14., 0., 3.]]];
+        assert!(intact_floor_points(too_steep, forward, true).is_err());
     }
 
     #[test]
@@ -2834,7 +2893,7 @@ mod tests {
         serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Fixture","donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":13,"engine":"fixture","scenarioPath":"fixture"},"donorTagsDirectory":"fixture","donorBspIndex":0,"translation":[0.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[0.,0.,0.],[100.,0.,0.]],"tunnelWidth":4.,"tunnelHeight":4.,"tunnelShaderPath":"fixture/metal"})).unwrap()
     }
     #[test]
-    fn separate_native_layout_round_trips_and_requires_one_straight_enclosed_route() {
+    fn separate_native_layout_requires_one_straight_route_and_preserved_bridge_landings() {
         let mut plan = dual_route_plan();
         assert!(serde_json::to_value(&plan).unwrap().get("separateNativeBsps").is_none());
         plan.separate_native_bsps = true;
@@ -2843,10 +2902,17 @@ mod tests {
         let mut restored: BspAssembly = serde_json::from_value(stored).unwrap();
         restored.validate().unwrap();
         restored.tunnel_points.insert(1, [50., 2., 0.]);
-        assert!(restored.validate().unwrap_err().to_string().contains("straight enclosed passage"));
+        assert!(restored.validate().unwrap_err().to_string().contains("straight connector"));
         restored.tunnel_points.remove(1);
         restored.tunnel_points[1] = [10., 0., 0.];
         assert!(restored.validate().unwrap_err().to_string().contains("twelve world units"));
+        restored.tunnel_points[1] = [100., 0., 0.];
+        restored.open_road = true;
+        assert!(restored.validate().unwrap_err().to_string().contains("Preserve donor BSP"));
+        restored.preserve_donor_bsp = true;
+        assert!(restored.validate().unwrap_err().to_string().contains("six world units"));
+        restored.tunnel_width = 6.;
+        restored.validate().unwrap();
     }
     #[test]
     fn optional_road_and_infantry_metadata_preserve_old_serialization_and_reject_invalid_routes() {

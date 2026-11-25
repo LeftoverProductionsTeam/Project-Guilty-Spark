@@ -807,7 +807,13 @@ export default function BspAssembly({
                   <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
                   {canExtend && baseParts.length <= 14 && <div>
                     <label><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
-                      onChange={event => update({ preserveDonorBsp: event.target.checked })} /> Preserve donor BSP in native build</label>
+                      onChange={event => update({ preserveDonorBsp: event.target.checked, openRoad: event.target.checked && draft.openRoad })} /> Preserve donor BSP in native build</label>
+                    {draft.preserveDonorBsp && <label>
+                      <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy}
+                        onChange={event => update(event.target.checked ? {
+                          openRoad: true, tunnelWidth: Math.max(6, draft.tunnelWidth), tunnelHeight: Math.max(4, draft.tunnelHeight),
+                        } : { openRoad: false })} /> Open land bridge
+                    </label>}
                     <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
                     <div className="bsp-actions">
