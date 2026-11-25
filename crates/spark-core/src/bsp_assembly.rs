@@ -2269,10 +2269,12 @@ fn playable_anchor(
         }
         if let Some((point, face)) = floor {
             let delta = sub(point, fallback.0);
-            // A rebuilt world can retain starts only in its original section.
-            // Do not send a new connection back across an entire donor map.
-            let distance=dot(delta,delta);
-            if distance<=32.*32. { candidates.push((point, face, distance)); }
+            // Bound the search in the map plane. A nearby playable floor can
+            // sit far above a closed BSP's bottom. Rank admitted floors in
+            // three dimensions to favor the nearest supported elevation.
+            if delta[0].hypot(delta[1]) <= 32. {
+                candidates.push((point, face, dot(delta, delta)));
+            }
         }
     }
     Ok(candidates
@@ -2819,6 +2821,21 @@ mod tests {
             anchor(&mesh, &faces, 0, [-1., 0., 0.]).unwrap().0[0] > 5.,
             "Sky boundaries cannot be map entrances"
         );
+    }
+    #[test]
+    fn a_nearby_playable_floor_can_be_above_the_bsp_bottom() {
+        let mesh = MeshData {
+            positions: vec![0., -2., -50., 4., -2., -50., 2., 2., -50.,
+                            0., -2., 0., 4., -2., 0., 2., 2., 0.],
+            indices: vec![0, 1, 2, 3, 4, 5],
+            parts: vec![maps::MeshPart { name: "Stacked floors".into(), index_start: 0, index_count: 6 }],
+            ..Default::default()
+        };
+        let faces = vec![CollisionFace { shader: Some(1), flags: 0, normal: [0., 0., 1.] }; 2];
+        let toward = [-1., 0., 0.];
+        assert_eq!(anchor(&mesh, &faces, 0, toward).unwrap().0[2], -50.);
+        assert_eq!(playable_anchor(&mesh, &faces, 0, toward, &[[2., 0., 0.1]]).unwrap(),
+            ([2., 0., 0.], 1));
     }
     #[test]
     fn chained_world_ignores_starts_remote_from_the_selected_edge() {
