@@ -1202,6 +1202,18 @@ mod tests {
         altered.scripts.retain(|script|script.name!="forerunner_squad_01_begin");
         assert!(!super::compiled_extraction_requirements(&cache,&altered).unwrap().unwrap().iter().any(|feature|feature==super::SQUAD_BEGIN_FEATURE));
         assert_eq!(crate::maps::hash_file(&cache).unwrap(),map.sha256);
+        let scene=crate::maps::scenario_logic_readback(&cache,&map).unwrap();
+        let index=scene.names.iter().position(|name|name.name=="extraction_squad_01").unwrap();
+        let terminal=scene.devices.iter().find(|device|device.class=="ctrl"&&device.name_index==index as i16).unwrap();
+        let hub=scene.volumes.iter().find(|volume|volume.name=="extraction_return").unwrap().geometry.as_ref().unwrap();
+        assert!(hub.contains(terminal.position));
+        let model=map.tags.iter().find(|tag|tag.class=="ctrl"&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&terminal.tag_path.replace('\\',"/"))).unwrap();
+        let (_,mesh)=crate::render::preview_owned_object_model(&cache,&map.sha256,&map,model.id).unwrap();
+        let offset=crate::render::upright_model_base_offset(&mesh).unwrap();
+        let support=crate::maps::bsp_point_locations(&cache,&map,&[terminal.position],Some(2.)).unwrap();
+        assert_eq!(support[0].ground.len(),1,"One readable surface must support the numbered terminal");
+        let surface=support[0].ground[0].z;
+        eprintln!("Numbered terminal origin {:?}, collision surface {surface}, measured model base offset {offset}, bottom gap {}",terminal.position,terminal.position[2]-surface-offset);
         eprintln!("Numbered Extraction cache {} requires {features:?}",map.sha256);
     }
 

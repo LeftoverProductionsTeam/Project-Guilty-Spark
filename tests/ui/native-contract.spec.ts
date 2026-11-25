@@ -5943,12 +5943,22 @@ test('Forerunner capability inspection displays native requirements without gran
 });
 
 for(const firstGate of [false,true])test('native squad terminals preserve source restoration and save two independent gate choices'+(firstGate?' both required':''),async({page},testInfo)=>{
- await mockNativeHubSource(page);await openFixture(page);await chooseTool(page,'AI & scenario');
+ await mockNativeHubSource(page);if(firstGate)await mockNativePointReview(page);await openFixture(page);await chooseTool(page,'AI & scenario');
  const native=page.locator('.scenario-page .native-tag-operations');if(await native.getAttribute('open')===null){await revealPagedControl(native.locator(':scope > summary'));await native.locator(':scope > summary').click();}
  const form=native.locator('.native-squad-terminals');await revealPagedControl(form.locator('> summary'));await form.locator('> summary').click();
  const preview=form.getByRole('button',{name:'Preview squad terminal & gate',exact:true});await expect(preview).toBeDisabled();
  for(const[axis,value]of [['X','49'],['Y','-87.472'],['Z','0.1'],['yaw','90']]){const input=form.getByRole('spinbutton',{name:'Squad terminal '+axis,exact:true});await revealPagedControl(input);await input.fill(value);}
  await revealPagedControl(form.getByRole('spinbutton',{name:'Squad terminal number',exact:true}));await form.getByRole('spinbutton',{name:'Squad terminal number',exact:true}).fill('23');await expect(preview).toBeDisabled();await form.getByRole('spinbutton',{name:'Squad terminal number',exact:true}).fill('1');
+ if(firstGate){
+  const z=form.getByRole('spinbutton',{name:'Squad terminal Z',exact:true});await revealPagedControl(z);await z.fill('1.25');
+  const ground=form.getByText('Ground support for control',{exact:true});await revealPagedControl(ground);await ground.click();
+  const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true});await revealPagedControl(find);await find.check();
+  const check=form.getByRole('button',{name:'Check control ground',exact:true});await revealPagedControl(check);await check.click();
+  const model=form.getByRole('button',{name:'Use model base offset',exact:true});await revealPagedControl(model);await model.click();
+  await revealPagedControl(check);await check.click();
+  const useGround=form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.1',exact:true});
+  await revealPagedControl(useGround);await useGround.click();await expect(z).toHaveValue('0.1');
+ }
  if(firstGate)await form.getByRole('checkbox',{name:"Require this squad's objectives before extraction",exact:true}).check();
  await revealPagedControl(preview);await preview.click();const accept=native.getByRole('button',{name:'Accept as new source revision',exact:true});await revealPagedControl(accept);await accept.click();
  await expect(form).toContainText('This native squad number already exists');await expect(preview).toBeDisabled();

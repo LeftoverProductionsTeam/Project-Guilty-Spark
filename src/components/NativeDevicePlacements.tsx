@@ -1,21 +1,17 @@
-import NativeBspPointCheck from './NativeBspPointCheck';
+import NativeControlGroundCheck from './NativeControlGroundCheck';
 import {useEffect,useRef,useState} from 'react';
 import {useMapState,writeMapSession} from '../mapSession';
 import {NATIVE_DEVICE_VIEW,deviceMatches,deviceDraft,devicePose,deviceObjectId} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
 import type {NativeDeviceGroup,NativeTagContext,NativeOperation} from '../nativeOperations';
-import {Notice,NumberField} from './ui';
+import {Notice} from './ui';
 export default function NativeDevicePlacements({context,busy,dirty,onPreview,onDraftChange,onLevelEditor}:{context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(op:NativeOperation)=>void;onDraftChange:()=>void;onLevelEditor?:()=>void}){
  const [view,setView]=useMapState<NativeDeviceView|null>(context.projectId,NATIVE_DEVICE_VIEW,()=>null),[selected,setSelected]=useState('');const details=useRef<HTMLDetailsElement>(null),review=useRef(0),rows=context.scenarioDevices??[];
  const owns=!!view&&deviceMatches(view,context),original=owns?view.original:rows.find(row=>row.class+':'+row.index===selected)??rows[0];const vehicle=original?.class==='vehi',label=vehicle?'Vehicle':'Device';const draft=original?(owns?view:deviceDraft(original)):null,pose=original&&draft?devicePose({...draft,original}):null,changed=!!pose&&JSON.stringify(pose)!==JSON.stringify(original);const blocked=busy||dirty||!!context.deviceEditIssue||owns&&view.locked||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'');
  useEffect(()=>{if(view&&!deviceMatches(view,context))setView(null);},[context]);useEffect(()=>{onDraftChange();},[JSON.stringify(view)]);useEffect(()=>{if(owns&&view.reviewRequest&&review.current!==view.reviewRequest){review.current=view.reviewRequest;if(details.current){details.current.open=true;details.current.querySelector<HTMLInputElement>(`[aria-label="${label} position X"]`)?.focus();}}},[context,view?.reviewRequest]);
  const groups=context.scenarioDeviceGroups;
  const [groupIndex,setGroupIndex]=useState(-1);
- const [mount,setMount]=useState<{key:string;offset:number}|null>(null);
- const mountingKey=JSON.stringify([context.buildId,context.tagSha256,original?.class,original?.index,pose?.rotationRadians.slice(1)]);
- const mountOffset=mount?.key===mountingKey?mount.offset:0;
  const upright=!!pose&&pose.rotationRadians.slice(1).every(angle=>Math.abs(angle)<1e-4);
- const setMountOffset=(offset:number)=>setMount({key:mountingKey,offset});
  const group=groups?.find(row=>row.index===groupIndex);
  const groupBindings=group?rows.filter(row=>[row.powerGroup,row.positionGroup].includes(group.index)):[];
  const groupLocked=!!group&&(group.reserved||groupBindings.some(row=>/^extraction_/i.test(row.name)));
@@ -78,22 +74,10 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
   <p className="subtle">{wiringLocked?'Extraction owns this device’s startup state.':'Each option applies when its Power or Position group is Unbound. A linked group supplies its initial value.'}</p>
  </fieldset>}
  {!pose&&<Notice>Use finite XYZ within ±1,000,000 and angles within ±360°.</Notice>}
- {original.class==='ctrl'&&<details>
-  <summary>Ground support for control</summary>
-  <NumberField label="Origin offset from ground" value={mountOffset} min={-64} max={64}
-   step={0.001} disabled={!!blocked} onCommit={setMountOffset}/>
-  <small>{upright?'Check the compiled control to measure its model base, or enter an offset.':'Enter an offset for this tilted control.'} A positive value raises the origin above the selected ground.</small>
-  <NativeBspPointCheck context={context}
-   selectionKey={original.class+':'+original.index}
-   subject="Control origin"
-   mountOffset={mountOffset}
-   controlMountTag={upright?original.tagPath:undefined}
-   onMountOffset={setMountOffset}
-   points={pose?[pose.position]:[]}
-   disabled={!!blocked||!pose}
-   label="Check control ground"
-   onGround={(_,position)=>update({position:position.map(String) as [string,string,string]})}/>
- </details>}
+ {original.class==='ctrl'&&<NativeControlGroundCheck context={context}
+  selectionKey={JSON.stringify([original.index,pose?.rotationRadians.slice(1)])} tagPath={original.tagPath}
+  position={pose?.position??null} upright={upright} disabled={!!blocked}
+  onGround={point=>update({position:point.map(String) as [string,string,string]})}/>}
  <div className="button-row"><button disabled={!!blocked||!pose||!onLevelEditor} onClick={()=>{writeMapSession(context.projectId,'world.ai-start',null);writeMapSession(context.projectId,'world.cutscene-camera',null);writeMapSession(context.projectId,'world.trigger-volume',null);writeMapSession(context.projectId,'world.selection',deviceObjectId(original));update({active:true,focus:Date.now()});onLevelEditor?.();}}>{vehicle?'Show vehicle in Level Editor':'Show device in Level Editor'}</button><button disabled={!!blocked||!pose||!changed} onClick={()=>pose&&onPreview({kind:'devicePlacement',device:pose,sourceSha256:context.tagSha256!})}>{vehicle?'Preview vehicle placement':'Preview device placement'}</button><button disabled={busy||!owns} onClick={()=>{setView(null);onDraftChange();}}>Reset placement draft</button></div>
  {!onLevelEditor&&<p className="subtle">Viewport manipulation needs an opened compiled native map. Generated source placements use Logic / Events in the BSP Workshop.</p>}</>}
  </details>;
