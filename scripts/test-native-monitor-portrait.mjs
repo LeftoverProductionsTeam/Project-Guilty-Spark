@@ -87,6 +87,44 @@ try{
  expect(report.previewReadsOnHomeResume).toEqual([]);
  report.parkedAnimation=paused.animation;report.homeRetainedCanvasAndAnimation=true;
  await page.screenshot({path:path.join(root,'home-resumed.png')});
+ const character=page.getByRole('combobox',{name:'Home model',exact:true});
+ await character.selectOption('character:cortana');
+ await expect(home).toHaveAttribute('data-native-animation-count',/^[1-9]\d*$/);
+ await expect(canvas).toHaveAttribute('data-gs-animation',/stand unarmed idle/);
+ const readAnimation=()=>canvas.evaluate(node=>JSON.parse(node.dataset.gsAnimation));
+ await home.getByRole('button',{name:'Pause showcase animation',exact:true}).click();
+ await expect.poll(async()=> (await readAnimation()).playing).toBe(false);
+ const idle=await readAnimation();
+ const clip=home.getByRole('combobox',{name:'Showcase animation',exact:true});
+ await clip.selectOption({label:'stand talk'});
+ await expect.poll(async()=> (await readAnimation()).name).toBe('stand talk');
+ const talk=await readAnimation();
+ expect(talk.time).toBe(0);
+ expect(talk.bones).toBe(idle.bones);
+ expect(talk.samplePosition.every(Number.isFinite)).toBe(true);
+ await home.getByRole('button',{name:'Play showcase animation',exact:true}).click();
+ await expect.poll(async()=> (await readAnimation()).time).toBeGreaterThan(0);
+ const cortanaBox=await canvas.boundingBox();
+ const start=[cortanaBox.x+cortanaBox.width*.48,cortanaBox.y+cortanaBox.height*.45];
+ await page.mouse.move(...start);
+ await page.mouse.down();
+ const visiblePixels=[];
+ for(let step=1;step<=8;step++){
+   await page.mouse.move(start[0]+step*8,start[1]+step*2);
+   visiblePixels.push(await canvas.evaluate(node=>new Promise(resolve=>requestAnimationFrame(()=>{
+     const gl=node.getContext('webgl2');
+     const rgba=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+     gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,rgba);
+     let count=0;
+     for(let i=3;i<rgba.length;i+=4)if(rgba[i]>40)count++;
+     resolve(count);
+   }))));
+ }
+ await page.mouse.up();
+ expect(Math.min(...visiblePixels)).toBeGreaterThan(100);
+ report.cortanaNativePlayback={idle:idle.name,selected:talk.name,bones:talk.bones,minimumVisibleOrbitPixels:Math.min(...visiblePixels)};
+ await character.selectOption('automatic');
+ await expect(canvas).toHaveAttribute('data-gs-animation',/"bones":2/);
  // Close this owned process normally so WebView storage is flushed, then launch
  // the same application/profile again. A reload alone is not this acceptance.
  let exited=new Promise(resolve=>child.once('exit',resolve));

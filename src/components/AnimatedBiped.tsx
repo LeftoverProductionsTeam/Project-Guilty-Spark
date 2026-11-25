@@ -17,6 +17,7 @@ export default function AnimatedBiped({
   const group = useRef<Group>(null),
     elapsed = useRef(0),
     seek = useRef(-1),
+    sampledClip = useRef<AnimationPreview['clip'] | undefined>(undefined),
     failed = useRef(false);
   const { gl } = useThree();
   const prepared = useMemo(() => {
@@ -36,7 +37,8 @@ export default function AnimatedBiped({
   useFrame((_, delta) => {
     if (!animation || !prepared?.player || !group.current || failed.current) return;
     try {
-      if (seek.current !== animation.seek) {
+      if (sampledClip.current !== animation.clip || seek.current !== animation.seek) {
+        sampledClip.current = animation.clip;
         elapsed.current = animation.time;
         seek.current = animation.seek;
       } else if (animation.playing) elapsed.current += Math.min(delta, 0.1) * animation.speed;

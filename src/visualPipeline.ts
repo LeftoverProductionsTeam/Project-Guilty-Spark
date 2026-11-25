@@ -46,7 +46,8 @@ export function createVisualPipeline(
       c=mix(vec3(dot(c,vec3(.2126,.7152,.0722))),c,saturation);c=(c-.18)*contrast+.18;
       vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));vec3 rgb=displayColor(c);float a=original.a;
       if(preserveAlpha){vec4 source=texture2D(tAlpha,effectUv);float surface=max(source.a,max(source.r,max(source.g,source.b)));
-        a=max(source.a,clamp(max(rgb.r,max(rgb.g,rgb.b)),0.0,surface>0.0?1.0:.45));rgb=clamp(rgb/max(a,.00001),0.0,1.0);}
+        float bloomAlphaLimit=mix(.45,1.0,smoothstep(0.0,.25,surface));
+        a=max(source.a,clamp(max(rgb.r,max(rgb.g,rgb.b)),0.0,bloomAlphaLimit));rgb=clamp(rgb/max(a,.00001),0.0,1.0);}
       gl_FragColor=vec4(rgb,a);}`,
   });
   // ShaderPass clones its initial uniforms, which clears render-target

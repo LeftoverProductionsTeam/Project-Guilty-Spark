@@ -122,12 +122,11 @@ export function animationDeformer(mesh: MeshData, clip: AnimationClip) {
     normals,
     duration: Math.max(0, (clip.frameCount - 1) / clip.fps),
     sample(time: number, loop = true, rootMotion = false) {
-      const length = Math.max(1, clip.frameCount - 1),
-        frame = loop
-          ? (Math.max(0, time) * clip.fps) % length
-          : Math.min(length, Math.max(0, time) * clip.fps),
-        f0 = Math.min(clip.frameCount - 1, Math.floor(frame)),
-        f1 = Math.min(clip.frameCount - 1, f0 + 1),
+      const last = clip.frameCount - 1,
+        sample = Math.max(0, time) * clip.fps,
+        frame = loop ? sample % clip.frameCount : Math.min(last, sample),
+        f0 = Math.floor(frame),
+        f1 = f0 < last ? f0 + 1 : loop ? 0 : last,
         alpha = frame - f0;
       for (let i = 0; i < n; i++) {
         const node = mapping[i],

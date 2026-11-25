@@ -52,6 +52,12 @@ describe('Actual skeletal animation deformation', () => {
     expect(p.positions[3]).toBeCloseTo(1.5);
     expect(Math.abs(p.positions[4])).toBeCloseTo(0.5);
   });
+  it('plays the last native frame and blends into the first at the loop seam', () => {
+    const player = animationDeformer(mesh(), clip());
+    expect(player.sample(1).positions[3]).toBeCloseTo(0);
+    expect(player.sample(1.5).positions[3]).toBeCloseTo(1);
+    expect(player.sample(2).positions[3]).toBeCloseTo(2);
+  });
   it('rejects an incompatible rig, nonfinite frames, bad hierarchy and invalid weights', () => {
     const m = mesh(),
       c = clip();

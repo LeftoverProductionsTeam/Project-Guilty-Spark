@@ -31,7 +31,8 @@ import type {ModelSourceAppearance} from '../modelSourceAppearance';
 import HaloMesh from './HaloMesh';
 import AnimatedBiped from './AnimatedBiped';
 import { useNativeModelAnimations } from '../useNativeModelAnimations';
-import type { AnimationPreview } from '../animation';
+import { animationDeformer } from '../animation';
+import type { AnimationClip, AnimationPreview } from '../animation';
 import SceneEnvironment from './SceneEnvironment';
 import '../nativeModelPreview.css';
 import { useWorkspaceActivity } from './WorkspaceActivity';
@@ -67,6 +68,7 @@ function Model({
   showcase,
   portrait,
   animation,
+  framingClip,
   onAnimationError,
   identity,
   framing,
@@ -78,6 +80,7 @@ function Model({
   showcase: boolean;
   portrait: boolean;
   animation?: AnimationPreview;
+  framingClip?: AnimationClip;
   onAnimationError: (error: string) => void;
   identity:{projectId:string;sourceHash:string;tagId:number};
   framing:{preset:ModelViewPreset;revision:number};
@@ -115,22 +118,29 @@ function Model({
     return () => window.removeEventListener('pointermove', follow);
   }, [interactiveShowcase, live, motionAllowed, gl, invalidate]);
   const fit = useMemo(() => {
-    const box = new THREE.Box3();
-    for (let i = 0; i < view.mesh.positions.length; i += 3)
-      box.expandByPoint(new THREE.Vector3().fromArray(view.mesh.positions, i));
+    let positions: ArrayLike<number> = view.mesh.positions;
+    if (interactiveShowcase && framingClip) {
+      try {
+        positions = animationDeformer(view.mesh, framingClip).sample(0, false).positions;
+      } catch {
+        // Keep this model viewable while AnimatedBiped reports an invalid clip.
+      }
+    }
+    const box = new THREE.Box3(), vertex = new THREE.Vector3();
+    for (let i = 0; i < positions.length; i += 3)
+      box.expandByPoint(vertex.set(positions[i], positions[i + 1], positions[i + 2]));
     const center = box.getCenter(new THREE.Vector3());
     let radius = 0.01;
-    const vertex = new THREE.Vector3();
-    for (let i = 0; i < view.mesh.positions.length; i += 3)
-      radius = Math.max(radius, vertex.fromArray(view.mesh.positions, i).distanceTo(center));
+    for (let i = 0; i < positions.length; i += 3)
+      radius = Math.max(radius, vertex.set(positions[i], positions[i + 1], positions[i + 2]).distanceTo(center));
     return { center, radius };
-  }, [view.mesh]);
+  }, [interactiveShowcase, framingClip, view.mesh]);
   useEffect(() => {
     camera.up.set(0, 0, 1);
     const aspect=camera instanceof THREE.PerspectiveCamera?camera.aspect:1;
     const stored=readMapSession<unknown>(identity.projectId,sessionKey,null);
     const restore=!showcase&&framing.revision===0&&validModelPreviewCamera(stored,identity.sourceHash,fit.radius)?stored:null;
-    camera.position.fromArray(restore?.position??(portrait?[fit.radius*3.15,0,0]:showcase?[fit.radius*2.1,-fit.radius,fit.radius*.65]:modelFitPosition(fit.radius,aspect,42,framing.preset)));
+    camera.position.fromArray(restore?.position??(portrait?[fit.radius*3.15,0,0]:showcase?[fit.radius*1.89,-fit.radius*.9,fit.radius*.585]:modelFitPosition(fit.radius,aspect,42,framing.preset)));
     const target=new THREE.Vector3().fromArray(restore?.target??[0,0,0]);
     controls.current?.target.copy(target);camera.lookAt(target);controls.current?.update();
     if (camera instanceof THREE.PerspectiveCamera) {
@@ -229,6 +239,7 @@ export default function NativeModelPreview({
     setAnimationError('');
     setFraming({preset:'fit',revision:0});
   }, [asset.sourceProjectId, asset.sourceSha256, asset.tagId]);
+  const framingClip = showcase && !portrait ? animations.value?.clips[0] : undefined;
   const clip = animations.value?.clips[clipIndex];
   const animation = useMemo<AnimationPreview | undefined>(
     () =>
@@ -332,7 +343,7 @@ export default function NativeModelPreview({
       {view && (visible||live||onSnapshot) && activity.graphicsResident ? (
         <Canvas
           camera={{ fov: 42, up: [0, 0, 1] }}
-          dpr={portrait ? 1 : showcase ? [1.5, 2] : [1, 1.5]}
+          dpr={portrait ? 1 : [1, 1.5]}
           gl={{
             antialias: true,
             alpha: true,
@@ -355,6 +366,7 @@ export default function NativeModelPreview({
               showcase={showcase}
               portrait={portrait}
               animation={animation}
+              framingClip={framingClip}
               onAnimationError={setAnimationError}
               identity={identity}
               framing={framing}
