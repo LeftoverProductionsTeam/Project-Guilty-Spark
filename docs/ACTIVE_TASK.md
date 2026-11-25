@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Fourteen-region MCC13 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b remains the retained integration cache. Standalone MCC13 Death Island 3a8cc92fc2fbada073fa97f0f2ce12b31c1939cc5a1cb3c1cf4ada63c120a45d preserved all 24 checked stock environment and visibility fields.
-Next action: Verify a rigid translation of the intact Death Island BSP and author a separate native connector BSP with shared floors checked at both ends, including the non-flat stock Death Island landing. Keep stock portals, fog and ambience intact. Then continue Boarding Action, Gephyrophobia, Ice Fields and Infinity. Independent player occupancy remains open in Forerunner.
+Latest verified revision: The retained integration map is fourteen-region MCC13 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b. The intact Death Island BSP translated and compiled into a standalone MCC13 fixture efc4f6295fe17b29688676b3d28c685c59f0d9ef832c57169d8b7b388023aba4 with original PVS and PAS bytes.
+Next action: Build the separate native Death Island connector and verify both shared landings. Stock floor 329 is the nearest surveyed infantry fit after relocation. Review wider landing clearance and remap the stock sky references into the combined scenario before fifteen-region cache acceptance. Then continue Boarding Action, Gephyrophobia, Ice Fields and Infinity.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

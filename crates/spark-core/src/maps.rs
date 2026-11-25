@@ -27,6 +27,9 @@ pub use ui_tags::{verify_hud_edits,HudEditReadback,HudTagReadback,hud_root_array
 mod shader_transparent;
 pub use shader_transparent::{ShaderAnimation, ShaderStage};
 pub use decals::SceneDecal;
+#[path = "bsp_relocation.rs"]
+mod bsp_relocation;
+pub use bsp_relocation::{translate_bsp_extraction_input, BspRelocation};
 
 pub const MAX_CACHE_BYTES: u64 = 768 * 1024 * 1024;
 pub const MAX_TAGS: usize = 65_535;

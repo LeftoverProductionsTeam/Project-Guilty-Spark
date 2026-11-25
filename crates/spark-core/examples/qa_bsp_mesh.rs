@@ -3,6 +3,20 @@ use spark_core::{maps,Result};
 use std::{collections::BTreeMap,path::Path};
 fn main()->Result<()>{
  let args:Vec<_>=std::env::args().skip(1).collect();
+ if args.first().is_some_and(|arg| arg == "--translate-bsp-extraction-input") {
+  use std::io::Write;
+  if args.len() != 6 { return spark_core::invalid("Usage: --translate-bsp-extraction-input <source.map> <fresh output.map> <x> <y> <z>"); }
+  let source = Path::new(&args[1]);
+  let output = Path::new(&args[2]);
+  let number = |index: usize| args[index].parse::<f64>()
+   .map_err(|_| spark_core::SparkError::Invalid("BSP translation requires three numbers".into()));
+  let map = maps::inspect_map(source, source.parent())?;
+  let (bytes, receipt) = maps::translate_bsp_extraction_input(source, &map, [number(3)?, number(4)?, number(5)?])?;
+  spark_core::reject_links(output)?;
+  std::fs::OpenOptions::new().create_new(true).write(true).open(output)?.write_all(&bytes)?;
+  println!("{}", serde_json::to_string(&receipt)?);
+  return Ok(());
+ }
  if args.first().is_some_and(|arg| arg == "--flight-recordings") {
   if args.len() != 2 {
    return spark_core::invalid("qa_bsp_mesh --flight-recordings <owned.map>");
