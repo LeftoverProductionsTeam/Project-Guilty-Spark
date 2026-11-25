@@ -1325,14 +1325,10 @@ pub fn generate_preserved_connector(
     let forward = [delta[0] / length, delta[1] / length, 0.];
     let side = mul([-forward[1], forward[0], 0.], f64::from(plan.tunnel_width) / 2.);
     let offset = |center, distance| add(center, mul(forward, distance));
-    let overlap = |center| [offset(center, -2.3), offset(center, 2.3)];
-    let points = [offset(start, -3.0), offset(start, 2.5), offset(end, -2.5), offset(end, 3.0)];
     let mut review = plan.clone();
     review.separate_native_bsps = false;
     review.preserve_donor_bsp = false;
     review.base_bsp_index = 0;
-    review.tunnel_points = points[1..3].to_vec();
-    review.validate()?;
 
     for direction in [forward, [0., 0., 1.], [0., 0., -1.]] {
         let donor_near = projected_bounds(&donor.mesh, 0, plan.translation, 0., direction)?[0];
@@ -1347,26 +1343,19 @@ pub fn generate_preserved_connector(
 
     let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
     let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
-    let mut landings = Vec::with_capacity(2);
-    for (label, mesh, part, center, displacement) in [
-        ("Retained", &base_collision, plan.base_bsp_index, start, [0.; 3]),
-        ("Donor", &donor_collision, 0, end, plan.translation),
-    ] {
-        let result = (|| {
-            let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, part)?;
-            let landing = overlap(center).map(|point| sub(point, displacement));
-            review.tunnel_points = landing.to_vec();
-            checker.verify(&review)?;
-            checker.verify_return(&review)?;
-            let profile = checker.floor_profile(landing)?;
-            let difference = profile.into_iter().map(|z| (z + displacement[2] - center[2]).abs()).fold(0., f64::max);
-            if difference > 0.02 {
-                return invalid(format!("Floor differs from the level connector by {difference:.3} units"));
-            }
-            Ok(difference)
-        })();
-        landings.push(result.map_err(|error| SparkError::Invalid(format!("{label} connector landing: {error}")))?);
-    }
+    let choose = |review: &mut BspAssembly, mesh, part, center, displacement| {
+        let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, part)?;
+        choose_intact_landing(&checker, review, center, displacement, forward)
+    };
+    let base_landing = choose(&mut review, &base_collision, plan.base_bsp_index, start, [0.; 3])
+        .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?;
+    let donor_landing = choose(&mut review, &donor_collision, 0, end, plan.translation)
+        .map_err(|error| SparkError::Invalid(format!("Donor connector landing: {error}")))?;
+    let landings = [base_landing, donor_landing];
+    let overlaps = [landings[0].0, landings[1].0];
+    let points = intact_floor_points(overlaps, forward);
+    review.tunnel_points = points[1..3].to_vec();
+    review.validate()?;
 
     let height = f64::from(plan.tunnel_height);
     let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, None));
@@ -1385,12 +1374,12 @@ pub fn generate_preserved_connector(
     for point in mesh.positions.chunks_exact(3) {
         validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
     }
-    review.tunnel_points = vec![overlap(start)[0], points[1], points[2], overlap(end)[1]];
+    review.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
     let route_clearance = checker.verify_details(&review)?;
     checker.verify_return(&review)?;
-    for landing in [start, end] {
-        if checker.floor_profile(overlap(landing))?.into_iter().any(|z| (z - landing[2]).abs() > 0.02) {
+    for overlap in overlaps {
+        if checker.floor_profile(overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
             return invalid("Connector surface does not match a reviewed landing");
         }
     }
@@ -1401,24 +1390,71 @@ pub fn generate_preserved_connector(
         input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
         generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
         portal_count: 0, route_clearance, donor_scenery: 0,
-        warnings: vec![format!("Shared level floor differs by at most {:.3} units across both landings. Donor extraction, scenario binding and runtime travel are separate checks.", landings[0].max(landings[1]))],
+        warnings: vec![format!("Shared floor spans {:.2} and {:.2} units. Maximum floor difference is {:.3} units. Runtime travel requires playtesting.",
+            2. * landings[0].1, 2. * landings[1].1, landings[0].2.max(landings[1].2))],
     };
     let corridor = base.mesh.parts.len();
     let island = corridor + 1;
     let trigger = |from, to, center, distance: f64| partition_switch(
         from, to, offset(center, distance - 0.45), forward, plan.tunnel_width, plan.tunnel_height,
     );
+    // The two 0.9-unit triggers stay disjoint and entirely within the verified flat floor.
+    let base_switch = intact_switch_distance(landings[0].1);
+    let donor_switch = intact_switch_distance(landings[1].1);
     let switches = [
-        trigger(plan.base_bsp_index, corridor, start, 1.3),
-        trigger(corridor, plan.base_bsp_index, start, -1.3),
-        trigger(corridor, island, end, 1.3),
-        trigger(island, corridor, end, -1.3),
+        trigger(plan.base_bsp_index, corridor, start, base_switch),
+        trigger(corridor, plan.base_bsp_index, start, -base_switch),
+        trigger(corridor, island, end, donor_switch),
+        trigger(island, corridor, end, -donor_switch),
     ];
     Ok(PreservedConnector {
         geometry: AssemblyGeometry { mesh, materials, triangle_materials, report },
         switches,
-        overlaps: [overlap(start), overlap(end)],
+        overlaps,
     })
+}
+
+fn choose_intact_landing(
+    checker: &crate::bsp_clearance::RouteChecker, review: &mut BspAssembly,
+    center: V, displacement: V, forward: V,
+) -> Result<([V; 2], f64, f64)> {
+    let mut first_error = None;
+    for span in [2.3, 1.75, 1.4] {
+        let direction = mul(forward, span);
+        let world = [sub(center, direction), add(center, direction)];
+        let local = world.map(|point| sub(point, displacement));
+        review.tunnel_points = local.to_vec();
+        let checked = (|| {
+            checker.verify(review)?;
+            checker.verify_return(review)?;
+            let difference = checker.floor_profile(local)?.into_iter()
+                .map(|z| (z + displacement[2] - center[2]).abs()).fold(0., f64::max);
+            if difference > 0.02 {
+                return invalid(format!("Floor differs from the level connector by {difference:.3} units"));
+            }
+            Ok(difference)
+        })();
+        match checked {
+            Ok(difference) => return Ok((world, span, difference)),
+            Err(error) => { first_error.get_or_insert(error); }
+        }
+    }
+    Err(first_error.unwrap())
+}
+
+fn intact_switch_distance(span: f64) -> f64 {
+    (span - 0.75).min(1.3)
+}
+
+fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V) -> [V; 4] {
+    let outside = mul(forward, 0.7);
+    let slope_margin = mul(forward, 0.2);
+    [
+        sub(overlaps[0][0], outside),
+        add(overlaps[0][1], slope_margin),
+        sub(overlaps[1][0], slope_margin),
+        add(overlaps[1][1], outside),
+    ]
 }
 
 pub(crate) fn verify_intact_connector_collision(
@@ -1452,9 +1488,9 @@ pub(crate) fn verify_intact_connector_collision(
     if max_delta > 0.02 { return invalid("Compiled intact connector landing floors are misaligned"); }
     let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
     let delta = sub(end, start);
-    let forward = [delta[0], delta[1], 0.];
-    let offset = mul(forward, 2.5 / forward[0].hypot(forward[1]));
-    route.tunnel_points = vec![overlaps[0][0], add(start, offset), sub(end, offset), overlaps[1][1]];
+    let forward = mul([delta[0], delta[1], 0.], 1. / delta[0].hypot(delta[1]));
+    let points = intact_floor_points(overlaps, forward);
+    route.tunnel_points = vec![overlaps[0][0], points[1], points[2], overlaps[1][1]];
     let corridor = [connector.verify(&route)?, connector.verify_return(&route)?];
     Ok(serde_json::json!({
         "connectorSamples": corridor, "landingSamples": samples, "maxFloorDelta": max_delta,
@@ -2077,6 +2113,31 @@ mod tests {
             point[axis] += 0.01;
             assert!(validate_native_bsp_point(point).is_err());
         }
+    }
+
+    #[test]
+    fn intact_overlap_uses_shorter_supported_floor_and_disjoint_native_switches() {
+        let deck = |half: f32, height: f32| MeshData {
+            positions: vec![-half,-1.,height, half,-1.,height, half,1.,height, -half,1.,height],
+            indices: vec![0,1,2,0,2,3],
+            ..Default::default()
+        };
+        let center = [0.; 3];
+        let forward = [1., 0., 0.];
+        let mut plan = dual_route_plan();
+        let short = crate::bsp_clearance::RouteChecker::new(&deck(1.6, 0.)).unwrap();
+        let wide = crate::bsp_clearance::RouteChecker::new(&deck(2.6, 0.)).unwrap();
+        let outside = crate::bsp_clearance::RouteChecker::new(&deck(2.6, 0.1)).unwrap();
+        let (shared, span, height) = choose_intact_landing(&short, &mut plan, center, center, forward).unwrap();
+        assert_eq!((shared, span, height), ([[-1.4, 0., 0.], [1.4, 0., 0.]], 1.4, 0.));
+        assert_eq!(choose_intact_landing(&wide, &mut plan, center, center, forward).unwrap().1, 2.3);
+        assert!(choose_intact_landing(&outside, &mut plan, center, center, forward).is_err());
+        let d = intact_switch_distance(span);
+        let from = partition_switch(0, 1, [-d - 0.45, 0., 0.], forward, 1., 1.6).geometry;
+        let to = partition_switch(1, 0, [d - 0.45, 0., 0.], forward, 1., 1.6).geometry;
+        assert!(f64::from(from.corner[0]) >= shared[0][0]);
+        assert!(from.corner[0] + from.dimensions[0] < to.corner[0]);
+        assert!(f64::from(to.corner[0] + to.dimensions[0]) <= shared[1][0]);
     }
 
     #[test]

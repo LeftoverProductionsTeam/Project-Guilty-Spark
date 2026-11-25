@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: MCC13 4bb73ace passed native Death Island environment parity. Fourteen-region 71fc1648 remains installed. Forerunner 95c6def0f passed offline Black Echo UNSC deployment, Pelican boarding and field disembarkation.
-Next action: Finish the Boarding Action stacked approach survey and native compile where clear. Gameplay-test Death Island on 4bb73ace while preserving the installed 14-region cache. Continue Black Echo at the UNSC field objective. Verify evacuation/redeploy, Covenant and private LAN independently.
+Latest verified revision: Sixteen-region MCC13 3946c47e passed native readback with intact Boarding Action. Fifteen-region 4bb73ace remains retained and fourteen-region 71fc1648 remains installed. Black Echo offline UNSC insertion passed.
+Next action: Survey Gephyrophobia from the exact sixteen-region cache, then Ice Fields and Infinity. Forerunner has the pinned Boarding Action candidate for private infantry gameplay after Death Island. Continue Black Echo field, evacuation, both factions and LAN acceptance.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 

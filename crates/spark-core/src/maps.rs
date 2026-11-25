@@ -1151,7 +1151,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
     let mut encounters = vec![];
     // Multiplayer pickups live in a different scenario block from ordinary
     // placed equipment. Each references an item collection, not a model.
-    match space.block(&r,scenario_at+0x384,144,200){
+    match space.block(&r, scenario_at + 0x384, 144, netgame_equipment_limit(header.version)) {
         Ok((table,count))=>for index in 0..count {
             let row=table+index*144;let datum=r.u32(row+92)?;
             let Some(collection)=tags.iter().find(|t|t.id==datum&&t.class=="itmc")else{continue};
