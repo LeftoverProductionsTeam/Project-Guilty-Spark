@@ -4,7 +4,7 @@ import type {NativeCommandGeometryReview,NativeCommandList,NativeTagContext} fro
 import {Notice,NumberField} from './ui';
 /** Compiled reference and explicit coordinate-draft corrections; native writes stay in source review. */
 export default function NativeBspPointCheck({context,points,manualBsp,disabled,label,subject,onSelect,onGround,selectionKey,commandRoute,mountOffset,controlMountTag,onMountOffset,footprintSpacing}:{context:NativeTagContext;points:[number,number,number][];manualBsp?:number;disabled:boolean;label:string;subject?:string;onSelect?:(index:number)=>void;onGround?:(index:number,point:[number,number,number])=>void;selectionKey?:string;commandRoute?:NativeCommandList;mountOffset?:number;controlMountTag?:string;onMountOffset?:(offset:number)=>void;footprintSpacing?:number}){
- const [findGround,setFindGround]=useState(false),[drop,setDrop]=useState(16);
+ const [findGround,setFindGround]=useState(mountOffset!==undefined),[drop,setDrop]=useState(16);
  const groundDrop=footprintSpacing!==undefined?16:findGround&&onGround?drop:undefined;
  const offset=mountOffset??0;
  const [start,setStart]=useState<{key:string|undefined;mode:string;xyz:string[]}|null>(null);
@@ -57,6 +57,7 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
   }catch(problem){if(request===generation.current)setError(String(problem));}finally{if(request===generation.current)setChecking(false);}
  }
  const current=review?.key===key?review.value:null;
+ const modelBaseOffset=current?.controlMount?.offset;
  const survey=current&&footprintSpacing!==undefined?(current.points[0]?.ground??[]).flatMap(({bsp})=>{
   if(manualBsp!==undefined&&bsp!==manualBsp)return [];
   const heights=current.points.map(sample=>sample.ground?.find(surface=>surface.bsp===bsp)?.z);
@@ -103,6 +104,20 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
      if(measured!=null&&onMountOffset&&latest.current===review?.key)onMountOffset(measured);
     }}>Use model base offset</button></>}
  </div>}
+ {groundDrop!==undefined&&modelBaseOffset!=null&&
+  (row.ground??[]).filter(surface=>manualBsp===undefined||surface.bsp===manualBsp).map(surface=>{
+   const seatedZ=surface.z+modelBaseOffset;
+   const clearance=row.point[2]-seatedZ;
+   return <div className="button-row" key={surface.bsp}>
+    <small>BSP {surface.bsp} · {Math.abs(clearance)<.001?'Model base meets the surface':
+      'Model base is '+Math.abs(clearance).toFixed(3)+' units '+(clearance>0?'above':'below')+' the surface'}.</small>
+    <button type="button" disabled={disabled||checking||!onGround||Math.abs(seatedZ)>1e6} onClick={()=>{
+     if(disabled||!onGround||latest.current!==review?.key)return;
+     generation.current++;setReview(null);
+     onGround(index,[points[index][0],points[index][1],seatedZ]);
+    }}>Seat model on ground · BSP {surface.bsp} · origin Z {Number(seatedZ.toFixed(5))}</button>
+   </div>;
+  })}
  {groundDrop!==undefined&&<div className="button-row">{(row.ground??[]).filter(s=>manualBsp===undefined||s.bsp===manualBsp).map(surface=><button type="button" key={surface.bsp} disabled={disabled||checking||!onGround||Math.abs(surface.z+offset)>1e6} onClick={()=>{
    if(disabled||!onGround||latest.current!==review?.key)return;
    generation.current++;setReview(null);onGround(index,[points[index][0],points[index][1],surface.z+offset]);

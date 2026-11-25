@@ -4923,7 +4923,7 @@ test('native control support uses the reviewed ground and mounting offset in the
  const form=operations.locator('.native-device-placements');
  await form.locator(':scope > summary').click();
  await form.getByText('Ground support for control',{exact:true}).click();
- await form.getByRole('checkbox',{name:'Find ground below points'}).check();
+ await expect(form.getByRole('checkbox',{name:'Find ground below points'})).toBeChecked();
  await form.getByRole('button',{name:'Check control ground',exact:true}).click();
  await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('No collision surface within ±0.5');
  const offset=form.getByRole('spinbutton',{name:'Origin offset from ground',exact:true});
@@ -5962,9 +5962,8 @@ for(const firstGate of [false,true])test('native squad terminals preserve source
   const ground=form.getByText('Ground support for control',{exact:true});await revealPagedControl(ground);await ground.click();
   const find=form.getByRole('checkbox',{name:'Find ground below points',exact:true});await revealPagedControl(find);await find.check();
   const check=form.getByRole('button',{name:'Check control ground',exact:true});await revealPagedControl(check);await check.click();
-  const model=form.getByRole('button',{name:'Use model base offset',exact:true});await revealPagedControl(model);await model.click();
-  await revealPagedControl(check);await check.click();
-  const useGround=form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.1',exact:true});
+  await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('Model base is 1.150 units above the surface');
+  const useGround=form.getByRole('button',{name:'Seat model on ground · BSP 0 · origin Z 0.1',exact:true});
   await revealPagedControl(useGround);await useGround.click();await expect(z).toHaveValue('0.1');
  }
  if(firstGate)await form.getByRole('checkbox',{name:"Require this squad's objectives before extraction",exact:true}).check();
