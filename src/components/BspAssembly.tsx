@@ -6,7 +6,7 @@ import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
 import { runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -175,7 +175,7 @@ export default function BspAssembly({
   const [sealLift, setSealLift] = useMapState(project.id, 'bsp.nativeSealLift', 0);
   const [nativeBspIndex, setNativeBspIndex] = useMapState(project.id, 'bsp.nativePartitionPreview', 0);
   const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
-  const [pickingLanding, setPickingLanding] = useMapState(project.id, 'bsp.pickingLanding', false);
+  const [pickingLanding, setPickingLanding] = useMapState<'connector'|'ridge'|null>(project.id, 'bsp.pickingLanding', null);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
   const [importedDonor, setImportedDonor] = useState<LibraryEntry>();
@@ -323,9 +323,15 @@ export default function BspAssembly({
     if (pickingLanding) {
       if (pickedSurface.sourceHash !== hash || pickedSurface.bspIndex !== bsp) return;
       const point = base ? pickedSurface.point : donorPoint(pickedSurface.point, draft);
-      update({ tunnelPoints: draft.tunnelPoints.map((old, index) => index === (base ? 0 : 1) ? point : old) });
+      if (pickingLanding==='ridge') {
+        if (!draft.highGround) return;
+        const points=draft.highGround.points;
+        update({highGround:{...draft.highGround,points:points.map((old,index)=>index===(base?0:points.length-1)?point:old)}});
+      } else {
+        update({ tunnelPoints: draft.tunnelPoints.map((old, index) => index === (base ? 0 : 1) ? point : old) });
+      }
       setEdgeTarget(null);
-      setPickingLanding(false);
+      setPickingLanding(null);
       setPickedSurface(null);
       return;
     }
@@ -343,7 +349,7 @@ export default function BspAssembly({
   function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
   }
-  function armEdge(target:'base'|'donor', landing = false){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
+  function armEdge(target:'base'|'donor', landing:typeof pickingLanding = null){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
       <div className="bsp-vector">
@@ -553,7 +559,18 @@ export default function BspAssembly({
                 {!routeKey&&<label><input type="checkbox" aria-label="Open-sky road" checked={routeDraft!.openRoad??false} disabled={busy} onChange={e=>updateRoute({openRoad:e.target.checked,archSegments:undefined,...(e.target.checked?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}/> Open sky above road</label>}
               </div>
               <p className="subtle" aria-label="Seam route requirements">Player cave: {draft.infantryTunnel?'drafted':'missing'} · Warthog route: {draft.tunnelWidth>=6&&draft.tunnelHeight>=4?'design width set':'widen the primary passage'} · Canyon tops: {draft.highGround?'drafted':'missing'}. Drafts are not gameplay acceptance.</p>
-              <p className="subtle">{ridge?'Open ridge with access ramps. Adjust its floor points onto walkable canyon tops on both maps; use bends for overlooks. Source checks must pass before compiling.':infantry?'Separate player cave. Keep both entrances on the original ground.':'Widen the primary passage for a Warthog cave or choose open sky for a canyon road.'} All routes rebuild together. Vehicle handling, continuous mountain access and sniper sightlines require a Halo playtest.</p>
+              {ridge&&<div className="bsp-actions">
+                <button disabled={busy||!selectionMatches} onClick={()=>{setViewedBsp(draft.baseBspIndex??0);armEdge('base','ridge');}}>Pick ridge start on this BSP</button>
+                <button disabled={busy||!selectionMatches} onClick={()=>armEdge('donor','ridge')}>Pick ridge end on donor BSP</button>
+                <button disabled={busy||routeDraft!.tunnelWidth>=6} onClick={()=>updateRoute({tunnelWidth:6})}>Widen ridge for Warthog</button>
+                {draft.terrainSeam&&<button disabled={busy} onClick={()=>{try{
+                  const filled=fillTerrainToRidge(draft);
+                  if(filled===draft){setError('The terrain shoulders already reach the ridge deck.');return;}
+                  update({terrainSeam:filled.terrainSeam});
+                }catch(error){setError(String(error));}}}>Fill terrain to ridge</button>}
+                <small>A six-unit ridge also checks both sides of the deck for missing collision floor. Drive the compiled route to verify handling.</small>
+              </div>}
+              <p className="subtle">{ridge?'Open ridge with access ramps. Pick canyon-top floors on both source BSPs and use intermediate points for gradual ramps and overlooks. Source checks must pass before compiling.':infantry?'Separate player cave. Keep both entrances on the original ground.':'Widen the primary passage for a Warthog cave or choose open sky for a canyon road.'} All routes rebuild together. Vehicle handling, continuous mountain access and sniper sightlines require a Halo playtest.</p>
               </>}
               {pickedSurface&&project.source?.sha256===pickedSurface.sourceHash&&pickedSurface.bspIndex===(draft.baseBspIndex??0)&&<button disabled={busy} onClick={()=>updateRoute({tunnelPoints:routeDraft!.tunnelPoints.map((p,i)=>i===0?[...pickedSurface.point]:p)})}>Use selected landscape for entrance</button>}
               {!selectionMatches && (
@@ -747,8 +764,8 @@ export default function BspAssembly({
                     <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
                     <div className="bsp-actions">
-                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', true); }}>Pick current BSP landing</button>
-                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', true)}>Pick donor landing</button>
+                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
+                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
                     </div>
                     <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. With preservation enabled, apply and save the connection, then build for MCC13. The new connector gets its own BSP slot.</p>
                   </div>}

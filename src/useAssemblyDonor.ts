@@ -7,12 +7,12 @@ import {useMapState} from './mapSession';
 import {assemblyViewportSource,currentAssemblyPreview,currentAssemblyDraftPreview} from './assemblyViewport';
 import {publishTextureResources} from './textureResourceScope';
 /** One RAM source admission per reviewed donor identity, independent of motion. */
-export function useAssemblyDonor(project:Project){
+export function useAssemblyDonor(project:Project, pickDraftDonor=false){
  const [draft]=useMapState<BspAssembly|null>(project.id,'bsp.draft',()=>project.bspAssembly??null);
  const [baseline]=useMapState(project.id,'bsp.applied',()=>assemblySignature(project.bspAssembly??null));
  const [preview,setPreview]=useState<AssemblyReport['viewport']>(undefined);
  const accept=(value:AssemblyReport['viewport'])=>currentAssemblyPreview(project,value)??currentAssemblyDraftPreview(project,draft,baseline,value);
- const joined=accept(preview),plan=joined?.assembly??project.bspAssembly;
+ const joined=accept(preview),plan=pickDraftDonor&&baseline===assemblySignature(project.bspAssembly??null)?draft??project.bspAssembly:joined?.assembly??project.bspAssembly;
  useEffect(()=>{const received=(event:Event)=>{const value=(event as CustomEvent<AssemblyReport['viewport']>).detail;
   if(accept(value))setPreview(value);
  };window.addEventListener('gs:bsp-source-preview',received);return()=>window.removeEventListener('gs:bsp-source-preview',received);},[project.id,project.source?.sha256,project.bspAssembly,draft,baseline]);

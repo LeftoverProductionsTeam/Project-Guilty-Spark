@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
+import { addInfantryTunnel, addHighGroundRoute, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblyRoutes, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -153,4 +153,15 @@ it('sectioned seams retain edge identities, native dimensions and independent do
  expect(moved.sections![0].points[0]).toEqual(section.points[0]);expect(moved.sections![0].points.at(-1)).toEqual([27,15,2]);expect(moved.sections![0].edges).toBe(section.edges);
  expect(assemblyRoutes(p).at(-1)!.label).toBe('Existing doorway');expect(assemblySignature({...plan,sections:[]})).toBe(assemblySignature(plan));
  expect(assemblySignature({...p,sections:[{...section,height:Math.fround(1.6)}]})).toBe(assemblySignature(p));
+});
+
+it('widens the native terrain ribbon to the complete ridge deck and keeps the original plan',()=>{
+  const road={...plan,tunnelWidth:6,terrainSeam:{shoulderWidth:8,bankHeight:4,baseShaderPath:'owned/grass',donorShaderPath:'owned/snow'}};
+  const draft=addHighGroundRoute(road);
+  const widened=fillTerrainToRidge(draft);
+  expect(widened.terrainSeam?.shoulderWidth).toBe(12);
+  expect(widened.highGround).toBe(draft.highGround);
+  expect(draft.terrainSeam?.shoulderWidth).toBe(8);
+  expect(fillTerrainToRidge(widened)).toBe(widened);
+  expect(()=>fillTerrainToRidge(addHighGroundRoute(road,-40))).toThrow(/fill limit/);
 });

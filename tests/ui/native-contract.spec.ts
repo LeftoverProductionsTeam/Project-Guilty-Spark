@@ -3779,6 +3779,13 @@ test('three-route seam is one source edit with retained route controls and per-r
  const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();await click('Plan connected tunnel');await click('Make three-route seam');
  await expect(panel.getByLabel('Seam route requirements')).toContainText('Player cave: drafted');await expect(panel.getByLabel('Seam route requirements')).toContainText('Canyon tops: drafted');
  const route=panel.getByRole('combobox',{name:'Connection route',exact:true,includeHidden:true});await revealPagedControl(route);await route.selectOption('highGround');
+ await click('Pick ridge start on this BSP');
+ await expect(page.getByRole('button',{name:'Cancel ridge selection',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Cancel ridge selection',exact:true}).click();
+ await click('Pick ridge end on donor BSP');
+ await expect(page.getByRole('button',{name:'Cancel ridge selection',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Cancel ridge selection',exact:true}).click();
+ await click('Widen ridge for Warthog');
  const width=panel.getByRole('spinbutton',{name:'Tunnel width',exact:true,includeHidden:true});await revealPagedControl(width);await width.fill('4.5');await width.press('Enter');
  await click('Apply connection');await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.highGround?.width)).toBe(4.5);

@@ -634,7 +634,7 @@ export default function World({
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [surfacePick,setSurfacePick]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const [pickTarget,setPickTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
-  const [pickingLanding, setPickingLanding] = useMapState(project.id, 'bsp.pickingLanding', false);
+  const [pickingLanding, setPickingLanding] = useMapState<'connector'|'ridge'|null>(project.id, 'bsp.pickingLanding', null);
   const activity=useWorkspaceActivity();
   const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
@@ -695,7 +695,7 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
-  const assemblyDonor=useAssemblyDonor(project),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
+  const assemblyDonor=useAssemblyDonor(project,pickTarget==='donor'&&pickingLanding==='ridge'),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const joinedBaseMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===0)?.mesh;
   const joinedDonorMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===1)?.mesh;
@@ -1844,7 +1844,7 @@ export default function World({
             Compiled switch volume {visibleSwitch.triggerIndex} · BSP {visibleSwitch.sourceBsp} → {visibleSwitch.destinationBsp}
             <button type="button" onClick={()=>setCompiledSwitch(null)}>Hide switch volume</button>
           </div>}
-          {pickTarget&&<div className="viewport-object-actions" role="status">Click {pickingLanding?'the landing floor':'an edge'} on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>{setPickTarget(null);setPickingLanding(false);}}>{pickingLanding?'Cancel landing selection':'Cancel edge selection'}</button></div>}
+          {pickTarget&&<div className="viewport-object-actions" role="status">Click {pickingLanding==='ridge'?'a walkable canyon-top floor':pickingLanding?'the landing floor':'an edge'} on {pickTarget==='base'?'this region':'the donor region'}. <button onClick={()=>{setPickTarget(null);setPickingLanding(null);}}>{pickingLanding==='ridge'?'Cancel ridge selection':pickingLanding?'Cancel landing selection':'Cancel edge selection'}</button></div>}
           {!pickTarget&&!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
             <strong>BSP {surfacePick.bspIndex+1} · landscape</strong>
             <button onClick={()=>openObjectTag(surfacePick.shaderTagId)}>Surface shader</button>

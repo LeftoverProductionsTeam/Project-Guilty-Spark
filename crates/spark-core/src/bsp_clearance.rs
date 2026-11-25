@@ -363,12 +363,27 @@ impl RouteChecker {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
         let d = sub(b, a);
         let steps = (dot(d, d).sqrt() / 0.25).ceil() as usize;
+        let lateral = (strict_floor && assembly.tunnel_width >= 6.)
+            .then(|| mul([-d[1], d[0], 0.], 1.5 / d[0].hypot(d[1])));
         for step in 0..=steps {
             let p = add(a, mul(d, step as f64 / steps as f64));
             let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points ({})",segment + 1,p[0],p[1],p[2],index.floor_diagnostic(p))))?;
             // A nearby lower road cannot stand in for a canyon-top route.
             if strict_floor && (z-p[2]).abs() > 0.12 {
                 return invalid(format!("The canyon-top floor is {:.2} units below its authored route near {:.2}, {:.2}; align the ridge with real supported terrain, not the lower passage",p[2]-z,p[0],p[1]));
+            }
+            if let Some(lateral) = lateral {
+                // A centerline can cross a narrow triangle or hide a tear
+                // under one wheel. Review both sides at the same elevation.
+                for sign in [-1., 1.] {
+                    let point = add([p[0], p[1], z], mul(lateral, sign));
+                    if index.floor_in_range(point, &mut scratch, 0.30, 0.30).is_none() {
+                        return invalid(format!(
+                            "Canyon-top deck loses lateral floor support near {:.2}, {:.2}, {:.2}. Fill the tear or move the ridge onto a wider floor.",
+                            point[0], point[1], point[2],
+                        ));
+                    }
+                }
             }
             if previous.is_some_and(|(_, old)| (z - old).abs() > 0.12) {
                 return invalid(format!(
@@ -613,6 +628,22 @@ mod tests {
         route.tunnel_points.reverse();
         assert!(verify_route(&mesh, &route).is_ok());
     }
+    #[test]
+    fn vehicle_width_ridge_checks_both_sides_of_the_deck() {
+        let mut route = plan();
+        route.tunnel_width = 6.;
+        route.tunnel_height = 4.;
+        route.open_road = true;
+        let full = RouteChecker::new(&corridor(6., 4.)).unwrap();
+        assert!(full.verify_one(&route, true).is_ok());
+
+        let thin = RouteChecker::new(&corridor(2., 4.)).unwrap();
+        assert!(thin.verify_one(&route, false).is_ok());
+        assert!(thin.verify_one(&route, true).unwrap_err().to_string().contains("lateral floor support"));
+        route.tunnel_points.reverse();
+        assert!(thin.verify_one(&route, true).is_err());
+    }
+
     #[test]
     fn missing_floor_and_invalid_collision_never_pass() {
         let mut m = corridor(2., 1.6);

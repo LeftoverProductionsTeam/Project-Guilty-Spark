@@ -150,6 +150,19 @@ export function addHighGroundRoute(plan:BspAssembly,offset=-12):BspAssembly {
   if(points.flat().some(n=>!Number.isFinite(n)||Math.abs(n)>2048))throw Error('The ridge exceeds the supported world bounds.');
   return {...plan,highGround:{points,width:4,height:8,shaderPath:plan.terrainSeam?.baseShaderPath??plan.tunnelShaderPath}};
 }
+/** Size the real terrain ribbon to meet the ridge deck without changing either source BSP. */
+export function fillTerrainToRidge(plan:BspAssembly):BspAssembly {
+  if(!plan.terrainSeam||!plan.highGround)throw Error('Plan adjacent terrain and a high-ground route first.');
+  const [start,end]=plan.tunnelPoints;
+  const dx=end[0]-start[0],dy=end[1]-start[1],length=Math.hypot(dx,dy);
+  if(!Number.isFinite(length)||length<4)throw Error('Choose two separated road endpoints first.');
+  const ridgeReach=Math.max(...plan.highGround.points.map(([x,y])=>Math.abs(((y-start[1])*dx-(x-start[0])*dy)/length)));
+  const shoulderWidth=Math.ceil((ridgeReach+plan.highGround.width/2+1-plan.tunnelWidth/2)*2)/2;
+  if(!Number.isFinite(shoulderWidth)||shoulderWidth>24)throw Error('The ridge is beyond the terrain fill limit. Move it closer or connect that section separately.');
+  if(shoulderWidth<=plan.terrainSeam.shoulderWidth)return plan;
+  return {...plan,terrainSeam:{...plan.terrainSeam,shoulderWidth}};
+}
+
 /** One source edit; never certifies Warthog physics or sniper visibility. */
 export function makeThreeRouteSeam(plan:BspAssembly):BspAssembly {
   const next=addHighGroundRoute(addInfantryTunnel(plan));
