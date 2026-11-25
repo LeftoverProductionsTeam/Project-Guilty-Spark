@@ -719,14 +719,27 @@ function prepareClassicCeTags() {
   expect(fieldsWithout(edit(effect, ['-L'], 'classic-melee-fields-after'), changedMelee),
     fieldsWithout(meleeListing, changedMelee), 'unchanged melee fields');
 
-  const hunterMelee = 'characters/hunter/melee.damage_effect';
-  const hunterFields = ['maximum_intensity', 'damage_stun', 'damage_maximum_stun'];
-  expect(get(hunterMelee, ['type', ...hunterFields], 'classic-hunter-melee-before'), ['darken', '10.000000', '3.000000', '3.000000'], 'original Hunter flash');
-  const hunterListing = edit(hunterMelee, ['-L'], 'classic-hunter-melee-fields-before');
-  edit(hunterMelee, hunterFields.flatMap(field => ['-S', field, '1']), 'classic-hunter-melee-cap');
-  expect(get(hunterMelee, ['type', ...hunterFields], 'classic-hunter-melee-after'), ['darken', '1.000000', '1.000000', '1.000000'], 'CE Hunter flash');
-  expect(fieldsWithout(edit(hunterMelee, ['-L'], 'classic-hunter-melee-fields-after'), hunterFields),
-    fieldsWithout(hunterListing, hunterFields), 'unchanged Hunter melee fields');
+  const damageBounds = [
+    ['characters/hunter/melee.damage_effect', 10, 3, 3],
+    ['mgm/kiyoshi/broke/tags/molotov explosion.damage_effect', 2, 2, 2],
+    ['weapons/ball/melee.damage_effect', 3, 1, 1],
+    ['weapons/flag/melee.damage_effect', 3, 1, 1],
+    ['weapons/flamethrower/melee.damage_effect', 3, 1.5, 1.5],
+    ['weapons/shotgun/melee.damage_effect', 3, 1, 1],
+    ['weapons/sniper rifle/melee.damage_effect', 3, 1, 1],
+  ];
+  const cappedDamageFields = ['maximum_intensity', 'damage_stun', 'damage_maximum_stun'];
+  for (const [tag, ...values] of damageBounds) {
+    expect(get(tag, cappedDamageFields, 'classic-damage-before'), values.map(value => value.toFixed(6)),
+      'original flash and stun values for ' + tag);
+    const changed = cappedDamageFields.filter((_, i) => values[i] > 1);
+    const listing = edit(tag, ['-L'], 'classic-damage-fields-before');
+    edit(tag, changed.flatMap(field => ['-S', field, '1']), 'classic-damage-bounds');
+    expect(get(tag, cappedDamageFields, 'classic-damage-after'), ['1.000000', '1.000000', '1.000000'],
+      'CE flash and stun values for ' + tag);
+    expect(fieldsWithout(edit(tag, ['-L'], 'classic-damage-fields-after'), changed),
+      fieldsWithout(listing, changed), 'unchanged damage fields for ' + tag);
+  }
 
   const turret = 'mgm/fonzie/sparky/tags/weapons/undead demolisher turret.actor_variant';
   if (hashFile(path.join(directory, turret)) !== '0b283abfa21831e05ecbb5065aed2f33f4505c11cb5b9e0bfcc270af90af1f0f') {
@@ -886,7 +899,7 @@ function prepareClassicCeTags() {
     step: 'stage-classic-ce', state: 'native-source-reviewed', playable: false,
     restoredBuffers,
     melee: { original: meleeBefore, target: meleeAfter, fields: meleeFields },
-    hunterMelee: { tag: hunterMelee, cappedFields: hunterFields },
+    damageBounds: damageBounds.map(([tag, ...original]) => ({tag, original, fields: cappedDamageFields})),
     inactiveTurretGrenadeFields: legalEnums,
     removedUnusedVehicleSlots: empty,
     invisibleCarrier: { model, shader, bitmap },
