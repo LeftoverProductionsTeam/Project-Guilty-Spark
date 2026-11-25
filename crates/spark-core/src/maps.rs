@@ -963,6 +963,32 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
     let (header, bytes, sha256) = read_cache_snapshot_shared(path)?;
     inspect_snapshot(path,resource_directory,header,&bytes,sha256,true)
 }
+// Native loose-tag extraction collapses duplicate separators and appends the
+// tag class extension, including for a cache path with an empty basename.
+pub(crate) fn validate_cache_tag_path(name: &str) -> Result<()> {
+    let normalized = name.replace('\\', "/");
+    if normalized.starts_with('/') {
+        return invalid("An absolute cache tag path cannot be extracted");
+    }
+    let collapsed = normalized.split('/').filter(|part| !part.is_empty()).collect::<Vec<_>>().join("/");
+    let validation_path = if name.ends_with(['\\', '/']) {
+        format!("{collapsed}/__unnamed")
+    } else {
+        collapsed
+    };
+    crate::safe_relative(&validation_path)?;
+    Ok(())
+}
+
+#[test]
+fn cache_tag_path_admits_legacy_separators_without_admitting_unsafe_paths() {
+    assert!(validate_cache_tag_path(r"levels\test\icefields\scenery\\mp_tree_pine_snow_tall\mp_tree_pine_snow_tall").is_ok());
+    assert!(validate_cache_tag_path("effects/particles/").is_ok());
+    for unsafe_path in [r"\levels\test", r"C:\levels\test", r"levels\\..\test", "levels/aux/test", "levels/bad./test"] {
+        assert!(validate_cache_tag_path(unsafe_path).is_err(), "{unsafe_path:?}");
+    }
+}
+
 /// Metadata consumers can reuse one verified immutable file snapshot. The map
 /// viewer always uses inspect_map, including every supported object model.
 pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut header:MapHeader,bytes:&[u8],sha256:String,object_models:bool)->Result<MapInspection>{
@@ -1007,27 +1033,8 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         }
         let path_at = space.pointer(r.u32(at + 16)?, 1)?;
         let name = r.string(path_at, (space.end - path_at).min(1024))?;
-        // A legacy tag may have an empty basename: the extracted file still has
-        // its class extension (e.g. folder/.particle). Validate the directory
-        // without rejecting that safe, historically used filename form.
-        let normalized = name.replace('\\', "/");
-        if normalized.starts_with('/') {
-            return invalid(format!("Absolute tag path at index {i}: {name:?}"));
-        }
-        let collapsed = normalized
-            .split('/')
-            .filter(|c| !c.is_empty())
-            .collect::<Vec<_>>()
-            .join("/");
-        let validation_path = if name.ends_with(['\\', '/']) {
-            format!("{collapsed}/__unnamed")
-        } else {
-            collapsed
-        };
-        crate::safe_relative(&validation_path).map_err(|_| {
-            SparkError::Invalid(format!(
-                "Unsafe or protected tag path at index {i}: {name:?}"
-            ))
+        validate_cache_tag_path(&name).map_err(|_| {
+            SparkError::Invalid(format!("Unsafe or protected tag path at index {i}: {name:?}"))
         })?;
         let external_flag = r.u32(at + 24)?;
         if header.version != 5 && external_flag > 1 {

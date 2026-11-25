@@ -38,9 +38,9 @@ impl PreparedPickups {
         &self,
         path: &Path,
         map: &MapInspection,
-        trees: &[&crate::bsp_audio::ListenerTree],
+        actual: &[NativeNetgamePickup],
+        regions: &crate::bsp_audio::PlacementRegions,
     ) -> Result<usize> {
-        let actual = maps::scenario_netgame_pickups(path, map)?;
         if actual.len() != self.base.len() + self.donor.len() {
             return invalid("Compiled scenario changed the reviewed pickup count");
         }
@@ -71,9 +71,9 @@ impl PreparedPickups {
                 "Compiled pickup collections changed ordered items, weights or spawn timing",
             );
         }
-        let (donor_tree, retained) = trees.split_last()
+        let donor_slot = regions.len().checked_sub(1)
             .ok_or_else(|| SparkError::Invalid("Missing compiled pickup region".into()))?;
-        if retained.len() > 1 && actual[..self.base.len()].iter().any(|row| donor_tree.contains_placement(row.position)) {
+        if donor_slot > 1 && actual[..self.base.len()].iter().any(|row| regions.contains(donor_slot, row.position)) {
             return invalid("The donor overlaps an existing pickup. Move the shared passage clear of the item.");
         }
         for (index, (row, expected)) in actual[self.base.len()..]
@@ -81,8 +81,8 @@ impl PreparedPickups {
             .zip(&self.donor_membership)
             .enumerate()
         {
-            if retained.iter().any(|tree| tree.contains_placement(row.position))
-                || donor_tree.contains_placement(row.position) != *expected
+            if (0..donor_slot).any(|index| regions.contains(index, row.position))
+                || regions.contains(donor_slot, row.position) != *expected
             {
                 return invalid(format!(
                     "Donor pickup {index} changed region membership at {:?}",
@@ -134,7 +134,9 @@ fn isolate_dependencies(
         }
     }
     for tag in &donor.tags {
-        safe_relative(&tag.path)?;
+        maps::validate_cache_tag_path(&tag.path).map_err(|error| {
+            SparkError::Invalid(format!("Unsafe donor pickup extraction tag {} {:?}: {error}", tag.class, tag.path))
+        })?;
     }
     fs::create_dir(&extracted)?;
     let mut args = vec!["-t".into(), "pickup-source".into()];

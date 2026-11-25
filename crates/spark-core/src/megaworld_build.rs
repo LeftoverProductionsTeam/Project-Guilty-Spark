@@ -315,14 +315,17 @@ fn build_partition_cache(
             return invalid("Compiled partition switch differs from the reviewed markerless volume");
         }
     }
-    let world = crate::bsp_audio::inspect_ambience(&path, &map.sha256)?;
-    let trees = world.bsps.iter().map(|bsp| bsp.listener_tree.as_ref()
-        .ok_or_else(|| SparkError::Invalid("Missing compiled placement collision tree".into())))
-        .collect::<Result<Vec<_>>>()?;
-    if trees.len() != expected_count { return invalid("Unexpected number of compiled placement collision trees"); }
-    let donor_pickups_in_region = prepared.pickups.as_ref().map(|pickups| pickups.verify(&path, &map, &trees)).transpose()?;
-    let native_flags = prepared.netgame_flags.as_ref().map(|flags| flags.verify(&path, &map, regional, &trees)).transpose()?;
-    let native_starts = prepared.player_starts.as_ref().map(|starts| starts.verify(&path, &map, regional, &trees)).transpose()?;
+    let pickups = if prepared.pickups.is_some() { maps::scenario_netgame_pickups(&path, &map)? } else { Vec::new() };
+    let flags = if prepared.netgame_flags.is_some() { maps::scenario_netgame_flags(&path, &map)? } else { Vec::new() };
+    let starts = if prepared.player_starts.is_some() { maps::scenario_region_starts(&path, &map)? } else { Vec::new() };
+    let positions = pickups.iter().map(|row| row.position)
+        .chain(flags.iter().map(|row| row.position))
+        .chain(starts.iter().map(|row| row.position));
+    let (world, regions) = crate::bsp_audio::inspect_placement_regions(&path, &map.sha256, positions)?;
+    if regions.len() != expected_count { return invalid("Unexpected number of compiled placement collision trees"); }
+    let donor_pickups_in_region = prepared.pickups.as_ref().map(|review| review.verify(&path, &map, &pickups, &regions)).transpose()?;
+    let native_flags = prepared.netgame_flags.as_ref().map(|review| review.verify(&flags, regional, &regions)).transpose()?;
+    let native_starts = prepared.player_starts.as_ref().map(|review| review.verify(&starts, regional, &regions)).transpose()?;
     let collision = if let Some(overlaps) = prepared.intact_overlaps {
         crate::bsp_assembly::verify_intact_connector_collision(&path, &map, plan, overlaps, old_count)?
     } else {

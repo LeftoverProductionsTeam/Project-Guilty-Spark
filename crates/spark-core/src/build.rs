@@ -567,7 +567,7 @@ impl Runner<'_> {
         let stderr = child.stderr.take().unwrap();
         // Retain the complete scenario listing for comparison without sending
         // hundreds of thousands of field lines to the build UI.
-        let scenario_review = phase == "squad-readback"
+        let scenario_review = matches!(phase, "squad-readback" | "partition-scenario")
             && executable.file_stem().is_some_and(|name| name == "invader-edit")
             && args.iter().any(|arg| arg == "-L");
         // Inventory and detail output is machine input for validation.

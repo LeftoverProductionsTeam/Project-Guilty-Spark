@@ -1650,7 +1650,17 @@ export async function readDevelopmentStorage(checkout = projectRoot) {
 }
 export async function retainGeneratedSchemaState(checkout = projectRoot) {
   const directory = path.join(checkout, 'src-tauri', 'gen', 'schemas'),
-    saved = [];
+    saved = [],
+    createdParents = [];
+  for (const parent of [directory, path.dirname(directory)]) {
+    await noLinks(parent);
+    const info = await fs.lstat(parent).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (info && !info.isDirectory()) throw Error('Unexpected native schema parent protected');
+    if (!info) createdParents.push(parent);
+  }
   for (const name of [
     'acl-manifests.json',
     'capabilities.json',
@@ -1687,10 +1697,12 @@ export async function retainGeneratedSchemaState(checkout = projectRoot) {
         await fs.unlink(row.file);
       }
     }
-    for (const parent of [directory, path.dirname(directory)])
+    for (const parent of createdParents) {
+      await noLinks(parent);
       await fs.rmdir(parent).catch((error) => {
         if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error;
       });
+    }
   };
 }
 async function removeDevelopmentReceipt(base, run, record) {

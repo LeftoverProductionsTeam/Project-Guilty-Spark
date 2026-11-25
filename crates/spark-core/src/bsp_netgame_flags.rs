@@ -35,9 +35,8 @@ fn teleporter_side(kind: u16) -> Option<usize> {
     }
 }
 
-fn exclusive_teleporter_home(trees: &[&crate::bsp_audio::ListenerTree], position: [f32; 3]) -> Result<usize> {
-    let mut matches = trees.iter().enumerate().filter(|(_, tree)| tree.contains_placement(position));
-    matches.next().filter(|_| matches.next().is_none()).map(|(index, _)| index)
+fn exclusive_teleporter_home(regions: &crate::bsp_audio::PlacementRegions, position: [f32; 3]) -> Result<usize> {
+    regions.unique_slot(position)
         .ok_or_else(|| SparkError::Invalid("A teleporter needs an unambiguous native home outside the overlap".into()))
 }
 
@@ -81,12 +80,10 @@ impl PreparedFlags {
         let original_teleporter_homes = if original_bsp_count == 1 {
             base.iter().map(|row| teleporter_side(row.kind).map(|_| 0)).collect()
         } else {
-            let world = crate::bsp_audio::inspect_ambience(&base_source.preserved_path, &base_map.sha256)?;
-            let trees = world.bsps.iter().map(|bsp| bsp.listener_tree.as_ref()
-                .ok_or_else(|| SparkError::Invalid("Retained BSP collision is unavailable".into())))
-                .collect::<Result<Vec<_>>>()?;
+            let positions = base.iter().filter(|row| teleporter_side(row.kind).is_some()).map(|row| row.position);
+            let (_, regions) = crate::bsp_audio::inspect_placement_regions(&base_source.preserved_path, &base_map.sha256, positions)?;
             base.iter().map(|row| if teleporter_side(row.kind).is_some() {
-                exclusive_teleporter_home(&trees, row.position).map(Some)
+                exclusive_teleporter_home(&regions, row.position).map(Some)
             } else { Ok(None) }).collect::<Result<Vec<_>>>()?
         };
         Ok(Self { base, donor, original_teleporter_homes })
@@ -156,13 +153,11 @@ impl PreparedFlags {
 
     pub(crate) fn verify(
         &self,
-        path: &Path,
-        map: &MapInspection,
+        actual: &[NativeNetgameFlag],
         regional: bool,
-        trees: &[&crate::bsp_audio::ListenerTree],
+        regions: &crate::bsp_audio::PlacementRegions,
     ) -> Result<serde_json::Value> {
         let donor = if regional { self.donor.as_slice() } else { &[] };
-        let actual = maps::scenario_netgame_flags(path, map)?;
         if actual.len() != self.base.len() + donor.len() {
             return invalid("Compiled multiplayer flag count differs from the reviewed target");
         }
@@ -194,8 +189,8 @@ impl PreparedFlags {
                 };
                 let expected_bsp = if index < self.base.len() {
                     self.original_teleporter_homes[index].unwrap()
-                } else { trees.len().checked_sub(1).ok_or_else(|| SparkError::Invalid("Missing donor teleporter BSP".into()))? };
-                if row.usage_id < 0 || exclusive_teleporter_home(trees, row.position)? != expected_bsp {
+                } else { regions.len().checked_sub(1).ok_or_else(|| SparkError::Invalid("Missing donor teleporter BSP".into()))? };
+                if row.usage_id < 0 || exclusive_teleporter_home(regions, row.position)? != expected_bsp {
                     return invalid(format!("Teleporter flag {index} needs an unambiguous native home outside the overlap"));
                 }
                 channels

@@ -147,20 +147,86 @@ pub fn inspect(path: &Path, expected: &str) -> Result<Inspection> {
     read(&header, &bytes, sha)
 }
 fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspection> {
-    read_with_listener(header, bytes, sha, false)
+    read_with_listener(header, bytes, sha, ListenerReadback::None)
 }
 pub fn inspect_ambience(path: &Path, expected: &str) -> Result<Inspection> {
     let (header, bytes, sha) = maps::read_cache_snapshot(path)?;
     if sha != expected {
         return invalid("Map ambience source changed");
     }
-    read_with_listener(&header, &bytes, sha, true)
+    read_with_listener(&header, &bytes, sha, ListenerReadback::Ambience)
 }
+/// Placement admission uses the same validated collision trees as ambience.
+// Process each resident BSP once, retaining only a mask for each exact point.
+#[derive(Default)]
+pub(crate) struct PlacementRegions {
+    masks: HashMap<[u32; 3], u16>,
+    bsp_count: usize,
+}
+impl PlacementRegions {
+    pub(crate) fn len(&self) -> usize { self.bsp_count }
+
+    pub(crate) fn contains(&self, bsp: usize, position: [f32; 3]) -> bool {
+        bsp < self.bsp_count && self.mask(position) & (1u16 << bsp) != 0
+    }
+
+    pub(crate) fn unique_slot(&self, position: [f32; 3]) -> Option<usize> {
+        let mask = self.mask(position);
+        (mask.count_ones() == 1).then(|| mask.trailing_zeros() as usize)
+    }
+
+    fn mask(&self, position: [f32; 3]) -> u16 {
+        self.masks.get(&position.map(f32::to_bits)).copied().unwrap_or(0)
+    }
+
+    fn scan(&mut self, index: usize, tree: &ListenerTree) -> Result<()> {
+        if index != self.bsp_count || index >= u16::BITS as usize {
+            return invalid("Invalid compiled placement BSP index");
+        }
+        for (bits, mask) in &mut self.masks {
+            if tree.contains_placement(bits.map(f32::from_bits)) {
+                *mask |= 1u16 << index;
+            }
+        }
+        self.bsp_count += 1;
+        Ok(())
+    }
+}
+
+pub(crate) fn inspect_placement_regions(
+    path: &Path,
+    expected: &str,
+    positions: impl IntoIterator<Item = [f32; 3]>,
+) -> Result<(Inspection, PlacementRegions)> {
+    let (header, bytes, sha) = maps::read_cache_snapshot(path)?;
+    if sha != expected {
+        return invalid("Compiled placement source changed");
+    }
+    let mut regions = PlacementRegions::default();
+    for position in positions {
+        if !position.iter().all(|axis| axis.is_finite()) {
+            return invalid("Invalid compiled placement position");
+        }
+        regions.masks.insert(position.map(f32::to_bits), 0);
+        if regions.masks.len() > 8192 {
+            return invalid("Compiled placement queries exceed their total budget");
+        }
+    }
+    let world = read_with_listener(&header, &bytes, sha, ListenerReadback::Placement(&mut regions))?;
+    Ok((world, regions))
+}
+
+enum ListenerReadback<'a> {
+    None,
+    Ambience,
+    Placement(&'a mut PlacementRegions),
+}
+
 fn read_with_listener(
     header: &maps::MapHeader,
     bytes: &[u8],
     sha: String,
-    include_listener: bool,
+    mut listener: ListenerReadback<'_>,
 ) -> Result<Inspection> {
     if ![6, 7, 13, 609].contains(&header.version) || header.extended {
         return invalid("BSP audio inspection requires an unextended Halo 1 PC-family cache");
@@ -323,7 +389,7 @@ fn read_with_listener(
         if portal_count > 65536 {
             return invalid("BSP portal count exceeds the inspection bound");
         }
-        let listener_tree = if include_listener {
+        let mut listener_tree = if !matches!(listener, ListenerReadback::None) {
             let (collision, n) = space.block(&r, root + 0xb0, 96, 1)?;
             let (leaves, leaf_count) = space.block(&r, root + 0xe0, 16, 65536)?;
             if n == 0 || leaf_count == 0 {
@@ -332,11 +398,13 @@ fn read_with_listener(
                 let (nodes, node_count) = space.block(&r, collision, 12, 131072)?;
                 let (planes, plane_count) = space.block(&r, collision + 12, 16, 65536)?;
                 let (_, collision_leaf_count) = space.block(&r, collision + 24, 8, 65536)?;
-                total_nodes += node_count;
-                total_planes += plane_count;
-                total_leaves += leaf_count;
-                if total_nodes > 131072 || total_planes > 65536 || total_leaves > 65536 {
-                    return invalid("Map ambience listener geometry exceeds its total budget");
+                if matches!(listener, ListenerReadback::Ambience) {
+                    total_nodes += node_count;
+                    total_planes += plane_count;
+                    total_leaves += leaf_count;
+                    if total_nodes > 131072 || total_planes > 65536 || total_leaves > 65536 {
+                        return invalid("Map ambience listener geometry exceeds its total budget");
+                    }
                 }
                 if node_count == 0 || collision_leaf_count != leaf_count {
                     None
@@ -385,6 +453,11 @@ fn read_with_listener(
         } else {
             None
         };
+        if let ListenerReadback::Placement(regions) = &mut listener {
+            let tree = listener_tree.take()
+                .ok_or_else(|| SparkError::Invalid("Missing compiled placement collision tree".into()))?;
+            regions.scan(index, &tree)?;
+        }
         bsps.push(Bsp {
             index,
             tag_path: path,
@@ -1307,10 +1380,25 @@ mod tests {
         word(&mut bytes, 0x2a20, 1f32.to_bits());
         half(&mut bytes, 0x2b08, 0);
         half(&mut bytes, 0x2b18, 1);
-        let report = read_with_listener(&h, &bytes, "a".repeat(64), true).unwrap();
+        let report = read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Ambience).unwrap();
         let tree = report.bsps[0].listener_tree.as_ref().unwrap();
         assert_eq!(tree.leaf_clusters, vec![Some(0), Some(1)]);
         assert_eq!(tree.nodes, vec![[0, 0x80000000, 0x80000001]]);
+        let points = [[-1., 0., 0.], [1., 0., 0.]];
+        let mut regions = PlacementRegions::default();
+        for point in points {
+            regions.masks.insert(point.map(f32::to_bits), 0);
+        }
+        let placement = read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Placement(&mut regions)).unwrap();
+        assert!(placement.bsps.iter().all(|bsp| bsp.listener_tree.is_none()));
+        for point in points {
+            assert_eq!(regions.contains(0, point), tree.contains_placement(point));
+            assert_eq!(regions.unique_slot(point), Some(0));
+        }
+        regions.scan(1, tree).unwrap();
+        assert!(regions.contains(1, points[0]));
+        assert!(regions.unique_slot(points[0]).is_none());
+        assert!(regions.unique_slot([2., 0., 0.]).is_none());
         assert!(read(&h, &bytes, "a".repeat(64)).unwrap().bsps[0]
             .listener_tree
             .is_none());
@@ -1325,15 +1413,15 @@ mod tests {
             let mut bad = bytes.clone();
             word(&mut bad, at, value);
             assert!(
-                read_with_listener(&h, &bad, "a".repeat(64), true).is_err(),
+                read_with_listener(&h, &bad, "a".repeat(64), ListenerReadback::Ambience).is_err(),
                 "invalid listener field at {at:x}"
             );
         }
         half(&mut bytes, 0x2b08, 2);
-        assert!(read_with_listener(&h, &bytes, "a".repeat(64), true).is_err());
+        assert!(read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Ambience).is_err());
         half(&mut bytes, 0x2b08, 0);
         word(&mut bytes, 0x2918, 1);
-        assert!(read_with_listener(&h, &bytes, "a".repeat(64), true)
+        assert!(read_with_listener(&h, &bytes, "a".repeat(64), ListenerReadback::Ambience)
             .unwrap()
             .bsps[0]
             .listener_tree

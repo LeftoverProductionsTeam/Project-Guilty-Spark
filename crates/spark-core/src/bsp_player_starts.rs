@@ -1,7 +1,7 @@
 //! Bind native starting locations to their source region in the MCC13 export.
 use crate::{
     bsp_assembly::{self, BspAssembly},
-    bsp_audio::ListenerTree,
+    bsp_audio::PlacementRegions,
     build::{self, Runner, Toolchain},
     invalid,
     maps::{self, MapInspection, NativeRegionStart, NATIVE_SPAWN_TYPES},
@@ -162,17 +162,15 @@ impl PreparedStarts {
 
     pub(crate) fn verify(
         &self,
-        path: &Path,
-        map: &MapInspection,
+        actual: &[NativeRegionStart],
         regional: bool,
-        trees: &[&ListenerTree],
+        regions: &PlacementRegions,
     ) -> Result<serde_json::Value> {
         let donor = if regional { self.donor.as_slice() } else { &[] };
-        let actual = maps::scenario_region_starts(path, map)?;
         if actual.len() != self.base.len() + donor.len() {
             return invalid("Compiled player start count differs from the reviewed target");
         }
-        let mut owned = vec![0usize; trees.len()];
+        let mut owned = vec![0usize; regions.len()];
         for (index, (actual, expected)) in
             actual.iter().zip(self.base.iter().chain(donor)).enumerate()
         {
@@ -194,7 +192,7 @@ impl PreparedStarts {
             }
             if regional {
                 let bsp = expected_bsp as usize;
-                if !trees.get(bsp).is_some_and(|tree| tree.contains_placement(actual.position)) {
+                if !regions.contains(bsp, actual.position) {
                     return invalid(format!(
                         "Player start {index} is outside its authored BSP {bsp}"
                     ));

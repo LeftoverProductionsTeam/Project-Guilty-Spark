@@ -376,6 +376,23 @@ test('Tauri incidental schemas are disposed while pre-existing input and unrelat
     assert.equal(await fs.readFile(path.join(schemas, 'unrelated.txt'), 'utf8'), 'user input');
   }));
 
+test('Tauri schema cleanup preserves empty existing directories and removes generated ones', () =>
+  fixture(async (parent) => {
+    const existing = path.join(parent, 'existing');
+    const existingSchemas = path.join(existing, 'src-tauri', 'gen', 'schemas');
+    await fs.mkdir(existingSchemas, { recursive: true });
+    await (await retainGeneratedSchemaState(existing))();
+    assert.equal((await fs.stat(existingSchemas)).isDirectory(), true);
+
+    await fs.mkdir(path.join(parent, 'src-tauri'));
+    const restore = await retainGeneratedSchemaState(parent);
+    const generated = path.join(parent, 'src-tauri', 'gen', 'schemas');
+    await fs.mkdir(generated, { recursive: true });
+    await fs.writeFile(path.join(generated, 'desktop-schema.json'), '{"generated":true}');
+    await restore();
+    await assert.rejects(fs.stat(path.dirname(generated)), { code: 'ENOENT' });
+  }));
+
 test('explicit build export copies only admitted artifacts and protects different existing output', () =>
   fixture(async (parent) => {
     const release = path.join(parent, 'release'),
