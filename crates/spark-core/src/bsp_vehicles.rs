@@ -13,6 +13,19 @@ pub(crate) fn limit(cache_version: u32) -> usize {
     if cache_version == 13 { 256 } else { 80 }
 }
 
+pub(crate) fn edited_base_vehicles(project: &Project, map: &MapInspection) -> Result<Vec<NativeVehicle>> {
+    let source = project.source.as_ref()
+        .ok_or_else(|| SparkError::Invalid("Missing native vehicle base source".into()))?;
+    let mut vehicles = maps::scenario_vehicles(&source.preserved_path, map)?;
+    for (index, row) in vehicles.iter_mut().enumerate() {
+        if let Some(item) = project.scene.iter().find(|item| item.id == format!("Vehicle-{index}")) {
+            row.position = item.position;
+            row.rotation = item.rotation;
+        }
+    }
+    Ok(vehicles)
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PreparedVehicles {
@@ -28,16 +41,8 @@ impl PreparedVehicles {
         project: &Project, base: &MapInspection, assembly: &BspAssembly, donor: &MapInspection,
         cache_version: u32, contains: impl Fn([f32; 3]) -> bool,
     ) -> Result<Self> {
-        let source = project.source.as_ref()
-            .ok_or_else(|| SparkError::Invalid("Missing native vehicle base source".into()))?;
-        let mut base = maps::scenario_vehicles(&source.preserved_path, base)?;
+        let base = edited_base_vehicles(project, base)?;
         let donor = maps::scenario_vehicles(&assembly.donor_source.preserved_path, donor)?;
-        for (index, row) in base.iter_mut().enumerate() {
-            if let Some(item) = project.scene.iter().find(|item| item.id == format!("Vehicle-{index}")) {
-                row.position = item.position;
-                row.rotation = item.rotation;
-            }
-        }
         Self::from_rows(base, donor, assembly.translation, assembly.yaw_degrees, cache_version, contains)
     }
 

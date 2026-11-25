@@ -1511,15 +1511,13 @@ pub fn generate_preserved_connector(
 
     let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
     let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
-    let choose = |review: &mut BspAssembly, mesh, part, center, displacement| {
-        let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, part)?;
-        choose_intact_landing(&checker, review, center, displacement, forward)
-    };
-    let base_landing = choose(&mut review, &base_collision, plan.base_bsp_index, start, [0.; 3])
+    let base_vehicles = crate::bsp_vehicles::edited_base_vehicles(project, base)?;
+    let donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?;
+    let base_span = intact_span_before_vehicles(start, mul(forward, -1.), plan.tunnel_width, plan.tunnel_height,
+        base_vehicles.iter().filter(|row| row.tag.is_some()).map(|row| row.position.map(f64::from)));
+    let checker = crate::bsp_clearance::RouteChecker::for_part(&base_collision, plan.base_bsp_index)?;
+    let base_landing = choose_intact_landing_bounded(&checker, &mut review, start, [0.; 3], forward, base_span)
         .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?;
-    let donor_vehicles = if donor.header.scenario_type == 1 {
-        maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?
-    } else { Vec::new() };
     let donor_span = intact_span_before_vehicles(end, forward, plan.tunnel_width, plan.tunnel_height,
         donor_vehicles.iter().map(|row| add(row.position.map(f64::from), plan.translation)));
     let checker = crate::bsp_clearance::RouteChecker::for_part(&donor_collision, 0)?;
@@ -1553,9 +1551,11 @@ pub fn generate_preserved_connector(
     review.validate()?;
 
     let height = f64::from(plan.tunnel_height);
+    let width = f64::from(plan.tunnel_width);
+    verify_intact_connector_vehicles(&points, forward, plan, &base_vehicles, &donor_vehicles)?;
     for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
         let position = add(pickup.position.map(f64::from), plan.translation);
-        if intact_connector_contains_pickup(&points, forward, f64::from(plan.tunnel_width), height, position) {
+        if intact_connector_contains_placement(&points, forward, width, height, position) {
             return invalid(format!("Donor pickup {index} at {position:?} lies inside the new connector; move the passage clear of the original pickup"));
         }
     }
@@ -1673,7 +1673,23 @@ fn verify_intact_neighborhood(
     Ok(())
 }
 
-fn intact_connector_contains_pickup(points: &[V], forward: V, width: f64, height: f64, position: V) -> bool {
+fn verify_intact_connector_vehicles(
+    points: &[V], forward: V, plan: &BspAssembly, base: &[maps::NativeVehicle], donor: &[maps::NativeVehicle],
+) -> Result<()> {
+    let width = f64::from(plan.tunnel_width);
+    let height = f64::from(plan.tunnel_height);
+    for (name, vehicles, translation) in [("Retained", base, [0.; 3]), ("Donor", donor, plan.translation)] {
+        for (index, vehicle) in vehicles.iter().enumerate().filter(|(_, row)| row.tag.is_some()) {
+            let position = add(vehicle.position.map(f64::from), translation);
+            if intact_connector_contains_placement(points, forward, width, height, position) {
+                return invalid(format!("{name} vehicle {index} at {position:?} lies inside the new connector. Move the passage clear of the vehicle."));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn intact_connector_contains_placement(points: &[V], forward: V, width: f64, height: f64, position: V) -> bool {
     let sideways = [-forward[1], forward[0], 0.];
     if dot(sub(position, points[0]), sideways).abs() > width / 2. {
         return false;
@@ -1749,12 +1765,6 @@ fn intact_span_before_vehicles(
     }).fold(f64::INFINITY, f64::min)
 }
 
-fn choose_intact_landing(
-    checker: &crate::bsp_clearance::RouteChecker, review: &mut BspAssembly,
-    center: V, displacement: V, forward: V,
-) -> Result<([V; 2], f64, f64)> {
-    choose_intact_landing_bounded(checker, review, center, displacement, forward, f64::INFINITY)
-}
 
 fn choose_intact_landing_bounded(
     checker: &crate::bsp_clearance::RouteChecker, review: &mut BspAssembly,
@@ -1785,7 +1795,7 @@ fn choose_intact_landing_bounded(
             Err(error) => { first_error.get_or_insert(error); }
         }
     }
-    Err(first_error.unwrap_or_else(|| SparkError::Invalid("Choose a landing clear of the donor’s native vehicle placements".into())))
+    Err(first_error.unwrap_or_else(|| SparkError::Invalid("Choose a landing clear of the native vehicle placements".into())))
 }
 
 fn verify_intact_switch_spacing(
@@ -2108,14 +2118,9 @@ pub fn plan_from_bsp(
     if retaining && (donor.header.version != 609 || donor.mesh.parts.len() != 1) {
         return invalid("A retained MCC13 assembly requires a single-BSP Custom Edition donor");
     }
-    let (base_mesh, faces) = maps::collision_source(
-        &base_project
-            .source
-            .as_ref()
-            .ok_or_else(|| SparkError::Invalid("Destination source missing".into()))?
-            .preserved_path,
-        base,
-    )?;
+    let base_source = base_project.source.as_ref()
+        .ok_or_else(|| SparkError::Invalid("Destination source missing".into()))?;
+    let (base_mesh, faces) = maps::collision_source(&base_source.preserved_path, base)?;
     let donor_source = donor_project
         .source
         .clone()
@@ -2187,16 +2192,21 @@ pub fn plan_from_bsp(
             review.tunnel_width = 6.;
             review.tunnel_height = 4.;
         }
+        let base_vehicles = crate::bsp_vehicles::edited_base_vehicles(base_project, base)?;
+        let donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, donor)?;
         let donor_pickups=maps::scenario_netgame_pickups(&plan.donor_source.preserved_path,donor)?;
-        let mut pick = |mesh:&MeshData, part, candidates:Vec<(V,usize)>, label, check_pickups:bool| {
+        let mut pick = |mesh:&MeshData, part, candidates:Vec<(V,usize)>, label, donor_side:bool| {
             let checker=crate::bsp_clearance::RouteChecker::for_part(mesh,part)?;
+            let (vehicles, outward) = if donor_side { (&donor_vehicles, toward) } else { (&base_vehicles, mul(toward, -1.)) };
             for candidate in candidates.into_iter().take(32) {
-                if let Ok((overlap,_,_))=choose_intact_landing(&checker, &mut review, candidate.0, [0.; 3], toward) {
+                let bound = intact_span_before_vehicles(candidate.0, outward, review.tunnel_width, review.tunnel_height,
+                    vehicles.iter().filter(|row| row.tag.is_some()).map(|row| row.position.map(f64::from)));
+                if let Ok((overlap,_,_))=choose_intact_landing_bounded(&checker, &mut review, candidate.0, [0.; 3], toward, bound) {
                     let donor_cap=[
                         sub(overlap[0],mul(toward,1.)),
-                        add(overlap[1],mul(toward,0.7)),
+                        add(overlap[1],mul(toward,CONNECTOR_END_CAP)),
                     ];
-                    if check_pickups && donor_pickups.iter().any(|row|intact_connector_contains_pickup(
+                    if donor_side && donor_pickups.iter().any(|row|intact_connector_contains_placement(
                         &donor_cap,toward,f64::from(review.tunnel_width),f64::from(review.tunnel_height),row.position.map(f64::from),
                     )) { continue; }
                     return Ok((candidate,overlap));
@@ -2224,8 +2234,9 @@ pub fn plan_from_bsp(
             let checked=(|| {
                 placed.validate()?;
                 let points=intact_floor_points(overlaps,toward,placed.open_road)?;
+                verify_intact_connector_vehicles(&points, toward, &placed, &base_vehicles, &donor_vehicles)?;
                 for point in &points {validate_native_bsp_point(*point)?;}
-                if donor_pickups.iter().any(|row|intact_connector_contains_pickup(
+                if donor_pickups.iter().any(|row|intact_connector_contains_placement(
                     &points,toward,f64::from(placed.tunnel_width),f64::from(placed.tunnel_height),
                     add(row.position.map(f64::from),placed.translation),
                 )) {
@@ -2647,9 +2658,9 @@ mod tests {
         let point = |distance| add(end, mul(forward, distance));
         let route = [point(-840.), point(-830.), point(-2.), point(2.5)];
         let pickup = [1376.3582, -619.83777, -18.205042];
-        assert!(intact_connector_contains_pickup(&route, forward, 2., 1.6, pickup));
-        assert!(!intact_connector_contains_pickup(&route, forward, 2., 1.6, add(pickup, [1.5, 1.5, 0.])));
-        assert!(!intact_connector_contains_pickup(&route, forward, 2., 1.6, add(pickup, [0., 0., 2.])));
+        assert!(intact_connector_contains_placement(&route, forward, 2., 1.6, pickup));
+        assert!(!intact_connector_contains_placement(&route, forward, 2., 1.6, add(pickup, [1.5, 1.5, 0.])));
+        assert!(!intact_connector_contains_placement(&route, forward, 2., 1.6, add(pickup, [0., 0., 2.])));
     }
 
     #[test]
@@ -2728,13 +2739,18 @@ mod tests {
         let short = crate::bsp_clearance::RouteChecker::new(&deck(1.6, 0.)).unwrap();
         let wide = crate::bsp_clearance::RouteChecker::new(&deck(2.6, 0.)).unwrap();
         let outside = crate::bsp_clearance::RouteChecker::new(&deck(2.6, 0.1)).unwrap();
-        let (shared, span, height) = choose_intact_landing(&short, &mut plan, center, center, forward).unwrap();
+        let (shared, span, height) = choose_intact_landing_bounded(&short, &mut plan, center, center, forward, f64::INFINITY).unwrap();
         assert_eq!((shared, span, height), ([[-1.4, 0., 0.], [1.4, 0., 0.]], 1.4, 0.));
-        assert_eq!(choose_intact_landing(&wide, &mut plan, center, center, forward).unwrap().1, 2.3);
+        assert_eq!(choose_intact_landing_bounded(&wide, &mut plan, center, center, forward, f64::INFINITY).unwrap().1, 2.3);
         let stock_vehicle = add(center, mul(forward, 2.66));
         let bound = intact_span_before_vehicles(center, forward, plan.tunnel_width, plan.tunnel_height, [stock_vehicle]);
         assert_eq!(choose_intact_landing_bounded(&wide, &mut plan, center, center, forward, bound).unwrap().1, 1.4);
-        assert!(choose_intact_landing(&outside, &mut plan, center, center, forward).is_err());
+        let reverse = mul(forward, -1.);
+        let retained_vehicle = mul(stock_vehicle, -1.);
+        let bound = intact_span_before_vehicles(center, reverse, plan.tunnel_width, plan.tunnel_height, [retained_vehicle]);
+        assert_eq!(choose_intact_landing_bounded(&wide, &mut plan, center, center, forward, bound).unwrap().1, 1.4);
+        assert!(intact_span_before_vehicles(center, reverse, plan.tunnel_width, plan.tunnel_height, [stock_vehicle]).is_infinite());
+        assert!(choose_intact_landing_bounded(&outside, &mut plan, center, center, forward, f64::INFINITY).is_err());
         let d = intact_switch_distance(span);
         let from = partition_switch(0, 1, [-d - 0.45, 0., 0.], forward, 1., 1.6).geometry;
         let to = partition_switch(1, 0, [d - 0.45, 0., 0.], forward, 1., 1.6).geometry;
