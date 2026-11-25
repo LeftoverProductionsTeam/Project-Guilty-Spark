@@ -17,6 +17,26 @@ fn main()->Result<()>{
   println!("{}", serde_json::to_string(&receipt)?);
   return Ok(());
  }
+ if args.first().is_some_and(|arg| arg == "--bsp-lightmaps") {
+  if args.len() != 3 { return spark_core::invalid("qa_bsp_mesh --bsp-lightmaps <owned.map> <BSP slot>"); }
+  let source = Path::new(&args[1]);
+  let slot = args[2].parse::<usize>().map_err(|_| spark_core::SparkError::Invalid("Invalid BSP slot".into()))?;
+  let map = maps::inspect_map(source, None)?;
+  let render = map.render_mesh.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Native render geometry is unavailable".into()))?;
+  let pages: std::collections::BTreeSet<_> = render.material_ranges.iter().filter(|range| range.bsp_index == slot && range.has_lightmap_uvs)
+   .filter_map(|range| range.lightmap_bitmap_tag_id.zip(usize::try_from(range.lightmap_page).ok())).collect();
+  if pages.is_empty() || pages.len() > 8 {
+   return spark_core::invalid("The requested BSP must have 1–8 independently readable lightmap pages");
+  }
+  let previews = pages.into_iter().map(|(tag, image)|
+   spark_core::bitmap_preview::preview_owned_bitmap(source, &map.sha256, &map, tag, image)
+    .map(|preview| serde_json::json!({
+     "page": image, "width": preview.width, "height": preview.height, "dds_base64": preview.dds_base64,
+    }))
+  ).collect::<Result<Vec<_>>>()?;
+  println!("{}", serde_json::to_string(&previews)?);
+  return Ok(());
+ }
  if args.first().is_some_and(|arg| arg == "--flight-recordings") {
   if args.len() != 2 {
    return spark_core::invalid("qa_bsp_mesh --flight-recordings <owned.map>");

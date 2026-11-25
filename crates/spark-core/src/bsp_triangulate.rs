@@ -129,6 +129,18 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
 /// adding interior points. Bisect its geometric edge on every adjacent face,
 /// including aliases with another material/UV, then improve coplanar diagonals.
 pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_material: u64) -> crate::Result<usize> {
+    refine_generated_faces(m, maximum, generated_material, f64::INFINITY)
+}
+
+/// Keep long standalone connector charts within the native baker's working
+/// span; the collision layer is emitted from the original manifold.
+pub(crate) fn refine_connector_charts(m: &mut MeshGL64, maximum: usize) -> crate::Result<usize> {
+    refine_generated_faces(m, maximum, 0, 64.)
+}
+
+fn refine_generated_faces(
+    m: &mut MeshGL64, maximum: usize, generated_material: u64, maximum_span: f64,
+) -> crate::Result<usize> {
     const QUALITY: f64 = 0.002;
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
         return crate::invalid("Native triangle refinement lost source properties");
@@ -136,8 +148,13 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
     let mut splits = 0;
     loop {
         let selected = m.tri_verts.chunks_exact(3).enumerate().find_map(|(index,t)| {
-            (m.face_id[index] == generated_material && face(m,[t[0],t[1],t[2]]).1 < QUALITY)
-                .then_some([t[0],t[1],t[2]])
+            let vertices = [t[0],t[1],t[2]];
+            if m.face_id[index] != generated_material { return None; }
+            let too_long = maximum_span.is_finite() && (0..3).any(|edge| {
+                let delta = sub(at(m, vertices[edge]), at(m, vertices[(edge + 1) % 3]));
+                dot(delta, delta) > maximum_span * maximum_span
+            });
+            (too_long || face(m,vertices).1 < QUALITY).then_some(vertices)
         });
         let Some(t) = selected else { return Ok(splits); };
         let k = (0..3).max_by(|&a,&b| {

@@ -1369,7 +1369,7 @@ pub fn generate_preserved_connector(
         if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
         body = checked(body.boolean_with_engine_and_token(&solid?, OpType::Add, BooleanEngine::Auto, None), "Intact BSP connector")?;
     }
-    let render = body.get_mesh_gl64(-1);
+    let mut render = body.get_mesh_gl64(-1);
     let mut materials = vec![AssemblyMaterial {
         name: format!("gsconnector{}x", &base.sha256[..8]),
         source: 0, shader_path: Some(plan.tunnel_shader_path.clone()), shader_class: Some("senv".into()),
@@ -1388,6 +1388,7 @@ pub fn generate_preserved_connector(
             return invalid("Connector surface does not match a reviewed landing");
         }
     }
+    crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
     append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
     let report = AssemblyReport {
