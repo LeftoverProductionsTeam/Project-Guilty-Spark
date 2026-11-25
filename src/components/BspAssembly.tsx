@@ -117,6 +117,7 @@ export default function BspAssembly({
   const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface,setPickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const [sealText, setSealText] = useMapState(project.id, 'bsp.nativeSealVertices', '');
+  const [nativeBspIndex, setNativeBspIndex] = useMapState(project.id, 'bsp.nativePartitionPreview', 0);
   const [edgeTarget,setEdgeTarget]=useMapState<'base'|'donor'|null>(project.id,'bsp.edgeTarget',null);
   const [edgePicks,setEdgePicks]=useMapState<{base?:SeamEdge;donor?:SeamEdge}>(project.id,'bsp.edgePicks',()=>({}));
   const activeNow=useRef(active);activeNow.current=active;
@@ -260,7 +261,7 @@ export default function BspAssembly({
     if(!value||!project.bspAssembly||busy)return;
     await perform(async current=>{
       const signature=assemblySignature(value);
-      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value});
+      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined});
       if(current()&&latest.current.signature===signature){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
@@ -622,6 +623,19 @@ export default function BspAssembly({
                   {(()=>{const shader=sourceShaders.find(tag=>tag.path===routeDraft!.tunnelShaderPath),bitmap=shader?.references.find(ref=>ref.class==='bitm'&&/base map|diffuse map/i.test(ref.label));return bitmap&&<details><summary>Preview material bitmap</summary><BitmapPreview project={project} tagId={bitmap.targetId}/></details>;})()}
                 </div>
               </div>
+              <fieldset>
+                <legend>Build layout</legend>
+                <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy}
+                  onChange={event => update({ separateNativeBsps: event.target.checked })} /> Separate native BSPs</label>
+                {draft.separateNativeBsps && <>
+                  <p>Use one straight enclosed passage between two single-BSP maps. Spark builds paired switch volumes and bakes each BSP. Pick MCC13 for donor starts and teleporters. Runtime crossing and simultaneous play require verification.</p>
+                  <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
+                    onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
+                    <option value={0}>BSP 0 · Current region</option>
+                    <option value={1}>BSP 1 · Donor region</option>
+                  </select></label>
+                </>}
+              </fieldset>
               <div className="bsp-actions">
                 <button
                   disabled={busy || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
@@ -660,12 +674,13 @@ export default function BspAssembly({
                       if (!matches()) return;
                       const checked = await call<AssemblyReport>('preview_bsp_assembly', {
                         projectId: project.id, includeGeometry:true,
+                        nativeBspIndex: draft.separateNativeBsps ? nativeBspIndex : undefined,
                       });
                       if (matches()) {setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
                     })
                   }
                 >
-                  Preview joined seam & clearance
+                  {draft.separateNativeBsps ? 'Preview native BSP & clearance' : 'Preview joined seam & clearance'}
                 </button>
                 <button
                   disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
@@ -677,7 +692,7 @@ export default function BspAssembly({
                     })
                   }
                 >
-                  Build & playtest connection
+                  {draft.separateNativeBsps ? 'Open Build & playtest' : 'Build & playtest connection'}
                 </button>
                 <button
                   disabled={busy || !project.bspAssembly}
@@ -715,10 +730,11 @@ export default function BspAssembly({
                   {(report.donorScenery ?? 0) > 0 && (
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
+                  {report.nativePartitions && <p>BSP {report.nativePartitions.selected} · {report.nativePartitions.overlapSamples} shared corridor-floor samples · Largest floor difference {report.nativePartitions.maxFloorDelta.toFixed(4)} world units.</p>}
                   {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget} />}
                   {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
-                  <p>Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.</p>
+                  <p>{draft.separateNativeBsps ? 'Build next to check both compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}

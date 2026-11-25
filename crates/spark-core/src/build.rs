@@ -259,6 +259,9 @@ pub fn compatibility(
         warnings.push("Tag duplicates are rebuilt from editable tags with a new path. Only the selected referencing tag is redirected; dependencies remain shared. Campaign/UI game-load acceptance is still required.".into());
     }
     if let Some(assembly)=&project.bsp_assembly{
+        if assembly.separate_native_bsps {
+            blockers.push("Select an explicit Custom Edition, Chupathingy or MCC target to build separate native BSPs through BSP Assembly.".into());
+        }
         if !native{blockers.push("Connected BSP assemblies require the MCC H1A compiler".into());}
         if !assembly.donor_tags_directory.is_dir(){blockers.push("Choose the donor's matching editable tags folder before starting a connected-map build".into());}
         if inspection.mesh.parts.len()!=1 {blockers.push("A connected-map destination must contain one BSP; existing destination sections cannot be discarded".into());}

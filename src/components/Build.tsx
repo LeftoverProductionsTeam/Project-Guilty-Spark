@@ -109,6 +109,7 @@ export default function Build({
       cancelled = true;
     };
   }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,dirty, data.settings, epoch]);
+  const separateBsps = project.bspAssembly?.separateNativeBsps === true;
   const targetName=ceTarget?(target!.runtimeId==='chupathingyCe'?'Chupathingy':'Custom Edition'):'MCC';
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
@@ -136,7 +137,7 @@ export default function Build({
             </button>
             {view==='build'&&<button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
               <Hammer size={15} />
-              {ceTarget?(dirty?`Save & build for ${targetName}`:`Build for ${targetName}`):(dirty ? 'Save & convert to MCC' : 'Convert map to MCC')}
+              {separateBsps ? (dirty ? 'Save & build native BSPs' : 'Build native BSPs') : ceTarget?(dirty?`Save & build for ${targetName}`:`Build for ${targetName}`):(dirty ? 'Save & convert to MCC' : 'Convert map to MCC')}
             </button>}
           </>
         }
@@ -148,7 +149,9 @@ export default function Build({
       <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
           <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and {targetName} toolchain</small></summary>
-            <p>{ceTarget?`${project.bspAssembly?"Rebuild the connected CE regions":"Compile this scenario from its complete matching editable CE tags"}, producing a standard CE cache for ${targetName}. Select and review that tagset in Engine build targets; a stock SDK cannot replace the original scenario. Existing tags and maps stay unchanged. Pending cache edits cannot be silently omitted. Native compilation and actual engine loading are checked separately.`:"Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check."}</p>
+            <p>{separateBsps ? (ceTarget
+              ? 'Build two native BSPs from the matching editable region tags. CE609 includes donor pickups and retains the base starts and flags.'
+              : 'Build two native BSPs from the matching editable region tags. The MCC13 output includes donor starts, pickups and teleporters. Regional gameplay needs a runtime with reviewed support.') : ceTarget?`${project.bspAssembly?"Rebuild the connected CE regions":"Compile this scenario from its complete matching editable CE tags"}, producing a standard CE cache for ${targetName}. Select and review that tagset in Engine build targets; a stock SDK cannot replace the original scenario. Existing tags and maps stay unchanged. Pending cache edits cannot be silently omitted. Native compilation and actual engine loading are checked separately.`:"Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check."}</p>
             <BuildTargets project={project} defaults={data.settings} onSave={onSave} onChange={next=>edit(next,'Configure map conversion target')}/>
             {!ceTarget&&<>
             <button disabled={!native||preparing||!!activeJob} onClick={()=>{setPreparing(true);void onAction(async()=>{await call('prepare_mcc_conversion_tools',{projectId:project.id});onRefresh();},'MCC tools and editable tags are prepared. Your choices are saved.').finally(()=>setPreparing(false));}}>{preparing?'Preparing installed MCC tools…':'Prepare installed MCC tools'}</button>
@@ -156,7 +159,7 @@ export default function Build({
             </>}
             {project.source?.sha256==='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'&&<label>Zombie Apocalypse conversion profile<select aria-label="Zombie Apocalypse conversion profile" value={project.conversionProfile??'faithful'} onChange={e=>edit({...project,conversionProfile:e.target.value as Project['conversionProfile']},'Choose Zombie Apocalypse conversion profile')}><option value="faithful">Faithful · require the two original missing custom audio cues</option><option value="zombie-recovery">Recovery edition · omit two unavailable cues and disable one corrupt placement</option></select></label>}
             {project.conversionProfile==='zombie-recovery'&&<Notice>The recovery edition retains the actual vehicle-based zombie spawners and valid mixed-class placements. Two missing custom sounds and the corrupt first placement are recorded as omissions. Runtime behavior still needs testing.</Notice>}
-            {!ceTarget&&project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
+            {!ceTarget&&!project.bspAssembly&&project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
           </details>
           {issues.map((issue) => (
             <Notice key={issue}>{issue}</Notice>

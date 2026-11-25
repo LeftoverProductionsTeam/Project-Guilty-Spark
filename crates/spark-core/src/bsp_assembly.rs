@@ -50,6 +50,8 @@ pub struct BspAssembly {
     pub donor_tags_directory: PathBuf,
     pub donor_bsp_index: usize,
     #[serde(default, skip_serializing_if = "is_false")]
+    pub separate_native_bsps: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
     pub translation: [f64; 3],
     pub yaw_degrees: f64,
@@ -111,6 +113,7 @@ impl BspAssembly {
                 "Tunnel needs 2-16 floor points, width 0.8-16 and height 1-16 world units",
             );
         }
+        if self.separate_native_bsps { self.validate_partition_route()?; }
         if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
         }
@@ -165,6 +168,20 @@ impl BspAssembly {
             if route.tunnel_points == self.tunnel_points || self.infantry_tunnel.as_ref().is_some_and(|t|t.points == ridge.points) {
                 return invalid("The high-ground route needs its own canyon-top floor points, separate from the lower passages");
             }
+        }
+        Ok(())
+    }
+    fn validate_partition_route(&self) -> Result<()> {
+        if self.donor_bsp_index != 0 || self.tunnel_points.len() != 2 || self.open_road
+            || self.terrain_seam.is_some() || self.arch_segments.is_some()
+            || self.infantry_tunnel.is_some() || self.high_ground.is_some()
+            || !self.sections.is_empty() || !self.visibility_zones.is_empty() || !self.native_seals.is_empty()
+        {
+            return invalid("Separate native BSPs require a single-BSP donor and one straight enclosed passage without custom portal cuts or seals.");
+        }
+        let [start, end] = [self.tunnel_points[0], self.tunnel_points[1]];
+        if (end[0] - start[0]).hypot(end[1] - start[1]) < 12. {
+            return invalid("Allow at least twelve world units for separate corridor caps and switch volumes");
         }
         Ok(())
     }
@@ -795,6 +812,7 @@ fn generate_end(
         &assembly.native_seals, &mut mesh, &mut materials, &mut triangle_materials,
     )?;
     let mut clearance_route = route_geometry.clone();
+    clearance_route.separate_native_bsps = false;
     if let Some((seam, end)) = partition {
         // Keep clearance samples away from each partition’s own closed cap.
         clearance_route.tunnel_points = match end {
@@ -861,7 +879,12 @@ fn generate_end(
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
     let connector_triangles=triangle_materials.iter().filter(|&&slot|slot>=first_connector_material&&materials[slot].shader_path.is_some()&&!materials[slot].collision_only).count();
-    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),"This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.".into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials}, overlap_floor))
+    let rebuild_scope = if partition.is_some() {
+        "Separate BSPs rebuild collision, portals and lightmaps. The build imports donor multiplayer pickups. MCC13 also imports donor starts and teleporters. Review per-cluster ambience, scenery and other gameplay separately."
+    } else {
+        "This rebuild regenerates collision, portals and lightmaps. Original per-cluster weather, sound and render-only details require review. Donor scenery is optional. Campaign actors, scripts and gameplay objects are outside this build."
+    };
+    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials}, overlap_floor))
 }
 // Automatic cuts may span a change of grade along the same horizontal run.
 // Keep authored segment identities intact, and never join around an XY bend.
@@ -1095,21 +1118,16 @@ pub fn generate_partitioned_project(
     if !matches!(source.cache_version, 609 | 13) || source.sha256 != base.sha256 || maps::hash_file(&source.preserved_path)? != base.sha256 {
         return invalid("Open the exact preserved CE609 or MCC13 base for a native partition");
     }
-    if assembly.tunnel_points.len() != 2 || assembly.open_road || assembly.terrain_seam.is_some()
-        || assembly.arch_segments.is_some() || assembly.infantry_tunnel.is_some()
-        || assembly.high_ground.is_some() || !assembly.sections.is_empty()
-        || !assembly.visibility_zones.is_empty() || !assembly.native_seals.is_empty() {
-        return invalid("Partition export currently requires one straight enclosed route and no custom portal cuts or seals. Preserve other routes in their existing source.");
-    }
+    assembly.validate_partition_route()?;
     let start = assembly.tunnel_points[0];
     let end = assembly.tunnel_points[1];
     let delta = sub(end, start);
     let length = delta[0].hypot(delta[1]);
-    if length < 12. { return invalid("Allow at least twelve world units for separate corridor caps and switch volumes"); }
     let direction = mul(delta, 1. / length);
     let aim = [direction[0], direction[1], 0.];
     let donor = maps::inspect_map(&assembly.donor_source.preserved_path, assembly.donor_source.resource_directory.as_deref())?;
     if donor.sha256 != assembly.donor_source.sha256 { return invalid("The preserved donor changed"); }
+    if donor.mesh.parts.len() != 1 { return invalid("Choose a donor map with exactly one native BSP"); }
     let port = projected_bounds(&base.mesh, 0, [0.; 3], 0., aim)?[1].max(dot(start, aim));
     let arrival = projected_bounds(&donor.mesh, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, aim)?[0].min(dot(end, aim));
     if arrival - port < 8. {
@@ -1156,6 +1174,7 @@ pub(crate) fn verify_bound_partition_collision(
     let original = crate::bsp_clearance::RouteChecker::for_part(&collision, 0)?;
     let extension = crate::bsp_clearance::RouteChecker::for_part(&collision, 1)?;
     let mut approach = plan.clone();
+    approach.separate_native_bsps = false;
     approach.tunnel_points = vec![plan.tunnel_points[0], overlap[1]];
     let base_samples = [original.verify(&approach)?, original.verify_return(&approach)?];
     approach.tunnel_points = vec![overlap[0], plan.tunnel_points[1]];
@@ -1391,6 +1410,7 @@ pub fn plan_in_direction(
         donor_source,
         donor_tags_directory: tags,
         donor_bsp_index: index,
+        separate_native_bsps: false,
         include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,
@@ -2029,6 +2049,21 @@ mod tests {
     }
     fn dual_route_plan() -> BspAssembly {
         serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Fixture","donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":13,"engine":"fixture","scenarioPath":"fixture"},"donorTagsDirectory":"fixture","donorBspIndex":0,"translation":[0.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[0.,0.,0.],[100.,0.,0.]],"tunnelWidth":4.,"tunnelHeight":4.,"tunnelShaderPath":"fixture/metal"})).unwrap()
+    }
+    #[test]
+    fn separate_native_layout_round_trips_and_requires_one_straight_enclosed_route() {
+        let mut plan = dual_route_plan();
+        assert!(serde_json::to_value(&plan).unwrap().get("separateNativeBsps").is_none());
+        plan.separate_native_bsps = true;
+        let stored = serde_json::to_value(&plan).unwrap();
+        assert_eq!(stored["separateNativeBsps"], true);
+        let mut restored: BspAssembly = serde_json::from_value(stored).unwrap();
+        restored.validate().unwrap();
+        restored.tunnel_points.insert(1, [50., 2., 0.]);
+        assert!(restored.validate().unwrap_err().to_string().contains("straight enclosed passage"));
+        restored.tunnel_points.remove(1);
+        restored.tunnel_points[1] = [10., 0., 0.];
+        assert!(restored.validate().unwrap_err().to_string().contains("twelve world units"));
     }
     #[test]
     fn optional_road_and_infantry_metadata_preserve_old_serialization_and_reject_invalid_routes() {

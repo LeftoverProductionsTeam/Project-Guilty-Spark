@@ -918,6 +918,9 @@ pub fn prepare_native(
         return Ok(());
     };
     assembly.validate()?;
+    if assembly.separate_native_bsps {
+        return invalid("Use the BSP Assembly connected-region build for separate native BSPs");
+    }
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| {
         SparkError::Invalid("BSP assemblies require the MCC H1A editing kit".into())
     })?;

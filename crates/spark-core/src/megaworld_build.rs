@@ -42,7 +42,18 @@ pub fn selected(project: &Project) -> bool {
 pub fn compatibility(project: &Project, inspection: &MapInspection) -> build::CompatibilityReport {
     let target = cache_target(project).expect("selected connected-region target");
     let blockers = preflight(project, inspection).err().map(|e| vec![e.to_string()]).unwrap_or_default();
-    let mut warnings = vec!["One resident BSP. Native compilation is separate from player traversal. Painted detail requires native preservation support.".into()];
+    let separate = project.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps);
+    let mut warnings = vec![if separate {
+        "Two native BSPs with paired corridor switches. Independent regional occupancy requires runtime verification.".into()
+    } else {
+        "One resident BSP. Painted detail requires native preservation support.".into()
+    }];
+    if separate {
+        warnings.push("Review region ambience after rebuilding. Sky, fog and mixed per-cluster assignments need a verified mapping.".into());
+    }
+    if separate && target.version == CLASSIC.version {
+        warnings.push("CE609 retains the base player starts and netgame flags. Choose MCC13 to include the donor starts and teleporters.".into());
+    }
     let readers: Vec<_> = RuntimeId::ALL.into_iter()
         .filter(|&id| crate::runtime::supports_map_version(id, target.version))
         .map(RuntimeId::name)
@@ -122,6 +133,14 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     let tools=Toolchain{h1a_directory:target.hek_directory,base_tags_directory:target.hek_tags_directory,invader_directory:target.invader_directory,..Default::default()};
     if tools.base_tags_directory.as_ref().is_none_or(|p|!p.is_dir())||crate::conversion::native_tool(&tools).is_none(){return invalid("Select matching extracted CE source tags and the installed H1A authoring kit");}
     for name in ["invader-edit","invader-build","invader-info","invader-dependency","invader-refactor"]{if build::tool_path(&tools,name).is_none(){return invalid(format!("{name} is required for connected CE source"));}}
+    if plan.separate_native_bsps {
+        if build::tool_path(&tools, "invader-extract").is_none() {
+            return invalid("Separate native BSPs require Invader extraction for placement and ambience readback");
+        }
+        if !crate::bsp_compile::connected_additions(project, inspection)?.is_empty() {
+            return invalid("Save new scenery imports in the source region before compiling separate native BSPs");
+        }
+    }
     Ok(tools)
 }
 /// Compile partition structure tags for owner review without publishing a map.
@@ -203,99 +222,115 @@ fn build_partition_probes(
     project: &Project, source: &MapInspection, prepared: &crate::bsp_compile::PreparedPartitions,
     tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path, bake: bool,
 ) -> Result<Vec<serde_json::Value>> {
+    // Keep the classic cache before the staged scenario receives the MCC rows.
+    [CLASSIC, MCC].into_iter().map(|target| {
+        let output = workspace.join(target.engine);
+        Ok(build_partition_cache(project, source, prepared, tools, runner, workspace, tags, &output, target, bake)?.receipt)
+    }).collect()
+}
+
+struct PartitionCache {
+    path: std::path::PathBuf,
+    sha256: String,
+    resident_bytes: u32,
+    receipt: serde_json::Value,
+}
+
+fn build_partition_cache(
+    project: &Project, source: &MapInspection, prepared: &crate::bsp_compile::PreparedPartitions,
+    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path, output: &Path,
+    target: CacheTarget, bake: bool,
+) -> Result<PartitionCache> {
     let plan = project.bsp_assembly.as_ref().unwrap();
     let preserved_path = &project.source.as_ref().unwrap().preserved_path;
     let existing = maps::scenario_volume_readback(preserved_path, source)?;
     let compiler = build::tool_path(tools, "invader-build").unwrap();
     let info = build::tool_path(tools, "invader-info").unwrap();
     let name = source.scenario_path.rsplit(['\\', '/']).next().ok_or_else(|| SparkError::Invalid("Missing scenario filename".into()))?;
-    [CLASSIC, MCC].into_iter().map(|target| {
-        let output = workspace.join(target.engine);
-        fs::create_dir(&output)?;
-        // Compile the classic cache before adding donor flags to the job's
-        // staged scenario. Original sources and the CE output stay immutable.
-        let regional = target.version == MCC.version;
-        if regional {
-            if let Some(flags) = &prepared.netgame_flags {
-                flags.append(&source.scenario_path, tools, runner, workspace)?;
-            }
-            if let Some(starts) = &prepared.player_starts {
-                starts.append(&source.scenario_path, tools, runner, workspace)?;
-            }
+    fs::create_dir(output)?;
+    let regional = target.version == MCC.version;
+    if regional {
+        if let Some(flags) = &prepared.netgame_flags {
+            flags.append(&source.scenario_path, tools, runner, workspace)?;
         }
-        runner.run(&compiler, &["-g".into(), target.engine.into(), "-t".into(), tags.to_string_lossy().into_owned(),
-            "-m".into(), output.to_string_lossy().into_owned(), "--resource-usage".into(), "none".into(), source.scenario_path.clone()],
-            workspace, "partition-cache", 75)?;
-        let path = output.join(format!("{name}.map"));
-        let map = maps::inspect_map(&path, None)?;
-        if map.header.version != target.version || map.header.scenario_type != source.header.scenario_type
-            || map.scenario_path != source.scenario_path || map.mesh.parts.len() != 2
-            || map.tags.iter().any(|tag| tag.external) || map.resources.iter().any(|resource| resource.required) {
-            return invalid("Native partition probe differs from the authored scenario, format or self-contained resource policy");
+        if let Some(starts) = &prepared.player_starts {
+            starts.append(&source.scenario_path, tools, runner, workspace)?;
         }
-        for field in ["crc32_mismatched", "is_protected", "stub_count"] {
-            let value = runner.run(&info, &["-T".into(), field.into(), path.to_string_lossy().into_owned()],
-                workspace, "partition-cache-check", 90)?;
-            if !["0", "false"].contains(&value.trim().to_lowercase().as_str()) {
-                return invalid(format!("Partition probe {field} failed: {value}"));
-            }
+    }
+    runner.run(&compiler, &["-g".into(), target.engine.into(), "-t".into(), tags.to_string_lossy().into_owned(),
+        "-m".into(), output.to_string_lossy().into_owned(), "--resource-usage".into(), "none".into(), source.scenario_path.clone()],
+        workspace, "partition-cache", 75)?;
+    let path = output.join(format!("{name}.map"));
+    let map = maps::inspect_map(&path, None)?;
+    if map.header.version != target.version || map.header.scenario_type != source.header.scenario_type
+        || map.scenario_path != source.scenario_path || map.mesh.parts.len() != 2
+        || map.tags.iter().any(|tag| tag.external) || map.resources.iter().any(|resource| resource.required) {
+        return invalid("Native partition probe differs from the authored scenario, format or self-contained resource policy");
+    }
+    for field in ["crc32_mismatched", "is_protected", "stub_count"] {
+        let value = runner.run(&info, &["-T".into(), field.into(), path.to_string_lossy().into_owned()],
+            workspace, "partition-cache-check", 90)?;
+        if !["0", "false"].contains(&value.trim().to_lowercase().as_str()) {
+            return invalid(format!("Partition probe {field} failed: {value}"));
         }
-        crate::bsp_compile::verify_compiled_base(project, source, &map)?;
-        if !prepared.scenery.is_empty() {
-            crate::bsp_scenery::verify_compiled(source, &map, &path, &prepared.scenery, &format!("gsbsp_{}_1", &runner.id[..8]), 0)?;
+    }
+    crate::bsp_compile::verify_compiled_base(project, source, &map)?;
+    if !prepared.scenery.is_empty() {
+        crate::bsp_scenery::verify_compiled(source, &map, &path, &prepared.scenery, &format!("gsbsp_{}_1", &runner.id[..8]), 0)?;
+    }
+    let volumes = maps::scenario_volume_readback(&path, &map)?;
+    let transitions = maps::scenario_bsp_transitions(&path, &map)?;
+    if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
+        || transitions.bsp_count != 2 || transitions.transitions.len() != 2 {
+        return invalid("Partition probe lost original volumes or compiled an unexpected BSP switch set");
+    }
+    for (index, expected) in prepared.switches.iter().enumerate() {
+        let volume_index = existing.len() + index;
+        let volume = &volumes[volume_index];
+        let (from, to) = maps::native_bsp_switch_name(&expected.name).unwrap();
+        if volume.name != expected.name || volume.kind != 1 || volume.geometry.as_ref().is_none_or(|geometry| {
+            !crate::native_operations::volume_geometry_close(geometry, &expected.geometry)
+        }) || !transitions.transitions.iter().any(|row| row.trigger_index == volume_index
+            && row.trigger_name == expected.name && row.source_bsp == from && row.destination_bsp == to && row.arrival_marker.is_none()) {
+            return invalid("Compiled partition switch differs from the reviewed markerless volume");
         }
-        let volumes = maps::scenario_volume_readback(&path, &map)?;
-        let transitions = maps::scenario_bsp_transitions(&path, &map)?;
-        if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
-            || transitions.bsp_count != 2 || transitions.transitions.len() != 2 {
-            return invalid("Partition probe lost original volumes or compiled an unexpected BSP switch set");
-        }
-        for (index, expected) in prepared.switches.iter().enumerate() {
-            let volume_index = existing.len() + index;
-            let volume = &volumes[volume_index];
-            let (from, to) = maps::native_bsp_switch_name(&expected.name).unwrap();
-            if volume.name != expected.name || volume.kind != 1 || volume.geometry.as_ref().is_none_or(|geometry| {
-                !crate::native_operations::volume_geometry_close(geometry, &expected.geometry)
-            }) || !transitions.transitions.iter().any(|row| row.trigger_index == volume_index
-                && row.trigger_name == expected.name && row.source_bsp == from && row.destination_bsp == to && row.arrival_marker.is_none()) {
-                return invalid("Compiled partition switch differs from the reviewed markerless volume");
-            }
-        }
-        let world = crate::bsp_audio::inspect_ambience(&path, &map.sha256)?;
-        let [base, donor] = world.bsps.as_slice() else { return invalid("Expected both compiled placement collision trees") };
-        let [Some(base_tree), Some(donor_tree)] = [base.listener_tree.as_ref(), donor.listener_tree.as_ref()] else {
-            return invalid("Missing compiled placement collision tree");
-        };
-        let trees = [base_tree, donor_tree];
-        let donor_pickups_in_region = prepared.pickups.as_ref().map(|pickups| pickups.verify(&path, &map, trees)).transpose()?;
-        let native_flags = prepared.netgame_flags.as_ref().map(|flags| flags.verify(&path, &map, regional, trees)).transpose()?;
-        let native_starts = prepared.player_starts.as_ref().map(|starts| starts.verify(&path, &map, regional, trees)).transpose()?;
-        let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
-        let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
-        if let Some(environment) = &prepared.donor_environment {
-            let readback = output.join("environment-tags");
-            fs::create_dir(&readback)?;
-            let extract = build::tool_path(tools, "invader-extract").unwrap();
-            runner.run(&extract, &["-t".into(), readback.to_string_lossy().into_owned(), "-s".into(),
-                prepared.donor_tag.clone(), path.to_string_lossy().into_owned()], workspace, "partition-environment-readback", 91)?;
-            let edit = build::tool_path(tools, "invader-edit").unwrap();
-            environment.verify(|fields| {
-                let mut args = vec!["-t".into(), readback.to_string_lossy().into_owned()];
-                args.extend(fields);
-                args.push(prepared.donor_tag.clone());
-                runner.run(&edit, &args, workspace, "partition-environment-readback", 91)
-            })?;
-        }
-        let lightmap_pages = if bake {
-            crate::native_lighting::verify_cache(project, &path, &map)?;
-            Some([crate::native_lighting::verify_bsp_lightmaps(&path, &map, 0)?,
-                crate::native_lighting::verify_bsp_lightmaps(&path, &map, 1)?])
-        } else { None };
-        Ok(serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
-            "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages,
-            "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
-            "netgameFlags": native_flags, "playerStarts": native_starts}))
-    }).collect()
+    }
+    let world = crate::bsp_audio::inspect_ambience(&path, &map.sha256)?;
+    let [base, donor] = world.bsps.as_slice() else { return invalid("Expected both compiled placement collision trees") };
+    let [Some(base_tree), Some(donor_tree)] = [base.listener_tree.as_ref(), donor.listener_tree.as_ref()] else {
+        return invalid("Missing compiled placement collision tree");
+    };
+    let trees = [base_tree, donor_tree];
+    let donor_pickups_in_region = prepared.pickups.as_ref().map(|pickups| pickups.verify(&path, &map, trees)).transpose()?;
+    let native_flags = prepared.netgame_flags.as_ref().map(|flags| flags.verify(&path, &map, regional, trees)).transpose()?;
+    let native_starts = prepared.player_starts.as_ref().map(|starts| starts.verify(&path, &map, regional, trees)).transpose()?;
+    let collision = crate::bsp_assembly::verify_bound_partition_collision(&path, &map, plan, &project.inherited_bsp_connections, prepared.overlap)?;
+    let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
+    if let Some(environment) = &prepared.donor_environment {
+        let readback = output.join("environment-tags");
+        fs::create_dir(&readback)?;
+        let extract = build::tool_path(tools, "invader-extract").unwrap();
+        runner.run(&extract, &["-t".into(), readback.to_string_lossy().into_owned(), "-s".into(),
+            prepared.donor_tag.clone(), path.to_string_lossy().into_owned()], workspace, "partition-environment-readback", 91)?;
+        let edit = build::tool_path(tools, "invader-edit").unwrap();
+        environment.verify(|fields| {
+            let mut args = vec!["-t".into(), readback.to_string_lossy().into_owned()];
+            args.extend(fields);
+            args.push(prepared.donor_tag.clone());
+            runner.run(&edit, &args, workspace, "partition-environment-readback", 91)
+        })?;
+    }
+    let lightmap_pages = if bake {
+        crate::native_lighting::verify_cache(project, &path, &map)?;
+        Some([crate::native_lighting::verify_bsp_lightmaps(&path, &map, 0)?,
+            crate::native_lighting::verify_bsp_lightmaps(&path, &map, 1)?])
+    } else { None };
+    if maps::hash_file(&path)? != map.sha256 { return invalid("Compiled partition cache changed during validation"); }
+    let receipt = serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
+        "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "lightmapPages": lightmap_pages,
+        "donorEnvironmentVerified": prepared.donor_environment.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
+        "netgameFlags": native_flags, "playerStarts": native_starts});
+    Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })
 }
 
 pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:Arc<AtomicBool>,event:impl Fn(JobEvent)+Send+Sync)->Result<BuildRecord>{
@@ -329,6 +364,37 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     fs::create_dir(dir.join("data"))?;
     let authored=crate::bsp_compile::apply_base_transforms(project,inspection,&build::tool_path(&tools,"invader-edit").unwrap(),&runner,&dir,&tags)?;
         project::atomic_write(&dir.join("authored-scenario.json"),&serde_json::to_vec_pretty(&authored)?,false)?;
+    if plan.separate_native_bsps {
+        let parts = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &dir, &tags,
+            crate::bsp_compile::PartitionStage::Lighting)?;
+        let cache = build_partition_cache(project, inspection, &parts, &tools, &runner, &dir, &tags, &dir.join("output"), target, true)?;
+        if cancel.load(Ordering::Relaxed) { return invalid("Build cancelled"); }
+        if crate::tool_transaction::inventory(base_tags)? != hashes {
+            return invalid("Editable source tags changed during partition compilation");
+        }
+        for original in [source, &plan.donor_source] {
+            if maps::hash_file(&original.preserved_path)? != original.sha256 {
+                return invalid("Original region identity changed during build");
+            }
+        }
+        let fingerprint = project.fingerprint()?;
+        let record = BuildRecord {
+            id: id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(),
+            target: target.engine.into(), output: Some(cache.path), sha256: Some(cache.sha256),
+            message: format!("{} · two native BSPs · {:.2} / {:.2} MiB resident tag space · physical corridor clearance checked. Runtime traversal remains unverified.",
+                target.name, f64::from(cache.resident_bytes) / 1048576., f64::from(target.tag_capacity) / 1048576.),
+            project_fingerprint: fingerprint,
+        };
+        let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
+        let receipt = serde_json::json!({"schemaVersion": 1, "build": record, "compiledTagHashes": compiled_tag_hashes,
+            "residentBsps": 2, "partitions": parts.receipt, "cache": cache.receipt, "detailSources": detail,
+            "authoredScenario": authored, "originalHashesVerified": true, "gameplayVerified": false, "streaming": false});
+        project::atomic_write(&dir.join("megaworld-receipt.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
+        project::atomic_write(&dir.join("receipt.json"), &serde_json::to_vec_pretty(&record)?, false)?;
+        storage_lease.finish(true, Some(record.project_fingerprint.clone()))?;
+        runner.emit("validated", "Native BSPs, corridor switches and lightmaps passed readback", 100, "success");
+        return Ok(record);
+    }
     let import_hashes=crate::native_asset_imports::stage(import_root,project,&tags)?;
     crate::bsp_compile::prepare_native(project,inspection,&tools,&runner,&dir,&tags)?;
     // Donor scenery keeps its stable native array slots. Append authored rows

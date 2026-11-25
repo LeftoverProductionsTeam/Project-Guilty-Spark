@@ -588,7 +588,7 @@ async fn inspect_native_bsp_transitions(
 }
 
 #[tauri::command]
-async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>)->Reply<serde_json::Value>{
+async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geometry:Option<bool>,draft:Option<core::bsp_assembly::BspAssembly>,native_bsp_index:Option<usize>)->Reply<serde_json::Value>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if let Some(draft)=draft {
             let saved=p.bsp_assembly.as_ref().ok_or("Apply the donor identity before previewing seam drafts")?;
@@ -596,8 +596,18 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
             draft.validate().map_err(error)?;p.bsp_assembly=Some(draft);
         }
         let i=inspect(&state,&p)?;
-        let geometry=core::bsp_assembly::generate_project(&p,&i,&AtomicBool::new(false)).map_err(error)?;
+        let cancel = AtomicBool::new(false);
+        let (geometry, partition_report) = if p.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
+            let selected = native_bsp_index.unwrap_or(0);
+            if selected > 1 { return Err("Choose native BSP 0 or 1".into()); }
+            let parts = core::bsp_assembly::generate_partitioned_project(&p, &i, &cancel).map_err(error)?;
+            let report = serde_json::json!({"selected": selected, "overlapSamples": parts.overlap_samples, "maxFloorDelta": parts.max_floor_delta});
+            (if selected == 0 { parts.base } else { parts.donor }, Some(report))
+        } else {
+            (core::bsp_assembly::generate_project(&p, &i, &cancel).map_err(error)?, None)
+        };
         let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
+        if let Some(report) = partition_report { result["nativePartitions"] = report; }
         if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No saved BSP connection")?;
             let donor=maps::inspect_map(&plan.donor_source.preserved_path,plan.donor_source.resource_directory.as_deref()).map_err(error)?;
             if let Some(source) = &p.source {

@@ -403,3 +403,26 @@ The separate H1A draft-radiosity build including all pickups and the target-spec
 Classic CE retains 65,820 bytes of observed headroom. The lit MCC13 cache retains 284 flags including 30 Chiron teleporter channels. This bake began before the regional-start change. A single retained lit artifact containing the new starts still needs validation. Both BSPs still share linked address ranges, so native compile evidence does not establish simultaneous occupancy.
 
 Focused Rust checks passed for runtime-target review and eight native scenario readback cases. Two opt-in fixtures were skipped. TypeScript passed. The native placement and lighting probes used hash-checked originals and retired their generated outputs.
+
+### Separate native BSPs in the editor
+
+In Level Editor, open Construction and Connect another map’s BSP. Plan a straight enclosed passage between two single-BSP sources, enable Separate native BSPs, then Apply connection. Choose BSP 0 or BSP 1 with Preview native BSP and run Preview native BSP & clearance. The editor uses the same planned corridor halves and shared floor checks as the compiler. Open Build & playtest, select the desired engine build target and choose Build native BSPs. The normal saved build records the cache hash, both switches, lighting and independent native placement checks. CE609 keeps the base starts and flags. MCC13 adds donor starts and teleporter channels. The existing workflow opens a validated cache in a separate map tab.
+
+The exact-binary capability query on Forerunner 45389963 reported 4,096 MCC13 netgame flags and a 64 MiB window. Windows x64 executable SHA-256 923004a39810743fcd8154cb52a7b1a345596606dc417febf65fbae5cfd8df85 and SDL3 SHA-256 1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0 held before and after discovery. Its Spark startup declaration still lists CE609 solo.
+
+The smaller Chiron–Chill Out test passed northward source clearance and reached H1A Tool. Tool rejected base collision edges 1114, 1552 and 2990 at the structure stage. The eastward route exceeded the source needle-refinement limit. A separate Boarding Action test raised the donor landing by 0.02 world units and reproduced the same missing floor at X 100.06, Y −24.69. The nearest floor still stops at X 99.895. This rules out that small grade correction for the floor gap. The owned test outputs were retired.
+
+Verification covered 22 Rust assembly tests, Windows Tauri compilation, TypeScript, and the existing browser draft, Save and Undo regression. The optional layout remains absent from older and joined-plan JSON. Enabling it contributes to the saved project identity.
+
+The combined placement and lighting probe at Spark 94967e2 passed for both formats. Both caches independently matched 42 Chiron pickups, 32 donor scenery placements, 12 and 9 lightmap pages, both switch volumes, the original Chiron ambience and 20 common corridor-floor samples. The largest compiled floor difference remained 0.000001039 world units. All eleven inherited route checks passed. The disposable builds were retired.
+
+| Combined lit probe | SHA-256 | Resident bytes | Starts | Flags |
+| --- | --- | ---: | ---: | ---: |
+| CE609 | f38c08de9c5f982e7428ce4136c1d150d64ae1a5ae9f80f3a5526dabaf2aeacf | 24,051,428 / 24,117,248 | 68 base | 150 base |
+| MCC13 | 54952d1c1384dc97897acb1c3ed42a884bc5e79efe07de3d7e59a5cdae396faa | 16,100,228 / 67,108,864 | 68 base + 59 Chiron | 150 base + 134 Chiron |
+
+The lit MCC13 probe includes the 30 donor teleporter channels and the 127 explicit BSP-bound starts in the same cache. The overlapping linked BSP ranges remain measurable. Physical crossings and independent multiplayer occupancy are separate runtime gates.
+
+The same reviewed Chiron corridor completed the normal MCC13 Build path through the owner CLI. It wrote the saved layout and the normal BuildRecord in the expected output directory. The first wrapper checks passed validated status, MCC13 target, output path and file SHA-256 equality. A later combined assertion failed before it printed the remaining receipt fields and final hash. The wrapper compared JSON strings from a directly serialized BuildRecord and a serde_json Value object. The actual serializer configuration and declared BuildRecord order reproduced the failure with equal fields. Structural equality passes. The owned files were retired, so the full production receipt and its exact SHA-256 still need capture on an authorized retained export. The independent combined-probe hashes above are unaffected.
+
+The final layout round-trip test passed again after generic conversion was guarded against flattening a separate-BSP project. The joined three-route browser workflow also passed with the new Build workspace action present. No game process was launched.
