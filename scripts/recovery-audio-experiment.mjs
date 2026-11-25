@@ -54,7 +54,7 @@ if (repairMixedPalettes && (resourceHashes['bitmaps.map'] !== '5357828124ed03b9b
 }
 const invaderCommands = nativeMccTool ? ['extract', 'build', 'edit', 'info'] : ['extract', 'build', 'edit'];
 if (repairCarrierInertia) invaderCommands.push('crc');
-if (compileClassicCe) invaderCommands.push('bitmap');
+if (compileClassicCe) invaderCommands.push('bitmap', 'bludgeon');
 const executables = Object.fromEntries(invaderCommands.map((name) => {
   const exe = path.join(invader, `invader-${name}${process.platform === 'win32' ? '.exe' : ''}`);
   return [name, { path: exe, sha256: hashFile(exe) }];
@@ -773,8 +773,8 @@ function prepareClassicCeTags() {
   const shader = 'spark_recovery/classic_ce/invisible_carrier.shader_transparent_chicago';
   const bitmapStem = 'spark_recovery/classic_ce/invisible_carrier';
   const bitmap = bitmapStem + '.bitmap';
-  const originalModel = get(model, ['shaders[*].shader'], 'classic-carrier-shaders-before').map(normalizeNativePath);
-  expect(originalModel, Array(15).fill('effects/lights/coop teleport.light'), 'original Evolved carrier shader bindings');
+  const standardModel = 'weapons/gravity rifle/gravity rifle.gbxmodel';
+  const carrierModels = [[model, 15], [standardModel, 3]];
   const data = path.join(output, 'classic-ce-data');
   const image = path.join(data, bitmapStem + '.tga');
   fs.mkdirSync(path.dirname(image), { recursive: true });
@@ -799,9 +799,57 @@ function prepareClassicCeTags() {
     'classic-carrier-transparent-shader');
   expect(get(shader, ['framebuffer_blend_function', 'maps[0].map'], 'classic-carrier-transparent-readback')
     .map(normalizeNativePath), ['add', bitmap], 'native zero-color material');
-  edit(model, originalModel.flatMap((_, i) => ['-S', 'shaders[' + i + '].shader', shader]), 'classic-carrier-rebind-shaders');
-  expect(get(model, ['shaders[*].shader'], 'classic-carrier-shaders-after').map(normalizeNativePath),
-    originalModel.map(() => shader), 'target Evolved carrier shader bindings');
+  for (const [carrierModel, slots] of carrierModels) {
+    const originalShaders = get(carrierModel, ['shaders[*].shader'], 'classic-carrier-shaders-before').map(normalizeNativePath);
+    expect(originalShaders, Array(slots).fill('effects/lights/coop teleport.light'), 'original light placeholders for ' + carrierModel);
+    edit(carrierModel, originalShaders.flatMap((_, i) => ['-S', 'shaders[' + i + '].shader', shader]), 'classic-carrier-rebind-shaders');
+    expect(get(carrierModel, ['shaders[*].shader'], 'classic-carrier-shaders-after').map(normalizeNativePath),
+      originalShaders.map(() => shader), 'target carrier material for ' + carrierModel);
+  }
+  // Classic CE requires two render and collision regions here. Add tire
+  // metadata without adding collision surfaces to the original compact hull.
+  const sharedCarriers = [
+    'mgm/fonzie/sparky/tags/evolved zombie container.vehicle',
+    'mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle',
+  ];
+  const ammoCollision = 'powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry';
+  const carrierCollision = 'spark_recovery/classic_ce/evolved_carrier.model_collision_geometry';
+  const originalCollision = fs.readFileSync(path.join(directory, ammoCollision));
+  expect(sha(originalCollision), '96eef6de3ceffca4f990f7d6d17716c8f37a7c942c5c440a7967a9942983ee5a',
+    'original compact collision tag');
+  const readCarrier = tag => get(tag, ['model', 'collision_model'], 'classic-carrier-binding').map(normalizeNativePath);
+  expect(readCarrier(standardCarrier), [standardModel, ammoCollision], 'original Standard carrier binding');
+  const renderRegions = get(model, ['regions[*].name', 'regions[*].permutations[*].name'], 'classic-evolved-render-regions');
+  expect(renderRegions, ['hull', 'tire', '__base', '__base', '~blur'], 'Evolved render region order');
+  const sourceFields = ['regions[*].name', 'regions[*].permutations[*].name', 'nodes[0].region', 'nodes[0].name'];
+  expect(get(ammoCollision, sourceFields, 'classic-evolved-collision-before'),
+    ['__unnamed', '__base', '0', 'frame ammo'], 'original single collision region');
+  const derivedCollision = path.join(directory, carrierCollision);
+  fs.copyFileSync(path.join(directory, ammoCollision), derivedCollision, fs.constants.COPYFILE_EXCL);
+  edit(carrierCollision, ['-n', '-S', 'regions[0].name', 'hull', '-I', 'regions', '1', 'end',
+    '-S', 'regions[1].name', 'tire', '-I', 'regions[1].permutations', '2', 'end',
+    '-S', 'regions[1].permutations[0].name', '__base', '-S', 'regions[1].permutations[1].name', '~blur'],
+    'classic-evolved-collision-regions');
+  expect(get(carrierCollision, sourceFields, 'classic-evolved-collision-after'),
+    [...renderRegions, '0', 'frame ammo'], 'carrier collision regions and original node');
+  expect(edit(carrierCollision, ['-V', '-C', 'nodes', '-C', 'nodes[0].bsps', '-C', 'pathfinding_spheres'],
+    'classic-evolved-collision-counts'), ['matched', '1', '1', '0'], 'original hull BSP and no extra collision nodes');
+  const fixedCollision = fs.readFileSync(derivedCollision);
+  const nodeAnchor = Buffer.from('frame ammo');
+  const oldNode = originalCollision.indexOf(nodeAnchor);
+  const newNode = fixedCollision.indexOf(nodeAnchor);
+  if (oldNode < 0 || newNode < 0 || originalCollision.indexOf(nodeAnchor, oldNode + 1) !== -1 ||
+      fixedCollision.indexOf(nodeAnchor, newNode + 1) !== -1 ||
+      !fixedCollision.subarray(newNode).equals(originalCollision.subarray(oldNode))) {
+    throw new Error('Matching Evolved regions changed the original node or collision BSP bytes');
+  }
+  for (const carrier of sharedCarriers) {
+    expect(readCarrier(carrier), [model, ammoCollision], 'original carrier binding for ' + carrier);
+    edit(carrier, ['-S', 'collision_model', carrierCollision], 'classic-bind-carrier-collision');
+    expect(readCarrier(carrier), [model, carrierCollision], 'reviewed carrier binding for ' + carrier);
+  }
+  expect(hashFile(path.join(directory, ammoCollision)), sha(originalCollision), 'preserved ammo collision tag');
+
   const physics = 'fzero/zombie/zombiephysics.physics';
   const moment = ['-G', 'moment_scale', '-G', 'mass', '-C', 'mass_points'];
   expect(edit(physics, moment, 'classic-carrier-inertia-before'),
@@ -893,20 +941,144 @@ function prepareClassicCeTags() {
     [...unarmed, '1.000000'], 'CE unarmed Evolved actor tracking');
   expect(fieldsWithout(edit(carrierActor, ['-L'], 'classic-evolved-fields-after'), [tracking]),
     fieldsWithout(actorListing, [tracking]), 'unchanged Evolved actor fields');
+  // Classic multiplayer can encode seven carried grenades per
+  // slot. Keep both authored Molotov references and zero starting counts.
+  const globals = 'globals/globals.globals';
+  const maximum = ['grenades[0].maximum_count', 'grenades[1].maximum_count'];
+  const grenadeRules = ['grenades[*].maximum_count', 'grenades[*].mp_spawn_default', 'grenades[*].projectile'];
+  const molotov = 'mgm/kiyoshi/broke/tags/equipment/molotov.projectile';
+  expect(get(globals, grenadeRules, 'classic-global-grenades-before').map(normalizeNativePath),
+    ['8', '8', '0', '0', molotov, molotov], 'original multiplayer Molotov inventory');
+  const inventoryListing = edit(globals, ['-L'], 'classic-global-fields-before');
+  edit(globals, maximum.flatMap(field => ['-S', field, '7']), 'classic-multiplayer-grenade-cap');
+  expect(get(globals, grenadeRules, 'classic-global-grenades-after').map(normalizeNativePath),
+    ['7', '7', '0', '0', molotov, molotov], 'Classic multiplayer Molotov inventory');
+  expect(edit(globals, ['-L'], 'classic-global-fields-after'),
+    inventoryListing.map(line => line.replace(/(\bmaximum_count )\(8\)/, '$1(7)')), 'only the two grenade caps changed');
+
+  const dormantMaterialEffects = [
+    [3, 'alpha zombieorig'], [13, 'zombie'], [17, 'evolved zombie'],
+  ];
+  const materialEffects = get(globals, ['materials[*].effect'], 'classic-material-effects-before').map(normalizeNativePath);
+  expect(materialEffects.flatMap((tag, i) => tag.endsWith('.effect') ? [] : [i]),
+    dormantMaterialEffects.map(([i]) => i), 'only the reviewed legacy material misbindings');
+  for (const [i, name] of dormantMaterialEffects) {
+    const material = 'materials[' + i + ']';
+    const fields = [material + '.maximum_vitality', material + '.effect'];
+    expect(get(globals, fields, 'classic-material-before').map(normalizeNativePath),
+      ['0.000000', 'mgm/fonzie/sparky/tags/zombies/' + name + '.biped'], 'dormant breakable-material entry');
+    edit(globals, ['-S', fields[1], '.effect'], 'classic-clear-dormant-material-effect');
+    materialEffects[i] = '.effect';
+  }
+  expect(get(globals, ['materials[*].effect'], 'classic-material-effects-after').map(normalizeNativePath),
+    materialEffects, 'preserve all valid breakable-material effects');
+
+  const modifier = 'modifier_shader';
+  const molotovVisuals = [modifier, 'creation_effect', 'attachments[0].type', 'effect'];
+  const nativeFire = ['effects/coop teleport.effect', 'scenery/emitters/burning_flame/effects/burning.effect',
+    'halo3/weapons/fire-grenade/explosion.effect'];
+  expect(get(molotov, molotovVisuals, 'classic-molotov-visuals-before').map(normalizeNativePath),
+    ['weapons/flamethrower/effects/flame detonation.effect', ...nativeFire], 'legacy shader misbinding and active fire effects');
+  const projectileListing = edit(molotov, ['-L'], 'classic-molotov-fields-before');
+  edit(molotov, ['-S', modifier, '.shader_model'], 'classic-molotov-clear-invalid-shader');
+  expect(get(molotov, molotovVisuals, 'classic-molotov-visuals-after').map(normalizeNativePath),
+    ['.shader_model', ...nativeFire], 'original native Molotov effect chain');
+  expect(fieldsWithout(edit(molotov, ['-L'], 'classic-molotov-fields-after'), [modifier]),
+    fieldsWithout(projectileListing, [modifier]), 'unchanged Molotov projectile fields');
+
+  const hud = 'ui/hud/default.hud_globals';
+  const splitFont = 'ui/small_ui.font';
+  const hudFonts = ['fullscreen_font', 'splitscreen_font'];
+  expect(get(hud, hudFonts, 'classic-hud-fonts-before').map(normalizeNativePath),
+    ['ui/large_ui.font', '.font'], 'original fullscreen HUD and absent split-screen font');
+  if (!fs.lstatSync(path.join(directory, splitFont)).isFile()) throw new Error('Original split-screen font is missing');
+  const hudListing = edit(hud, ['-L'], 'classic-hud-fields-before');
+  edit(hud, ['-S', 'splitscreen_font', splitFont], 'classic-hud-stock-split-font');
+  expect(get(hud, hudFonts, 'classic-hud-fonts-after').map(normalizeNativePath),
+    ['ui/large_ui.font', splitFont], 'CE split-screen font and original fullscreen font');
+  expect(fieldsWithout(edit(hud, ['-L'], 'classic-hud-fields-after'), ['splitscreen_font']),
+    fieldsWithout(hudListing, ['splitscreen_font']), 'unchanged HUD layout');
+
+  // The same legacy decoded-length defect also occurs in intact cues.
+  // Use the native decoder-backed repair with only that fix enabled.
+  const bufferFixSha = '094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3';
+  if (executables.bludgeon.sha256 !== bufferFixSha || hashFile(executables.bludgeon.path) !== bufferFixSha) {
+    throw new Error('Classic CE audio staging requires the reviewed native sound repair tool');
+  }
+  const beforeSoundRepair = hashTagInventory(directory);
+  const fixedBuffers = run('bludgeon', ['-t', directory, '-j', '2', '-T', 'incorrect-sound-buffer', '-b', '*.sound'],
+    'classic-sound-decoded-buffer-repair');
+  if (fixedBuffers.exitCode !== 0 || fixedBuffers.incomplete || /failed|error:/i.test(fixedBuffers.log)) {
+    throw new Error('Native CE sound buffer repair did not complete on intact audio');
+  }
+  const afterSoundRepair = hashTagInventory(directory);
+  expect(Object.keys(afterSoundRepair), Object.keys(beforeSoundRepair), 'unchanged tag tree contents during audio repair');
+  const repairedSoundBuffers = Object.entries(afterSoundRepair).filter(([tag, hash]) => hash !== beforeSoundRepair[tag]).map(([tag]) => tag);
+  if (repairedSoundBuffers.some(tag => !tag.endsWith('.sound'))
+      || restoredBuffers.some(row => repairedSoundBuffers.includes(path.normalize(row.tag)))) {
+    throw new Error('Native sound buffer repair changed an unrelated or independently verified tag');
+  }
+
+  const menuTextRepairs = [
+    ['ui/multiplayer_game_text.unicode_string_list', 191, [3, 4, 13, 67, 69, 70, 76, 77, 81, 97, 98, 100]],
+    ['ui/random_player_names.unicode_string_list', 40, Array.from({length: 40}, (_, i) => i).filter(i => i !== 18 && i !== 26)],
+    ['ui/shell/main_menu/mp_map_list.unicode_string_list', 21, [9]],
+    ['ui/shell/main_menu/multiplayer_type_select/mp_map_select/map_data.unicode_string_list', 20, [9]],
+    ['ui/shell/strings/loading.unicode_string_list', 10, [2, 3, 5, 6, 8, 9]],
+  ];
+  for (const [tag, count, missingTerminator] of menuTextRepairs) {
+    const readMenuStrings = () => {
+      const data = fs.readFileSync(path.join(directory, tag));
+      if (data.readUInt32BE(64) !== count) throw new Error('Unexpected multiplayer text slot count: ' + tag);
+      // HEK header, UnicodeStringList reflexive and TagDataOffset records.
+      let offset = 76 + 20 * count;
+      const strings = Array.from({ length: count }, (_, i) => {
+        const length = data.readUInt32BE(76 + 20 * i);
+        if (length < 2 || length % 2 !== 0 || offset + length > data.length) {
+          throw new Error('Unexpected multiplayer text slot length: ' + tag);
+        }
+        const slot = data.subarray(offset, offset + length);
+        offset += length;
+        return slot;
+      });
+      if (offset !== data.length) throw new Error('Unexpected trailing multiplayer text data: ' + tag);
+      return strings;
+    };
+    const originalMenu = readMenuStrings();
+    expect(originalMenu.flatMap((slot, i) => slot.readUInt16LE(slot.length - 2) === 0 ? [] : [i]),
+      missingTerminator, 'original missing CE string terminators in ' + tag);
+    if (tag === menuTextRepairs[0][0]) {
+      expect(originalMenu[100].toString('utf16le').trimEnd(), 'Zombie Apocalypse', 'original custom title');
+    }
+    const repair = run('bludgeon', ['-t', directory, '-T', 'invalid-strings', tag], 'classic-menu-string-terminators');
+    if (repair.exitCode !== 0 || repair.incomplete || /failed|error:/i.test(repair.log)) {
+      throw new Error('Native CE multiplayer text repair failed: ' + tag);
+    }
+    if (readMenuStrings().some((slot, i) => !slot.equals(missingTerminator.includes(i)
+      ? Buffer.concat([originalMenu[i], Buffer.alloc(2)]) : originalMenu[i]))) {
+      throw new Error('CE text repair changed original multiplayer text bytes or indices: ' + tag);
+    }
+  }
+
   expect(hashTagInventory(), before, 'preserved MCC source tree');
 
   manifest.results.push({
     step: 'stage-classic-ce', state: 'native-source-reviewed', playable: false,
-    restoredBuffers,
+    restoredBuffers, repairedSoundBuffers,
     melee: { original: meleeBefore, target: meleeAfter, fields: meleeFields },
     damageBounds: damageBounds.map(([tag, ...original]) => ({tag, original, fields: cappedDamageFields})),
     inactiveTurretGrenadeFields: legalEnums,
     removedUnusedVehicleSlots: empty,
-    invisibleCarrier: { model, shader, bitmap },
+    invisibleCarrier: { models: carrierModels.map(([tag]) => tag), shader, bitmap, collision: carrierCollision, sharedCarriers },
     physics: { tag: physics, momentScale: 1 },
     rotationalSprites: { tags: [ball, flame, smoke, burning], unchangedPixelBytes: true },
     normalizedZombieBipeds: feignDeath.map(([name]) => name),
     unarmedCarrierTracking: carrierActor,
+    grenadeInventoryMaximum: { original: 8, classicCe: 7 },
+    molotovNativeEffects: nativeFire,
+    splitScreenFont: splitFont,
+    terminatedMenuStrings: menuTextRepairs.map(([tag, , slots]) => ({tag, slots})),
+    clearedDormantMaterialEffects: dormantMaterialEffects.map(([i]) => i),
     unchangedRecoveredSource: true,
   });
   save();
