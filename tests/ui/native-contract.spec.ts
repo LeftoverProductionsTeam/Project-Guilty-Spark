@@ -5778,7 +5778,7 @@ for(const mode of ['shared','flags','objects','covenant','insertion','covenant-i
 
 async function mockNativePointReview(page:Page){await page.evaluate(()=>{const w=window as any,m=w.__sparkMock,invoke=w.__TAURI_INTERNALS__.invoke;m.geometryCalls=[];m.geometryStale=false;m.geometryDeferred=false;
  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
-  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={...(args.controlMountTag?{controlMount:{tagPath:args.controlMountTag,offset:0.1,issue:null}}:{}),buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[])=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};
+  if(command==='native_scenario_geometry'){m.geometryCalls.push(structuredClone(args));const result={...(args.controlMountTag?{controlMount:{tagPath:args.controlMountTag,offset:0.1,issue:null}}:{}),buildId:args.expectedBuildId,tagSha256:m.geometryStale?'f'.repeat(64):args.expectedTagSha256,outputSha256:'c'.repeat(64),points:args.points.map((point:number[],index:number)=>({point:point.map(Math.fround),bsps:[0],nearPartition:false,supports:Math.abs(point[2])<=0.5?[{bsp:0,z:0}]:[],...(args.groundDrop!==undefined?{ground:m.geometryWrongGround?[{bsp:0,z:point[2]+1}]:point[2]>=0&&point[2]<=args.groundDrop?[{bsp:0,z:m.geometryTerrainCorner&&index===25?0.75:0}]:[]}: {})})),...(args.groundDrop!==undefined?{groundDrop:args.groundDrop}:{})};
    if(args.commandRoute){
     const destinations=args.commandRoute.commands.flatMap((step:any,action:number)=>step.atom.startsWith('go_to')?[{point:step.point1,action}]:[]);
     let from:number|null=null;
@@ -5858,6 +5858,23 @@ test('native BSP flight review checks the supplied first leg and navigates nativ
  expect(compared[0][1]).toBeCloseTo(cy-2.5);
  expect(compared[25][0]).toBeCloseTo(cx+2.5);
  expect(compared[25][1]).toBeCloseTo(cy-1.5);
+ const useObserved=form.getByRole("checkbox",{name:"Use observed touchdown coordinates",exact:true});
+ await revealPagedControl(useObserved);await useObserved.check();
+ await expect(result).toHaveCount(0);
+ await expect(survey).toBeDisabled();
+ for(const [i,axis] of ['X','Y','Z'].entries()){
+  const field=form.getByRole('spinbutton',{name:'Observed touchdown '+axis,exact:true});
+  await revealPagedControl(field);await field.fill(['79.221','-122.37','1.505'][i]);
+ }
+ await page.evaluate(()=>(window as any).__sparkMock.geometryTerrainCorner=true);
+ await revealPagedControl(survey);await survey.click();
+ await expect(result).toContainText("Center 79.221 / -122.37 / 1.505");
+ const comparison=result.getByText(/BSP 0 · Height range 0.750 units/);
+ await expect(comparison).toContainText("Estimated surface up.k 1.0000 at center");
+ await expect(comparison).toContainText("Steepest sampled patch up.k "+(1/Math.hypot(1,1,0.6)).toFixed(4));
+ const observed=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1).points);
+ expect(observed[12]).toEqual([cx,cy,cz]);
+ expect(observed[37]).toEqual([79.221,-122.37,2.505]);
  await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0]);
  await page.locator('.native-tag-operations:visible').getByRole('button',{name:'Refresh source',exact:true}).click();
  await expect(form).toContainText('recipe-owned AI group');

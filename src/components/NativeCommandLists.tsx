@@ -2,6 +2,7 @@ import NativeBspPointCheck,{landingFootprintPoints} from './NativeBspPointCheck'
 import {useEffect,useRef,useState} from 'react';
 import {useMapState,writeMapSession} from '../mapSession';
 import {NATIVE_COMMAND_VIEW,nativeCommandKey,nativeCommandMatches,newNativeCommandRoute,nativeRouteCommand} from '../nativeOperations';
+import type {LandingFootprint} from './NativeBspPointCheck';
 import type {NativeCommand,NativeCommandDraft,NativeCommandList,NativeTagContext,NativeOperation} from '../nativeOperations';
 import {Notice,NumberField} from './ui';
 const flagNames=['Allow initiative','Allow targeting','Disable looking','Disable communication','Disable falling damage','Use manual BSP'];
@@ -11,7 +12,7 @@ export default function NativeCommandLists({context,busy,dirty,onPreview,onDraft
  const [index,setIndex]=useState(''),[step,setStep]=useState('0'),[point,setPoint]=useState('0');
  const [halfWidth,setHalfWidth]=useState(1.5),[halfLength,setHalfLength]=useState(1.5);
  const [heading,setHeading]=useState(0),[compareHeading,setCompareHeading]=useState(false),[secondHeading,setSecondHeading]=useState(90);
- const landingFootprint={halfWidth,halfLength,headings:compareHeading?[heading,secondHeading]:[heading]};
+ const [observed,setObserved]=useState(false),[observedCenter,setObservedCenter]=useState(['','','']);
  const [draft,setDraft]=useMapState<NativeCommandDraft|null>(context.projectId,NATIVE_COMMAND_VIEW,()=>null);
  const details=useRef<HTMLDetailsElement>(null),reviewed=useRef(0);
  const owns=!!draft&&nativeCommandMatches(draft,context);
@@ -32,6 +33,9 @@ export default function NativeCommandLists({context,busy,dirty,onPreview,onDraft
  const pointIndex=owns?draft.point:Number(point);
  function update(next:NativeCommandList,patch:Partial<NativeCommandDraft>={}){if(!original||!context.tagSha256)return;setDraft({key,projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,original,point:pointIndex,active:false,focus:0,locked:false,...(owns?draft:{}),list:next,...patch});onDraftChange();}
  const current=list?.commands[Number(step)],position=list?.points[pointIndex];
+ const comparisonPosition=observed?observedCenter.map(numeric) as [number,number,number]:position;
+ const landingFootprint:LandingFootprint={halfWidth,halfLength,poses:position?[{heading,position}]:[]};
+ if(compareHeading&&comparisonPosition)landingFootprint.poses.push({heading:secondHeading,position:comparisonPosition});
  const field=(name:string,value:number,min:number,max:number,change:(value:number)=>void)=><label key={name}>{name}<input type="number" step={name.startsWith('Parameter')||name==='Arrival radius'?'any':1} min={min} max={max} aria-label={'Command '+name} value={Number.isFinite(value)?value:''} onChange={e=>change(numeric(e.target.value))}/></label>;
  function command(patch:Partial<NativeCommand>){if(list&&current)update({...list,commands:list.commands.map((c,i)=>i===Number(step)?{...c,...patch}:c)});}
  return <details className="native-command-lists" ref={details}><summary>Existing AI command lists · {source?.lists.length??0}</summary>
@@ -51,10 +55,18 @@ export default function NativeCommandLists({context,busy,dirty,onPreview,onDraft
    <NumberField label="Footprint heading (degrees)" value={heading} min={-180} max={180} step={1} disabled={!!selectionBlocked} onCommit={setHeading}/>
   </div>
   <label><input type="checkbox" checked={compareHeading} disabled={!!selectionBlocked} onChange={event=>setCompareHeading(event.target.checked)}/>Compare another heading</label>
-  {compareHeading&&<NumberField label="Comparison heading (degrees)" value={secondHeading} min={-180} max={180} step={1} disabled={!!selectionBlocked} onCommit={setSecondHeading}/>}
+  {compareHeading&&<>
+   <NumberField label="Comparison heading (degrees)" value={secondHeading} min={-180} max={180} step={1} disabled={!!selectionBlocked} onCommit={setSecondHeading}/>
+   <label><input type="checkbox" checked={observed} disabled={!!selectionBlocked} onChange={event=>setObserved(event.target.checked)}/>Use observed touchdown coordinates</label>
+   {observed&&<div className="native-encounter-position">{['X','Y','Z'].map((axis,index)=><label key={axis}>Observed {axis}
+    <input type="number" step="any" min={-1e6} max={1e6} aria-label={'Observed touchdown '+axis}
+     disabled={!!selectionBlocked} value={observedCenter[index]}
+     onChange={event=>setObservedCenter(values=>values.map((value,i)=>i===index?event.target.value:value))}/>
+   </label>)}</div>}
+  </>}
   <NativeBspPointCheck context={context} selectionKey={key+':'+pointIndex}
    landingFootprint={landingFootprint} manualBsp={list?.flags[5]?list.bsp:undefined}
-   points={position?landingFootprintPoints(position,landingFootprint):[]}
+   points={position?landingFootprintPoints(landingFootprint):[]}
    disabled={!!selectionBlocked} label="Check landing footprint"/>
  </details>
  <NativeBspPointCheck context={context} selectionKey={key} commandRoute={list} onGround={blocked?undefined:(index,position)=>{if(list){setPoint(String(index));update({...list,points:list.points.map((point,i)=>i===index?position:point)},{point:index,focus:Date.now()});requestAnimationFrame(()=>details.current?.querySelector<HTMLInputElement>('[aria-label="Command point Z"]')?.focus());}}} points={list?.points??[]} manualBsp={list?.flags[5]?list.bsp:undefined} disabled={!!selectionBlocked||!valid} label="Check route against compiled BSP" onSelect={blocked?undefined:index=>{if(list){setPoint(String(index));update(list,{point:index,focus:Date.now()});requestAnimationFrame(()=>details.current?.querySelector<HTMLInputElement>('[aria-label="Command point X"]')?.focus());}}}/>
