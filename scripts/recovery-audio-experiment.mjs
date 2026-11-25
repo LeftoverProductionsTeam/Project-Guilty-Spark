@@ -1060,6 +1060,18 @@ function prepareClassicCeTags() {
     }
   }
 
+  // The legacy Survivor stores 4.5 radians, outside the native camera's
+  // valid range. Use the owned stock CE multiplayer default on this target.
+  const survivor = 'mgm/fonzie/sparky/tags/player/survivor.biped';
+  const cameraFov = 'camera_field_of_view';
+  expect(get(survivor, [cameraFov], 'classic-survivor-fov-before'),
+    ['257.831008'], 'original out-of-range Survivor camera angle');
+  const cameraListing = edit(survivor, ['-L'], 'classic-survivor-fields-before');
+  edit(survivor, ['-S', cameraFov, String(70 * Math.PI / 180)], 'classic-survivor-native-fov');
+  expect(get(survivor, [cameraFov], 'classic-survivor-fov-after'), ['70.000000'], 'stock CE player camera angle');
+  expect(fieldsWithout(edit(survivor, ['-L'], 'classic-survivor-fields-after'), [cameraFov]),
+    fieldsWithout(cameraListing, [cameraFov]), 'unchanged Survivor biped fields');
+
   expect(hashTagInventory(), before, 'preserved MCC source tree');
 
   manifest.results.push({
@@ -1077,6 +1089,7 @@ function prepareClassicCeTags() {
     grenadeInventoryMaximum: { original: 8, classicCe: 7 },
     molotovNativeEffects: nativeFire,
     splitScreenFont: splitFont,
+    survivorCameraDegrees: 70,
     terminatedMenuStrings: menuTextRepairs.map(([tag, , slots]) => ({tag, slots})),
     clearedDormantMaterialEffects: dormantMaterialEffects.map(([i]) => i),
     unchangedRecoveredSource: true,
