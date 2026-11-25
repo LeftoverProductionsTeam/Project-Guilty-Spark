@@ -4944,6 +4944,17 @@ test('native control support uses the reviewed ground and mounting offset in the
  await form.getByRole('button',{name:'Check control ground',exact:true}).click();
  await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0 → origin Z 0.125',exact:true}).click();
  await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0.125');
+ const z=form.getByRole('spinbutton',{name:'Device position Z',exact:true});
+ await z.fill('-0.25');
+ await z.press('Enter');
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('No upward-facing ground');
+ await form.getByRole('checkbox',{name:'Start ground search 0.5 units above origin'}).check();
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toHaveCount(0);
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('Model base is 0.350 units below');
+ await form.getByRole('button',{name:'Seat model on ground · BSP 0 · origin Z 0.1',exact:true}).click();
+ await expect(z).toHaveValue('0.1');
  await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
  await expect(form.getByRole('spinbutton',{name:'Device position Y',exact:true})).toHaveValue('2');
  expect(await page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].position)).toEqual([1,2,3]);

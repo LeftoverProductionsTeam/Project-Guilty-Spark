@@ -23,7 +23,7 @@ export default function NativeControlGroundCheck({context,selectionKey,tagPath,p
     <NumberField label="Origin offset from ground" value={mountOffset} min={-64} max={64}
       step={0.001} disabled={disabled} onCommit={setOffset}/>
     <small>{upright?'Check the compiled control, then seat its model on a reviewed surface or enter a custom offset.':'Enter an offset for this tilted control.'} A positive value raises the origin above the selected ground.</small>
-    <NativeBspPointCheck context={context} selectionKey={key} subject="Control origin"
+    <NativeBspPointCheck context={context} selectionKey={key} subject="Control origin" allowGroundHeadroom
       mountOffset={mountOffset} controlMountTag={upright?tagPath:undefined} onMountOffset={setOffset}
       points={position?[position]:[]} disabled={disabled||!position} label="Check control ground"
       onGround={(_,point)=>onGround(point)}/>

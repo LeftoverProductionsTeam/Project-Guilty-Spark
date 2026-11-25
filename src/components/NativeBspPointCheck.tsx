@@ -3,10 +3,14 @@ import {call,native} from '../api';
 import type {NativeCommandGeometryReview,NativeCommandList,NativeTagContext} from '../nativeOperations';
 import {Notice,NumberField} from './ui';
 /** Compiled reference and explicit coordinate-draft corrections; native writes stay in source review. */
-export default function NativeBspPointCheck({context,points,manualBsp,disabled,label,subject,onSelect,onGround,selectionKey,commandRoute,mountOffset,controlMountTag,onMountOffset,footprintSpacing}:{context:NativeTagContext;points:[number,number,number][];manualBsp?:number;disabled:boolean;label:string;subject?:string;onSelect?:(index:number)=>void;onGround?:(index:number,point:[number,number,number])=>void;selectionKey?:string;commandRoute?:NativeCommandList;mountOffset?:number;controlMountTag?:string;onMountOffset?:(offset:number)=>void;footprintSpacing?:number}){
+export default function NativeBspPointCheck({context,points,manualBsp,disabled,label,subject,onSelect,onGround,selectionKey,commandRoute,mountOffset,controlMountTag,onMountOffset,footprintSpacing,allowGroundHeadroom=false}:{context:NativeTagContext;points:[number,number,number][];manualBsp?:number;disabled:boolean;label:string;subject?:string;onSelect?:(index:number)=>void;onGround?:(index:number,point:[number,number,number])=>void;selectionKey?:string;commandRoute?:NativeCommandList;mountOffset?:number;controlMountTag?:string;onMountOffset?:(offset:number)=>void;footprintSpacing?:number;allowGroundHeadroom?:boolean}){
  const [findGround,setFindGround]=useState(mountOffset!==undefined),[drop,setDrop]=useState(16);
  const groundDrop=footprintSpacing!==undefined?16:findGround&&onGround?drop:undefined;
  const offset=mountOffset??0;
+ const [raisedSelection,setRaisedSelection]=useState<string|null>(null);
+ const lookAbove=raisedSelection!==null&&raisedSelection===selectionKey;
+ const headroom=allowGroundHeadroom&&lookAbove&&groundDrop!==undefined ? 0.5 : 0;
+ const probePoints=headroom ? points.map(([x,y,z]):[number,number,number]=>[x,y,Math.fround(z+headroom)]) : points;
  const [start,setStart]=useState<{key:string|undefined;mode:string;xyz:string[]}|null>(null);
  const originMode=start&&start.key===selectionKey?start.mode:'';
  const xyz=start&&start.key===selectionKey?start.xyz:['','',''];
@@ -14,17 +18,17 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
  const routeOrigin=originMode==='custom'
   ?xyz.map(value=>value.trim()?Number(value):NaN) as [number,number,number]
   :vehicles.find(vehicle=>String(vehicle.index)===originMode)?.position;
- const key=JSON.stringify([context.projectId,context.buildId,context.tagSha256,selectionKey,manualBsp,points,groundDrop,mountOffset,controlMountTag,commandRoute,originMode,routeOrigin]);const latest=useRef(key);latest.current=key;
+ const key=JSON.stringify([context.projectId,context.buildId,context.tagSha256,selectionKey,manualBsp,points,groundDrop,headroom,mountOffset,controlMountTag,commandRoute,originMode,routeOrigin]);const latest=useRef(key);latest.current=key;
  const generation=useRef(0);const [checking,setChecking]=useState(false),[error,setError]=useState('');const [review,setReview]=useState<{key:string;value:NativeCommandGeometryReview}|null>(null);
  useEffect(()=>{generation.current++;setChecking(false);setError('');return()=>{generation.current++;};},[key]);
  const finitePoint=(point:number[])=>point.length===3&&point.every(value=>Number.isFinite(value)&&Math.abs(value)<=1e6);
- const valid=points.length>0&&points.length<=64&&points.every(finitePoint)&&
+ const valid=points.length>0&&points.length<=64&&points.every(finitePoint)&&probePoints.every(finitePoint)&&
   (!originMode||!!routeOrigin&&finitePoint(routeOrigin))&&(groundDrop===undefined||Number.isFinite(groundDrop)&&groundDrop>=.5&&groundDrop<=64);
  async function check(){
   if(!native||disabled||checking||!valid||!context.tagSha256)return;const request=++generation.current,selection=key;setChecking(true);setError('');setReview(null);
-  try{const value=await call<NativeCommandGeometryReview>('native_scenario_geometry',{projectId:context.projectId,expectedBuildId:context.buildId,expectedTagSha256:context.tagSha256,points,...(groundDrop!==undefined?{groundDrop}:{}),...(controlMountTag?{controlMountTag}:{}),...(commandRoute?{commandRoute,routeOrigin}:{} )});
+  try{const value=await call<NativeCommandGeometryReview>('native_scenario_geometry',{projectId:context.projectId,expectedBuildId:context.buildId,expectedTagSha256:context.tagSha256,points:probePoints,...(groundDrop!==undefined?{groundDrop}:{}),...(controlMountTag?{controlMountTag}:{}),...(commandRoute?{commandRoute,routeOrigin}:{} )});
    if(request!==generation.current||latest.current!==selection)return;
-   if(value.buildId!==context.buildId||value.tagSha256!==context.tagSha256||!/^[a-f0-9]{64}$/i.test(value.outputSha256)||!Array.isArray(value.points)||value.points.length!==points.length||value.points.some((row,i)=>!Array.isArray(row.point)||row.point.length!==3||row.point.some((n,k)=>Math.fround(n)!==Math.fround(points[i][k]))||!Array.isArray(row.bsps)||row.bsps.some(n=>!Number.isInteger(n)||n<0||n>=16)||!Array.isArray(row.supports)||row.supports.some(s=>!Number.isInteger(s.bsp)||s.bsp<0||s.bsp>=16||!Number.isFinite(s.z))))throw Error('BSP review belongs to a different native source or coordinate revision; review again.');
+   if(value.buildId!==context.buildId||value.tagSha256!==context.tagSha256||!/^[a-f0-9]{64}$/i.test(value.outputSha256)||!Array.isArray(value.points)||value.points.length!==points.length||value.points.some((row,i)=>!Array.isArray(row.point)||row.point.length!==3||row.point.some((n,k)=>Math.fround(n)!==Math.fround(probePoints[i][k]))||!Array.isArray(row.bsps)||row.bsps.some(n=>!Number.isInteger(n)||n<0||n>=16)||!Array.isArray(row.supports)||row.supports.some(s=>!Number.isInteger(s.bsp)||s.bsp<0||s.bsp>=16||!Number.isFinite(s.z))))throw Error('BSP review belongs to a different native source or coordinate revision; review again.');
    if(groundDrop!==undefined&&(Math.fround(value.groundDrop??NaN)!==Math.fround(groundDrop)||value.points.some(row=>
     !Array.isArray(row.ground)||new Set(row.ground.map(s=>s.bsp)).size!==row.ground.length||row.ground.some(s=>
       !Number.isInteger(s.bsp)||s.bsp<0||s.bsp>=16||!Number.isFinite(s.z)||Math.fround(s.z)>Math.fround(row.point[2])||row.point[2]-s.z>groundDrop+1e-4))))
@@ -77,8 +81,9 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
  </details>}
  <button type="button" disabled={!native||disabled||checking||!valid} onClick={()=>void check()}>{checking?'Checking compiled BSP…':label}</button>
  {onGround&&<div className="native-ground-search"><label><input type="checkbox" disabled={disabled||checking} checked={findGround} onChange={event=>setFindGround(event.target.checked)}/>Find ground below points</label>{findGround&&<NumberField label="Maximum ground search drop" value={drop} min={.5} max={64} step={.5} onCommit={setDrop}/>}
- <small>Finds the closest upward-facing ground below each point within the chosen distance. Choose a surface candidate by BSP. {mountOffset===undefined?'Only its Z is copied.':'The mounting offset is added to the surface Z.'} Existing BSP assignment stays unchanged. Use ground changes only the coordinate draft; Preview → Accept → Save → rebuild is still required. It does not move actors, certify landing clearance or fix a missing map surface.</small></div>}
- {footprintSpacing!==undefined?<small>Samples nine ground heights around the selected point within each BSP. Height range and estimated slope describe terrain only. Check the full hull, approach and passenger exit in-game.</small>:subject?<small>Checks collision at the control origin. Review its model base and approach in the Level Editor, then verify the Use prompt in-game.</small>:<small>Checks the compiled reference. Native ground-bound command points need a collision surface within ±0.5 world units, including facing points. BSP empty-space membership is separate. Rebuild after structural BSP edits; neither result proves hull clearance, ground contact, pathfinding or flight.</small>}
+ {findGround&&allowGroundHeadroom&&<label><input type="checkbox" disabled={disabled||checking} checked={lookAbove} onChange={event=>setRaisedSelection(event.target.checked?selectionKey??null:null)}/>Start ground search 0.5 units above origin</label>}
+ <small>Finds the closest upward-facing ground below the search start within the chosen distance. Choose a surface candidate by BSP. {mountOffset===undefined?'Only its Z is copied.':'The mounting offset is added to the surface Z.'} Existing BSP assignment stays unchanged. Use ground changes only the coordinate draft; Preview → Accept → Save → rebuild is still required. It does not move actors, certify landing clearance or fix a missing map surface.</small></div>}
+ {footprintSpacing!==undefined?<small>Samples nine ground heights around the selected point within each BSP. Height range and estimated slope describe terrain only. Check the full hull, approach and passenger exit in-game.</small>:subject?<small>Checks collision at the ground search start. Review the model base and approach in the Level Editor, then verify the Use prompt in-game.</small>:<small>Checks the compiled reference. Native ground-bound command points need a collision surface within ±0.5 world units, including facing points. BSP empty-space membership is separate. Rebuild after structural BSP edits; neither result proves hull clearance, ground contact, pathfinding or flight.</small>}
  {error&&<Notice>{error}</Notice>}
  {current?.route&&<>
   <h4>Flight leg results</h4>
@@ -94,7 +99,7 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
   <small>Checks straight segments in native go-to action order. Facing-only points, hull clearance, scenery, coplanar contact and actual flight are outside this check.</small>
  </>}
  {current&&survey&&<div aria-label="Landing footprint results">{survey.length?<ul>{survey.map(row=><li key={row.bsp}>BSP {row.bsp} · Height range {row.relief.toFixed(3)} units · Estimated surface up.k {row.up.toFixed(4)}</li>)}</ul>:<p>No single BSP has a readable ground surface below all nine samples within 16 units.</p>}<small>Compiled reference {current.outputSha256.slice(0,12)}.</small></div>}
- {current&&!survey&&<><p>{common.length?'Common nearby-surface BSP: '+common.join(', '):'No single BSP has a nearby surface for every selected point.'}</p><ul aria-label="Native BSP point results">{current.points.map((row,index)=>{const surfaces=row.supports.filter(s=>manualBsp===undefined||s.bsp===manualBsp),inside=manualBsp===undefined?row.bsps.length>0:row.bsps.includes(manualBsp);return <li key={index}>{onSelect?<button type="button" onClick={()=>onSelect(index)}>Point {index}</button>:<strong>{subject??("Point "+index)}</strong>} — {surfaces.length?surfaces.map(s=>'surface BSP '+s.bsp+' at Z '+Number(s.z.toFixed(5))).join('; '):'No collision surface within ±0.5'}; {inside?'inside collision space':'outside collision space'}{row.nearPartition?' · near partition plane':''}
+ {current&&!survey&&<>{headroom>0&&<small>Nearby surface and collision results describe the raised probe. Applying ground changes only the control's Z.</small>}<p>{common.length?'Common nearby-surface BSP: '+common.join(', '):'No single BSP has a nearby surface for every selected point.'}</p><ul aria-label="Native BSP point results">{current.points.map((row,index)=>{const surfaces=row.supports.filter(s=>manualBsp===undefined||s.bsp===manualBsp),inside=manualBsp===undefined?row.bsps.length>0:row.bsps.includes(manualBsp);return <li key={index}>{onSelect?<button type="button" onClick={()=>onSelect(index)}>Point {index}</button>:<strong>{headroom>0?"Raised ground probe":subject??("Point "+index)}</strong>} — {surfaces.length?surfaces.map(s=>'surface BSP '+s.bsp+' at Z '+Number(s.z.toFixed(5))).join('; '):'No collision surface within ±0.5'}; {inside?'inside collision space':'outside collision space'}{row.nearPartition?' · near partition plane':''}
  {current?.controlMount&&<div className="button-row">
   {current.controlMount.offset===null
    ?<small>{current.controlMount.issue}</small>
@@ -107,7 +112,7 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
  {groundDrop!==undefined&&modelBaseOffset!=null&&
   (row.ground??[]).filter(surface=>manualBsp===undefined||surface.bsp===manualBsp).map(surface=>{
    const seatedZ=surface.z+modelBaseOffset;
-   const clearance=row.point[2]-seatedZ;
+   const clearance=points[index][2]-seatedZ;
    return <div className="button-row" key={surface.bsp}>
     <small>BSP {surface.bsp} · {Math.abs(clearance)<.001?'Model base meets the surface':
       'Model base is '+Math.abs(clearance).toFixed(3)+' units '+(clearance>0?'above':'below')+' the surface'}.</small>
@@ -122,7 +127,7 @@ export default function NativeBspPointCheck({context,points,manualBsp,disabled,l
    if(disabled||!onGround||latest.current!==review?.key)return;
    generation.current++;setReview(null);onGround(index,[points[index][0],points[index][1],surface.z+offset]);
   }}>Use ground for {subject?.toLowerCase()??("point "+index)} · BSP {surface.bsp} · Z {Number(surface.z.toFixed(5))}{offset!==0&&' → origin Z '+Number((surface.z+offset).toFixed(5))}</button>)}
-  {!(row.ground??[]).some(s=>manualBsp===undefined||s.bsp===manualBsp)&&<small>No upward-facing ground below within {groundDrop} units{manualBsp===undefined?'':' in selected BSP '+manualBsp}.</small>}</div>}
+  {!(row.ground??[]).some(s=>manualBsp===undefined||s.bsp===manualBsp)&&<small>No upward-facing ground below within {groundDrop} units{headroom?' of the raised probe':''}{manualBsp===undefined?'':' in selected BSP '+manualBsp}.</small>}</div>}
  </li>;})}</ul><small>Compiled reference {current.outputSha256.slice(0,12)}. Source changes require another review. Native compile/readback remains authoritative.</small></>}
  </div>;
 }
