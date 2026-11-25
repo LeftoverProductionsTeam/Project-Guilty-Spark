@@ -127,6 +127,74 @@ pub fn write_map_export_credits(export: &MapExport, text: &str) -> Result<PathBu
     Ok(path)
 }
 
+/// Derive mode and dependency evidence from the exact exported cache and its
+/// verified authoring revision. The contract is independent of the filename.
+pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(PathBuf, &'static str)> {
+    if export.project_id != project.id || export.project_fingerprint != project.fingerprint()? {
+        return invalid("Mode metadata belongs to a different authoring revision");
+    }
+    let output = &export.output;
+    crate::reject_links(output)?;
+    let map = maps::inspect_map(output, None)?;
+    if map.sha256 != export.sha256 || map.header.version != export.cache_version || map.header.extended {
+        return invalid("Mode metadata requires the exact verified native export");
+    }
+    let extraction = crate::creative::compiled_extraction_requirements(output, &map)?;
+    let authored_survival = project.quick_forge.as_ref().is_some_and(|document| document.game_mode == "zombie");
+    let reviewed_recovery = project.conversion_profile.as_deref() == Some("zombie-recovery");
+    let round_scripts = ["gs_firefight", "gs_ff_reset", "gs_ff_bootstrap"];
+    let round = map.header.scenario_type == 0
+        && round_scripts.iter().all(|name| map.scripts.iter().filter(|script| script.name == *name).count() == 1);
+    if let Some(plan) = crate::firefight::native_round_plan(project)? {
+        crate::firefight::verify_native_round(&plan, &map, output)?;
+        if !round { return invalid("Reviewed Firefight output is missing its compiled controller"); }
+    }
+    let mode = if extraction.is_some() {
+        "extraction"
+    } else if reviewed_recovery || (authored_survival && round) {
+        "zombieSurvival"
+    } else if round {
+        "firefight"
+    } else {
+        match map.header.scenario_type { 0 => "campaign", 1 => "multiplayer", _ => "unclassified" }
+    };
+    let mut resources: std::collections::BTreeSet<_> = map.resources.iter()
+        .filter(|resource| resource.required).map(|resource| resource.name.as_str()).collect();
+    if map.header.version == 609 {
+        // The CE runtime mounts the native banks even for a self-contained map.
+        resources.extend(["bitmaps.map", "sounds.map", "loc.map"]);
+    }
+    let runtime_settings = if mode == "extraction" {
+        serde_json::json!({"game.extraction": true, "network.firefight_encounter": false})
+    } else if mode == "firefight" || mode == "zombieSurvival" {
+        serde_json::json!({"network.firefight_encounter": false})
+    } else {
+        serde_json::json!({})
+    };
+    let name = output.file_name().and_then(|name| name.to_str())
+        .ok_or_else(|| SparkError::Invalid("Exported map filename is unavailable".into()))?;
+    let receipt = serde_json::json!({
+        "schemaVersion": 1, "fileName": name, "cacheSha256": export.sha256,
+        "cacheVersion": map.header.version, "scenarioPath": map.scenario_path,
+        "scenarioType": map.header.scenario_type, "mode": mode,
+        "requiredResourceBanks": resources, "requiredNativeFeatures": extraction.unwrap_or_default(),
+        "runtimeSettings": runtime_settings,
+    });
+    if maps::hash_file(output)? != export.sha256 {
+        return invalid("Exported map changed while reviewing its mode");
+    }
+    let data = serde_json::to_vec_pretty(&receipt)?;
+    let path = output.with_extension("spark-mode.json");
+    let prior = project::FileRevision::capture(&path)?;
+    if prior.sha256.is_none() {
+        project::atomic_write_checked(&path, &data, false, Some(&prior))?;
+    }
+    if project::FileRevision::capture(&path)?.sha256.as_deref() != Some(crate::hex_bytes(Sha256::digest(&data)).as_str()) {
+        return invalid("Existing map mode metadata differs; it was preserved");
+    }
+    Ok((path, mode))
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Toolchain {

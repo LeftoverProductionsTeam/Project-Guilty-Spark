@@ -3,7 +3,7 @@ import {call,native} from '../api';
 import type {RuntimeId} from '../types';
 import {runtimeNames} from '../runtimeWorkbench';
 import {Notice} from './ui';
-interface Exported {output:string;sha256:string;bytes:number;cacheVersion:number;runtimeId:RuntimeId;reused:boolean;credits?:string}
+interface Exported {output:string;sha256:string;bytes:number;cacheVersion:number;runtimeId:RuntimeId;reused:boolean;credits?:string;modeMetadata?:string;gameplayMode?:string}
 /** Explicit export uses the configured folder. It never installs or converts. */
 export default function MapExport({projectId,buildId,runtimeId='mccSteam',onSave}:{projectId:string;buildId:string;runtimeId?:RuntimeId;onSave?:()=>Promise<void>}){
   const [runtime,setRuntime]=useState(runtimeId),[busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Exported|null>(null);
@@ -20,7 +20,7 @@ export default function MapExport({projectId,buildId,runtimeId='mccSteam',onSave
       {(['mccSteam','haloCustomEdition','openCe','chupathingyCe'] as RuntimeId[]).map(id=><option key={id} value={id}>{runtimeNames[id]}</option>)}
     </select><button disabled={!native||busy} onClick={()=>void exportMap()}>{busy?'Verifying export…':'Export to mods folder'}</button></div>
     <small>Uses Settings → Storage. Keeps the native filename and original files. Credits travel with the export. Record creator and permission details in Preservation record before sharing.</small>
-    {result&&<div role="status"><small>{result.reused?'Existing identical export verified.':'Native map exported and hash-verified.'}</small><code>{result.output}</code>{result.credits && <><small>Map attribution and permissions</small><code>{result.credits}</code></>}</div>}
+    {result&&<div role="status"><small>{result.reused?'Existing identical export verified.':'Native map exported and hash-verified.'}</small><code>{result.output}</code>{result.modeMetadata && <><small>Game mode · {({zombieSurvival:'Zombie survival',extraction:'Extraction',firefight:'Firefight',campaign:'Campaign',multiplayer:'Multiplayer'} as Record<string,string>)[result.gameplayMode??'']??'Unclassified'}</small><code>{result.modeMetadata}</code></>}{result.credits && <><small>Map attribution and permissions</small><code>{result.credits}</code></>}</div>}
     {error&&<Notice tone="error">{error}</Notice>}
   </details>;
 }

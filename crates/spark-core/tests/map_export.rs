@@ -58,3 +58,32 @@ fn compatible_ce_exports_share_bytes_without_rewriting_the_cache(){
     for runtime in [RuntimeId::OpenCe,RuntimeId::ChupathingyCe]{let copy=build::export_map_copy(&store,&id,&build,runtime,&base).unwrap();assert!(copy.reused);assert_eq!(copy.output,first.output);assert_eq!(copy.cache_version,609);}
     assert_eq!(fs::read_dir(base).unwrap().filter(|e|e.as_ref().unwrap().file_type().unwrap().is_dir()).count(),1);
 }
+
+#[test]
+#[ignore = "requires an owner-supplied native Extraction fixture"]
+fn installed_extraction_exports_mode_and_rejects_changed_metadata() {
+    let source = std::path::PathBuf::from(std::env::var_os("SPARK_QA_EXTRACTION_CACHE").unwrap());
+    let temp = tempfile::tempdir().unwrap();
+    let output = temp.path().join("a-custom-name.map");
+    fs::copy(source, &output).unwrap();
+    let project = spark_core::project::Project::new("Extraction export QA");
+    let export = build::MapExport {
+        project_id: project.id.clone(), build_id: uuid::Uuid::new_v4().to_string(),
+        project_fingerprint: project.fingerprint().unwrap(), output: output.clone(),
+        sha256: maps::hash_file(&output).unwrap(), bytes: fs::metadata(&output).unwrap().len(),
+        cache_version: 609, runtime_id: RuntimeId::OpenCe, reused: false,
+    };
+    let (mode_file, mode) = build::write_map_export_mode(&export, &project).unwrap();
+    assert_eq!(mode, "extraction");
+    let metadata: serde_json::Value = serde_json::from_slice(&fs::read(&mode_file).unwrap()).unwrap();
+    assert_eq!(metadata["fileName"], "a-custom-name.map");
+    assert_eq!(metadata["cacheSha256"], export.sha256);
+    assert_eq!(metadata["requiredResourceBanks"], serde_json::json!(["bitmaps.map", "loc.map", "sounds.map"]));
+    assert_eq!(metadata["runtimeSettings"]["game.extraction"], true);
+    let alternate = build::MapExport { runtime_id: RuntimeId::HaloCustomEdition, ..export.clone() };
+    assert_eq!(build::write_map_export_mode(&alternate, &project).unwrap().0, mode_file);
+    fs::write(&mode_file, b"user edit").unwrap();
+    assert!(build::write_map_export_mode(&export, &project).is_err());
+    assert_eq!(fs::read(&mode_file).unwrap(), b"user edit");
+    assert_eq!(maps::hash_file(&output).unwrap(), export.sha256);
+}

@@ -56,6 +56,8 @@ pub(super) struct CreditedMapExport {
     #[serde(flatten)]
     map: build::MapExport,
     credits: PathBuf,
+    mode_metadata: PathBuf,
+    gameplay_mode: &'static str,
 }
 
 fn append_provenance(lines: &mut Vec<String>, provenance: &core::project::Provenance) {
@@ -171,7 +173,10 @@ pub(super) async fn storage_export_map(
         let credits = build::write_map_export_credits(&result, &credit_text).map_err(|reason| {
             format!("Map exported to {}. Its credit file could not be saved: {reason}", result.output.display())
         })?;
-        Ok(CreditedMapExport { map: result, credits })
+        let (mode_metadata, gameplay_mode) = build::write_map_export_mode(&result, &project).map_err(|reason| {
+            format!("Map exported to {}. Mode metadata could not be saved: {reason}", result.output.display())
+        })?;
+        Ok(CreditedMapExport { map: result, credits, mode_metadata, gameplay_mode })
     }).await.map_err(error)?
 }
 #[tauri::command]
