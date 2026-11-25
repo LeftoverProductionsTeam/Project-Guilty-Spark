@@ -6943,7 +6943,10 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
       base.project.inheritedBspConnections = [{ ...plan, separateNativeBsps: true }];
     }
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
-      if (command === 'plan_bsp_assembly') w.__regionPlan = args;
+      if (command === 'plan_bsp_assembly') {
+        w.__regionPlan = args;
+        return {...await original(command,args),donorTagsDirectory:'',baseBspIndex:args.baseBspIndex,separateNativeBsps:extendsWorld};
+      }
       if (command !== 'import_map_sources') return original(command, args);
       w.__sourceDropArgs = args;
       const data = await original('bootstrap', {});
@@ -6991,6 +6994,11 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
     await expect(assembly.getByRole('combobox',{name:'Connect from BSP',exact:true,includeHidden:true})).toHaveValue('1');
     await plan.click();
     await expect.poll(()=>page.evaluate(()=>(window as any).__regionPlan?.baseBspIndex)).toBe(1);
+    await expect(assembly.getByText('Connect matching editable tags before building this map.',{exact:true})).toBeAttached();
+    const apply=await constructionControl(page,'button','Apply connection');
+    await apply.click();
+    await page.keyboard.press('Control+s');
+    await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.donorTagsDirectory)).toBe('');
   }
 });
 

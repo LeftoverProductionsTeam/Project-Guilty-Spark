@@ -718,6 +718,7 @@ export default function BspAssembly({
                   >
                     Browse donor tags
                   </button>
+                  {!draft.donorTagsDirectory.trim() && <small>Connect matching editable tags before building this map.</small>}
                 </label>
                 <label>
                   Tunnel shader

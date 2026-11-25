@@ -104,12 +104,12 @@ fn namespace_materials(
     recovery: Option<(&project::Source,&MapInspection)>,
     extra_roots: &[String],
 ) -> Result<NamespacedDependencies> {
-    crate::reject_links(source)?;
-    if !source.is_dir() {
+    if source.as_os_str().is_empty() || !source.is_dir() {
         return invalid(
             "Select the matching editable donor tags directory before compiling a BSP assembly",
         );
     }
+    crate::reject_links(source)?;
     // Native read-only dependency lookup also has legacy filename buffers.
     // Keep the exact input root alive under its own short alias for this scope.
     #[cfg(windows)] let source_alias=crate::native_workspace::Alias::new(source)?;
