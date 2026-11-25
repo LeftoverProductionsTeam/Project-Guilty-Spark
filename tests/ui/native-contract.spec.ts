@@ -6947,6 +6947,10 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
         w.__regionPlan = args;
         return {...await original(command,args),donorTagsDirectory:'',baseBspIndex:args.baseBspIndex,separateNativeBsps:extendsWorld};
       }
+      if (command === 'open_bsp_assembly_donor') {
+        w.__regionDonorPreview = args;
+        return original('open_project',{id:args.donorProjectId});
+      }
       if (command !== 'import_map_sources') return original(command, args);
       w.__sourceDropArgs = args;
       const data = await original('bootstrap', {});
@@ -6997,6 +7001,9 @@ for(const origin of ['drawer','viewport','region viewport'])test('creator map-so
     await expect(assembly.getByText('Connect matching editable tags before building this map.',{exact:true})).toBeAttached();
     const apply=await constructionControl(page,'button','Apply connection');
     await apply.click();
+    await expect.poll(()=>page.evaluate(()=>(window as any).__regionDonorPreview)).toMatchObject({
+      projectId:'a',donorProjectId:'dropped-ce-donor',donorSourceSha256:expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
     await page.keyboard.press('Control+s');
     await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.donorTagsDirectory)).toBe('');
   }

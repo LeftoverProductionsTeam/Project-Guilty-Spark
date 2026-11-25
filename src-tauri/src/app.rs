@@ -561,7 +561,7 @@ async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project
         core::library::validate_local_input_path(&source.preserved_path).map_err(error)?;core::reject_links(&source.preserved_path).map_err(error)?;
         if ![6,7,13,609].contains(&source.cache_version)||j.header.scenario_type!=1{return Err("Choose a supported multiplayer donor source".into());}
         if maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256{return Err("The donor source changed; no world was created".into());}
-        let tags=editing_tools(&state,&donor)?.base_tags_directory.ok_or("Select matching editable donor tags in Project setup before creating the connection. Original maps were retained.")?;
+        let tags=editing_tools(&state,&donor)?.base_tags_directory.unwrap_or_default();
         project.bsp_assembly=Some(core::bsp_assembly::plan(&project,&i,&donor,&j,donor_bsp_index,tags).map_err(error)?);
         // The session library owns this new identity. No donor edit, source copy,
         // permanent descriptor or compiler workspace is created by New.
@@ -571,12 +571,23 @@ async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn open_bsp_assembly_donor(app:tauri::AppHandle,project_id:String)->Reply<OpenProject>{
+async fn open_bsp_assembly_donor(
+    app:tauri::AppHandle, project_id:String, donor_project_id:String, donor_source_sha256:String,
+)->Reply<OpenProject>{
     tauri::async_runtime::spawn_blocking(move||{
-        let state=app.state::<AppState>();let owner=lock(&state.library)?.get(&project_id).map_err(error)?;
-        let plan=owner.bsp_assembly.as_ref().ok_or("This project has no saved donor region")?;
-        let donor=core::bsp_assembly::referenced_donor(&owner,&plan.donor_project_id).map_err(error)?.ok_or("Saved donor is unavailable")?;
-        let source=donor.source.as_ref().ok_or("Saved donor has no source")?;
+        let state=app.state::<AppState>();
+        let owner=lock(&state.library)?.get(&project_id).map_err(error)?;
+        if owner.source.is_none() || owner.id==donor_project_id {
+            return Err("Choose a different donor for this native source map".into());
+        }
+        let donor=match core::bsp_assembly::referenced_donor(&owner,&donor_project_id).map_err(error)? {
+            Some(donor) => donor,
+            None => lock(&state.library)?.get(&donor_project_id).map_err(error)?,
+        };
+        let source=donor.source.as_ref().ok_or("Donor has no compiled map source")?;
+        if source.sha256!=donor_source_sha256 {
+            return Err("The selected donor source changed. Review the connection again.".into());
+        }
         // Existing preview documents are RAM-only and use their own identity.
         // Never adopt the saved donor UUID or overwrite its editable document.
         let (preview,inspection)=lock(&state.library)?.preview_source(source).map_err(error)?;
