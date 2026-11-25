@@ -10,12 +10,27 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  const owns=!!view&&deviceMatches(view,context),original=owns?view.original:rows.find(row=>row.class+':'+row.index===selected)??rows[0];const vehicle=original?.class==='vehi',label=vehicle?'Vehicle':'Device';const draft=original?(owns?view:deviceDraft(original)):null,pose=original&&draft?devicePose({...draft,original}):null,changed=!!pose&&JSON.stringify(pose)!==JSON.stringify(original);const blocked=busy||dirty||!!context.deviceEditIssue||owns&&view.locked||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'');
  useEffect(()=>{if(view&&!deviceMatches(view,context))setView(null);},[context]);useEffect(()=>{onDraftChange();},[JSON.stringify(view)]);useEffect(()=>{if(owns&&view.reviewRequest&&review.current!==view.reviewRequest){review.current=view.reviewRequest;if(details.current){details.current.open=true;details.current.querySelector<HTMLInputElement>(`[aria-label="${label} position X"]`)?.focus();}}},[context,view?.reviewRequest]);
  const groups=context.scenarioDeviceGroups;
+ const [groupIndex,setGroupIndex]=useState(-1);
+ const group=groups?.find(row=>row.index===groupIndex);
+ const groupBindings=group?rows.filter(row=>[row.powerGroup,row.positionGroup].includes(group.index)):[];
+ const groupLocked=!!group&&(group.reserved||groupBindings.some(row=>/^extraction_/i.test(row.name)));
  const wiringLocked=!!original&&(/^extraction_/i.test(original.name)||groups?.some(group=>group.reserved&&[original.powerGroup,original.positionGroup].includes(group.index)));
  function update(patch:Partial<NativeDeviceView>){if(!original||!draft||!context.tagSha256)return;setView({projectId:context.projectId,buildId:context.buildId,tag:context.tag,sourceSha256:context.tagSha256,original,active:false,focus:0,...(owns?view:{}),...draft,...patch});onDraftChange();}
  return <details className="native-device-placements" ref={details}><summary>Existing controls, machines &amp; vehicles · {rows.length}</summary><p className="subtle">Edit an existing native placement or connect controls and machines through scenario groups. Existing names, indices, palette references and group definitions are preserved. Aircraft poses must leave clear walking/boarding space and stable ground; editor placement does not prove a native landing. Preview → Accept → Save → rebuild. Native Restore is separate from project Undo; terminal use, door collision and gameplay need separate testing.</p>
  {context.deviceEditIssue&&<Notice tone="info">{context.deviceEditIssue}</Notice>}
- {groups&&context.tagSha256&&<DeviceGroupAppend key={JSON.stringify([context.projectId,context.buildId,context.tag,context.tagSha256])}
-  groups={groups} sourceSha256={context.tagSha256} disabled={busy||dirty||!!context.deviceEditIssue} onPreview={onPreview} onDraftChange={onDraftChange}/>}
+ {groups&&context.tagSha256&&<details className="native-device-groups">
+  <summary>Device groups · {groups.length}/128</summary>
+  <label>Device group<select aria-label="Device group to edit" value={group?.index??-1} disabled={busy||dirty}
+    onChange={event=>{setGroupIndex(Number(event.target.value));onDraftChange();}}>
+   <option value={-1}>Add a device group</option>
+   {groups.map(row=><option key={row.index} value={row.index}>{row.name||'Unnamed group'} · {row.index}</option>)}
+  </select></label>
+  {group&&<p className="subtle">This group drives {groupBindings.length} device {groupBindings.length===1?'placement':'placements'}. Its name, index and links stay in place.</p>}
+  {groupLocked?<Notice>Extraction owns this device group. Edit it in the mission workflow.</Notice>:
+   <DeviceGroupDraft key={JSON.stringify([context.projectId,context.buildId,context.tag,context.tagSha256,group?.index])}
+    group={group} groups={groups} sourceSha256={context.tagSha256} disabled={busy||dirty||!!context.deviceEditIssue}
+    onPreview={onPreview} onDraftChange={onDraftChange}/>}
+ </details>}
  {original&&draft&&<><label>Placement<select aria-label="Native source placement" value={original.class+':'+original.index} disabled={busy||dirty} onChange={e=>{setSelected(e.target.value);setView(null);onDraftChange();}}>{rows.map(row=><option key={row.class+':'+row.index} value={row.class+':'+row.index}>{row.class} {row.index} · {row.name||'Unnamed placement'} · {row.tagPath}</option>)}</select></label><fieldset disabled={!!blocked}><legend>Native position & rotation</legend><div className="studio-fields">{(['position','angles'] as const).map(field=><div key={field}>{['X','Y','Z'].map((axis,i)=><label key={axis}>{field==='position'?axis:['Yaw','Pitch','Roll'][i]}{field==='angles'?' °':''}<input type="number" step="any" aria-label={label+' '+(field==='position'?'position '+axis:['yaw','pitch','roll'][i])} value={draft[field][i]} onChange={e=>update({[field]:draft[field].map((v,j)=>j===i?e.target.value:v) as [string,string,string]})}/></label>)}</div>)}</div></fieldset>
  {original.class==='ctrl'&&(original.usableFromBothSides!==undefined||original.interactionDisabled!==undefined)&&<fieldset disabled={!!blocked}><legend>Control interaction</legend>
  {original.interactionDisabled!==undefined&&<label className="checkbox-label"><input type="checkbox" checked={draft.interactionDisabled??original.interactionDisabled} onChange={e=>update({interactionDisabled:e.target.checked})}/>Disable player interaction</label>}
@@ -73,31 +88,35 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  </details>;
 }
 
-function DeviceGroupAppend({groups,sourceSha256,disabled,onPreview,onDraftChange}:{
- groups:NativeDeviceGroup[];sourceSha256:string;disabled:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void
+function DeviceGroupDraft({group,groups,sourceSha256,disabled,onPreview,onDraftChange}:{
+ group?:NativeDeviceGroup;groups:NativeDeviceGroup[];sourceSha256:string;disabled:boolean;
+ onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void
 }){
- const [draft,setDraft]=useState({name:'',initialValue:'0',changeOnce:false});
- const name=draft.name.trim(),value=Number(draft.initialValue);
- const duplicate=groups.some(group=>group.name.toLowerCase()===name.toLowerCase());
- const reserved=/^extraction_/i.test(name);
- const valid=/^[a-z0-9_]{1,31}$/i.test(name)&&!duplicate&&!reserved
-  &&draft.initialValue.trim()!==''&&Number.isFinite(value)&&value>=0&&value<=1&&/^[a-f0-9]{64}$/i.test(sourceSha256);
+ const [draft,setDraft]=useState({name:group?.name??'',initialValue:String(group?.initialValue??0),changeOnce:group?.changeOnce??false});
+ const name=group?.name??draft.name.trim();
+ const value=Number(draft.initialValue);
+ const duplicate=!group&&groups.some(row=>row.name.toLowerCase()===name.toLowerCase());
+ const reserved=!group&&/^extraction_/i.test(name);
+ const validName=!!group||/^[a-z0-9_]{1,31}$/i.test(name)&&!duplicate&&!reserved;
+ const valid=validName&&draft.initialValue.trim()!==''&&Number.isFinite(value)&&value>=0&&value<=1
+  &&/^[a-f0-9]{64}$/i.test(sourceSha256)&&(!group||group.initialValue!==value||group.changeOnce!==draft.changeOnce);
  function update(patch:Partial<typeof draft>){
   setDraft(current=>({...current,...patch}));
   onDraftChange();
  }
- return <details className="native-device-group-append">
-  <summary>Add a device group · {groups.length}/128</summary>
-  <p className="subtle">Use 1 for a group that starts powered and 0 for a machine that starts at rest. After accepting, assign the new group in Device wiring.</p>
-  {groups.length>=128?<Notice>The scenario already has 128 device groups.</Notice>:<fieldset disabled={disabled}>
-   <legend>New native device group</legend>
+ if(!group&&groups.length>=128)return <Notice>The scenario already has 128 device groups. Select an existing group to edit it.</Notice>;
+ return <fieldset disabled={disabled}>
+   <legend>{group?'Existing native device group':'New native device group'}</legend>
+   <p className="subtle">Use 1 for a fully powered or open group and 0 for an off or closed group.</p>
    <div className="button-row">
-    <label>Group name<input aria-label="New device group name" maxLength={31} value={draft.name} onChange={e=>update({name:e.target.value})}/></label>
+    {!group&&<label>Group name<input aria-label="New device group name" maxLength={31} value={draft.name} onChange={e=>update({name:e.target.value})}/></label>}
     <label>Initial value<input aria-label="Device group initial value" type="number" min={0} max={1} step="any" value={draft.initialValue} onChange={e=>update({initialValue:e.target.value})}/></label>
    </div>
    <label className="checkbox-label"><input type="checkbox" checked={draft.changeOnce} onChange={e=>update({changeOnce:e.target.checked})}/>Allow only one change</label>
    {(duplicate||reserved)&&<p role="status">{duplicate?'That device group already exists.':'Names starting with extraction_ are reserved.'}</p>}
-   <button disabled={!valid} onClick={()=>onPreview({kind:'deviceGroupAppend',name,initialValue:value,changeOnce:draft.changeOnce,sourceSha256})}>Preview new device group</button>
-  </fieldset>}
- </details>;
+   <button disabled={!valid} onClick={()=>{
+    const settings={name,initialValue:value,changeOnce:draft.changeOnce,sourceSha256};
+    onPreview(group?{kind:'deviceGroupSettings',index:group.index,...settings}:{kind:'deviceGroupAppend',...settings});
+   }}>{group?'Preview group changes':'Preview new device group'}</button>
+ </fieldset>;
 }

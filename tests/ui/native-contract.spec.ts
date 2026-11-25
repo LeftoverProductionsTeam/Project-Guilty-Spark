@@ -4862,18 +4862,23 @@ async function mockRecoveredMissionAreas(page:Page,withDevice:boolean|'vehicle'=
    if(command==='native_tag_context'){w.__sparkMock.areaReads++;return {projectId:args.projectId,buildId:'native-area-source',tag:'levels/test.scenario',class:'scnr',tagsDirectory:'owned/tags',canEdit:false,canRepair:false,editIssue:null,repairIssue:null,history:structuredClone(w.__sparkMock.placementHistory),tagSha256:w.__sparkMock.nativeAreaSha,boundingRadius:null,lensFlareScale:null,scenarioVolumes:structuredClone(w.__sparkMock.nativeAreas),triggerEditIssue:null,scenarioDevices:w.__sparkMock.nativeDevices??[],scenarioDeviceGroups:w.__sparkMock.nativeDeviceGroups??null,deviceEditIssue:null,scenarioPlayerStarts:w.__sparkMock.nativePlayerStarts??[],playerStartEditIssue:w.__sparkMock.playerStartEditIssue??null};}
    if(command==='native_operation_preview'&&args.operation.kind==='playerStartPosition'){const mock=w.__sparkMock;if(args.operation.sourceSha256!==mock.nativeAreaSha)throw Error('Native source changed after selection');mock.playerProposal=structuredClone(args.operation);mock.playerBefore=structuredClone(mock.nativePlayerStarts);return mock.playerPreview={id:'player-start-review',tag:'levels/test.scenario',toolId:'synthetic-invader',beforeSha256:mock.nativeAreaSha,afterSha256:(args.operation.copyFrom===undefined?'b':'c').repeat(64),changedBytes:12,fieldChanges:[{before:'Original native start',after:JSON.stringify(args.operation)}],detail:'Synthetic player source review',currentState:'before'};}
    if(command==='native_operation_accept'&&args.operationId==='player-start-review'){const mock=w.__sparkMock,proposal=mock.playerProposal,start={index:proposal.index,position:proposal.position,facingRadians:proposal.facingRadians};mock.nativePlayerStarts=args.restore?structuredClone(mock.playerBefore):proposal.copyFrom!==undefined?[...mock.playerBefore,start]:mock.playerBefore.map((p:any)=>p.index===proposal.index?start:p);mock.nativeAreaSha=args.restore?mock.playerPreview.beforeSha256:mock.playerPreview.afterSha256;mock.playerPreview.currentState=args.restore?'before':'after';mock.placementHistory=[structuredClone(mock.playerPreview)];return {operationId:'player-start-review',revisionId:'player-source-revision',tagsDirectory:'owned/tags',files:1,restored:!!args.restore,detail:'Synthetic player source revision'};}
-   if(command==='native_operation_preview'&&args.operation.kind==='deviceGroupAppend'){
+   if(command==='native_operation_preview'&&['deviceGroupAppend','deviceGroupSettings'].includes(args.operation.kind)){
     const mock=w.__sparkMock;
     if(args.operation.sourceSha256!==mock.nativeAreaSha)throw Error('Native source changed after selection');
     mock.groupProposal=structuredClone(args.operation);
     mock.groupsBefore=structuredClone(mock.nativeDeviceGroups);
     return mock.groupPreview={id:'device-group-review',tag:'levels/test.scenario',toolId:'synthetic-invader',
-     beforeSha256:mock.nativeAreaSha,afterSha256:'d'.repeat(64),changedBytes:52,
+     beforeSha256:mock.nativeAreaSha,afterSha256:(args.operation.kind==='deviceGroupAppend'?'d':'e').repeat(64),changedBytes:52,
      fieldChanges:[{before:'Original groups',after:args.operation.name}],detail:'Synthetic device group review',currentState:'before'};
    }
    if(command==='native_operation_accept'&&args.operationId==='device-group-review'){
     const mock=w.__sparkMock,{name,initialValue,changeOnce}=mock.groupProposal,groups=structuredClone(mock.groupsBefore);
-    mock.nativeDeviceGroups=args.restore?groups:[...groups,{index:groups.length,name,initialValue,changeOnce,reserved:false}];
+    if(!args.restore){
+     const index=mock.groupProposal.index;
+     if(index===undefined)groups.push({index:groups.length,name,initialValue,changeOnce,reserved:false});
+     else Object.assign(groups[index],{initialValue,changeOnce});
+    }
+    mock.nativeDeviceGroups=groups;
     mock.nativeAreaSha=args.restore?mock.groupPreview.beforeSha256:mock.groupPreview.afterSha256;
     mock.groupPreview.currentState=args.restore?'before':'after';
     mock.placementHistory=[structuredClone(mock.groupPreview)];
@@ -5020,7 +5025,7 @@ test('a recovered scenario with no groups can create and bind a group through re
  await operations.locator(':scope > summary').click();
  const form=operations.locator('.native-device-placements');
  await form.locator(':scope > summary').click();
- await form.getByText('Add a device group · 0/128',{exact:true}).press('Enter');
+ await form.getByText('Device groups · 0/128',{exact:true}).press('Enter');
  const name=form.getByLabel('New device group name',{exact:true});
  const previewButton=form.getByRole('button',{name:'Preview new device group',exact:true});
  await name.fill('extraction_signal');
@@ -5048,6 +5053,31 @@ test('a recovered scenario with no groups can create and bind a group through re
  expect(await page.evaluate(()=>(window as any).__sparkMock.placementPreviews.at(-1))).toMatchObject({
   sourceSha256:'d'.repeat(64),device:{name:'terminal',positionGroup:0},
  });
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await page.keyboard.press('Control+s');
+ const groupPanel=form.locator('.native-device-groups');
+ if(await groupPanel.getAttribute('open')===null)await groupPanel.locator('summary').click();
+ await groupPanel.getByLabel('Device group to edit',{exact:true}).selectOption('0');
+ await expect(groupPanel).toContainText('1 device placement');
+ const currentValue=groupPanel.getByLabel('Device group initial value',{exact:true});
+ const changeOnce=groupPanel.getByLabel('Allow only one change',{exact:true});
+ const updateGroup=groupPanel.getByRole('button',{name:'Preview group changes',exact:true});
+ await expect(currentValue).toHaveValue('0.375');
+ await expect(updateGroup).toBeDisabled();
+ await currentValue.fill('0.625');
+ await changeOnce.uncheck();
+ await updateGroup.click();
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await expect(currentValue).toHaveValue('0.625');
+ await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();
+ await expect(currentValue).toHaveValue('0.375');
+ await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();
+ await page.keyboard.press('Control+s');
+ await expect(currentValue).toHaveValue('0.625');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.nativeDeviceGroups)).toEqual([
+  {index:0,name:'vehicle_gate',initialValue:0.625,changeOnce:false,reserved:false},
+ ]);
+ await expect(position).toHaveValue('0');
 });
 
 test('recovered aircraft use the existing viewport and reviewed native placement workflow',async({page})=>{
