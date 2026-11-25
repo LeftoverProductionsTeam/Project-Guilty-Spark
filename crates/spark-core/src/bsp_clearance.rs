@@ -359,20 +359,26 @@ impl RouteChecker {
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
+    // Match the same mitered cross sections used by the ridge solid. A lane
+    // sampled at a segment's perpendicular can cross onto the next graded
+    // segment near a turn and compare the next ramp height to the old one.
+    let lane_sides = (strict_floor && assembly.tunnel_width >= 6.)
+        .then(|| crate::bsp_assembly::tunnel_sides(&assembly.tunnel_points, 3.))
+        .transpose()?;
     for (segment, pair) in assembly.tunnel_points.windows(2).enumerate() {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
         let d = sub(b, a);
         let steps = (dot(d, d).sqrt() / 0.25).ceil() as usize;
-        let lateral = (strict_floor && assembly.tunnel_width >= 6.)
-            .then(|| mul([-d[1], d[0], 0.], 1.5 / d[0].hypot(d[1])));
         for step in 0..=steps {
-            let p = add(a, mul(d, step as f64 / steps as f64));
+            let t = step as f64 / steps as f64;
+            let p = add(a, mul(d, t));
             let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points ({})",segment + 1,p[0],p[1],p[2],index.floor_diagnostic(p))))?;
             // A nearby lower road cannot stand in for a canyon-top route.
             if strict_floor && (z-p[2]).abs() > 0.12 {
                 return invalid(format!("The canyon-top floor is {:.2} units below its authored route near {:.2}, {:.2}; align the ridge with real supported terrain, not the lower passage",p[2]-z,p[0],p[1]));
             }
-            if let Some(lateral) = lateral {
+            if let Some(sides) = &lane_sides {
+                let lateral = add(sides[segment], mul(sub(sides[segment + 1], sides[segment]), t));
                 // A centerline can cross a narrow triangle or hide a tear
                 // under one wheel. Review both sides at the same elevation.
                 for sign in [-1., 1.] {

@@ -551,7 +551,7 @@ fn source_solid(
     gl.merge();
     checked(Manifold::from_mesh_gl64_robust(&gl), "Source BSP import")
 }
-fn tunnel_sides(points: &[V], width: f64) -> Result<Vec<V>> {
+pub(crate) fn tunnel_sides(points: &[V], width: f64) -> Result<Vec<V>> {
     let sides=points.windows(2).map(|pair| {let d=sub(pair[1],pair[0]);let length=d[0].hypot(d[1]);[-d[1]/length,d[0]/length,0.]}).collect::<Vec<_>>();
     let mut result=vec![mul(sides[0],width/2.)];
     for pair in sides.windows(2) {
@@ -2779,14 +2779,16 @@ mod tests {
     #[test]
     fn ramped_canyon_support_remains_continuous_at_every_miter(){
         let mut plan=dual_route_plan();plan.tunnel_points=vec![[0.,0.,0.],[32.788,0.,0.]];
-        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,0.,0.],[6.5576,-12.,0.],[13.1152,-12.,1.96728],[19.6728,-12.,1.96728],[26.2304,-12.,0.],[32.788,0.,0.]],width:4.,height:8.,shader_path:"fixture/stone".into()});
+        plan.high_ground=Some(InfantryTunnel{points:vec![[0.,0.,0.],[6.5576,-12.,0.],[13.1152,-12.,1.96728],[19.6728,-12.,1.96728],[26.2304,-12.,0.],[32.788,0.,0.]],width:6.,height:8.,shader_path:"fixture/stone".into()});
         let a=[-3.,0.,0.];let b=[36.,0.,0.];let sides=tunnel_sides(&[a,b],40.).unwrap();
         let space=passage_solid(a,b,sides[0],sides[1],20.,0,Some(2)).unwrap();
         let ridge=plan.high_ground_plan(plan.high_ground.as_ref().unwrap());
         let supported=support_high_ground(space,&ridge,1,-1.,None).unwrap().get_mesh_gl64(-1);
         let mut slots=vec![material(),material(),AssemblyMaterial{name:"+sky".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}];
         let (mesh,_)=collision_layer(&supported,&mut slots).unwrap();
-        let report=crate::bsp_clearance::RouteChecker::new(&mesh).unwrap().verify_details(&plan).unwrap();
+        let checker=crate::bsp_clearance::RouteChecker::new(&mesh).unwrap();
+        let report=checker.verify_details(&plan).unwrap();
+        assert_eq!(checker.verify_return(&plan).unwrap(),report.iter().map(|route|route.walk_samples).sum::<usize>());
         assert_eq!(report.len(),2);assert!(supported.num_tri()<200);
     }
     #[test]
