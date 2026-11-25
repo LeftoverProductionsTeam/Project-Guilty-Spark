@@ -14,6 +14,8 @@ use std::{
     path::Path,
 };
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct PreparedPickups {
     base: Vec<NativeNetgamePickup>,
     moved_base: Vec<usize>,
@@ -35,13 +37,12 @@ impl PreparedPickups {
         serde_json::json!({"aliasedTags": self.aliased_tags, "sharedTags": self.shared_tags})
     }
 
-    pub(crate) fn verify(
+    fn verify_inventory(
         &self,
         path: &Path,
         map: &MapInspection,
         actual: &[NativeNetgamePickup],
-        regions: &crate::bsp_audio::PlacementRegions,
-    ) -> Result<usize> {
+    ) -> Result<()> {
         if actual.len() != self.base.len() + self.donor.len() {
             return invalid("Compiled scenario changed the reviewed pickup count");
         }
@@ -72,6 +73,17 @@ impl PreparedPickups {
                 "Compiled pickup collections changed ordered items, weights or spawn timing",
             );
         }
+        Ok(())
+    }
+
+    pub(crate) fn verify(
+        &self,
+        path: &Path,
+        map: &MapInspection,
+        actual: &[NativeNetgamePickup],
+        regions: &crate::bsp_audio::PlacementRegions,
+    ) -> Result<usize> {
+        self.verify_inventory(path, map, actual)?;
         let donor_slot = regions.len().checked_sub(1)
             .ok_or_else(|| SparkError::Invalid("Missing compiled pickup region".into()))?;
         for &index in &self.moved_base {
@@ -102,6 +114,33 @@ impl PreparedPickups {
             .filter(|&&inside| inside)
             .count())
     }
+}
+
+pub(crate) fn verify_merged_manifest(
+    manifest: &serde_json::Value, path: &Path, map: &MapInspection,
+) -> Result<Option<serde_json::Value>> {
+    let Some(receipt) = manifest.get("mergedNetgamePickups").filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    let planned: PreparedPickups = serde_json::from_value(receipt.clone())?;
+    let actual = maps::scenario_netgame_pickups(path, map)?;
+    planned.verify_inventory(path, map, &actual)?;
+    if planned.donor_membership.len() != planned.donor.len()
+        || planned.moved_base.iter().any(|&index| index >= planned.base.len())
+    {
+        return invalid("Merged native pickup receipt has inconsistent placement ownership");
+    }
+    let verify_positions = planned.moved_base.iter().map(|&i| actual[i].position).chain(
+        actual[planned.base.len()..].iter().zip(&planned.donor_membership)
+            .filter(|(_, originally_inside)| **originally_inside).map(|(row, _)| row.position),
+    );
+    let positions = verify_positions.collect::<Vec<_>>();
+    let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, positions.iter().copied())?;
+    if positions.iter().any(|&position| regions.unique_slot(position) != Some(0)) {
+        return invalid("An imported or moved pickup no longer has a valid home in the merged native BSP");
+    }
+    Ok(Some(serde_json::json!({ "count": actual.len(), "donorCount": planned.donor_count(),
+        "checkedMembership": positions.len(), "dependencies": planned.dependency_summary() })))
 }
 
 fn isolate_dependencies(
@@ -301,7 +340,7 @@ pub(crate) fn stage(
         maps::scenario_netgame_pickups(&assembly.donor_source.preserved_path, donor)?;
     let limit = maps::netgame_equipment_limit(cache_version);
     if base_rows.len() + donor_rows.len() > limit {
-        return invalid(format!("Combined native pickup count exceeds {limit} for cache version {cache_version}."));
+        return invalid(format!("Combined native pickup count {} exceeds the {limit} slots supported by cache version {cache_version}.", base_rows.len() + donor_rows.len()));
     }
     let base_collections = base_rows.iter().map(|row| row.collection.clone()).collect();
     let mut collections =
@@ -402,7 +441,7 @@ pub(crate) fn stage(
         SparkError::Invalid("invader-edit is required for pickup placement".into())
     })?;
     let run = |fields: Vec<String>| {
-        let mut args = vec!["-t".into(), "tags".into()];
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         args.extend(fields);
         args.push(format!("{}.scenario", base.scenario_path));
         runner.run(&edit, &args, workspace, "asset-placement", 61)

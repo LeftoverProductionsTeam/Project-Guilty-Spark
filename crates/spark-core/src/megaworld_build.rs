@@ -498,6 +498,12 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
     let imported_teleporters = crate::bsp_netgame_flags::verify_merged_manifest(&manifest,&file,&compiled)?;
     if let Some(report)=imported_teleporters { project::atomic_write(&dir.join("teleporter-readback.json"), &serde_json::to_vec_pretty(&report)?, false)?; }
+    if let Some(report) = crate::bsp_pickups::verify_merged_manifest(&manifest, &file, &compiled)? {
+        project::atomic_write(&dir.join("pickup-readback.json"), &serde_json::to_vec_pretty(&report)?, false)?;
+    }
+    if let Some(report) = crate::bsp_player_starts::verify_merged_manifest(&manifest, &file, &compiled)? {
+        project::atomic_write(&dir.join("player-start-readback.json"), &serde_json::to_vec_pretty(&report)?, false)?;
+    }
     let structure = crate::bsp_audio::inspect(&file, &compiled.sha256)?;
     let bsp = structure.bsps.first().ok_or_else(|| SparkError::Invalid("Native visibility metadata is missing".into()))?;
     let visibility = serde_json::json!({

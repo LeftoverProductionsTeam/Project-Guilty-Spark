@@ -85,9 +85,10 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
   </section>;
 }
 
-function NativeGameplayBudget({ budget, cacheTarget }: {
+function NativeGameplayBudget({ budget, cacheTarget, separate }: {
   budget: NonNullable<AssemblyReport['nativeGameplayBudget']>;
   cacheTarget: 'CE609' | 'MCC13' | undefined;
+  separate: boolean;
 }) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
   useEffect(() => {
@@ -105,13 +106,13 @@ function NativeGameplayBudget({ budget, cacheTarget }: {
   const items = mcc ? budget.mcc13RegionalEquipment ?? budget.netgameEquipment : budget.netgameEquipment;
   const classic = cacheTarget === 'CE609';
   const rows = [
-    { label: 'Player starts', ...starts, donor: classic ? 0 : starts.donor },
+    { label: 'Player starts', ...starts, donor: classic && separate ? 0 : starts.donor },
     { label: 'Multiplayer item placements', ...items },
-    { label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor },
+    ...(separate ? [{ label: 'Multiplayer flags and teleporter endpoints', ...flags, donor: classic ? 0 : flags.donor }] : []),
   ];
   return <details open={rows.some(row => row.existing + row.donor > row.limit)}>
     <summary>Native gameplay placement limits{cacheTarget ? ' · ' + cacheTarget : ''}</summary>
-    <p>{classic ? 'This CE609 split build keeps the base player starts and flags, and adds donor pickups.' : 'Projected placement counts across the compiled scenario.'}</p>
+    <p>{!separate ? 'Merged builds import donor player starts, pickups and paired teleporters.' : classic ? 'This CE609 split build keeps the base player starts and flags, and adds donor pickups.' : 'Projected placement counts across the compiled scenario.'}</p>
     <ul>
       {rows.map(({ label, existing, donor, limit }) => {
         const total = existing + donor;
@@ -122,7 +123,7 @@ function NativeGameplayBudget({ budget, cacheTarget }: {
       })}
     </ul>
     {regional && <>
-      {cacheTarget !== 'MCC13' && <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>}
+      {separate && cacheTarget !== 'MCC13' && <p>MCC13 regional flags · {regional.existing + regional.donor} / {regional.limit} · Reviewed native build limit</p>}
       {profiles.map(profile => {
         const capabilities = profile.reviewedCompanion?.capabilities;
         const target = capabilities?.map_targets?.find(row => row.cache_version === 13 && row.invader_engine === 'mcc-cea');
@@ -130,7 +131,7 @@ function NativeGameplayBudget({ budget, cacheTarget }: {
         const reviewed = [
           { label: 'Starts', count: budget.mcc13RegionalStarts, limit: target.max_player_starts },
           { label: 'Pickups', count: budget.mcc13RegionalEquipment, limit: target.max_netgame_equipment },
-          { label: 'Flags', count: regional, limit: target.max_netgame_flags },
+          ...(separate ? [{ label: 'Flags', count: regional, limit: target.max_netgame_flags }] : []),
         ];
         if (reviewed.every(row => row.limit == null)) return null;
         return <div key={profile.id}>
@@ -928,8 +929,9 @@ export default function BspAssembly({
                   {!!report.intactSwitches?.length && <p>Planned native switches: {report.intactSwitches.join(' · ')}</p>}
                   {report.nativePartitions && <p>BSP {report.nativePartitions.selected} · {report.nativePartitions.overlapSamples} shared corridor-floor samples · Largest floor difference {report.nativePartitions.maxFloorDelta.toFixed(4)} world units.</p>}
                   {report.nativeGameplayBudget && <NativeGameplayBudget budget={report.nativeGameplayBudget}
-                    cacheTarget={draft.separateNativeBsps && (canExtend || buildRuntime === 'mccSteam') ? 'MCC13'
-                      : draft.separateNativeBsps && (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}
+                    separate={!!draft.separateNativeBsps}
+                    cacheTarget={(draft.separateNativeBsps && canExtend) || buildRuntime === 'mccSteam' ? 'MCC13'
+                      : (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}
                   {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
                   <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>

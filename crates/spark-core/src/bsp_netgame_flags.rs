@@ -52,6 +52,14 @@ fn teleporter_homes(path:&Path, map:&MapInspection, flags:&[NativeNetgameFlag]) 
     flags.iter().map(|row| if teleporter_side(row.kind).is_some(){exclusive_teleporter_home(&regions,row.position).map(Some)}else{Ok(None)}).collect()
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct MergedTeleporterDonor<'a> {
+    pub path: &'a Path,
+    pub map: &'a MapInspection,
+    pub translation: [f64; 3],
+    pub yaw: f64,
+}
+
 impl PreparedFlags {
     pub(crate) fn base_count(&self) -> usize { self.base.len() }
 
@@ -93,54 +101,56 @@ impl PreparedFlags {
     }
 
 
-    /// The single-BSP assembly path must preserve donor teleporters even when
-    /// it keeps other original game-mode flags from the destination scenario.
+    /// Keep stock channels local to the prepared BSP and reserve each channel across all donors.
     pub(crate) fn from_merged_teleporters(
         base_path: &Path, base_map: &MapInspection, destination_bsp: usize,
-        donor_path: &Path, donor_map: &MapInspection, translation: [f64; 3], yaw: f64,
-        cache_version: u32,
+        donors: &[MergedTeleporterDonor<'_>], cache_version: u32,
     ) -> Result<Self> {
         if destination_bsp >= base_map.mesh.parts.len() {
             return invalid("Select the native BSP which owns the restored teleporters");
         }
         let base = maps::scenario_netgame_flags(base_path, base_map)?;
         let original_teleporter_homes = teleporter_homes(base_path, base_map, &base)?;
-        let mut donor_channels: BTreeMap<i16, Vec<NativeNetgameFlag>> = BTreeMap::new();
-        for mut flag in maps::scenario_netgame_flags(donor_path, donor_map)? {
-            if teleporter_side(flag.kind).is_none() { continue; }
-            if flag.usage_id < 0 || flag.weapon_group.is_some() {
-                return invalid("A donor teleporter has an invalid channel or unsupported item binding");
-            }
-            let moved = bsp_assembly::transform(flag.position.map(f64::from), translation, yaw);
-            if moved.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
-                return invalid("A donor teleporter moves outside the compiled world bounds");
-            }
-            flag.position = moved.map(|v| v as f32);
-            flag.facing = bsp_assembly::transform_facing(flag.facing, yaw);
-            donor_channels.entry(flag.usage_id).or_default().push(flag);
-        }
         let mut used: std::collections::BTreeSet<_> = base.iter().zip(&original_teleporter_homes)
             .filter(|(_, home)| **home == Some(destination_bsp)).map(|(row, _)| row.usage_id).collect();
         let mut donor = Vec::new();
-        for (stock_channel, rows) in donor_channels {
-            let exits = rows.iter().filter(|row| row.kind == 7).count();
-            if exits != 1 || rows.len() < 2 {
-                return invalid(format!("Donor channel {stock_channel} needs at least one entrance and exactly one exit"));
+        for &source in donors {
+            let MergedTeleporterDonor { path: donor_path, map: donor_map, translation, yaw } = source;
+            let mut donor_channels: BTreeMap<i16, Vec<NativeNetgameFlag>> = BTreeMap::new();
+            for mut flag in maps::scenario_netgame_flags(donor_path, donor_map)? {
+                if teleporter_side(flag.kind).is_none() { continue; }
+                if flag.usage_id < 0 || flag.weapon_group.is_some() {
+                    return invalid("A donor teleporter has an invalid channel or unsupported item binding");
+                }
+                let moved = bsp_assembly::transform(flag.position.map(f64::from), translation, yaw);
+                if moved.iter().any(|v| !v.is_finite() || v.abs() > 2048.) {
+                    return invalid("A donor teleporter moves outside the compiled world bounds");
+                }
+                flag.position = moved.map(|v| v as f32);
+                flag.facing = bsp_assembly::transform_facing(flag.facing, yaw);
+                donor_channels.entry(flag.usage_id).or_default().push(flag);
             }
-            let installed = rows.iter().filter_map(|row| base.iter().zip(&original_teleporter_homes)
-                .find(|(known, home)| **home == Some(destination_bsp) && known.kind == row.kind
-                    && crate::native_operations::positions_close(known.position, row.position)))
-                .map(|(row, _)| row.usage_id).collect::<Vec<_>>();
-            if !installed.is_empty() {
-                if installed.len() == rows.len() && installed.iter().all(|id| *id == installed[0]) { continue; }
-                return invalid(format!("Donor channel {stock_channel} partially overlaps existing teleporter markers; review those placements before importing"));
+            for (stock_channel, rows) in donor_channels {
+                let exits = rows.iter().filter(|row| row.kind == 7).count();
+                if exits != 1 || rows.len() < 2 {
+                    return invalid(format!("Donor channel {stock_channel} needs at least one entrance and exactly one exit"));
+                }
+                let installed = rows.iter().filter_map(|row| base.iter().zip(original_teleporter_homes.iter().copied())
+                    .chain(donor.iter().map(|row| (row, Some(destination_bsp))))
+                    .find(|(known, home)| *home == Some(destination_bsp) && known.kind == row.kind
+                        && crate::native_operations::positions_close(known.position, row.position)))
+                    .map(|(row, _)| row.usage_id).collect::<Vec<_>>();
+                if !installed.is_empty() {
+                    if installed.len() == rows.len() && installed.iter().all(|id| *id == installed[0]) { continue; }
+                    return invalid(format!("Donor channel {stock_channel} partially overlaps existing teleporter markers; review those placements before importing"));
+                }
+                let channel = if !used.contains(&stock_channel) { stock_channel } else {
+                    (0..=i16::MAX).find(|id| !used.contains(id))
+                        .ok_or_else(|| SparkError::Invalid("No unused native teleporter channel remains".into()))?
+                };
+                used.insert(channel);
+                donor.extend(rows.into_iter().map(|mut row| { row.usage_id=channel; row }));
             }
-            let channel = if !used.contains(&stock_channel) { stock_channel } else {
-                (0..=i16::MAX).find(|id| !used.contains(id))
-                    .ok_or_else(|| SparkError::Invalid("No unused native teleporter channel remains".into()))?
-            };
-            used.insert(channel);
-            donor.extend(rows.into_iter().map(|mut row| { row.usage_id=channel; row }));
         }
         let limit=if cache_version==13 { maps::MCC13_REGIONAL_FLAG_LIMIT } else { maps::CLASSIC_NETGAME_FLAG_LIMIT };
         if base.len()+donor.len()>limit {
@@ -295,21 +305,33 @@ pub(crate) fn verify_merged_manifest(manifest:&serde_json::Value, output:&Path, 
 
 #[cfg(test)]
 #[test]
-#[ignore = "Requires the retained nineteen-region map and legally installed original Sidewinder"]
-fn restore_stock_sidewinder_teleporters_in_merged_bsp() {
+#[ignore = "Requires the retained nineteen-region assembly recipe and its licensed stock maps"]
+fn restore_stock_teleporters_in_merged_bsp() {
     let env_path=|key|std::path::PathBuf::from(std::env::var_os(key).unwrap());
     let parent=env_path("SPARK_MERGED_TELEPORT_PARENT");
-    let original=env_path("SPARK_MERGED_TELEPORT_STOCK");
+    let stock_directory=env_path("SPARK_MERGED_TELEPORT_STOCK");
+    let recipe=env_path("SPARK_MERGED_TELEPORT_RECIPE");
     let workspace=env_path("SPARK_MERGED_TELEPORT_WORKSPACE");
     let tags=workspace.join("tags");
     let scenario=tags.join("levels/test/timberland/gsmegaroad.scenario");
     assert!(scenario.is_file(),"Exact extracted scenario is absent at {}",scenario.display());
     let actual=maps::inspect_map(&parent,None).unwrap();
-    let stock=maps::inspect_map(&original,original.parent()).unwrap();
-    assert_eq!(actual.sha256,"84c955d34ad5869d4119c571aac87ce73a6d244e0ced1c1f5b5f97bd1d930067");
-    let placement=[114.02209091186523,9.3280029296875,-17.233085022040342];
-    let reviewed=PreparedFlags::from_merged_teleporters(&parent,&actual,0,&original,&stock,placement,0.,13).unwrap();
-    assert_eq!(reviewed.added(),12);
+    assert_eq!(actual.sha256,"5b738f30bbf291935b5e838f4343f7abedc8679b4c4744deb7088d86bf2bfa4d");
+    let recipe: serde_json::Value=serde_json::from_slice(&std::fs::read(recipe).unwrap()).unwrap();
+    let donors=recipe["recipe"]["inheritedConnections"].as_array().unwrap().iter().take_while(|row|row["separateNativeBsps"] != true)
+        .map(|row| {
+            let source=&row["donorSource"];
+            let name=source["originalPath"].as_str().unwrap().rsplit(['/', '\\']).next().unwrap();
+            let path=stock_directory.join(name);
+            let stock=maps::inspect_map(&path,Some(&stock_directory)).unwrap_or_else(|error|panic!("{}: {error}",path.display()));
+            assert_eq!(stock.sha256,source["sha256"].as_str().unwrap());
+            let translation: [f64;3]=serde_json::from_value(row["translation"].clone()).unwrap();
+            (path,stock,translation,row["yawDegrees"].as_f64().unwrap())
+        }).collect::<Vec<_>>();
+    assert_eq!(donors.len(),11);
+    let sources=donors.iter().map(|(path,map,translation,yaw)|MergedTeleporterDonor {path,map,translation:*translation,yaw:*yaw}).collect::<Vec<_>>();
+    let reviewed=PreparedFlags::from_merged_teleporters(&parent,&actual,0,&sources,13).unwrap();
+    assert_eq!(reviewed.added(),36);
     let cancel=std::sync::atomic::AtomicBool::new(false);
     let runner=Runner{id:"merged-teleporter-native",project:"retained-megaworld",cancel:&cancel,event:&|event|{
         if event.phase=="bsp-teleporter-source" || event.severity=="error" { eprintln!("{}",event.message); }
@@ -333,14 +355,14 @@ fn restore_stock_sidewinder_teleporters_in_merged_bsp() {
     assert_eq!(actual.mesh.positions,retained.mesh.positions);
     assert_eq!(actual.mesh.indices,retained.mesh.indices);
     assert_eq!(maps::hash_file(&parent).unwrap(),actual.sha256);
-    assert_eq!(maps::hash_file(&original).unwrap(),stock.sha256);
+    for source in &sources { assert_eq!(maps::hash_file(source.path).unwrap(),source.map.sha256); }
     let info=build::tool_path(&tools,"invader-info").unwrap();
     for key in ["crc32_mismatched","stub_count","is_protected"] {
         assert_eq!(runner.run(&info,&["-T".into(),key.into(),cache.to_string_lossy().into_owned()],&workspace,"validate-cache",90).unwrap().trim(),"0");
     }
-    let check=PreparedFlags::from_merged_teleporters(&cache,&retained,0,&original,&stock,placement,0.,13).unwrap();
+    let check=PreparedFlags::from_merged_teleporters(&cache,&retained,0,&sources,13).unwrap();
     assert_eq!(check.added(),0,"The exact stock transform must not re-add restored markers");
-    let receipt=serde_json::json!({"baseSha256":actual.sha256,"stockSha256":stock.sha256,"cacheSha256":retained.sha256,
+    let receipt=serde_json::json!({"baseSha256":actual.sha256,"stockSha256":sources.iter().map(|source|&source.map.sha256).collect::<Vec<_>>(),"cacheSha256":retained.sha256,
         "report":report,"added":reviewed.donor,"preservedBspCount":after.bsp_count,"preservedSwitchCount":after.transitions.len()});
     println!("{}",receipt);
     std::fs::write(output.join("teleporter-review.json"),serde_json::to_vec_pretty(&receipt).unwrap()).unwrap();

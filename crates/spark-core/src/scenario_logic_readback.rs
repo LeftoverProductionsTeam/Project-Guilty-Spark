@@ -115,16 +115,16 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScenarioPlacementBudget {
-    existing: usize,
-    donor: usize,
+    pub(crate) existing: usize,
+    pub(crate) donor: usize,
     limit: usize,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScenarioGameplayBudget {
-    player_starts: ScenarioPlacementBudget,
-    netgame_equipment: ScenarioPlacementBudget,
+    pub(crate) player_starts: ScenarioPlacementBudget,
+    pub(crate) netgame_equipment: ScenarioPlacementBudget,
     netgame_flags: ScenarioPlacementBudget,
     mcc13_regional_flags: ScenarioPlacementBudget,
     mcc13_regional_starts: ScenarioPlacementBudget,
@@ -179,7 +179,7 @@ pub fn scenario_gameplay_merge_budget(
     })
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NativeNetgamePickup {
     pub collection: String,
@@ -217,7 +217,7 @@ pub(crate) fn scenario_netgame_pickups(path: &Path, inspection: &MapInspection) 
     })
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub(crate) struct NativeItemCollection {
     pub spawn_seconds: i16,
     pub permutations: Vec<(u32, String)>,
@@ -291,7 +291,8 @@ pub(crate) const NATIVE_SPAWN_TYPES: [Option<&str>; 15] = [
     Some("all_except_ctf"), Some("all_except_race_and_ctf"),
 ];
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct NativeRegionStart {
     pub position: [f32; 3],
     pub facing: f32,

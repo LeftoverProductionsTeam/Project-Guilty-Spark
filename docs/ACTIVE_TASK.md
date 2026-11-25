@@ -3,10 +3,10 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: MCC13 5b738f30 restores the twelve stock Sidewinder teleporter endpoints to the nineteen-region cache. Native compilation and independent readback passed. The 84c955d3 parent retains the Derelict repair and two Extraction deployment hubs. A separate Derelict component passed a Forerunner infantry round trip.
+Latest verified revision: MCC13 33d25373 restores all 48 audited missing stock teleporter endpoints to the nineteen-region cache. Its 13 collision BSPs and 24 switches match the parent, and physical use remains in Forerunner review. The same native BSP Assembly workflow imports stock pickups and starts for new merged builds.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native 78ddeb48 passed Forerunner death, Elite respawn, diagonal movement and jump. Two-client colors, arms and Spirit transfers remain open.
-Next action: Verify physical Sidewinder teleporting in 5b738f30. Carry the remaining stock teleporter pairs and vehicle placements into one reviewed build. The 975 required netgame equipment rows exceed Forerunner’s current 512-row limit. Repair remaining geometry and stock lighting differences and author both faction aircraft routes. Keep MCC13 Extraction launch gated. See RUNTIME_INTEGRATION_20261107 and ENGINE_SOURCE_ATLAS.
+Next action: Verify 33d25373 teleporters in-game. A stock-complete world needs 975 equipment rows and 1,307 starts against current Forerunner limits of 512 and 1,024. Restore vehicle rows, repair stock sky and lighting fidelity, and finish both faction aircraft routes. Zombie MCC13 05a4268a restores all three carrier colliders and is with Forerunner for gameplay comparison. See RUNTIME_INTEGRATION_20261107 and ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.
 
 Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
 

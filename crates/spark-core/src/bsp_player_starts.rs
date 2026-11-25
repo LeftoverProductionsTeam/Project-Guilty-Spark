@@ -10,6 +10,8 @@ use crate::{
 };
 use std::path::Path;
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct PreparedStarts {
     base: Vec<NativeRegionStart>,
     donor: Vec<NativeRegionStart>,
@@ -35,7 +37,7 @@ impl PreparedStarts {
         let mut donor = maps::scenario_region_starts(&assembly.donor_source.preserved_path, donor)?;
         let limit = maps::player_start_limit(cache_version);
         if base.len() + donor.len() > limit {
-            return invalid(format!("Combined player starts exceed {limit} for cache version {cache_version}."));
+            return invalid(format!("Combined player start count {} exceeds the {limit} slots supported by cache version {cache_version}.", base.len() + donor.len()));
         }
         let base_bsp_count = base_map_bsp_count;
         if base.iter().any(|row| !(0..base_bsp_count as i16).contains(&row.bsp_index)
@@ -51,6 +53,9 @@ impl PreparedStarts {
                 row.facing = placement.rotation[0];
             }
         }
+        let donor_bsp = if assembly.separate_native_bsps {
+            (base_bsp_count + usize::from(assembly.preserve_donor_bsp)) as i16
+        } else { 0 };
         for row in &mut donor {
             if row.spawn_types.iter().any(|&entry| {
                 NATIVE_SPAWN_TYPES
@@ -71,7 +76,7 @@ impl PreparedStarts {
             }
             row.position = position.map(|v| v as f32);
             row.facing = bsp_assembly::transform_facing(row.facing, assembly.yaw_degrees);
-            row.bsp_index = (base_bsp_count + usize::from(assembly.preserve_donor_bsp)) as i16;
+            row.bsp_index = donor_bsp;
         }
         Ok(Self { base, donor, base_bsp_count })
     }
@@ -205,4 +210,16 @@ impl PreparedStarts {
             "count": actual.len(), "donorCount": donor.len(), "explicitBspOwnership": if regional { Some(owned) } else { None }
         }))
     }
+}
+
+pub(crate) fn verify_merged_manifest(
+    manifest: &serde_json::Value, path: &Path, map: &MapInspection,
+) -> Result<Option<serde_json::Value>> {
+    let Some(receipt) = manifest.get("mergedPlayerStarts").filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    let planned: PreparedStarts = serde_json::from_value(receipt.clone())?;
+    let actual = maps::scenario_region_starts(path, map)?;
+    let (_, regions) = crate::bsp_audio::inspect_placement_regions(path, &map.sha256, actual.iter().map(|row| row.position))?;
+    planned.verify(&actual, true, &regions).map(Some)
 }

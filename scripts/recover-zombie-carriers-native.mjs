@@ -164,6 +164,91 @@ export function carrierSources(nodes, checksum, mesh, regions, nodeByRegion) {
   return { jms: jms.join('\n') + '\n', jma };
 }
 
+export async function readCompactCarrierMesh({ get, getMany, counts }, collision) {
+  const base = 'nodes[0].bsps[0]';
+  const points = [],
+    edges = [],
+    surfaces = [];
+  const [pointCount, edgeCount, surfaceCount] = await counts(collision, [
+    base + '.vertices',
+    base + '.edges',
+    base + '.surfaces',
+  ]);
+  if (
+    pointCount < 1 ||
+    pointCount > 4096 ||
+    edgeCount < 1 ||
+    edgeCount > 8192 ||
+    surfaceCount < 1 ||
+    surfaceCount > 4096
+  )
+    throw Error('Native collider counts exceed reviewed bounds');
+  const edgeKeys = [
+    'start_vertex',
+    'end_vertex',
+    'forward_edge',
+    'reverse_edge',
+    'left_surface',
+    'right_surface',
+  ];
+  // Query each bounded logical array without spawning a tool for every scalar.
+  // Large valid edge arrays are split so the per-snapshot request cap still applies.
+  const readArray = async (size, fields, prefix) => {
+    const rows = [];
+    for (let start = 0; start < size; start += Math.floor(4096 / fields.length)) {
+      const end = Math.min(size, start + Math.floor(4096 / fields.length));
+      const keys = [];
+      for (let i = start; i < end; i++) for (const field of fields) keys.push(`${prefix}[${i}].${field}`);
+      const values = await getMany(collision, keys);
+      for (let at = 0; at < values.length; at += fields.length)
+        rows.push(values.slice(at, at + fields.length));
+    }
+    return rows;
+  };
+  for (const [point] of await readArray(pointCount, ['point'], base + '.vertices'))
+    points.push(point.split(',').map(Number));
+  for (const values of await readArray(edgeCount, edgeKeys, base + '.edges'))
+    edges.push(Object.fromEntries(edgeKeys.map((key, i) => [key, Number(values[i])])));
+  for (const [edge] of await readArray(surfaceCount, ['first_edge'], base + '.surfaces'))
+    surfaces.push(Number(edge));
+  return {
+    points,
+    triangles: triangulateCollider(points, edges, surfaces),
+    material: await get(collision, 'materials[0].name'),
+  };
+}
+
+export async function readCarrierModelRig({ getMany, counts }, model) {
+  const [nodeCount, regionCount] = await counts(model, ['nodes', 'regions']);
+  if (nodeCount < 1 || nodeCount > 64 || regionCount < 1 || regionCount > 8)
+    throw Error('Native model counts exceed reviewed bounds');
+  const nodeKeys = [
+    'name',
+    'first_child_node_index',
+    'next_sibling_node_index',
+    'default_translation',
+    'default_rotation',
+  ];
+  const keys = [];
+  for (let j = 0; j < nodeCount; j++) for (const key of nodeKeys) keys.push(`nodes[${j}].${key}`);
+  for (let j = 0; j < regionCount; j++) keys.push(`regions[${j}].name`);
+  keys.push('node_list_checksum');
+  const values = await getMany(model, keys),
+    nodes = [];
+  for (let j = 0; j < nodeCount; j++) {
+    const [name, child, sibling, translation, rotation] = values.slice(j * 5, j * 5 + 5);
+    nodes.push({
+      name,
+      child: none(Number(child)),
+      sibling: none(Number(sibling)),
+      translation: translation.split(',').map(Number),
+      rotation: rotation.split(',').map(Number),
+    });
+  }
+  const regions = values.slice(nodeCount * 5, nodeCount * 5 + regionCount);
+  return { nodes, regions, checksum: Number(values.at(-1)) };
+}
+
 async function regular(file, max = 512 * 1024 * 1024) {
   const s = await fs.lstat(file);
   if (!s.isFile() || s.isSymbolicLink() || s.size > max) throw Error('Expected bounded regular input');
@@ -328,58 +413,8 @@ async function execute(argv) {
         )
       ).map(Number);
     const count = async (tag, key) => (await counts(tag, [key]))[0];
-    const collision = 'powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry',
-      base = 'nodes[0].bsps[0]';
-    const points = [],
-      edges = [],
-      surfaces = [];
-    const [pointCount, edgeCount, surfaceCount] = await counts(collision, [
-      base + '.vertices',
-      base + '.edges',
-      base + '.surfaces',
-    ]);
-    if (
-      pointCount < 1 ||
-      pointCount > 4096 ||
-      edgeCount < 1 ||
-      edgeCount > 8192 ||
-      surfaceCount < 1 ||
-      surfaceCount > 4096
-    )
-      throw Error('Native collider counts exceed reviewed bounds');
-    const edgeKeys = [
-      'start_vertex',
-      'end_vertex',
-      'forward_edge',
-      'reverse_edge',
-      'left_surface',
-      'right_surface',
-    ];
-    // Query each bounded logical array without spawning a tool for every scalar.
-    // Large valid edge arrays are split so the per-snapshot request cap still applies.
-    const readArray = async (size, fields, prefix) => {
-      const rows = [];
-      for (let start = 0; start < size; start += Math.floor(4096 / fields.length)) {
-        const end = Math.min(size, start + Math.floor(4096 / fields.length));
-        const keys = [];
-        for (let i = start; i < end; i++) for (const field of fields) keys.push(`${prefix}[${i}].${field}`);
-        const values = await getMany(collision, keys);
-        for (let at = 0; at < values.length; at += fields.length)
-          rows.push(values.slice(at, at + fields.length));
-      }
-      return rows;
-    };
-    for (const [point] of await readArray(pointCount, ['point'], base + '.vertices'))
-      points.push(point.split(',').map(Number));
-    for (const values of await readArray(edgeCount, edgeKeys, base + '.edges'))
-      edges.push(Object.fromEntries(edgeKeys.map((key, i) => [key, Number(values[i])])));
-    for (const [edge] of await readArray(surfaceCount, ['first_edge'], base + '.surfaces'))
-      surfaces.push(Number(edge));
-    const mesh = {
-      points,
-      triangles: triangulateCollider(points, edges, surfaces),
-      material: await get(collision, 'materials[0].name'),
-    };
+    const collision = 'powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry';
+    const mesh = await readCompactCarrierMesh({ get, getMany, counts }, collision);
     report.colliderSource = {
       vertices: points.length,
       triangles: mesh.triangles.length,
@@ -399,34 +434,8 @@ async function execute(argv) {
       'vehicles/rwarthog/rwarthog.gbxmodel',
       'weapons/gravity rifle/gravity rifle.gbxmodel',
     ].entries()) {
-      const [nodeCount, regionCount] = await counts(model, ['nodes', 'regions']);
-      if (nodeCount < 1 || nodeCount > 64 || regionCount < 1 || regionCount > 8)
-        throw Error('Native model counts exceed reviewed bounds');
-      const nodeKeys = [
-        'name',
-        'first_child_node_index',
-        'next_sibling_node_index',
-        'default_translation',
-        'default_rotation',
-      ];
-      const keys = [];
-      for (let j = 0; j < nodeCount; j++) for (const key of nodeKeys) keys.push(`nodes[${j}].${key}`);
-      for (let j = 0; j < regionCount; j++) keys.push(`regions[${j}].name`);
-      keys.push('node_list_checksum');
-      const values = await getMany(model, keys),
-        nodes = [];
-      for (let j = 0; j < nodeCount; j++) {
-        const [name, child, sibling, translation, rotation] = values.slice(j * 5, j * 5 + 5);
-        nodes.push({
-          name,
-          child: none(Number(child)),
-          sibling: none(Number(sibling)),
-          translation: translation.split(',').map(Number),
-          rotation: rotation.split(',').map(Number),
-        });
-      }
-      const regions = values.slice(nodeCount * 5, nodeCount * 5 + regionCount);
-      const sources = carrierSources(nodes, Number(values.at(-1)), mesh, regions, i === 0 ? [0, 14] : [0]);
+      const { nodes, regions, checksum } = await readCarrierModelRig({ getMany, counts }, model);
+      const sources = carrierSources(nodes, checksum, mesh, regions, i === 0 ? [0, 14] : [0]);
       const stem = `gs_compat/recovered_carrier_${i}`,
         name = `recovered_carrier_${i}`,
         tag = `${stem}/${name}.model_collision_geometry`,
