@@ -5,6 +5,7 @@ use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::{Arc,atomic::AtomicBool}};
 
 const MAX_FILES: usize = 4096;
+const MAX_MCC_SCENARIO_FILES: usize = 8192;
 const MAX_TAG_BYTES: u64 = 64*1024*1024;
 const MAX_TOTAL: u64 = 512*1024*1024;
 #[derive(Serialize,Deserialize)]
@@ -22,7 +23,7 @@ fn reusable_extraction(root:&Path,source:&project::Source,project_id:&str,query:
             let contract=p.join("extraction-inputs.json");reject_links(&contract)?;if fs::metadata(&contract)?.len()>65536{return invalid("Extraction contract too large");}
             let old:ExtractInputs=serde_json::from_slice(&fs::read(contract)?)?;
             if old.schema_version!=inputs.schema_version||old.legacy_input_sha256!=inputs.legacy_input_sha256||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
-            let (files,total)=inventory(&receipt.tag_root)?;if files!=receipt.files||total!=receipt.total_bytes{return invalid("Extracted tags changed");}Ok(receipt)
+            let (files,total)=receipt.inventory(&receipt.tag_root)?;if files!=receipt.files||total!=receipt.total_bytes{return invalid("Extracted tags changed");}Ok(receipt)
         })();
         if let Ok(mut receipt)=attempt{receipt.notice.push_str(" Reused exact source/tool/resource identities after fresh extracted-file hash checks; no duplicate extraction was created.");return Ok(Some(receipt));}
     }Ok(None)
@@ -47,6 +48,11 @@ pub struct TagExtractReceipt {
     pub files:Vec<ExtractedFile>,
     pub total_bytes:u64,
     pub notice:String,
+}
+impl TagExtractReceipt {
+    pub(crate) fn inventory(&self, root: &Path) -> Result<(Vec<ExtractedFile>, u64)> {
+        inventory_with_limit(root, extraction_file_limit(self.source_version, &self.requested_tag))
+    }
 }
 pub fn extension(class:&str)->Result<&'static str>{
     match class {
@@ -85,6 +91,15 @@ pub fn extension(class:&str)->Result<&'static str>{
         _=>invalid(format!("Invader tag class {class:?} needs a verified extension mapping before extraction"))
     }
 }
+fn extraction_file_limit(source_version: u32, requested_tag: &str) -> usize {
+    // Whole MCC scenarios can carry many more small tags. Keep the ordinary
+    // asset limit and the same byte, path, and receipt checks for both.
+    if source_version == 13 && requested_tag.ends_with(".scenario") {
+        MAX_MCC_SCENARIO_FILES
+    } else {
+        MAX_FILES
+    }
+}
 fn tag_query(path:&str,class:&str)->Result<(String,PathBuf)>{
     let ext=extension(class)?;
     let tag_path=safe_relative(path)?;
@@ -94,26 +109,29 @@ fn tag_query(path:&str,class:&str)->Result<(String,PathBuf)>{
     Ok((query,expected))
 }
 pub(crate) fn inventory(root:&Path)->Result<(Vec<ExtractedFile>,u64)> {
+    inventory_with_limit(root, MAX_FILES)
+}
+fn inventory_with_limit(root:&Path, max_files:usize)->Result<(Vec<ExtractedFile>,u64)> {
     let mut files=vec![];
     let mut total=0u64;
     let mut directories=vec![root.to_path_buf()];
     let mut visited_dirs=0usize;
     while let Some(folder)=directories.pop(){
         visited_dirs+=1;
-        if visited_dirs>MAX_FILES{return invalid("Tag extraction exceeds 4096 source directories");}
+        if visited_dirs>max_files{return invalid(format!("Tag extraction exceeds {max_files} source directories"));}
         reject_links(&folder)?;
         for entry in fs::read_dir(&folder)? {
             let entry=entry?;let path=entry.path();
             reject_links(&path)?;
             let metadata=entry.metadata()?;
             if metadata.is_dir(){
-                if directories.len()+files.len()>=MAX_FILES{return invalid("Tag extraction exceeds directory/file limit");}
+                if directories.len()+files.len()>=max_files{return invalid("Tag extraction exceeds directory/file limit");}
                 directories.push(path);continue;
             }
             if !metadata.is_file(){return invalid("Extraction produced an unsupported file type");}
             if metadata.len()>MAX_TAG_BYTES{return invalid("Extracted tag exceeds 64 MiB per-file limit");}
             total=total.checked_add(metadata.len()).ok_or_else(||SparkError::Invalid("Extracted tag byte count overflow".into()))?;
-            if total>MAX_TOTAL || files.len()>=MAX_FILES{return invalid("Extraction exceeds 4096 files or 512 MiB");}
+            if total>MAX_TOTAL || files.len()>=max_files{return invalid(format!("Extraction exceeds {max_files} files or 512 MiB"));}
             let relative=path.strip_prefix(root).map_err(|_|SparkError::Invalid("Extraction escaped its managed tags folder".into()))?;
             let name=relative.to_string_lossy().replace('\\',"/");
             safe_relative(&name)?;
@@ -255,7 +273,7 @@ pub fn extract_selected_tag(
             // Do not retain a second complete map tag library for one actor.
             for file in all.iter().filter(|file|!wanted.contains(&file.path)) {let path=tags.join(safe_relative(&file.path)?);reject_links(&path)?;fs::remove_file(path)?;}
         }
-        let (files,total_bytes)=inventory(&tags)?;
+        let (files,total_bytes)=inventory_with_limit(&tags, extraction_file_limit(source.cache_version, &query))?;
         if files.is_empty() || !files.iter().any(|f|f.path.eq_ignore_ascii_case(&expected.to_string_lossy().replace('\\',"/"))) {
             return invalid("Invader finished without producing the selected requested .tag file");
         }
@@ -337,7 +355,7 @@ pub(crate) fn load_receipt(root:&Path,job_id:&str)->Result<TagExtractReceipt>{
     }
     let r:TagExtractReceipt=serde_json::from_slice(&fs::read(&path)?)?;
     if r.job_id!=job_id || r.source_project_id.is_empty() || r.source_engine.is_empty() ||
-        r.status!="extracted-unverified-import" || r.files.is_empty() || r.files.len()>MAX_FILES ||
+        r.status!="extracted-unverified-import" || r.files.is_empty() || r.files.len()>extraction_file_limit(r.source_version, &r.requested_tag) ||
         r.total_bytes>MAX_TOTAL || r.receipt_path!=path || r.tag_root!=folder.join("tags") {
         return invalid("Extraction receipt fails identity or path validation");
     }
@@ -391,7 +409,7 @@ pub fn stage_into_project(target:&Project,managed_root:&Path,source_job:&str,job
         return invalid("Incompatible Halo engine or cache version; extracted tags cannot be staged into this project automatically");
     }
     let extracted_dir=job_dir(managed_root,source_job)?.join("tags");
-    let (observed,total)=inventory(&extracted_dir)?;
+    let (observed,total)=original.inventory(&extracted_dir)?;
     if observed!=original.files || total!=original.total_bytes {
         return invalid("Extraction receipt hashes or file inventory changed; transfer stopped");
     }
@@ -422,12 +440,12 @@ pub fn stage_into_project(target:&Project,managed_root:&Path,source_job:&str,job
                 return invalid("Staged tag checksum mismatch; no import was committed");
             }
         }
-        let (copied,copied_bytes)=inventory(&tags)?;
+        let (copied,copied_bytes)=original.inventory(&tags)?;
         if copied!=observed || copied_bytes!=total {
             return invalid("Staged tag inventory changed before commit");
         }
         verify_source_snapshot(target_source,None)?;
-        let (unchanged_source,unchanged_bytes)=inventory(&extracted_dir)?;
+        let (unchanged_source,unchanged_bytes)=original.inventory(&extracted_dir)?;
         if unchanged_source!=original.files||unchanged_bytes!=original.total_bytes{return invalid("Extracted source tags changed during transfer; no staged import was committed");}
         let receipt=TagImportReceipt{
             status:"staged-not-merged".into(),job_id:job_id.into(),source_job_id:source_job.into(),

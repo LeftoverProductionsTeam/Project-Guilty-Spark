@@ -254,20 +254,18 @@ fn validate_receipt(root: &Path, receipt: &RecoveryReceipt) -> Result<()> {
     {
         return invalid("Recovery receipt has a different managed destination");
     }
-    for (folder, expected) in [
-        (&receipt.tags_directory, &receipt.native_tags),
-        (&receipt.data_directory, &receipt.recovered_data),
-    ] {
-        reject_links(folder)?;
-        if tag_exchange::inventory(folder)?.0 != *expected {
-            return invalid("Recovered project files changed; old validation cannot be reused. Edited source is preserved.");
-        }
+    let extracted = tag_exchange::load_receipt(root, &receipt.extraction_id)?;
+    reject_links(&receipt.tags_directory)?;
+    reject_links(&receipt.data_directory)?;
+    if extracted.inventory(&receipt.tags_directory)?.0 != receipt.native_tags
+        || tag_exchange::inventory(&receipt.data_directory)?.0 != receipt.recovered_data
+    {
+        return invalid("Recovered project files changed; old validation cannot be reused. Edited source is preserved.");
     }
     if receipt.native_readback.len() != receipt.native_tags.len() || receipt.native_tags.is_empty()
     {
         return invalid("Recovery receipt has incomplete native readback");
     }
-    let extracted = tag_exchange::load_receipt(root, &receipt.extraction_id)?;
     if extracted.source_project_id != receipt.plan.project_id
         || extracted.source_sha256 != receipt.plan.source_sha256
         || extracted.files != receipt.native_tags
@@ -439,7 +437,7 @@ pub fn recover(
             &cancel,
             |_, _, _, _| {},
         )?;
-        let (files, _) = tag_exchange::inventory(&tags)?;
+        let (files, _) = extracted.inventory(&tags)?;
         if files != extracted.files {
             return invalid("Recovered tag copy differs from verified extracted source");
         }
@@ -575,8 +573,8 @@ pub fn recover(
         let recovered_data = tag_exchange::inventory(&data)?.0;
         // Native parsers/recovery must be read-only on input tags, and every
         // original identity is rechecked before the separate result is adopted.
-        if tag_exchange::inventory(&tags)?.0 != files
-            || tag_exchange::inventory(&extracted.tag_root)?.0 != extracted.files
+        if extracted.inventory(&tags)?.0 != files
+            || extracted.inventory(&extracted.tag_root)?.0 != extracted.files
         {
             return invalid("A recovery reader changed native source tags; recovery refused");
         }

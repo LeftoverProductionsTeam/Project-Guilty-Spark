@@ -621,7 +621,22 @@ fn support_high_ground(mut space:Manifold,route:&BspAssembly,material:usize,mini
 #[derive(Clone, Copy)]
 enum PartitionEnd { Base, Donor }
 
-struct PartitionRoute { start: V, end: V, cap_before: V, cap_after: V, overlap_before: V, overlap_after: V }
+struct PartitionRoute {
+    start: V, end: V, cap_before: V, cap_after: V, overlap_before: V, overlap_after: V,
+    separation_axis: V,
+    donor_grade_start: Option<V>,
+}
+
+fn retained_grade_start(start: V, end: V) -> Option<V> {
+    if (end[2] - start[2]).abs() <= 1e-6 { return None; }
+    let delta = sub(end, start);
+    let horizontal = delta[0].hypot(delta[1]);
+    Some(add(start, [3. * delta[0] / horizontal, 3. * delta[1] / horizontal, 0.]))
+}
+
+fn donor_partition_points(first: V, grade_start: Option<V>, end: V) -> Vec<V> {
+    std::iter::once(first).chain(grade_start).chain(std::iter::once(end)).collect()
+}
 
 /// Paired standard Halo trigger volumes in native world coordinates.
 #[derive(Debug, Serialize)]
@@ -672,9 +687,9 @@ fn generate_end(
         );
     }
     let donor_scenery = crate::bsp_scenery::plan(assembly, &donor)?.len();
-    let (base_mesh, base_faces) = maps::collision_source(base_path, base)?;
+    let (base_mesh, base_faces) = maps::collision_shell_source(base_path, base)?;
     let (donor_mesh, donor_faces) =
-        maps::collision_source(&assembly.donor_source.preserved_path, &donor)?;
+        maps::collision_shell_source(&assembly.donor_source.preserved_path, &donor)?;
     if donor.render_mesh.is_none() {
         donor.render_mesh = maps::render_bsp_source(
             &assembly.donor_source.preserved_path,
@@ -701,7 +716,7 @@ fn generate_end(
     if let Some((seam, end)) = partition {
         route_geometry.tunnel_points = match end {
             PartitionEnd::Base => vec![seam.start, seam.cap_after],
-            PartitionEnd::Donor => vec![seam.cap_before, seam.end],
+            PartitionEnd::Donor => donor_partition_points(seam.cap_before, seam.donor_grade_start, seam.end),
         };
     }
     let routes = route_geometry.connection_routes();
@@ -813,6 +828,13 @@ fn generate_end(
                     &right, OpType::Add, BooleanEngine::Auto, Some(&token),
                 ), "Donor join")?
             } else { combined };
+            if matches!(partition, Some((seam, PartitionEnd::Donor)) if seam.separation_axis[2] != 0.) {
+                // Where the approach crosses an outdoor region, its ramp
+                // must remain solid even above the donor's lower ground.
+                united = support_high_ground(
+                    united, &routes[0], passage_materials[0], lowest_source - 0.25, Some(&token),
+                )?;
+            }
             if let Some(ridge)=&assembly.high_ground {
                 united=support_high_ground(united,&assembly.high_ground_plan(ridge),passage_materials[1+usize::from(assembly.infantry_tunnel.is_some())],lowest_source-0.25,Some(&token))?;
             }
@@ -849,11 +871,12 @@ fn generate_end(
     }
     let mut clearance_route = route_geometry.clone();
     clearance_route.separate_native_bsps = false;
+    clearance_route.base_bsp_index = 0;
     if let Some((seam, end)) = partition {
         // Keep clearance samples away from each partition’s own closed cap.
         clearance_route.tunnel_points = match end {
             PartitionEnd::Base => vec![seam.start, seam.overlap_after],
-            PartitionEnd::Donor => vec![seam.overlap_before, seam.end],
+            PartitionEnd::Donor => donor_partition_points(seam.overlap_before, seam.donor_grade_start, seam.end),
         };
     }
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
@@ -909,7 +932,7 @@ fn generate_end(
         &base_mesh,
         &donor_mesh,
         assembly.terrain_seam.as_ref().map(|_|terrain::render_edge(&donor,assembly.donor_bsp_index,false).map(|edge|edge-0.25+assembly.translation[0])).transpose()?,
-        partition.map(|(_, end)| end),
+        partition.map(|(seam, end)| (end, seam.separation_axis)),
     )?;
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
@@ -972,7 +995,7 @@ fn add_portals(
     base: &MeshData,
     donor: &MeshData,
     trimmed_donor_min: Option<f64>,
-    partition: Option<PartitionEnd>,
+    partition: Option<(PartitionEnd, V)>,
 ) -> Result<usize> {
     fn bounds(mesh: &MeshData, part: usize, translation: V, yaw: f64) -> (V, V) {
         let mut lo = [f64::INFINITY; 3];
@@ -1000,14 +1023,15 @@ fn add_portals(
     // even while they are inside its world-aligned bounding rectangle.
     let along = sub(*assembly.tunnel_points.last().unwrap(), assembly.tunnel_points[0]);
     let aim = mul([along[0], along[1], 0.], 1. / along[0].hypot(along[1]));
+    let axis = partition.map_or(aim, |(_, axis)| axis);
     let projection = match partition {
-        Some(PartitionEnd::Base) => Some(projected_bounds(base, 0, [0.; 3], 0., aim)?),
-        Some(PartitionEnd::Donor) => Some(projected_bounds(donor, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, aim)?),
+        Some((PartitionEnd::Base, _)) => Some(projected_bounds(base, 0, [0.; 3], 0., axis)?),
+        Some((PartitionEnd::Donor, _)) => Some(projected_bounds(donor, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, axis)?),
         None => None,
     };
     let inside_retained_source = |p| projection.map_or_else(
         || inside(p, base_bounds) || inside(p, donor_bounds),
-        |[low, high]| (low - 0.1..=high + 0.1).contains(&dot(p, aim)),
+        |[low, high]| (low - 0.1..=high + 0.1).contains(&dot(p, axis)),
     );
     // Authored sections can widen or cross the primary passage just like the
     // outdoor terrain join. A route-sized portal cannot close that joined air
@@ -1173,16 +1197,36 @@ pub fn generate_partitioned_project(
     }
     let port = projected_bounds(&base.mesh, assembly.base_bsp_index, [0.; 3], 0., aim)?[1].max(dot(start, aim));
     let arrival = projected_bounds(&donor.mesh, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, aim)?[0].min(dot(end, aim));
-    if arrival - port < 8. {
+    let separation_axis = if arrival - port >= 8. {
+        aim
+    } else if retaining {
+        // Keep every original BSP physically separate from a vertically
+        // offset donor. Only the new ramp and shared landing may cross layers.
+        let vertical = [0., 0., if end[2] >= start[2] { 1. } else { -1. }];
+        let mut retained_top = f64::NEG_INFINITY;
+        for slot in 0..base_count {
+            retained_top = retained_top.max(projected_bounds(&base.mesh, slot, [0.; 3], 0., vertical)?[1]);
+        }
+        let [donor_bottom, _] = projected_bounds(
+            &donor.mesh, assembly.donor_bsp_index, assembly.translation, assembly.yaw_degrees, vertical,
+        )?;
+        if donor_bottom - retained_top < 8. {
+            return invalid("Leave eight world units of horizontal separation, or place the entire donor eight units above or below every retained BSP");
+        }
+        vertical
+    } else {
         return invalid("Leave at least eight world units between the projected region bounds for the overlap, caps and visibility cuts");
-    }
+    };
     // A new corridor enters the existing floor before the retained wall.
     // Its first authored point is the center of the shared switch area.
     let center = if retaining { start } else { add(start, mul(direction, (port + arrival) * 0.5 - dot(start, aim))) };
-    let offset = |distance| add(center, mul(direction, distance));
+    let vertical_join = separation_axis[2] != 0.;
+    let overlap_direction = if vertical_join { aim } else { direction };
+    let offset = |distance| add(center, mul(overlap_direction, distance));
     let seam = PartitionRoute {
         start, end, cap_before: offset(-3.), cap_after: offset(3.),
-        overlap_before: offset(-2.3), overlap_after: offset(2.3),
+        overlap_before: offset(-2.3), overlap_after: offset(2.3), separation_axis,
+        donor_grade_start: if vertical_join { retained_grade_start(start, end) } else { None },
     };
     let overlap = [seam.overlap_before, seam.overlap_after];
     let (left, left_floor) = if retaining {
@@ -1240,7 +1284,10 @@ pub(crate) fn verify_bound_partition_collision(
     approach.base_bsp_index = 0;
     approach.tunnel_points = vec![if original_count == 1 { plan.tunnel_points[0] } else { overlap[0] }, overlap[1]];
     let base_samples = [original.verify(&approach)?, original.verify_return(&approach)?];
-    approach.tunnel_points = vec![overlap[0], plan.tunnel_points[1]];
+    let grade_start = if original_count > 1 && overlap[0][2] == overlap[1][2] {
+        retained_grade_start(plan.tunnel_points[0], plan.tunnel_points[1])
+    } else { None };
+    approach.tunnel_points = donor_partition_points(overlap[0], grade_start, plan.tunnel_points[1]);
     let donor_samples = [extension.verify(&approach)?, extension.verify_return(&approach)?];
     let floor_a = original.floor_profile(overlap)?;
     let floor_b = extension.floor_profile(overlap)?;
@@ -1837,6 +1884,14 @@ mod tests {
             point[axis] += 0.01;
             assert!(validate_native_bsp_point(point).is_err());
         }
+    }
+
+    #[test]
+    fn graded_retained_route_levels_the_shared_landing() {
+        let start = [0., 0., -15.];
+        let end = [300., 400., 70.];
+        assert_eq!(retained_grade_start(start, end), Some([1.8, 2.4, -15.]));
+        assert_eq!(retained_grade_start(start, [10., 0., -15.]), None);
     }
 
     #[test]

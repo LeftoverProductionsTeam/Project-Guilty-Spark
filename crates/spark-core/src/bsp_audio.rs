@@ -603,6 +603,10 @@ pub fn verify_output(before: &Inspection, after: &Inspection, request: &Request)
 }
 
 fn indices(output: &str, count: usize) -> Result<Vec<Option<usize>>> {
+    native_indices(output, count, false)
+}
+
+fn native_indices(output: &str, count: usize, packed_fog: bool) -> Result<Vec<Option<usize>>> {
     let rows: Vec<_> = output
         .lines()
         .map(str::trim)
@@ -619,6 +623,7 @@ fn indices(output: &str, count: usize) -> Result<Vec<Option<usize>>> {
             match value {
                 -1 | 65535 => Ok(None),
                 0..=32767 => Ok(Some(value as usize)),
+                -32768..=-2 | 32768..=65534 if packed_fog => Ok(Some(value as u16 as usize)),
                 _ => invalid("Native BSP audio index is out of range"),
             }
         })
@@ -665,9 +670,27 @@ impl DonorEnvironment {
         let cluster = |key: &str| indices(&run(vec!["-G".into(), format!("clusters[*].{key}")])?, clusters);
         // Nonuniform settings and geometry-bound sky or fog need a verified
         // source-to-output cluster mapping. Never blend them implicitly.
-        if ["sky", "fog"].into_iter().map(cluster).collect::<Result<Vec<_>>>()?
-            .iter().flatten().any(Option::is_some)
-        {
+        let sky = cluster("sky")?;
+        let fog = native_indices(
+            &run(vec!["-G".into(), "clusters[*].fog".into()])?, clusters, true,
+        )?;
+        if fog.iter().any(Option::is_some) {
+            let planes = count("fog_planes", 32)?;
+            let regions = count("fog_regions", 32)?;
+            for &reference in fog.iter().flatten() {
+                // Native H1 fog references use bit 15 for a fog plane.
+                let (index, limit) = if reference & 0x8000 != 0 {
+                    (reference & 0x7fff, planes)
+                } else {
+                    (reference, regions)
+                };
+                if index >= limit {
+                    return invalid("Native cluster fog references a missing plane or region");
+                }
+            }
+            return Ok(None);
+        }
+        if sky.iter().any(Option::is_some) {
             return Ok(None);
         }
         let mut palettes = Vec::with_capacity(REGION_PALETTES.len());
@@ -990,6 +1013,25 @@ pub(crate) fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packed_cluster_fog_uses_native_plane_bounds() {
+        let review = |fog| DonorEnvironment::read(&|query| {
+            Ok(match query[1].as_str() {
+                "clusters" | "fog_planes" => "1",
+                "fog_regions" => "0",
+                "clusters[*].sky" => "65535",
+                "clusters[*].fog" => fog,
+                _ => return invalid("Test received an unexpected native field"),
+            }.into())
+        });
+        assert!(review("32768").unwrap().is_none());
+        assert!(review("-32768").unwrap().is_none());
+        assert!(review("32769").is_err());
+        assert!(review("0").is_err());
+        assert!(indices("32768", 1).is_err());
+    }
+
     #[test]
     #[ignore="requires explicitly selected owned MCC campaign cache/native BSP and installed Invader"]
     fn owned_campaign_painted_details_block_before_native_audio_serialization() {

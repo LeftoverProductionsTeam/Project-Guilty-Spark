@@ -1931,6 +1931,38 @@ fn source_active_surfaces(r:&Reader,space:&Space,root:usize,surfaces:usize)->Res
     while let Some(child)=references_to_walk.pop(){if child==u32::MAX{continue;}if child&0x80000000!=0{let index=(child&0x7fffffff) as usize;if index>=surfaces{return invalid("Source BSP2D surface index is invalid");}active[index]=true;}else{let index=child as usize;if index>=count2d{return invalid("Source BSP2D node index is invalid");}if nodes2d_seen[index]{continue;}nodes2d_seen[index]=true;references_to_walk.push(r.u32(nodes2d+index*20+12)?);references_to_walk.push(r.u32(nodes2d+index*20+16)?);}}
     Ok(active)
 }
+// A native cache may leave genuine shell faces out of its runtime search
+// tree. Assembly needs the complete connected shell to perform a solid join.
+// Follow stored topology without welding, inventing faces or editing the cache.
+fn include_connected_shell_faces(r: &Reader, edges: usize, edge_count: usize, active: &mut [bool]) -> Result<()> {
+    if !active.contains(&false) { return Ok(()); }
+    let mut neighbors = vec![vec![]; active.len()];
+    for index in 0..edge_count {
+        let at = edges + index * 24;
+        let left = r.u32(at + 16)? as usize;
+        let right = r.u32(at + 20)? as usize;
+        if left == right || left >= active.len() || right >= active.len() {
+            // This native block does not describe a closed edge graph.
+            // Keep the runtime selection and let the solid validator report it.
+            return Ok(());
+        }
+        neighbors[left].push(right);
+        neighbors[right].push(left);
+    }
+    let mut pending: Vec<_> = active.iter().enumerate()
+        .filter_map(|(index, selected)| selected.then_some(index))
+        .collect();
+    while let Some(face) = pending.pop() {
+        for &neighbor in &neighbors[face] {
+            if !active[neighbor] {
+                active[neighbor] = true;
+                pending.push(neighbor);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Membership in the compiled collision BSP; this is not aircraft clearance,
 /// ground contact, pathfinding or gameplay. Standard format: c20 sbsp BSP3D fields.
 #[derive(Clone,Debug,Serialize)]
@@ -2072,16 +2104,25 @@ pub fn bsp_geometry_review(
  Ok(BspGeometryReview { points: rows, route: route_review })
 }
 pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
-    let (header,bytes,hash)=read_cache_snapshot(path)?;
-    if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}
-    collision_snapshot(&header,&bytes,inspection)
+    read_collision_source(path, inspection, false)
+}
+pub(crate) fn collision_shell_source(path: &Path, inspection: &MapInspection) -> Result<(MeshData, Vec<CollisionFace>)> {
+    read_collision_source(path, inspection, true)
+}
+fn read_collision_source(path: &Path, inspection: &MapInspection, include_shell_faces: bool) -> Result<(MeshData, Vec<CollisionFace>)> {
+    let (header, bytes, hash) = read_cache_snapshot(path)?;
+    if hash != inspection.sha256 { return invalid("BSP source changed after inspection"); }
+    collision_snapshot_recover(&header, &bytes, inspection, include_shell_faces)
 }
 pub(crate) fn collision_snapshot(header:&MapHeader,bytes:&[u8],inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
+    collision_snapshot_recover(header, bytes, inspection, false)
+}
+fn collision_snapshot_recover(header:&MapHeader,bytes:&[u8],inspection:&MapInspection,include_shell_faces:bool)->Result<(MeshData,Vec<CollisionFace>)>{
     let r=Reader(&bytes);let start=header.tag_offset as usize;let array=r.u32(start)?;
     let address=match header.version{5=>0x803a6000,6=>0x4bf10000,13=>array.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC index".into()))?,_=>0x40440000};
     let space=Space{begin:start,end:start+header.tag_size as usize,address};
     let sc=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;
-    let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces))?;Ok((mesh,faces))
+    let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces),include_shell_faces)?;Ok((mesh,faces))
 }
 pub(crate) fn scenery_parameters(path: &Path, inspection: &MapInspection) -> Result<std::collections::BTreeMap<String, (u16, i16)>> {
     let (_, bytes, hash) = read_cache_snapshot(path)?;
@@ -2098,9 +2139,9 @@ pub(crate) fn scenery_parameters(path: &Path, inspection: &MapInspection) -> Res
 }
 pub(crate) fn render_bsp_source(path:&Path,inspection:&MapInspection,index:usize)->Result<MeshData>{let(header,bytes,hash)=read_cache_snapshot(path)?;if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;crate::render::bsp_render_geometry_selected(&bytes,&header,scenario,Some(index))}
 fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<MeshData> {
-    collision_mesh_record(r,space,sc,tags,None)
+    collision_mesh_record(r,space,sc,tags,None,false)
 }
-fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut records:Option<&mut Vec<CollisionFace>>) -> Result<MeshData> {
+fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut records:Option<&mut Vec<CollisionFace>>,include_shell_faces:bool) -> Result<MeshData> {
     let (bsps, count) = space.block(r, sc + 0x5a4, 32, 16)?;
     let mut mesh = MeshData {
         label: "Imported BSP collision geometry".into(),
@@ -2130,8 +2171,11 @@ fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut 
             let root = blocks + b * 96;
             let(planes,plane_count)=if records.is_some(){bsp_space.block(r,root+0xc,16,262144)?}else{(0,0)};
             let (surfaces, sn) = bsp_space.block(r, root + 0x3c, 12, 131072)?;
-            let active=if records.is_some(){Some(source_active_surfaces(r,&bsp_space,root,sn)?)}else{None};
+            let mut active=if records.is_some(){Some(source_active_surfaces(r,&bsp_space,root,sn)?)}else{None};
             let (edges, en) = bsp_space.block(r, root + 0x48, 24, 262144)?;
+            if let Some(active) = active.as_mut().filter(|_| include_shell_faces) {
+                include_connected_shell_faces(r, edges, en, active)?;
+            }
             let (vertices, vn) = bsp_space.block(r, root + 0x54, 16, 131072)?;
             if mesh.positions.len() / 3 + vn > 500000 {
                 return invalid("Collision mesh exceeds 500000 vertices");
