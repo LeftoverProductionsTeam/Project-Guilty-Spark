@@ -4909,6 +4909,25 @@ test('recovered objective areas refuse stale source, duplicate names and unsuppo
  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-native-source-changed',{detail:{projectId:'a'}})));await expect(source).not.toContainText('1 native areas');
 });
 
+test('native control support copies only the reviewed ground coordinate to the placement draft',async({page})=>{
+ await mockRecoveredMissionAreas(page,true);
+ await mockNativePointReview(page);
+ await chooseTool(page,'AI & scenario');
+ const operations=page.locator('.native-tag-operations');
+ await operations.locator(':scope > summary').click();
+ const form=operations.locator('.native-device-placements');
+ await form.locator(':scope > summary').click();
+ await form.getByText('Ground support for control',{exact:true}).click();
+ await form.getByRole('checkbox',{name:'Find ground below points'}).check();
+ await form.getByRole('button',{name:'Check control ground',exact:true}).click();
+ await expect(form.getByRole('list',{name:'Native BSP point results'})).toContainText('No collision surface within ±0.5');
+ await form.getByRole('button',{name:'Use ground for control origin · BSP 0 · Z 0',exact:true}).click();
+ await expect(form.getByRole('spinbutton',{name:'Device position Z',exact:true})).toHaveValue('0');
+ await expect(form.getByRole('spinbutton',{name:'Device position X',exact:true})).toHaveValue('1');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.nativeDevices[0].position)).toEqual([1,2,3]);
+ await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeEnabled();
+});
+
 test('recovered mission terminals move the actual model through native source review without modifying the cache scene',async({page})=>{
  await mockRecoveredMissionAreas(page,true);const row=page.locator('.studio-mission-record').first();await row.getByRole('combobox',{name:'Mission trigger 1',exact:true}).selectOption('deviceActivated');const controls=page.locator('.studio-native-areas');if(await controls.getAttribute('open')===null)await controls.locator(':scope > summary').click();await controls.getByRole('button',{name:'Read native controls',exact:true}).click();await row.getByRole('combobox',{name:'Mission terminal 1',exact:true}).selectOption('terminal');await page.keyboard.press('Control+s');await row.getByRole('button',{name:'Select objective terminal in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame native device',exact:true})).toBeEnabled();await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();await expect(page.locator('.viewport-object-actions:visible')).toHaveCount(1);for(const width of [800,1280]){await page.setViewportSize({width,height:800});const bar=page.locator('.native-device-actions');expect(await bar.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);await expect(bar.getByRole('button',{name:'Object tags',exact:true})).toBeVisible();await expect(bar.getByRole('button',{name:'Transform',exact:true})).toBeVisible();}
  const canvas=page.locator('canvas[data-gs-gizmo]');await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(s=>s?JSON.parse(s).mode:null)).toBe('translate');const h=await canvas.evaluate(e=>{const r=e.getBoundingClientRect(),g=JSON.parse((e as HTMLElement).dataset.gsGizmo!);return{x:r.x+(g.handles.X[0]+1)*r.width/2,y:r.y+(1-g.handles.X[1])*r.height/2,dx:(g.handles.X[0]-g.origin[0])*r.width/2,dy:-(g.handles.X[1]-g.origin[1])*r.height/2};});const n=Math.hypot(h.dx,h.dy);expect(n).toBeGreaterThan(1);await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+h.dx/n*40,h.y+h.dy/n*40,{steps:10});await page.mouse.up();

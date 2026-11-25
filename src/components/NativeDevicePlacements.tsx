@@ -1,3 +1,4 @@
+import NativeBspPointCheck from './NativeBspPointCheck';
 import {useEffect,useRef,useState} from 'react';
 import {useMapState,writeMapSession} from '../mapSession';
 import {NATIVE_DEVICE_VIEW,deviceMatches,deviceDraft,devicePose,deviceObjectId} from '../nativeDevicePlacement';
@@ -57,6 +58,16 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
   <p className="subtle">{wiringLocked?'Extraction owns this device’s startup state.':'Each option applies when its Power or Position group is Unbound. A linked group supplies its initial value.'}</p>
  </fieldset>}
  {!pose&&<Notice>Use finite XYZ within ±1,000,000 and angles within ±360°.</Notice>}
+ {original.class==='ctrl'&&<details>
+  <summary>Ground support for control</summary>
+  <NativeBspPointCheck context={context}
+   selectionKey={original.class+':'+original.index}
+   subject="Control origin"
+   points={pose?[pose.position]:[]}
+   disabled={!!blocked||!pose}
+   label="Check control ground"
+   onGround={(_,position)=>update({position:position.map(String) as [string,string,string]})}/>
+ </details>}
  <div className="button-row"><button disabled={!!blocked||!pose||!onLevelEditor} onClick={()=>{writeMapSession(context.projectId,'world.ai-start',null);writeMapSession(context.projectId,'world.cutscene-camera',null);writeMapSession(context.projectId,'world.trigger-volume',null);writeMapSession(context.projectId,'world.selection',deviceObjectId(original));update({active:true,focus:Date.now()});onLevelEditor?.();}}>{vehicle?'Show vehicle in Level Editor':'Show device in Level Editor'}</button><button disabled={!!blocked||!pose||!changed} onClick={()=>pose&&onPreview({kind:'devicePlacement',device:pose,sourceSha256:context.tagSha256!})}>{vehicle?'Preview vehicle placement':'Preview device placement'}</button><button disabled={busy||!owns} onClick={()=>{setView(null);onDraftChange();}}>Reset placement draft</button></div>
  {!onLevelEditor&&<p className="subtle">Viewport manipulation needs an opened compiled native map. Generated source placements use Logic / Events in the BSP Workshop.</p>}</>}
  </details>;

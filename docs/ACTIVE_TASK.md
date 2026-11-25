@@ -3,8 +3,8 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: The retained playable handoff remains fourteen-region MCC13 71fc164876cafcece4de49c2b0563c79c6f772abfff308c7dc61d5a411b79e2b. Conditioning only the connector rendering cleared the native radiosity failure. The lit 15-region MCC13 probe 187b40d9d38b8317ef26fb93459369c4f0d2ac685c7df7941bc8a9326387edeb independently decoded one 512×64 connector page and all eight native switches. Original hashes held.
-Next action: Bind intact Death Island to the normal BSP Assembly native build and reuse the regional placement staging for the donor. Preserve the translated original lightmaps and scenario environments. Verify starts, pickups, teleporters and scenery ownership, then test in-game lighting and two-way traversal without replacing the playable fourteen-region cache. Continue Boarding Action, Gephyrophobia, Ice Fields and Infinity.
+Latest verified revision: Fourteen-region MCC13 71fc1648 remains playable. Death Island compiled five BSPs and 4,728 tags (18.11 of 64 MiB), but independent validation refused donor pickup 16 at the connector landing. Scratch retired. Earlier lit probe and exact hashes remain in MEGAWORLD_SEAM_ROUTES_20261108.
+Next action: Reproduce Black Echo normal-menu admission, physical terminal Use and both aircraft on the exact installed d113e9db map with Forerunner, then resume the Death Island overlap. Existing 14-region handoff stays in place. See RUNTIME_INTEGRATION_20261107. Include offline gameplay in every ten-commit delivery, with private LAN and optional Delta tracked independently.
 
 Operation 110% V2 immediate priorities, 24 November 2026. MegaWorld comes first, then original Zombie Apocalypse, repeatable Black Echo and persistent Extraction, and Forge last. Use native multi-BSP scenarios where needed. Preserve CE609 and MCC13, region identity, and per-target budgets. Forerunner owns simultaneous occupancy and synchronized gameplay. Preserve all 475 records and M1–M6.
 
