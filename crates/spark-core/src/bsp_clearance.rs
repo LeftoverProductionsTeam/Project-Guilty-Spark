@@ -251,6 +251,24 @@ fn closest(p: V, t: Tri) -> V {
     }
     add(a, add(mul(ab, vb / denominator), mul(ac, vc / denominator)))
 }
+fn clip_connector_face(polygon: &mut Vec<V>, result: &mut Vec<V>, axis: usize, edge: f64, lower: bool) {
+    let Some(&last) = polygon.last() else { return; };
+    let inside = |point: V| if lower { point[axis] >= edge } else { point[axis] <= edge };
+    result.clear();
+    let mut previous = last;
+    for &point in polygon.iter() {
+        if inside(previous) != inside(point) {
+            let fraction = (edge - previous[axis]) / (point[axis] - previous[axis]);
+            result.push(add(previous, mul(sub(point, previous), fraction)));
+        }
+        if inside(point) {
+            result.push(point);
+        }
+        previous = point;
+    }
+    std::mem::swap(polygon, result);
+}
+
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
     pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh, &mesh.indices)? }) }
@@ -261,6 +279,62 @@ impl RouteChecker {
             .and_then(|end| mesh.indices.get(part.index_start..end))
             .ok_or_else(|| SparkError::Invalid("Compiled partition exceeds its collision index bounds".into()))?;
         Ok(Self { index: Index::new(mesh, indices)? })
+    }
+    /// Check the passage interior between the shared landing spans. A grade
+    /// keeps floor and ceiling parallel in the connector's local frame.
+    pub(crate) fn connector_intrusion(&self, floor: &[V], width: f64, height: f64, shift: V) -> Option<V> {
+        const CONTACT: f64 = 0.002;
+        let half = width / 2.;
+        let mut candidates = Vec::new();
+        let mut polygon = Vec::with_capacity(9);
+        let mut clipped = Vec::with_capacity(9);
+        for pair in floor.windows(2) {
+            let start = sub(pair[0], shift);
+            let end = sub(pair[1], shift);
+            let delta = sub(end, start);
+            let run = delta[0].hypot(delta[1]);
+            if run <= 2. * CONTACT {
+                continue;
+            }
+            let forward = [delta[0] / run, delta[1] / run, 0.];
+            let side = [-forward[1], forward[0], 0.];
+            let grade = delta[2] / run;
+            let low = [
+                start[0].min(end[0]) - side[0].abs() * half,
+                start[1].min(end[1]) - side[1].abs() * half,
+                start[2].min(end[2]),
+            ];
+            let high = [
+                start[0].max(end[0]) + side[0].abs() * half,
+                start[1].max(end[1]) + side[1].abs() * half,
+                start[2].max(end[2]) + height,
+            ];
+            candidates.clear();
+            self.index.root.query(low, high, &mut candidates);
+            for id in &candidates {
+                polygon.clear();
+                polygon.extend(self.index.triangles[*id].map(|point| {
+                    let rel = sub(point, start);
+                    let along = dot(rel, forward);
+                    [along, dot(rel, side), rel[2] - along * grade]
+                }));
+                let bounds = [
+                    [CONTACT, run - CONTACT],
+                    [-half + CONTACT, half - CONTACT],
+                    [CONTACT, height - CONTACT],
+                ];
+                for (axis, [low, high]) in bounds.into_iter().enumerate() {
+                    clip_connector_face(&mut polygon, &mut clipped, axis, low, true);
+                    clip_connector_face(&mut polygon, &mut clipped, axis, high, false);
+                }
+                if let Some(&[along, across, above]) = polygon.first() {
+                    let horizontal = add(mul(forward, along), mul(side, across));
+                    let offset = add(horizontal, [0., 0., above + along * grade]);
+                    return Some(add(pair[0], offset));
+                }
+            }
+        }
+        None
     }
     /// Independent triangle projection for native ground-bound waypoint review.
     /// The compiler remains authoritative for collision-surface/cluster binding.
@@ -435,6 +509,27 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graded_connector_checks_its_full_width_between_landings() {
+        let mesh = MeshData {
+            positions: vec![
+                2., 0.8, -1., 2., 0.8, 3., 2., 2., 3.,
+                4., -2., 2., 4., 2., 2., 5., 0., 2.5,
+            ],
+            indices: vec![0, 1, 2, 3, 4, 5],
+            ..Default::default()
+        };
+        let checker = RouteChecker::new(&mesh).unwrap();
+        let mouth = [[0., 0., 0.], [6., 0., 3.]];
+        let hit = checker.connector_intrusion(&mouth, 2., 1.6, [0.; 3]).unwrap();
+        assert!((hit[0] - 2.).abs() < 1e-6);
+        assert!(hit[1] > 0.79);
+        assert!(checker.connector_intrusion(&mouth, 1., 1.6, [0.; 3]).is_none());
+        assert!(checker.connector_intrusion(&[[3., 0., 1.5], mouth[1]], 2., 1.6, [0.; 3]).is_none());
+        let shifted = mouth.map(|point| add(point, [10., 0., 0.]));
+        assert!((checker.connector_intrusion(&shifted, 2., 1.6, [10., 0., 0.]).unwrap()[0] - 12.).abs() < 1e-6);
+    }
 
     #[test]
     fn native_flight_centerline_finds_nearest_bsp_crossing_in_either_direction() {

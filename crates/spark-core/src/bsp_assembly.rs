@@ -1860,6 +1860,28 @@ pub fn generate_preserved_connector(
 
     let height = f64::from(plan.tunnel_height);
     let width = f64::from(plan.tunnel_width);
+    if !plan.open_road {
+        let passage = &points[1..points.len() - 1];
+        for (name, mesh, slot, translation) in [
+            ("Retained", Some(&base_collision), plan.base_bsp_index, [0.; 3]),
+            ("Donor", Some(&donor_collision), 0, plan.translation),
+            ("Retained render", base.render_mesh.as_ref(), plan.base_bsp_index, [0.; 3]),
+            ("Donor render", donor.render_mesh.as_ref(), 0, plan.translation),
+        ] {
+            let Some(mesh) = mesh.filter(|mesh| {
+                mesh.parts.get(slot).is_some_and(|part| part.index_count > 0)
+            }) else {
+                continue;
+            };
+            let source = crate::bsp_clearance::RouteChecker::for_part(mesh, slot)?;
+            if let Some([x, y, z]) = source.connector_intrusion(passage, width, height, translation) {
+                return invalid(format!(
+                    "{name} BSP crosses the tunnel beyond its landing near ({x:.2}, {y:.2}, {z:.2}). \
+                     Move the entrance or cut a clear passage before preserving this BSP."
+                ));
+            }
+        }
+    }
     verify_intact_connector_vehicles(&points, forward, plan, &base_vehicles, &donor_vehicles)?;
     for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
         let position = add(pickup.position.map(f64::from), plan.translation);
