@@ -455,6 +455,43 @@ fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,
     Ok(mesh)
 }
 
+// Scenario blocks append scenery before dynamic placements. Keep that order when
+// everything fits. Above the existing limit, give each placed model category
+// a turn and prefer the models used by the most placements in that category.
+fn placed_preview_model_ids(objects: &[SceneObject]) -> Vec<u32> {
+    let mut placements = HashMap::new();
+    for (index, object) in objects.iter().enumerate() {
+        let category = match object.kind.as_str() {
+            "Scenery" => 0,
+            "Vehicle" => 1,
+            "Equipment" | "Weapon" | "Netgame item" => 2,
+            "Biped" => 3,
+            _ => continue,
+        };
+        if let Some(id) = object.tag_id {
+            let (_, _, count) = placements.entry(id).or_insert((index, category, 0usize));
+            *count += 1;
+        }
+    }
+    if placements.len() <= MAX_MODEL_TYPES {
+        let mut order: Vec<_> = placements.into_iter().collect();
+        order.sort_unstable_by_key(|(_, (index, _, _))| *index);
+        return order.into_iter().map(|(id, _)| id).collect();
+    }
+
+    let mut groups: [Vec<_>; 4] = Default::default();
+    for (id, (index, category, count)) in placements {
+        groups[category].push((id, index, count));
+    }
+    for group in &mut groups {
+        group.sort_unstable_by_key(|(_, index, count)| (std::cmp::Reverse(*count), *index));
+    }
+    let depth = groups.iter().map(Vec::len).max().unwrap_or(0);
+    (0..depth)
+        .flat_map(|row| groups.iter().filter_map(move |group| group.get(row).map(|entry| entry.0)))
+        .take(MAX_MODEL_TYPES + 1) // Retain the existing cap diagnostic.
+        .collect()
+}
 /// Returns successful unique static scenery/vehicle models keyed by the
 /// placement's object tag ID, and diagnostic detail for unsupported models.
 pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], objects: &[SceneObject]) -> (HashMap<u32,MeshData>,Vec<String>) {
@@ -475,7 +512,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
     if header.version!=5 && (raw_vertex_size>raw_model_size || raw_start.checked_add(raw_model_size).is_none_or(|end|end>bytes.len())) {
         return (models,vec!["Model vertex/index data is outside the bounded cache region".into()]);
     }
-    let requested=objects.iter().filter(|o|matches!(o.kind.as_str(),"Scenery"|"Vehicle"|"Equipment"|"Weapon"|"Biped"|"Netgame item")).filter_map(|o|o.tag_id)
+    let requested=placed_preview_model_ids(objects).into_iter()
         .chain(tags.iter().filter(|t|matches!(t.class.as_str(),"scen"|"vehi"|"weap"|"eqip"|"bipd"|"mach"|"ctrl")).map(|t|t.id));
     for object_id in requested {
         if !processed.insert(object_id) {continue;}
@@ -700,6 +737,38 @@ pub fn preview_owned_object_collision(path:&std::path::Path,expected:&str,inspec
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dense_preview_keeps_dynamic_placements_inside_the_shared_budget() {
+        let placement = |id, kind: &str| SceneObject {
+            id: format!("{kind}-{id}"),
+            name: kind.to_owned(),
+            kind: kind.to_owned(),
+            tag_id: Some(id),
+            position: [0.; 3],
+            rotation: [0.; 3],
+            scale: [1.; 3],
+            visible: true,
+            source_offset: None,
+            rotation_offset: None,
+            asset_id: None,
+            source_model: None,
+        };
+        let mut objects: Vec<_> = (0..128).map(|id| placement(id, "Scenery")).collect();
+        objects.extend([
+            placement(128, "Vehicle"),
+            placement(129, "Netgame item"),
+            placement(130, "Biped"),
+            placement(131, "Vehicle"),
+            placement(131, "Vehicle"),
+        ]);
+        assert_eq!(placed_preview_model_ids(&objects[..3]), [0, 1, 2]);
+        let ids = placed_preview_model_ids(&objects);
+        assert_eq!(ids.len(), MAX_MODEL_TYPES + 1);
+        assert_eq!(&ids[..6], &[0, 131, 129, 130, 1, 128]);
+        assert_eq!(ids.iter().copied().collect::<HashSet<_>>().len(), ids.len());
+    }
+
     #[test]
     fn region_rejects_before_or_after_and_accepts_exact_end() {
         let region=Region{begin:10,end:30,address:100};
