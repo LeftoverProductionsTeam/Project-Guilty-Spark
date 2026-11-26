@@ -5271,6 +5271,30 @@ test('AI scenario workspace keeps source tasks compact and drafts accessible acr
  await testInfo.attach('ai-scenario-layouts',{body:JSON.stringify(measurements,null,2),contentType:'application/json'});
 });
 
+test('a single campaign co-op start gives guidance until a duplicate is accepted', async ({page}) => {
+  await mockRecoveredMissionAreas(page, 'vehicle');
+  await page.evaluate(() => {
+    (window as any).__sparkMock.nativePlayerStarts = [{index:0, position:[40,-110,1.43], facingRadians:0}];
+  });
+  await chooseTool(page, 'AI & scenario');
+  const operations = page.locator('.native-tag-operations');
+  await operations.locator(':scope > summary').click();
+  const form = operations.locator('.native-player-starts');
+  await form.locator(':scope > summary').click();
+  const notice = form.getByText('Only one player start is authored.', {exact:false});
+  await expect(notice).toBeVisible();
+  const duplicate = form.getByRole('button', {name:'Preview duplicated player start', exact:true});
+  await expect(duplicate).toBeDisabled();
+  await form.getByRole('spinbutton', {name:'Player start X', exact:true}).fill('36.311');
+  await form.getByRole('spinbutton', {name:'Player start Z', exact:true}).fill('2.343');
+  await duplicate.click();
+  const preview = page.getByRole('region', {name:'Native edit preview', exact:true});
+  await expect(preview).toContainText('"copyFrom":0');
+  await preview.getByRole('button', {name:'Accept as new source revision', exact:true}).click();
+  await expect(notice).toHaveCount(0);
+  await expect(form.getByRole('option', {name:/Start 1 · 36.311/})).toHaveCount(1);
+});
+
 test('native player starts share viewport review, preserve other drafts and restore source',async({page})=>{
  await mockRecoveredMissionAreas(page,'vehicle');await page.evaluate(()=>{const m=(window as any).__sparkMock;m.nativePlayerStarts=[{index:0,position:[1,2,3],facingRadians:.25},{index:1,position:[7,8,9],facingRadians:0}];});await chooseTool(page,'AI & scenario');const operations=page.locator('.native-tag-operations');await operations.locator(':scope > summary').click();const vehicle=operations.locator('.native-device-placements');await vehicle.locator(':scope > summary').click();await vehicle.getByRole('spinbutton',{name:'Vehicle position X',exact:true}).fill('10');await vehicle.getByRole('button',{name:'Show vehicle in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame native vehicle',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Review vehicle source',exact:true}).click();const form=operations.locator('.native-player-starts');await form.locator(':scope > summary').click();await expect(form.getByRole('combobox',{name:'Native player starting location',exact:true})).toHaveValue('0');await form.getByRole('spinbutton',{name:'Player start X',exact:true}).fill('4');await form.getByRole('spinbutton',{name:'Player start facing degrees',exact:true}).fill('90');await expect(form.getByRole('combobox',{name:'AI start command list',exact:true})).toHaveCount(0);await form.getByRole('button',{name:'Show handles in Level Editor',exact:true}).click();await expect(page.getByRole('button',{name:'Frame player start',exact:true})).toBeVisible();await expect(page.locator('.native-device-actions:visible')).toHaveCount(0);await expect(page.getByRole('button',{name:'Scale (R)',exact:true})).toBeDisabled();await page.getByRole('button',{name:'Review player start source',exact:true}).click();await expect(form.getByRole('spinbutton',{name:'Player start X',exact:true})).toBeFocused();await expect(vehicle.getByRole('spinbutton',{name:'Vehicle position X',exact:true})).toHaveValue('10');await form.getByRole('button',{name:'Preview player starting pose',exact:true}).click();const preview=page.getByRole('region',{name:'Native edit preview',exact:true});await expect(preview).toContainText('Synthetic player source review');await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeAreaSha)).toBe('b'.repeat(64));await preview.getByRole('button',{name:'Restore before-edit tag',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.nativeAreaSha)).toBe('a'.repeat(64));await preview.getByRole('button',{name:'Accept as new source revision',exact:true}).click();await page.keyboard.press('Control+s');expect(await page.evaluate(()=>(window as any).__sparkMock.nativePlayerStarts)).toEqual([{index:0,position:[4,2,3],facingRadians:Math.PI/2},{index:1,position:[7,8,9],facingRadians:0}]);
  const starts=form.getByRole('combobox',{name:'Native player starting location',exact:true});
