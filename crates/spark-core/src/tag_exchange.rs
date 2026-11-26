@@ -284,7 +284,8 @@ pub fn extract_selected_tag(
             // Do not retain a second complete map tag library for one actor.
             for file in all.iter().filter(|file|!wanted.contains(&file.path)) {let path=tags.join(safe_relative(&file.path)?);reject_links(&path)?;fs::remove_file(path)?;}
         }
-        let (files,total_bytes)=inventory_with_limit(&tags, extraction_file_limit(source.cache_version, &query))?;
+        let (files,total_bytes) = inventory_with_limit(&tags, extraction_file_limit(source.cache_version, &query))
+            .map_err(|error| SparkError::Invalid(format!("Could not verify Invader output: {error}")))?;
         if files.is_empty() || !files.iter().any(|f|f.path.eq_ignore_ascii_case(&expected.to_string_lossy().replace('\\',"/"))) {
             return invalid("Invader finished without producing the selected requested .tag file");
         }
@@ -314,7 +315,8 @@ pub fn extract_selected_tag(
         }
         project::atomic_write(&staging.join("extraction-receipt.json"), &receipt_json, false)?;
         project::atomic_write(&staging.join("extraction-inputs.json"),&serde_json::to_vec_pretty(&inputs)?,false)?;
-        lease.adopt(&final_dir)?;
+        lease.adopt(&final_dir)
+            .map_err(|error| SparkError::Invalid(format!("Could not retain verified native tags: {error}")))?;
         Ok(receipt)
     })();
     if result.is_err()&&prepared_legacy.is_some(){

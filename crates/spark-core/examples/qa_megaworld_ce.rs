@@ -59,8 +59,47 @@ fn reviewed_plan(path: &Path, base: &mut Project) -> Result<(BspAssembly, Vec<Bs
     }
 }
 
+fn retained_mode_receipt(directory: &Path, expected_sha256: &str) -> Result<()> {
+    spark_core::reject_links(directory)?;
+    let project_path = directory.join("compiled.gsproject");
+    let acceptance = directory.join("acceptance.json");
+    let map = directory.join("timberland.map");
+    for input in [&project_path, &acceptance, &map] {
+        spark_core::reject_links(input)?;
+    }
+    let receipt: serde_json::Value = serde_json::from_slice(&fs::read(acceptance)?)?;
+    let build: project::BuildRecord = serde_json::from_value(receipt["build"].clone())?;
+    let project = project::load_project(&project_path)?;
+    if build.status != "validated" || build.target != "mcc-cea"
+        || build.sha256.as_deref() != Some(expected_sha256)
+        || project.fingerprint()? != build.project_fingerprint
+    {
+        return spark_core::invalid("Retained map, project and native validation receipt do not match");
+    }
+    let export = spark_core::build::MapExport {
+        project_id: project.id.clone(),
+        build_id: build.id,
+        project_fingerprint: build.project_fingerprint,
+        sha256: expected_sha256.to_owned(),
+        bytes: fs::metadata(&map)?.len(),
+        output: map,
+        cache_version: 13,
+        runtime_id: RuntimeId::MccSteam,
+        reused: true,
+    };
+    let (path, mode) = spark_core::build::write_map_export_mode(&export, &project)?;
+    println!("{}", serde_json::json!({"modeReceipt": path, "mode": mode, "cacheSha256": expected_sha256}));
+    Ok(())
+}
+
 fn main()->Result<()>{
     let mut a=std::env::args().skip(1).collect::<Vec<_>>();
+    if a.first().is_some_and(|arg| arg == "--retained-mode-receipt") {
+        if a.len() != 3 {
+            return spark_core::invalid("qa_megaworld_ce --retained-mode-receipt <checkpoint-directory> <map sha256>");
+        }
+        return retained_mode_receipt(Path::new(&a[1]), &a[2]);
+    }
     let mcc = a.first().is_some_and(|arg| arg == "--mcc13");
     if mcc { a.remove(0); }
     let reviewed_runtime = if a.first().is_some_and(|arg| arg == "--reviewed-forerunner") {
