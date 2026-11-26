@@ -10,6 +10,7 @@ pub struct ScenarioLogicDevice {
     #[serde(skip_serializing_if="Option::is_none")] pub power_group:Option<i16>,
     #[serde(skip_serializing_if="Option::is_none")] pub position_group:Option<i16>,
     #[serde(skip_serializing_if="Option::is_none")] pub usable_from_both_sides:Option<bool>,
+    #[serde(skip_serializing_if="Option::is_none")] pub custom_control_name:Option<i16>,
     #[serde(skip_serializing_if="Option::is_none")] pub interaction_disabled:Option<bool>,
     #[serde(skip_serializing_if="Option::is_none")] pub manual_activation:Option<bool>,
     #[serde(skip_serializing_if="Option::is_none")] pub initially_off:Option<bool>,
@@ -728,7 +729,8 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
             let interaction_disabled = device_flags.filter(|_| class == "ctrl").map(|flags| flags & (1 << 4) != 0);
             let initially_off = device_flags.map(|flags| flags & (1 << 1) != 0);
             let initially_open = device_flags.map(|flags| flags & 1 != 0);
-            let placement=ScenarioLogicDevice{interaction_disabled,manual_activation,initially_off,initially_open,power_group:if class=="vehi"{None}else{Some(r.u16(placement_at+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(placement_at+42)? as i16)},usable_from_both_sides,class:class.into(),index,name_index:r.u16(placement_at+2)? as i16,
+            let custom_control_name = if class == "ctrl" { Some(r.u16(placement_at + 52)? as i16) } else { None };
+            let placement=ScenarioLogicDevice{custom_control_name,interaction_disabled,manual_activation,initially_off,initially_open,power_group:if class=="vehi"{None}else{Some(r.u16(placement_at+40)? as i16)},position_group:if class=="vehi"{None}else{Some(r.u16(placement_at+42)? as i16)},usable_from_both_sides,class:class.into(),index,name_index:r.u16(placement_at+2)? as i16,
                 tag_path:targets[0].path.clone(),position:object.position,rotation_radians:object.rotation};
             if class=="vehi"{vehicles.push(placement);}else{devices.push(placement);}
         }

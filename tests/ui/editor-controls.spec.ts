@@ -152,6 +152,23 @@ test('existing native device poses retain bindings and refuse dirty invalid or s
  await yaw.fill('361');await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeDisabled();await yaw.fill('90');await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await expect(x).toBeDisabled();await page.getByRole('button',{name:'Toggle project dirty',exact:true}).click();await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();await expect(x).toHaveValue('1');await expect(yaw).toHaveValue('0');await expect(form.getByRole('button',{name:'Preview device placement',exact:true})).toBeDisabled();
 });
 
+test('a native control can choose a placement-specific Unicode name',async({page})=>{
+ await page.goto('/tests/ui/fixtures/editorControls.html?native-device');
+ const form=page.locator('.native-device-placements');
+ await form.locator(':scope > summary').click();
+ const name=form.getByRole('combobox',{name:'In-game control name',exact:true});
+ await expect(name).toHaveValue('0');
+ await name.selectOption({label:'2 · Évacuation'});
+ await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
+ const operation=JSON.parse((await page.getByTestId('device-operation').textContent())!);
+ expect(operation.device).toMatchObject({index:0,name:'terminal',customControlName:2,tagPath:'devices/terminal',position:[1,2,3]});
+ await form.getByRole('combobox',{name:'Native source placement',exact:true}).selectOption('ctrl:1');
+ await expect(name).toHaveValue('1');
+ await name.selectOption('0');
+ await page.getByRole('button',{name:'Refresh source revision',exact:true}).click();
+ await expect(name).toHaveValue('1');
+});
+
 test('native control sides change only the reviewed placement and reset on source change', async ({page}) => {
  await page.goto('/tests/ui/fixtures/editorControls.html?native-device');
  const form=page.locator('.native-device-placements');

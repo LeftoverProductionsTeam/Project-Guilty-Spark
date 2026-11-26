@@ -982,6 +982,39 @@ pub fn read_hud_source_tag(path:&Path)->Result<HudSourceTag> {
     Ok(HudSourceTag{sha256:crate::hex_bytes(Sha256::digest(&bytes)),messages})
 }
 
+/// Read standard loose HEK Unicode strings in native index order.
+pub fn read_unicode_string_source_tag(path: &Path) -> Result<Vec<String>> {
+    const MAX: usize = 2 * 1024 * 1024;
+    crate::reject_links(path)?;
+    let mut bytes = Vec::new();
+    File::open(path)?.take(MAX as u64 + 1).read_to_end(&mut bytes)?;
+    let r = Reader(&bytes);
+    let be32 = |offset| -> Result<usize> {
+        Ok(u32::from_be_bytes(r.bytes(offset, 4)?.try_into().unwrap()) as usize)
+    };
+    if bytes.len() > MAX || r.bytes(36, 4)? != b"ustr" || r.bytes(60, 4)? != b"blam"
+        || be32(44)? != 64 || r.bytes(56, 2)? != [0, 1] {
+        return invalid("Expected a bounded version 1 HEK unicode_string_list tag");
+    }
+    let count = be32(64)?;
+    if count > i16::MAX as usize { return invalid("Native object-name list exceeds the control index range"); }
+    let mut data = 76 + count * 20;
+    r.bytes(0, data)?;
+    let mut strings = Vec::with_capacity(count);
+    for index in 0..count {
+        let size = be32(76 + index * 20)?;
+        if size < 2 || size % 2 != 0 { return invalid("Native Unicode string has an invalid size"); }
+        let units: Vec<_> = r.bytes(data, size)?.chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect();
+        let text = units.strip_suffix(&[0]).ok_or_else(|| crate::SparkError::Invalid("Native Unicode string is missing its terminator".into()))?;
+        if text.contains(&0) { return invalid("Native Unicode string contains an embedded terminator"); }
+        strings.push(String::from_utf16(text).map_err(|_| crate::SparkError::Invalid("Native Unicode string contains invalid UTF-16".into()))?);
+        data += size;
+    }
+    if data != bytes.len() { return invalid("Native object-name list contains unrecognized trailing data"); }
+    Ok(strings)
+}
+
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
     let (header, bytes, sha256) = read_cache_snapshot_shared(path)?;
     inspect_snapshot(path,resource_directory,header,&bytes,sha256,true)

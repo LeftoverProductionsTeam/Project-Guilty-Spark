@@ -11,6 +11,8 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  useEffect(()=>{if(view&&!deviceMatches(view,context))setView(null);},[context]);useEffect(()=>{onDraftChange();},[JSON.stringify(view)]);useEffect(()=>{if(owns&&view.reviewRequest&&review.current!==view.reviewRequest){review.current=view.reviewRequest;if(details.current){details.current.open=true;details.current.querySelector<HTMLInputElement>(`[aria-label="${label} position X"]`)?.focus();}}},[context,view?.reviewRequest]);
  const interactionDisabled=draft?.interactionDisabled??original?.interactionDisabled;
  const bothSides=draft?.usableFromBothSides??original?.usableFromBothSides;
+ const nativeName=draft?.customControlName??original?.customControlName;
+ const controlNames=context.scenarioControlNames??[];
  const groups=context.scenarioDeviceGroups;
  const [groupIndex,setGroupIndex]=useState(-1);
  const upright=!!pose&&pose.rotationRadians.slice(1).every(angle=>Math.abs(angle)<1e-4);
@@ -39,6 +41,14 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  {original.interactionDisabled!==undefined&&<label className="checkbox-label"><input type="checkbox" checked={interactionDisabled} onChange={e=>update({interactionDisabled:e.target.checked})}/>Disable player interaction</label>}
  {original.usableFromBothSides!==undefined&&<label className="checkbox-label"><input type="checkbox" checked={bothSides} disabled={interactionDisabled} onChange={e=>update({usableFromBothSides:e.target.checked})}/>Allow use from both sides</label>}
  <p className="subtle">{interactionDisabled?'This placement blocks Use from every side.':bothSides===false?'For a model with a front marker, approach from the side the marker faces and aim back toward the control. The placement rotation turns the marker with the model. The control still needs power and the player must be in range.':'Players must be in range, aim at the control and meet its power and device requirements.'}</p>
+ {nativeName!==undefined&&<label className="studio-wide">In-game control name
+   <select aria-label="In-game control name" value={nativeName} onChange={event=>update({customControlName:Number(event.target.value)})}>
+    <option value={0}>Default prompt</option>
+    {nativeName!==0&&!controlNames[nativeName-1]?.trim()&&<option value={nativeName} disabled>Unavailable native name · {nativeName}</option>}
+    {controlNames.map((name,index)=>name.trim()?<option key={index} value={index+1}>{index+1} · {name}</option>:null)}
+   </select>
+   <small>{context.scenarioControlNameIssue??(controlNames.length?'Uses the scenario’s Unicode object-name list. This changes only the selected control.':'This scenario has no readable Unicode object names to select.')}</small>
+  </label>}
  </fieldset>}
  {original.manualActivation!==undefined&&<fieldset disabled={!!blocked||wiringLocked}>
   <legend>Machine activation</legend>

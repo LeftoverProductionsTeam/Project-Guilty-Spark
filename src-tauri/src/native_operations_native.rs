@@ -257,6 +257,8 @@ pub(super) struct Context {
     mission_source:Option<recipes::NativeMissionSource>,mission_source_issue:Option<String>,
     scenario_devices:Vec<recipes::NativeDevicePlacement>,
     scenario_device_groups:Option<Vec<recipes::NativeDeviceGroupChoice>>,
+    scenario_control_names:Option<Vec<String>>,
+    scenario_control_name_issue:Option<String>,
     device_edit_issue:Option<String>,
     scenario_volumes:Vec<maps::ScenarioLogicVolume>,
     trigger_edit_issue:Option<String>,
@@ -899,6 +901,12 @@ pub(super) async fn native_tag_context(
         let(mission_source,mission_source_issue)=if source.class=="scnr"{match recipes::native_mission_source(&values){Ok(value)=>(Some(value),None),Err(issue)=>(None,Some(error(issue)))}}else{(None,None)};
         let(scenario_player_starts,player_start_edit_issue)=if source.class=="scnr"{match recipes::scenario_player_start_choices(&values){Ok(rows)=>(rows,if source.project.quick_forge.is_some(){Some("Use the BSP Workshop for recipe-owned player spawns".into())}else{studio_native_source::require_unshared(&state,&source.project.id).err()}),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let scenario_device_groups=if source.class=="scnr"{recipes::scenario_device_group_choices(&values).ok()}else{None};
+        let (scenario_control_names, scenario_control_name_issue) = if source.class == "scnr" {
+            match recipes::scenario_custom_control_names(&values, &source.tags) {
+                Ok(rows) => (Some(rows), None),
+                Err(issue) => (None, Some(error(issue))),
+            }
+        } else { (None, None) };
         let(scenario_devices,device_edit_issue)=if source.class=="scnr"{match recipes::scenario_device_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_volumes,trigger_edit_issue)=if source.class=="scnr"{match recipes::scenario_volume_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
         let(scenario_flags,flag_edit_issue)=if source.class=="scnr"{match recipes::scenario_flag_choices(&values){Ok(rows)=>(rows,studio_native_source::require_unshared(&state,&source.project.id).err()),Err(issue)=>(vec![],Some(error(issue)))}}else{(vec![],None)};
@@ -963,7 +971,7 @@ pub(super) async fn native_tag_context(
         }else{(None,None)};
         let player_start_limit=recipes::native_player_start_limit(player_start_cache_version(&source.build)?);
         Ok(Context {
-            player_start_limit,guidance_objects,guidance_object_issue,mission_source,mission_source_issue,vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,scenario_player_starts,player_start_edit_issue,command_source,command_source_issue,protected_command_lists,scenario_devices,scenario_device_groups,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_flags,flag_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
+            player_start_limit,guidance_objects,guidance_object_issue,mission_source,mission_source_issue,vehicle_seats,vehicle_seat_issue,firefight_plan,firefight_plan_issue,hud_arrays,can_duplicate_hud,hud_structure_issue,scenario_squads,squad_edit_issue,protected_squad_encounters,scenario_start_squads,scenario_player_starts,player_start_edit_issue,command_source,command_source_issue,protected_command_lists,scenario_devices,scenario_device_groups,scenario_control_names,scenario_control_name_issue,device_edit_issue,scenario_volumes,trigger_edit_issue,scenario_flags,flag_edit_issue,scenario_cameras,camera_edit_issue,scenario_command_lists,command_list_issue,start_edit_issue,scenario_combat,combat_edit_issue,
             source_target: source.build.target.clone(),
             project_id,
             build_id: source.build.id,

@@ -798,6 +798,15 @@ impl Operation {
                 if before.is_none() { return invalid(format!("Native setting {field} is unavailable")); }
                 args.extend(["-S".into(), format!("{prefix}.{field}"), u8::from(value).to_string()]);
             }
+            if let Some(value) = device.custom_control_name.filter(|value| Some(*value) != original.custom_control_name) {
+                if original.custom_control_name.is_none() || value < 0 {
+                    return invalid("Choose the default prompt or a native object-name entry");
+                }
+                if value > 0 && !scenario_custom_control_names(before, tags)?.get(value as usize - 1).is_some_and(|name| !name.trim().is_empty()) {
+                    return invalid("The selected control name is missing or empty in the scenario's Unicode list");
+                }
+                args.extend(["-S".into(), format!("{prefix}.custom_control_name"), value.to_string()]);
+            }
             for (field, value) in changed_device_wiring(before, original, device)? {
                 args.extend(["-S".into(), format!("{prefix}.{field}"), value.to_string()]);
             }
@@ -2597,6 +2606,8 @@ pub struct NativeDevicePlacement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usable_from_both_sides: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_control_name: Option<i16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interaction_disabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manual_activation: Option<bool>,
@@ -2611,7 +2622,7 @@ pub struct NativeDevicePlacement {
 }
 impl NativeDevicePlacement {
     fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles","weap"=>"weapons",_=>"machines"}}
-    fn valid(&self)->bool{["ctrl","mach","vehi","weap"].contains(&self.class.as_str()) && (self.class!="weap" || self.name_index>=0 && !self.name.is_empty())&&(self.class=="ctrl"||(self.usable_from_both_sides.is_none()&&self.interaction_disabled.is_none()))
+    fn valid(&self)->bool{["ctrl","mach","vehi","weap"].contains(&self.class.as_str()) && (self.class!="weap" || self.name_index>=0 && !self.name.is_empty())&&(self.class=="ctrl"||(self.usable_from_both_sides.is_none()&&self.interaction_disabled.is_none()&&self.custom_control_name.is_none()))
         && (self.class == "mach" || self.manual_activation.is_none())
         && (!matches!(self.class.as_str(),"vehi"|"weap") || self.initially_off.is_none() && self.initially_open.is_none())
         && [self.power_group, self.position_group].into_iter().flatten().all(|group| matches!(self.class.as_str(),"ctrl"|"mach") && (-1..128).contains(&group))&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
@@ -2774,6 +2785,17 @@ fn changed_device_wiring(fields: &str, original: &NativeDevicePlacement, desired
     }).collect()
 }
 
+fn optional_int16_field(root: &str, key: &str, first_line: usize) -> Result<(Option<i16>, Option<usize>)> {
+    let prefix = format!("{key} (");
+    let mut fields = root.lines().enumerate().filter(|(_, line)| line.starts_with(&prefix));
+    let Some((line, value)) = fields.next() else { return Ok((None, None)); };
+    if fields.next().is_some() { return invalid(format!("Native {key} field is ambiguous")); }
+    let value: i16 = value.strip_prefix(&prefix).and_then(|s| s.split_once(')'))
+        .filter(|(_, ty)| ty.trim() == "int16").and_then(|(value, _)| value.parse().ok())
+        .ok_or_else(|| crate::SparkError::Invalid(format!("Native {key} field is malformed")))?;
+    Ok((Some(value), Some(first_line + line)))
+}
+
 fn device_group_field(root: &str, key: &str, first_line: usize) -> Result<(Option<i16>, Option<usize>)> {
     let line = root.lines().position(|line| line.starts_with(&format!("{key} (")));
     let Some(line) = line else { return Ok((None, None)); };
@@ -2795,8 +2817,17 @@ fn device_flag(root: &str, key: &str, first_line: usize) -> Result<(Option<bool>
     Ok((Some(value), Some(first_line + line)))
 }
 
+pub fn scenario_custom_control_names(fields: &str, tags: &Path) -> Result<Vec<String>> {
+    let Some(relative) = native_dependency_path(fields, "custom_object_names", "unicode_string_list")? else {
+        return Ok(Vec::new());
+    };
+    let tag = format!("{relative}.unicode_string_list");
+    let path = tags.join(crate::safe_relative(&tag.replace('\\', "/"))?);
+    crate::maps::read_unicode_string_source_tag(&path)
+}
+
 pub fn scenario_device_choices(fields:&str)->Result<Vec<NativeDevicePlacement>>{Ok(native_device_fields(fields)?.into_iter().map(|row|row.0).collect())}
-fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;9])>>{
+fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;10])>>{
     let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
     let mut result=vec![];
     for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle"),("weapons","weapon_palette","weap","weapon")]{
@@ -2835,9 +2866,12 @@ fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<
             } else {
                 (device_flag(&root, "initially_off", line + 1)?, device_flag(&root, "initially_open", line + 1)?)
             };
-            let row = NativeDevicePlacement { class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides, interaction_disabled, manual_activation, initially_off, initially_open, power_group, position_group };
+            let (custom_control_name, custom_name_line) = if class == "ctrl" {
+                optional_int16_field(&root, "custom_control_name", line + 1)?
+            } else { (None, None) };
+            let row = NativeDevicePlacement { custom_control_name, class:class.into(), index:index as u16, name_index, name, tag_path:tag.replace('\\', "/"), position, rotation_radians:rotation.map(f32::to_radians), usable_from_both_sides, interaction_disabled, manual_activation, initially_off, initially_open, power_group, position_group };
             if !row.valid() { return invalid("Native device identity/pose is invalid"); }
-            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line, power_line, position_line, interaction_line, activation_line, power_flag_line, position_flag_line]));
+            result.push((row, [Some(line + 1 + p), Some(line + 1 + r), side_line, power_line, position_line, interaction_line, activation_line, power_flag_line, position_flag_line, custom_name_line]));
             line += item.len();
         }
     }Ok(result)
@@ -2853,6 +2887,7 @@ fn reviewed_device(before:&str,after:&str,desired:&NativeDevicePlacement)->Resul
     changed_device_wiring(before, original, desired)?;
     if !original.same_identity(desired) || !revised.same_identity(desired)
         || !positions_close(revised.position, desired.position) || !revised.same_rotation(desired)
+        || revised.custom_control_name != desired.custom_control_name.or(original.custom_control_name)
         || revised.usable_from_both_sides != desired.usable_from_both_sides.or(original.usable_from_both_sides)
         || revised.interaction_disabled != desired.interaction_disabled.or(original.interaction_disabled)
         || revised.manual_activation != desired.manual_activation.or(original.manual_activation)
@@ -2884,7 +2919,7 @@ fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate:
     let rows=actual.devices.iter().chain(actual.vehicles.iter().filter(|_|vehicles)).collect::<Vec<_>>();
     let devices=expected.iter().filter(|row|row.class!="weap");
     if rows.len()!=devices.clone().count(){return invalid("Compiled native placement inventory differs from source");}
-    for(a,b)in devices.zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.interaction_disabled.is_some_and(|disabled|Some(disabled)!=b.interaction_disabled)||a.manual_activation.is_some_and(|value|Some(value)!=b.manual_activation)||a.initially_off.is_some_and(|value|Some(value)!=b.initially_off)||a.initially_open.is_some_and(|value|Some(value)!=b.initially_open)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, activation or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    for(a,b)in devices.zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.custom_control_name.is_some_and(|name|Some(name)!=b.custom_control_name)||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.interaction_disabled.is_some_and(|disabled|Some(disabled)!=b.interaction_disabled)||a.manual_activation.is_some_and(|value|Some(value)!=b.manual_activation)||a.initially_off.is_some_and(|value|Some(value)!=b.initially_off)||a.initially_open.is_some_and(|value|Some(value)!=b.initially_open)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, activation or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
     let mut weapons=expected.iter().filter(|row|row.class=="weap").peekable();
     if weapons.peek().is_some(){
         let (names, actual)=crate::maps::scenario_weapon_readback(path,map)?;
@@ -2938,6 +2973,56 @@ mod device_placement_tests {
   let mut invalid=desired.clone();invalid.class="weap".into();assert!(!invalid.valid());invalid=desired.clone();invalid.position[0]=f32::NAN;assert!(!invalid.valid());invalid=desired.clone();invalid.name_index=-1;assert!(!invalid.valid());
   let snapshot=ScenarioSquadReadback{machine_settings:Default::default(),named_objects:None,cutscene_flags:None,extraction_squads:None,faction_kits:None,transports:None,command_lists:None,devices:Some(vec![desired]),device_groups:None,volumes:None,cameras:None,source_sha256:"a".repeat(64),squads:vec![],include_starts:false,combat:vec![]};snapshot.validate().unwrap();let mut bad=snapshot.clone();bad.devices.as_mut().unwrap().push(original);assert!(bad.validate().is_err());
  }
+
+    #[test]
+    fn device_control_name_selects_existing_unicode_entry_and_preserves_other_fields() {
+        let tags = tempfile::tempdir().unwrap();
+        let mut bytes = vec![0; 96];
+        bytes[36..40].copy_from_slice(b"ustr");
+        bytes[44..48].copy_from_slice(&64u32.to_be_bytes());
+        bytes[56..58].copy_from_slice(&1u16.to_be_bytes());
+        bytes[60..64].copy_from_slice(b"blam");
+        bytes[64..68].copy_from_slice(&1u32.to_be_bytes());
+        let units: Vec<_> = "Évacuation".encode_utf16().chain([0]).collect();
+        bytes[76..80].copy_from_slice(&(units.len() as u32 * 2).to_be_bytes());
+        bytes.extend(units.into_iter().flat_map(u16::to_le_bytes));
+        let path = tags.path().join("names.unicode_string_list");
+        std::fs::write(&path, &bytes).unwrap();
+
+        let original = fields().replace("scripts[0]", "        custom_control_name (0) int16
+scripts[0]")
+            + "custom_object_names (names.unicode_string_list) dependency
+";
+        assert_eq!(scenario_custom_control_names(&original, tags.path()).unwrap(), ["Évacuation"]);
+        let mut device = scenario_device_choices(&original).unwrap().remove(0);
+        device.custom_control_name = Some(1);
+        let operation = |device| Operation::DevicePlacement { device, source_sha256: "a".repeat(64) };
+        let edit = operation(device.clone());
+        let recipe = edit.arguments_with_fields(tags.path(), "scnr", "level.scenario", &original).unwrap();
+        assert_eq!(recipe[2..5], ["-S", "controls[0].custom_control_name", "1"]);
+        let changed = original.replace("custom_control_name (0)", "custom_control_name (1)");
+        assert_eq!(reviewed_difference(&original, &changed, &edit).unwrap().len(), 1);
+        edit.verify_readback(tags.path(), "scnr", "level.scenario", &original, "1
+").unwrap();
+        assert!(edit.verify_readback(tags.path(), "scnr", "level.scenario", &original, "0
+").is_err());
+        device.custom_control_name = Some(2);
+        assert!(operation(device).arguments_with_fields(tags.path(), "scnr", "level.scenario", &original).is_err());
+        assert!(reviewed_difference(&original, &changed.replace("names.unicode_string_list", "other.unicode_string_list"), &edit).is_err());
+
+        bytes.pop();
+        std::fs::write(path, bytes).unwrap();
+        assert!(scenario_custom_control_names(&original, tags.path()).is_err());
+
+        if let Ok(path) = std::env::var("SPARK_NATIVE_CONTROL_NAME_CACHE") {
+            let path = Path::new(&path);
+            let map = crate::maps::inspect_map(path, None).unwrap();
+            let markers = crate::maps::scenario_logic_readback(path, &map).unwrap();
+            let names: Vec<_> = markers.devices.iter().filter_map(|row| row.custom_control_name).collect();
+            assert_eq!(names, [1, 0, 0, 0, 0]);
+        }
+    }
+
     #[test]
     fn device_wiring_writes_existing_groups_and_guards_reserved_bindings() {
         let before = fields() + concat!(
