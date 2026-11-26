@@ -13,6 +13,7 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
  const bothSides=draft?.usableFromBothSides??original?.usableFromBothSides;
  const nativeName=draft?.customControlName??original?.customControlName;
  const controlNames=context.scenarioControlNames??[];
+ const promptText=nativeName&&nativeName>0?controlNames[nativeName-1]?.trim():undefined;
  const groups=context.scenarioDeviceGroups;
  const [groupIndex,setGroupIndex]=useState(-1);
  const upright=!!pose&&pose.rotationRadians.slice(1).every(angle=>Math.abs(angle)<1e-4);
@@ -47,7 +48,8 @@ export default function NativeDevicePlacements({context,busy,dirty,onPreview,onD
     {nativeName!==0&&!controlNames[nativeName-1]?.trim()&&<option value={nativeName} disabled>Unavailable native name · {nativeName}</option>}
     {controlNames.map((name,index)=>name.trim()?<option key={index} value={index+1}>{index+1} · {name}</option>:null)}
    </select>
-   <small>{context.scenarioControlNameIssue??(controlNames.length?'Uses the scenario’s Unicode object-name list. This changes only the selected control.':'This scenario has no readable Unicode object names to select.')}</small>
+   {promptText&&<small>Forerunner prompt preview · Press [Action] to {promptText}</small>}
+   <small>{context.scenarioControlNameIssue??(controlNames.length?'Choose a verb phrase such as “use the deployment terminal.” The game inserts the action key and “to.”':'This scenario has no readable Unicode object names to select.')}</small>
   </label>}
  </fieldset>}
  {original.manualActivation!==undefined&&<fieldset disabled={!!blocked||wiringLocked}>

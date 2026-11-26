@@ -159,6 +159,7 @@ test('a native control can choose a placement-specific Unicode name',async({page
  const name=form.getByRole('combobox',{name:'In-game control name',exact:true});
  await expect(name).toHaveValue('0');
  await name.selectOption({label:'2 · Évacuation'});
+ await expect(form.getByText('Forerunner prompt preview · Press [Action] to Évacuation',{exact:true})).toBeVisible();
  await form.getByRole('button',{name:'Preview device placement',exact:true}).click();
  const operation=JSON.parse((await page.getByTestId('device-operation').textContent())!);
  expect(operation.device).toMatchObject({index:0,name:'terminal',customControlName:2,tagPath:'devices/terminal',position:[1,2,3]});
