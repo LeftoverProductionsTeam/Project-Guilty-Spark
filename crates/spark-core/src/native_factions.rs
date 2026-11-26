@@ -226,7 +226,8 @@ fn control_layout(
         }
     }
     let volumes = scenario_volume_choices(fields)?;
-    let regional = if added_profiles > 0 || kits.iter().any(|kit| regional_service_owner(&kit.name).is_some()) {
+    let regional = if added_profiles > 0 || kits.iter().any(|kit|
+        regional_service_owner(&kit.name).is_some() || kit.name.starts_with("extraction_squad_")) {
         regional_faction_hubs(&volumes)?
     } else { None };
     for kit in kits {
@@ -1124,7 +1125,6 @@ fn validate_terminal_point(
     position: [f32; 3],
 ) -> Result<()> {
     if let Some(hubs) = regional {
-        let faction = regional_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
         if let Some((faction, zones)) = faction_field_binding(name) {
             let zone_name = zones[faction];
             let zone = unique_volume(volumes, zone_name)?;
@@ -1138,10 +1138,17 @@ fn validate_terminal_point(
             }
             return Ok(());
         }
-        if !hubs[faction].contains_native_interior(position)
-            || hubs[1 - faction].contains_native_interior(position)
-        {
-            return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
+        if name.starts_with("extraction_squad_") {
+            if hubs.iter().filter(|hub| hub.contains_native_interior(position)).count() != 1 {
+                return invalid(format!("{name} needs a position inside exactly one MegaWorld faction hub"));
+            }
+        } else {
+            let faction = regional_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
+            if !hubs[faction].contains_native_interior(position)
+                || hubs[1 - faction].contains_native_interior(position)
+            {
+                return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
+            }
         }
         for field in FIELD_PICKUP_ZONES.into_iter().chain(GROUND_CALL_ZONES) {
             if volumes.iter().any(|v| v.name.eq_ignore_ascii_case(field))
@@ -1483,6 +1490,32 @@ mod tests {
             control_tag_path: "devices/terminal".into(), position: [21., 1., 1.], rotation_radians: [0.; 3] };
         assert!(malformed.validate().is_err());
     }
+    #[test]
+    fn regional_squad_selects_one_faction_hub_with_no_legacy_return() {
+        let volume = |name: &str, x| crate::maps::ScenarioLogicVolume {
+            name: name.into(), kind: 1,
+            geometry: Some(crate::maps::ScenarioLogicVolumeGeometry {
+                corner: [x, 0., 0.], forward: [1., 0., 0.], up: [0., 0., 1.], dimensions: [4., 4., 4.],
+            }),
+        };
+        let mut volumes = [
+            volume(MEGAWORLD_HUBS[0], 0.),
+            volume(MEGAWORLD_HUBS[1], 10.),
+            volume(GROUND_CALL_ZONES[0], 20.),
+        ];
+        let name = "extraction_squad_01";
+        let hubs = regional_faction_hubs(&volumes).unwrap();
+        for x in [1., 11.] {
+            validate_terminal_point(&volumes, hubs, name, [x, 1., 1.]).unwrap();
+        }
+        for x in [0., 5., 21.] {
+            assert!(validate_terminal_point(&volumes, hubs, name, [x, 1., 1.]).is_err());
+        }
+        volumes[2] = volume(GROUND_CALL_ZONES[0], 0.);
+        let hubs = regional_faction_hubs(&volumes).unwrap();
+        assert!(validate_terminal_point(&volumes, hubs, name, [1., 1., 1.]).is_err());
+    }
+
     fn kit() -> NativeFactionKit {
         NativeFactionKit {
             faction: "unsc".into(),
@@ -2642,11 +2675,7 @@ pub fn squad_snapshots(fields: &str) -> Result<Vec<NativeSquadTerminalSnapshot>>
             readiness: ready.is_some(),
         };
         terminal.validate()?;
-        if !unique_volume(&volumes, "extraction_return")?.contains(row.position)
-            || unique_volume(&volumes, "extraction_zone")?.contains(row.position)
-        {
-            return invalid("Squad terminal must be inside the return hub and outside activation");
-        }
+        validate_terminal_point(&volumes, regional_faction_hubs(&volumes)?, &terminal.name(), row.position)?;
         result.push(NativeSquadTerminalSnapshot {
             terminal,
             control_index: row.index,
@@ -2783,16 +2812,24 @@ pub fn verify_squad_cache(
     cache: &Path,
     map: &crate::maps::MapInspection,
 ) -> Result<()> {
-    if expected.len() > 22
-        || map.header.scenario_type != 0
-        || map.header.version != 609
-        || map.header.extended
-    {
-        return invalid("Squad terminals require standard CE609 solo output");
+    let edition = (map.header.version, map.header.scenario_type);
+    if expected.len() > 22 || !matches!(edition, (609, 0) | (13, 1)) || map.header.extended {
+        return invalid("Squad terminals require standard CE609 solo or regional MCC13 multiplayer output");
     }
     let read = crate::maps::scenario_logic_readback(cache, map)?;
+    let regional_hubs = if edition == (13, 1) {
+        Some(megaworld_hub_starts(cache, map)?.ok_or_else(|| crate::SparkError::Invalid(
+            "MCC13 squad terminals require both native faction hubs with supported player starts".into()
+        ))?)
+    } else { None };
+    let hubs = regional_hubs.as_ref().map(|_| regional_faction_hubs(&read.volumes))
+        .transpose()?.flatten();
+    let locations = if regional_hubs.is_some() && !expected.is_empty() {
+        let points = expected.iter().map(|row| row.terminal.position).collect::<Vec<_>>();
+        crate::maps::bsp_point_locations(cache, map, &points, Some(1.))?
+    } else { Vec::new() };
     let mut seen = std::collections::BTreeSet::new();
-    for row in expected {
+    for (row_index, row) in expected.iter().enumerate() {
         row.validate()?;
         if !seen.insert(row.terminal.number) {
             return invalid("Duplicate squad readback target");
@@ -2863,10 +2900,18 @@ pub fn verify_squad_cache(
                 }
             }
         }
-        if !unique_volume(&read.volumes, "extraction_return")?.contains(device.position)
-            || unique_volume(&read.volumes, "extraction_zone")?.contains(device.position)
-        {
-            return invalid("Compiled squad terminal is outside its safe hub");
+        validate_terminal_point(&read.volumes, hubs, &row.terminal.name(), device.position)?;
+        if let Some(regional_hubs) = &regional_hubs {
+            let home = regional_hubs.iter().find(|hub| {
+                read.volumes[hub.volume_index].geometry.as_ref()
+                    .is_some_and(|geometry| geometry.contains_native_interior(device.position))
+            }).ok_or_else(|| crate::SparkError::Invalid("Compiled squad terminal has no faction hub".into()))?;
+            let location = &locations[row_index];
+            if location.bsps.as_slice() != [home.bsp_index]
+                || !location.ground.iter().any(|support| support.bsp == home.bsp_index)
+            {
+                return invalid("Compiled squad terminal needs grounded placement in its faction hub BSP");
+            }
         }
     }
     Ok(())

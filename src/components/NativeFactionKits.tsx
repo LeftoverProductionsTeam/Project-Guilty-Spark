@@ -136,7 +136,7 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
    <p className="subtle">Preview, Accept, Save, then Build working tag edits. Compiled readback checks the control’s BSP, activation type and device groups.</p>
   </details>}
  <details className="native-squad-terminals"><summary>Forerunner squad terminals &amp; objective gates</summary>
-  <p className="subtle">Append one native squad-selection control inside the return hub. Forerunner owns membership, six-member limits, faction compatibility and durable banking. No loadout profile or inventory writer is added.</p>
+  <p className="subtle">Add a grounded squad-selection control inside one MegaWorld faction hub or the solo return hub. The selected hub determines the faction. Forerunner handles membership, the six-member limit and banking.</p>
   <fieldset disabled={squadBlocked}>
    <label>Squad number<input aria-label="Squad terminal number" type="number" min={1} max={22} step={1} value={squad.number} onChange={event=>setSquad({...squad,number:event.target.value===''?0:Number(event.target.value)})}/></label>
    <label>Touched control tag<input aria-label="Squad control tag" list={id+'-controls'} value={squad.control} onChange={event=>setSquad({...squad,control:event.target.value})}/></label>
@@ -150,7 +150,7 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
    <button type="button" disabled={!Number.isInteger(squad.number)||squad.number<1||squad.number>22||!validPose(squad)||squadExists||!/^[a-f0-9]{64}$/i.test(context.tagSha256??'')} onClick={()=>onPreview({kind:'squadTerminals',sourceSha256:context.tagSha256!,terminals:[{number:squad.number,controlTagPath:squad.control.trim(),position:squad.position.map(Number) as NativeFactionKit['position'],rotationRadians:squad.rotation.map(value=>Number(value)*Math.PI/180) as NativeFactionKit['rotationRadians'],readiness:squad.readiness}]})}>Preview squad terminal &amp; gate</button>
   </fieldset>
   {squadExists&&<Notice tone="info">This native squad number already exists. Select its existing control to edit the pose; choose an unused number to append another.</Notice>}
-  {!(context.canAppendSquadTerminals??context.canAppendFactionKits)&&<p className="subtle">Requires unshared standard CE609 solo source, readable hub/activation volumes and an existing touched-by-player control dependency.</p>}
+  {!(context.canAppendSquadTerminals??context.canAppendFactionKits)&&<p className="subtle">Requires unshared CE609 solo or MCC13 MegaWorld source, readable hub volumes and a touched-by-player control tag.</p>}
   <p className="subtle">Review → Accept → Save → Build working tag edits. Existing native device editing moves an accepted terminal. Restore before-edit tag recovers the complete preceding source; project Undo does not reverse native revisions. Native feature discovery must admit the selected Forerunner build. Player selection, objectives and extraction require gameplay testing.</p>
  </details></>;
 }

@@ -584,7 +584,9 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         return Ok(BTreeMap::from([(tag,before)]));
     }
     if !operation.is_encounter_append()&&!operation.is_transport_append()&&!operation.is_faction_edit(){return Ok(BTreeMap::new());}
-    let regional = matches!(operation, recipes::Operation::FactionBody { .. } | recipes::Operation::FactionKits { .. } | recipes::Operation::FactionService { .. })
+    let regional = matches!(operation,
+        recipes::Operation::FactionBody { .. } | recipes::Operation::FactionKits { .. }
+        | recipes::Operation::FactionService { .. } | recipes::Operation::SquadTerminals { .. })
         && regional_faction_source(source)?;
     let mut reviewed_arms = BTreeMap::new();
     let roots=if let recipes::Operation::AppendTransport{transport,regional_mcc,..}=operation{
@@ -602,7 +604,16 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         let tag=format!("{}.vehicle",transport.tag_path);let listing=fields(state,&source.project,&source.tags,&tag)?;recipes::validate_transport_vehicle_source(&listing).map_err(error)?;
         vec![(tag,"vehi")]
     }else if let recipes::Operation::SquadTerminals{terminals,..}=operation{
-        if source.build.target!="gbx-custom"{return Err("Native squad terminals require CE609 solo source".into());}let mut roots=vec![];for terminal in terminals{let tag=format!("{}.device_control",terminal.control_tag_path);recipes::validate_faction_control_source(&fields(state,&source.project,&source.tags,&tag)?).map_err(error)?;roots.push((tag,"ctrl"));}roots
+        if source.build.target != "gbx-custom" && !regional {
+            return Err("Native squad terminals require CE609 solo or reviewed MCC13 MegaWorld source".into());
+        }
+        let mut roots = Vec::new();
+        for terminal in terminals {
+            let tag = format!("{}.device_control", terminal.control_tag_path);
+            recipes::validate_faction_control_source(&fields(state, &source.project, &source.tags, &tag)?).map_err(error)?;
+            roots.push((tag, "ctrl"));
+        }
+        roots
     }else if let recipes::Operation::FactionService{service,..}=operation{
         if !regional{return Err("Faction services require reviewed MCC13 multiplayer source with both MegaWorld hubs".into());}
         let tag=format!("{}.device_control",service.control_tag_path.replace('\\',"/"));
@@ -960,9 +971,11 @@ pub(super) async fn native_tag_context(
             }
         }
         let can_append_encounter=can_append_encounter&&edit_issue.is_none()&&studio_native_source::require_unshared(&state,&source.project.id).is_ok();
-        let can_append_squad_terminals = can_append_encounter && source.build.target=="gbx-custom";
-        let can_append_faction_kits = can_append_squad_terminals || regional_faction_source
-            && edit_issue.is_none() && studio_native_source::require_unshared(&state, &source.project.id).is_ok();
+        let regional_hub_edits = regional_faction_source && edit_issue.is_none()
+            && studio_native_source::require_unshared(&state, &source.project.id).is_ok();
+        let can_append_squad_terminals = (can_append_encounter && source.build.target == "gbx-custom")
+            || regional_hub_edits;
+        let can_append_faction_kits = can_append_squad_terminals;
         let (faction_kits,faction_body_issue)=if source.class=="scnr"&&(source.build.target=="gbx-custom" || regional_faction_source) {
             match recipes::native_faction_snapshots(&values){Ok(kits)=>(kits,None),Err(issue)=>(vec![],Some(error(issue)))}
         }else{(vec![],regional_issue)};
