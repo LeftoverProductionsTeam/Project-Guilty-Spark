@@ -1,5 +1,6 @@
 import {describe,it,expect} from 'vitest';
-import {alignAtlasDonor,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
+import stockAtlas from '../docs/fixtures/c43-original-bsp-atlas.json';
+import {alignAtlasDonor,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
 import type {AtlasRegion} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -80,4 +81,26 @@ it('keeps reviewed burial depth and an explicit access edge outside the hex neig
   expect(()=>applyAtlasSurfaceAccess(layout,room.regionId,room.regionId,2,-19,0)).toThrow('surface');
   const shifted=spreadLayout(linked,outside.regionId).regions;
   expect(shifted[1].translation.map((axis,i)=>axis-shifted[0].translation[i])).toEqual([1,2,-19]);
+});
+
+it('loads the stock compact layout and preserves built surface frames', () => {
+  const sources = stockAtlas.regions.filter(row => row.cacheVersion === 609 && row.scenarioType === 1 && row.bspIndex === 0)
+    .map(row => ({...row, minimum: row.minimum as [number, number, number], maximum: row.maximum as [number, number, number],
+      translation: [0, 0, 0] as [number, number, number], yawDegrees: 0}));
+  const original = JSON.stringify(sources);
+  const plan = applyCompactStockLayout(null, sources);
+  const region = (name: string) => plan.regions.find(row => row.mapName === name)!;
+  expect(plan.regions).toHaveLength(19);
+  expect([-2, -1, 0, 1, 2].map(row => plan.regions.filter(item => item.hexSlot?.[1] === row).length)).toEqual([3, 4, 5, 4, 3]);
+  expect(region('sidewinder').translation).toEqual([114.02209091186523, 9.3280029296875, -17.233085022040342]);
+  expect(plan.regions.filter(row => row.underground && row.surfaceAccess)).toHaveLength(9);
+  expect(region('hangemhigh').surfaceAccess?.surfaceRegionId).toBe(region('bloodgulch').regionId);
+  expect(region('chillout')).toMatchObject({translation: [-12, 30, -31], surfaceAccess: {surfaceRegionId: region('timberland').regionId}});
+  expect(atlasAdjacentRegions(plan.regions, region('timberland')).map(row => row.mapName)).toContain('dangercanyon');
+  expect(JSON.stringify(sources)).toBe(original);
+  const moved = { ...region('timberland'), translation: [40, 25, -4] as [number, number, number], yawDegrees: 90 };
+  const rotated = applyCompactStockLayout(plan, sources, [moved]);
+  expect(rotated.regions.find(row => row.mapName === 'chillout')).toMatchObject({translation: [10, 13.000000000000002, -35], surfaceAccess: {headingDegrees: 0}});
+  expect(() => applyCompactStockLayout(null, sources.slice(1))).toThrow('Missing');
+  expect(() => applyCompactStockLayout(plan, sources, [region('timberland'), {...region('sidewinder'), translation: [80, 0, 0]}])).toThrow('move compiled');
 });

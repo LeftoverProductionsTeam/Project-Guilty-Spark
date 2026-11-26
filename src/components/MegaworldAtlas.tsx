@@ -5,7 +5,7 @@ import {useMapState} from '../mapSession';
 import {assemblyRoutes} from '../bspAssembly';
 import type {OpenProject,Project} from '../types';
 import {NumberField} from './ui';
-import {addLayoutRegions,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
+import {addLayoutRegions,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
 import type {AtlasRegion as Region,LayoutRegion,MegaworldLayout} from '../megaworldLayout';
 type Atlas={regions:Region[];caches:{path:string;error:string|null}[];elapsedMs:number;limitations:string[]};
 type PrepareConnection=(base:LayoutRegion,donor:LayoutRegion,terrain:boolean)=>Promise<void>;
@@ -36,7 +36,14 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
     <summary>Megaworld Atlas <small>{atlas?`${atlas.regions.length} source regions`:'owned map regions'}</small></summary>
     {open&&<><div className="atlas-controls"><button disabled={!native||busy} onClick={()=>void scan()}>{busy?'Inspecting complete source caches…':atlas?'Rescan installed maps':'Scan installed maps'}</button><input aria-label="Find Atlas region" placeholder="Map or BSP…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/><select aria-label="Atlas runtime" value={runtime} onChange={e=>{setRuntime(e.target.value);setPage(0);}}><option value="all">All installed Halos</option>{[...new Set(atlas?.regions.flatMap(r=>r.runtimes)??[])].map(r=><option key={r}>{r}</option>)}</select></div>
     <LayoutEditor layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
-    {atlas&&<div className="atlas-controls"><button onClick={addOriginals} disabled={busy||readOnly}>Add originals to layout</button><small>Choose a runtime to keep source editions explicit.</small></div>}
+    {atlas&&<div className="atlas-controls">
+      <button onClick={addOriginals} disabled={busy||readOnly}>Add originals to layout</button>
+      <button disabled={busy||readOnly} onClick={()=>{
+        try {onLayout(applyCompactStockLayout(layout, atlas.regions, compiledRegions), 'Load compact stock layout');setError('');}
+        catch (e) {setError(String(e));}
+      }}>Load compact stock layout</button>
+      <small>Choose a runtime when adding individual original maps.</small>
+    </div>}
     {assembly&&<div className="atlas-region"><b>Authored connection · {assembly.donorTitle}</b><p>Donor position {assembly.translation.map(n=>n.toFixed(2)).join(', ')} · yaw {assembly.yawDegrees}° · {assembly.tunnelPoints.length} route points</p>{polygons.length>0&&<svg width="100%" height="110" role="img" aria-label="Authored region bounds and physical connection in top view" viewBox={`${low[0]-8} ${low[1]-8} ${Math.max(1,high[0]-low[0])+16} ${Math.max(1,high[1]-low[1])+16}`}><polygon points={polygons[0].map(p=>p.join(',')).join(' ')} fill="#58b9b324" stroke="#58b9b3" vectorEffect="non-scaling-stroke"/><polygon points={polygons[1].map(p=>p.join(',')).join(' ')} fill="#d19a6024" stroke="#d19a60" vectorEffect="non-scaling-stroke"/>{routes.map((r,i)=><polyline key={r.id} aria-label={r.label+' draft'} points={r.points.map(p=>[p[0],-p[1]].join(',')).join(' ')} stroke={['#fff','#80cbbf','#e4be77'][i]} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke"><title>{r.label} · draft, not gameplay verified</title></polyline>)}</svg>}</div>}
     {error&&<p role="alert">{error}</p>}
     {atlas&&<><div className="atlas-list" role="list" aria-label="Owned BSP regions">{rows.slice(page*12,page*12+12).map(r=><button role="listitem" aria-pressed={selected===r.id} key={r.id} onClick={()=>setSelected(r.id)} title={`${r.coordinates}\nSHA-256 ${r.cacheSha256}`}><b>{r.mapName} / {r.bspName}</b><small>{r.scenarioType===0?'Campaign':'Multiplayer'} · v{r.cacheVersion} · {r.collisionTriangles.toLocaleString()} collision / {r.renderTriangles.toLocaleString()} render triangles</small></button>)}</div><div className="atlas-controls"><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><span>{rows.length?`${page*12+1}–${Math.min((page+1)*12,rows.length)} / ${rows.length}`:'No matching source regions'}</span><button disabled={(page+1)*12>=rows.length} onClick={()=>setPage(p=>p+1)}>Next</button></div></>}

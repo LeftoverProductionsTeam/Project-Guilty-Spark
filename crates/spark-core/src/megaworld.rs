@@ -205,7 +205,9 @@ fn review_burial_geometry(
         let a: [f64;3] = std::array::from_fn(|axis| triangle[1][axis] - triangle[0][axis]);
         let b: [f64;3] = std::array::from_fn(|axis| triangle[2][axis] - triangle[0][axis]);
         let cross = [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-        if cross[2] <= 0. || cross[2] < 0.65 * cross.iter().map(|component| component * component).sum::<f64>().sqrt() {
+        // A visible cliff can cover a room even when its slope is too steep
+        // for an entrance. Native construction checks walking surfaces separately.
+        if cross[2] <= 1e-10 {
             continue;
         }
         for point in &triangle {
@@ -327,6 +329,14 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
         assert!((0.49..=0.50).contains(&depth), "{report:?}");
         interior.translation[2] = depth;
         assert!(review_burial_geometry(&surface, &interior, &mesh, &faces, 2.).unwrap().uncovered_area <= 1e-6);
+        // The same full footprint remains covered by a face steeper than a
+        // player can climb. The roof check and entrance check are independent.
+        mesh.positions[5] = 15.;
+        mesh.positions[8] = 15.;
+        let cliff = review_burial_geometry(&surface, &interior, &mesh, &faces, 2.).unwrap();
+        assert!(cliff.uncovered_area <= 1e-6 && cliff.cover_z.is_some());
+        mesh.positions[5] = 5.;
+        mesh.positions[8] = 5.;
         mesh.indices.truncate(3);
         mesh.parts[0].index_count = 3;
         interior.translation[0] = 16.5;

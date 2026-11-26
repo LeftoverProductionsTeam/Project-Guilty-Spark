@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises';
 import {PerspectiveCamera,Vector3} from 'three';
 import {workshopExample} from '../../src/bspWorkshop';
 import {exportHaloCeTransport,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations} from '../../src/haloScript';
@@ -3629,6 +3630,41 @@ test('Atlas plans all19 original sources with one-action transforms, overlap rev
  expect(await page.evaluate(()=>(window as any).__sparkMock.saved.megaworldLayout.regions.length)).toBe(19);expect(await page.evaluate(()=>(window as any).__sparkMock.atlasSources.every((r:any)=>r.translation.every((n:number)=>n===0)&&r.yawDegrees===0))).toBe(true);
  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
  await expect(page.getByLabel('Saved region layout',{exact:true}).getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);
+});
+
+test('compact stock Atlas keeps the full native plan through Undo and reopen', async ({page})=>{
+  await mockDesktop(page);
+  await openFixture(page);
+  const stock = JSON.parse(await readFile('docs/fixtures/c43-original-bsp-atlas.json','utf8')).regions
+    .filter((region: any) => region.cacheVersion === 609 && region.scenarioType === 1 && region.bspIndex === 0);
+  await page.evaluate((regions) => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) =>
+      command === 'megaworld_atlas' ? {regions, caches: [], elapsedMs: 1, limitations: []} : invoke(command, args);
+  }, stock);
+  await chooseTool(page,'Level editor');
+  await openDrawer(page,'Construction');
+  const assembly = page.locator('.bsp-assembly>summary');
+  await revealPagedControl(assembly); await assembly.click();
+  const atlas = page.locator('.megaworld-atlas>summary');
+  await revealPagedControl(atlas); await atlas.click();
+  await (await pagedControl(page,'button','Scan installed maps')).click();
+  await (await pagedControl(page,'button','Load compact stock layout')).click();
+  const layout = page.getByLabel('Saved region layout',{exact:true});
+  await expect(layout.getByLabel('Planned Atlas region').locator('option')).toHaveCount(19);
+  await page.keyboard.press('Control+z');
+  await expect(layout.getByLabel('Planned Atlas region')).toHaveCount(0);
+  await page.keyboard.press('Control+y');
+  await page.keyboard.press('Control+s');
+  const plans = () => page.evaluate(() => (window as any).__sparkMock.saved?.megaworldLayout?.regions);
+  await expect.poll(async () => (await plans())?.filter((r: any) => r.surfaceAccess).length).toBe(9);
+  await (await pagedControl(page,'combobox','Atlas layout view',layout)).selectOption('underground');
+  await expect(layout.getByRole('img',{name:'Planned source bounds in top view'}).locator('polygon')).toHaveCount(9);
+  await chooseTool(page,'Map library');
+  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+  await chooseTool(page,'Level editor');
+  await openDrawer(page,'Construction');
+  await expect(page.getByLabel('Saved region layout',{exact:true}).getByLabel('Planned Atlas region').locator('option')).toHaveCount(19);
 });
 
 test('presentation packs keep engine-profile choices separate and show missing or unsupported packs honestly',async({page})=>{

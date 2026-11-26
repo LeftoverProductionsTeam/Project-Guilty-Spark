@@ -1,4 +1,5 @@
 import type {MapInspection,Vec3} from './types';
+import stockCompactAtlas from './stockCompactAtlas.json';
 export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'] as const;
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
 export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean;surfaceAccess?:{surfaceRegionId:string;roofClearance:number;headingDegrees:number}}
@@ -43,6 +44,76 @@ export function originalRegions(regions:AtlasRegion[]):{regions:AtlasRegion[];mi
     if(matches[0])result.push(matches[0]);else missing.push(name);
   }return {regions:result,missing};
 }
+
+interface StockCompactRegion {
+  mapName: string;
+  cacheSha256: string;
+  hexSlot: number[];
+  translation: number[];
+  yawDegrees: number;
+  surface?: string;
+  roofClearance?: number;
+  headingDegrees?: number;
+}
+
+/** Use the surveyed CE609 transforms, the built seed frame, and owned source identities. */
+export function applyCompactStockLayout(layout: MegaworldLayout | null | undefined,
+  inventory: AtlasRegion[], built: readonly LayoutRegion[] = []): MegaworldLayout {
+  const stock: StockCompactRegion[] = stockCompactAtlas;
+  const names = new Map(stock.map(row => [row.mapName, row.cacheSha256 + ':0']));
+  const specs = new Map(stock.map(row => [row.cacheSha256 + ':0', row]));
+  const owned = new Map(inventory.filter(row => row.cacheVersion === 609 && row.bspIndex === 0 && row.scenarioType === 1)
+    .map(row => [row.id, planRegion(row)]));
+  const saved = new Map(layout?.regions.map(row => [row.regionId, row]) ?? []);
+  const unresolved = stock.filter(row => {
+    const id = row.cacheSha256 + ':0';
+    const source = owned.get(id) ?? saved.get(id);
+    return !source || source.cacheVersion !== 609 || source.cacheSha256 !== row.cacheSha256 || source.bspIndex !== 0;
+  });
+  if (unresolved.length) throw Error('Scan the original Custom Edition maps. Missing ' + unresolved.map(row => row.mapName).join(', ') + '.');
+
+  const reference = built.find(region => specs.has(region.regionId));
+  const referenceSpec = reference && specs.get(reference.regionId);
+  const yaw = reference && referenceSpec ? reference.yawDegrees - referenceSpec.yawDegrees : 0;
+  const angle = yaw * Math.PI / 180;
+  const rotate = ([x, y, z]: number[]): Vec3 => [x * Math.cos(angle) - y * Math.sin(angle), x * Math.sin(angle) + y * Math.cos(angle), z];
+  const referenceOffset = referenceSpec && rotate(referenceSpec.translation);
+  const origin: Vec3 = reference && referenceOffset ? [
+    reference.translation[0] - referenceOffset[0],
+    reference.translation[1] - referenceOffset[1],
+    reference.translation[2] - referenceOffset[2],
+  ] : [0, 0, 0];
+  const stockRegions = stock.map((spec): LayoutRegion => {
+    const id = spec.cacheSha256 + ':0';
+    const source = owned.get(id) ?? saved.get(id)!;
+    const [x, y, z] = rotate(spec.translation);
+    return {
+      ...source, translation: [origin[0] + x, origin[1] + y, origin[2] + z],
+      yawDegrees: yaw + spec.yawDegrees, hexSlot: [spec.hexSlot[0], spec.hexSlot[1]],
+      underground: spec.surface ? true : undefined,
+      surfaceAccess: spec.surface ? {
+        surfaceRegionId: names.get(spec.surface)!,
+        roofClearance: spec.roofClearance!,
+        headingDegrees: ((spec.headingDegrees! + yaw + 180) % 360 + 360) % 360 - 180,
+      } : undefined,
+    };
+  });
+  for (const region of built) {
+    const planned = stockRegions.find(item => item.regionId === region.regionId);
+    if (planned && (planned.translation.some((axis, i) => Math.abs(axis - region.translation[i]) > 1e-5)
+      || Math.abs(planned.yawDegrees - region.yawDegrees) > 1e-5)) {
+      throw Error('The compact layout would move compiled ' + region.mapName + '. Keep its Atlas placement or load the compact layout in another project.');
+    }
+  }
+  const extra = (layout?.regions ?? []).filter(region => !specs.has(region.regionId));
+  if (stockRegions.length + extra.length > 64) throw Error('The Atlas layout holds at most 64 region plans.');
+  if (extra.some(region => region.hexSlot && stockRegions.some(stockRegion =>
+    stockRegion.hexSlot![0] === region.hexSlot![0] && stockRegion.hexSlot![1] === region.hexSlot![1]))) {
+    throw Error('A custom region occupies a stock hex slot. Move it before loading the compact stock layout.');
+  }
+  return {schemaVersion: 1, regions: [...stockRegions, ...extra]};
+}
+
 function linkedSurface(a: LayoutRegion, b: LayoutRegion): boolean {
   return Boolean(a.underground && !b.underground && a.surfaceAccess?.surfaceRegionId === b.regionId);
 }

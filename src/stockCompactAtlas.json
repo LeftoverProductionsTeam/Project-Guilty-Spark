@@ -1,0 +1,295 @@
+[
+  {
+    "mapName": "deathisland",
+    "cacheSha256": "f9684cb7e5436fd2901b7ea226726a6089957b91459923421264a5436f743244",
+    "hexSlot": [
+      0,
+      -2
+    ],
+    "translation": [
+      -128,
+      -109,
+      -42
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "hangemhigh",
+    "cacheSha256": "df9a1410571c4ec921c0a05f00d18034ac39cc06d992537e6df307025b620af4",
+    "hexSlot": [
+      1,
+      -2
+    ],
+    "translation": [
+      4,
+      -165,
+      -25
+    ],
+    "yawDegrees": 90,
+    "surface": "bloodgulch",
+    "roofClearance": 2,
+    "headingDegrees": 90
+  },
+  {
+    "mapName": "prisoner",
+    "cacheSha256": "9f54e66406b9dfc25399507400621640804de8f57f6c084fcde5bcd62778b1eb",
+    "hexSlot": [
+      2,
+      -2
+    ],
+    "translation": [
+      256,
+      35,
+      -28
+    ],
+    "yawDegrees": 0,
+    "surface": "icefields",
+    "roofClearance": 2,
+    "headingDegrees": 180
+  },
+  {
+    "mapName": "wizard",
+    "cacheSha256": "9e9b29ae235458bf8f3cf0b69f6748883ed53f37cae5919e0d5cdd8a421a29ae",
+    "hexSlot": [
+      -1,
+      -1
+    ],
+    "translation": [
+      -142,
+      37,
+      -29
+    ],
+    "yawDegrees": 0,
+    "surface": "dangercanyon",
+    "roofClearance": 2,
+    "headingDegrees": 180
+  },
+  {
+    "mapName": "bloodgulch",
+    "cacheSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+    "hexSlot": [
+      0,
+      -1
+    ],
+    "translation": [
+      -62,
+      -25,
+      -14
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "beavercreek",
+    "cacheSha256": "fcbcf73a22fd2e819c5f670edb333eff529ca1b7980ebbffbf6b21cf12b56db4",
+    "hexSlot": [
+      1,
+      -1
+    ],
+    "translation": [
+      80,
+      -89,
+      -17
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "longest",
+    "cacheSha256": "40470c1e315e3da87b4beceba97ed26b629127f5edf7aa742c983172b95854d9",
+    "hexSlot": [
+      2,
+      -1
+    ],
+    "translation": [
+      89,
+      17,
+      -29
+    ],
+    "yawDegrees": 0,
+    "surface": "sidewinder",
+    "roofClearance": 2,
+    "headingDegrees": 90
+  },
+  {
+    "mapName": "boardingaction",
+    "cacheSha256": "c3a21a0ccead064aebac3d1a7ff52fa005b1ac89f23bc1f02d2b273ad69b4b77",
+    "hexSlot": [
+      -2,
+      0
+    ],
+    "translation": [
+      -287.5,
+      241,
+      -7
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "dangercanyon",
+    "cacheSha256": "9e433796015ac2857a43ef180b3ba300d3b711defb5f0bb0e8dd96f5e2b06cc2",
+    "hexSlot": [
+      -1,
+      0
+    ],
+    "translation": [
+      -130.7,
+      -15,
+      -12
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "timberland",
+    "cacheSha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+    "hexSlot": [
+      0,
+      0
+    ],
+    "translation": [
+      0,
+      0,
+      0
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "sidewinder",
+    "cacheSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+    "hexSlot": [
+      1,
+      0
+    ],
+    "translation": [
+      114.02209091186523,
+      9.3280029296875,
+      -17.233085022040342
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "icefields",
+    "cacheSha256": "0e1336fd76c30563d86bef0229ec97930ca93cef882e108a5e646cf2a67ac9f0",
+    "hexSlot": [
+      2,
+      0
+    ],
+    "translation": [
+      291,
+      -18,
+      -17
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "ratrace",
+    "cacheSha256": "03a483b50ba3c50aa1071a0a13b24927a9ed1d3acd2528802ac4eb20a388c670",
+    "hexSlot": [
+      -2,
+      1
+    ],
+    "translation": [
+      -104,
+      3,
+      -30
+    ],
+    "yawDegrees": 90,
+    "surface": "dangercanyon",
+    "roofClearance": 2,
+    "headingDegrees": 90
+  },
+  {
+    "mapName": "gephyrophobia",
+    "cacheSha256": "1853a4443594190e3adb204a20f1f18ba4dbb52e86c4abaad9f0d2fb4a621216",
+    "hexSlot": [
+      -1,
+      1
+    ],
+    "translation": [
+      -96,
+      270,
+      -20
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "infinity",
+    "cacheSha256": "2ce5b0407f013fc498f280188779360f09abd1d98c3864348a9b40b88e76f7c6",
+    "hexSlot": [
+      0,
+      1
+    ],
+    "translation": [
+      115,
+      273,
+      -34
+    ],
+    "yawDegrees": 0
+  },
+  {
+    "mapName": "carousel",
+    "cacheSha256": "8d78e0d23398fb467ceaedb4dd76e80c048f7d8859ec9a7e70d35818d71374b8",
+    "hexSlot": [
+      1,
+      1
+    ],
+    "translation": [
+      24,
+      -25,
+      -26
+    ],
+    "yawDegrees": 0,
+    "surface": "timberland",
+    "roofClearance": 2,
+    "headingDegrees": 90
+  },
+  {
+    "mapName": "damnation",
+    "cacheSha256": "419b2b53736b6900dd62137232e8e76ff03ca98cf81d5eede0d43d9b0f84735b",
+    "hexSlot": [
+      -2,
+      2
+    ],
+    "translation": [
+      -33,
+      -105,
+      -43
+    ],
+    "yawDegrees": 0,
+    "surface": "bloodgulch",
+    "roofClearance": 2,
+    "headingDegrees": -90
+  },
+  {
+    "mapName": "putput",
+    "cacheSha256": "25c427f0a12a0c7851dbbee9c42041766c9a0268eac2051e1c817d100a1f30e3",
+    "hexSlot": [
+      -1,
+      2
+    ],
+    "translation": [
+      120,
+      145,
+      -31
+    ],
+    "yawDegrees": 0,
+    "surface": "infinity",
+    "roofClearance": 2,
+    "headingDegrees": 90
+  },
+  {
+    "mapName": "chillout",
+    "cacheSha256": "f550090182b34abce50f9c00e4f36b2781cdfeedaf1791156a9ce1e60176fe06",
+    "hexSlot": [
+      0,
+      2
+    ],
+    "translation": [
+      -12,
+      30,
+      -31
+    ],
+    "yawDegrees": 0,
+    "surface": "timberland",
+    "roofClearance": 2,
+    "headingDegrees": -90
+  }
+]
