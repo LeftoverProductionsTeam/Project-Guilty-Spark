@@ -248,7 +248,9 @@ impl BspAssembly {
         route.infantry_tunnel = None; route.high_ground = None; route.open_road = false; route.terrain_seam=None;route.sections.clear();route.arch_segments=None;
         route.tunnel_points = tunnel.points.clone(); route.tunnel_width = tunnel.width;
         route.tunnel_height = tunnel.height; route.tunnel_shader_path = tunnel.shader_path.clone();
-        route.visibility_zones.clear(); route.native_seals.clear(); route
+        route.visibility_zones.clear(); route.native_seals.clear();
+        route.outdoor_sky_split = None;
+        route
     }
     fn high_ground_plan(&self, ridge: &InfantryTunnel) -> Self {
         let mut route = self.infantry_plan(ridge); route.open_road = true; route
@@ -3372,6 +3374,33 @@ mod tests {
     fn dual_route_plan() -> BspAssembly {
         serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Fixture","donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":13,"engine":"fixture","scenarioPath":"fixture"},"donorTagsDirectory":"fixture","donorBspIndex":0,"translation":[0.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[0.,0.,0.],[100.,0.,0.]],"tunnelWidth":4.,"tunnelHeight":4.,"tunnelShaderPath":"fixture/metal"})).unwrap()
     }
+    #[test]
+    fn outdoor_sky_cut_stays_on_the_primary_terrain_route() {
+        let mut plan = dual_route_plan();
+        plan.tunnel_points[1][0] = 32.;
+        plan.open_road = true;
+        plan.terrain_seam = Some(TerrainSeam {
+            shoulder_width: 8.,
+            bank_height: 0.,
+            base_shader_path: "fixture/base".into(),
+            donor_shader_path: "fixture/donor".into(),
+        });
+        plan.outdoor_sky_split = Some(0.5);
+        let passage = |y| InfantryTunnel {
+            points: vec![[0., y, 0.], [32., y, 0.]],
+            width: 4.,
+            height: 4.,
+            shader_path: "fixture/metal".into(),
+        };
+        plan.infantry_tunnel = Some(passage(10.));
+        plan.high_ground = Some(passage(20.));
+        plan.validate().unwrap();
+        assert_eq!(
+            plan.connection_routes().iter().map(|route| route.outdoor_sky_split).collect::<Vec<_>>(),
+            vec![Some(0.5), None, None],
+        );
+    }
+
     #[test]
     fn separate_native_layout_requires_one_straight_route_and_preserved_bridge_landings() {
         let mut plan = dual_route_plan();
