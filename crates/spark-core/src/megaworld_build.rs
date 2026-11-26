@@ -23,6 +23,9 @@ const MCC: CacheTarget = CacheTarget {
     tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
 };
 
+pub(crate) const STANDARD_SKY_SLOTS: usize = 8;
+const REVIEWED_MCC13_SKY_SLOTS: usize = 16;
+
 const EXPANDED_TAG_MEMORY_FEATURE: &str = "maps.mcc13_tag_space_64m.v1";
 
 pub(crate) fn expanded_tag_memory_requirement(path: &Path, map: &MapInspection) -> Result<Option<&'static str>> {
@@ -39,6 +42,7 @@ pub struct GameplayLimits {
     pub(crate) starts: usize,
     pub(crate) pickups: usize,
     pub(crate) flags: usize,
+    pub(crate) skies: usize,
 }
 
 impl GameplayLimits {
@@ -46,6 +50,7 @@ impl GameplayLimits {
         Self {
             starts: maps::player_start_limit(version),
             pickups: maps::netgame_equipment_limit(version),
+            skies: STANDARD_SKY_SLOTS,
             flags: if version == 13 { maps::MCC13_REGIONAL_FLAG_LIMIT } else { maps::CLASSIC_NETGAME_FLAG_LIMIT },
         }
     }
@@ -69,6 +74,7 @@ impl GameplayLimits {
             starts: bound(target.max_player_starts, native.starts, maps::player_start_read_limit(MCC.version)),
             pickups: bound(target.max_netgame_equipment, native.pickups, maps::netgame_equipment_read_limit(MCC.version)),
             flags: bound(target.max_netgame_flags, native.flags, native.flags),
+            skies: bound(target.max_sky_references, native.skies, REVIEWED_MCC13_SKY_SLOTS),
         })
     }
 }

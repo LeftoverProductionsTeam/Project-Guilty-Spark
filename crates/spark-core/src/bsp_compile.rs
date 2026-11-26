@@ -1001,41 +1001,42 @@ fn extract_intact_donor(
     Ok((root, skies))
 }
 
-const NATIVE_SKY_SLOTS: usize = 8;
-
-fn intact_sky_span(existing: &[String], used: &BTreeSet<usize>, donor_count: usize) -> Result<usize> {
-    if existing.len() > NATIVE_SKY_SLOTS || used.iter().any(|&slot| slot >= existing.len()) {
+fn intact_sky_span(existing: &[String], used: &BTreeSet<usize>, donor_count: usize, limit: usize) -> Result<usize> {
+    if existing.len() > limit || used.iter().any(|&slot| slot >= existing.len()) {
         return invalid("Retained BSP references an invalid native sky slot");
     }
-    if donor_count <= NATIVE_SKY_SLOTS - existing.len() {
+    if donor_count <= limit - existing.len() {
         return Ok(existing.len());
     }
     // Keep the first native reference for each sky even if no cluster uses it.
     // Only a later, unused copy of the same sky may be overwritten.
+    if donor_count > limit { return invalid(format!("The donor exceeds the reviewed {limit}-slot sky budget")); }
     let mut names = BTreeSet::new();
-    let mut available = [true; NATIVE_SKY_SLOTS];
+    let mut available = vec![true; limit];
     for (slot, name) in existing.iter().enumerate() {
         let name = name.replace('/', "\\").to_ascii_lowercase();
         available[slot] = name.ends_with(".sky") && !names.insert(name) && !used.contains(&slot);
     }
     available.windows(donor_count).position(|span| span.iter().all(|&slot| slot))
-        .ok_or_else(|| SparkError::Invalid("The intact extension exceeds the native eight-sky budget after checking unused duplicate slots".into()))
+        .ok_or_else(|| SparkError::Invalid(format!("The intact extension exceeds the reviewed {limit}-slot sky budget after checking unused duplicate slots")))
 }
 
 #[test]
 fn intact_sky_binding_uses_only_unused_duplicate_slots_when_full() {
     let skies = ["a.sky", "b.sky", "c.sky", "night.sky", "dusk.sky", "dusk.sky", "dusk.sky", "ice.sky"].map(str::to_owned);
     let used = BTreeSet::from([0, 1, 2, 3, 7]);
-    assert_eq!(intact_sky_span(&skies, &used, 1).unwrap(), 5);
-    assert_eq!(intact_sky_span(&skies, &used, 2).unwrap(), 5);
-    assert!(intact_sky_span(&skies, &used, 3).is_err());
-    assert!(intact_sky_span(&skies, &BTreeSet::from([0, 1, 2, 3, 5, 6, 7]), 1).is_err());
-    assert_eq!(intact_sky_span(&skies[..6], &used.iter().copied().filter(|&n| n < 6).collect(), 1).unwrap(), 6);
+    assert_eq!(intact_sky_span(&skies, &used, 1, 8).unwrap(), 5);
+    assert_eq!(intact_sky_span(&skies, &used, 2, 8).unwrap(), 5);
+    assert_eq!(intact_sky_span(&skies, &used, 8, 16).unwrap(), 8);
+    assert!(intact_sky_span(&skies, &used, 9, 16).is_err());
+    assert!(intact_sky_span(&skies, &used, 3, 8).is_err());
+    assert!(intact_sky_span(&skies, &BTreeSet::from([0, 1, 2, 3, 5, 6, 7]), 1, 8).is_err());
+    assert_eq!(intact_sky_span(&skies[..6], &used.iter().copied().filter(|&n| n < 6).collect(), 1, 8).unwrap(), 6);
 }
 
 fn bind_intact_skies(
     edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    scenario: &str, retained: &[String], donor: &str, donor_skies: &[String],
+    scenario: &str, retained: &[String], donor: &str, donor_skies: &[String], limit: usize,
 ) -> Result<u8> {
     let run = |tag: &str, fields: Vec<String>| {
         let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
@@ -1044,9 +1045,9 @@ fn bind_intact_skies(
         runner.run(edit, &args, workspace, "partition-environment", 57)
     };
     let base_count = run(scenario, vec!["-C".into(), "skies".into()])?.trim()
-        .parse::<usize>().ok().filter(|&count| count <= NATIVE_SKY_SLOTS)
-        .ok_or_else(|| SparkError::Invalid("Retained scenario exceeds the native eight-sky budget".into()))?;
-    if donor_skies.len() > NATIVE_SKY_SLOTS { return invalid("Donor exceeds the native eight-sky budget"); }
+        .parse::<usize>().ok().filter(|&count| count <= limit)
+        .ok_or_else(|| SparkError::Invalid(format!("Retained scenario exceeds the reviewed {limit}-slot sky budget")))?;
+    if donor_skies.len() > limit { return invalid(format!("Donor exceeds the reviewed {limit}-slot sky budget")); }
     let read_slots = || -> Result<Vec<String>> {
         Ok(run(scenario, vec!["-G".into(), "skies[*].sky".into()])?
             .lines().map(str::trim).map(str::to_owned).collect())
@@ -1062,13 +1063,13 @@ fn bind_intact_skies(
     let indices = read_clusters(donor, donor_skies.len())?;
     if donor_skies.is_empty() { return Ok(0); }
     let mut used = BTreeSet::new();
-    if base_count + donor_skies.len() > NATIVE_SKY_SLOTS {
+    if base_count + donor_skies.len() > limit {
         for structure in retained {
             used.extend(read_clusters(&format!("{structure}.scenario_structure_bsp"), base_count)?
                 .into_iter().filter(|&index| index != 65535));
         }
     }
-    let offset = intact_sky_span(&original, &used, donor_skies.len())?;
+    let offset = intact_sky_span(&original, &used, donor_skies.len(), limit)?;
     let append = (offset + donor_skies.len()).saturating_sub(base_count);
     let mut expected_slots = original;
     expected_slots.resize(base_count + append, String::new());
@@ -1175,7 +1176,7 @@ fn native_sky_listener_keeps_unsigned_and_signed_leaf_addresses() {
 
 fn apply_outdoor_stock_skies(
     project: &Project, structure: &str, scenario: &str, edit: &Path,
-    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path,
+    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path, limit: usize,
 ) -> Result<()> {
     let bindings = project.inherited_bsp_connections.iter().chain(project.bsp_assembly.iter())
         .filter_map(|plan| bsp_assembly::outdoor_sky_witnesses(plan).map(|witnesses| (plan, witnesses)))
@@ -1218,7 +1219,7 @@ fn apply_outdoor_stock_skies(
         let slot = match slots.iter().position(|existing| *existing == sky) {
             Some(slot) => slot,
             None => {
-                if slots.len() >= NATIVE_SKY_SLOTS { return invalid("Regional sky would exceed this compiler's native eight-sky budget"); }
+                if slots.len() >= limit { return invalid(format!("Regional sky would exceed the reviewed {limit}-slot sky budget")); }
                 let destination = tags.join(safe_relative(&sky)?);
                 if !destination.is_file() {
                     fs::create_dir(&input)?;
@@ -1328,7 +1329,7 @@ pub(crate) fn prepare_partition_structure(
         let donor_tag = format!("{donor_path}.scenario_structure_bsp");
         if bind {
             intact_sky_offset = Some(bind_intact_skies(&edit, runner, workspace, tags,
-                &format!("{}.scenario", inspection.scenario_path), &original_structures, &donor_tag, skies)?);
+                &format!("{}.scenario", inspection.scenario_path), &original_structures, &donor_tag, skies, limits.skies)?);
         }
         let file = tags.join(safe_relative(&donor_tag)?);
         retained.push((file.clone(), maps::hash_file(&file)?));
@@ -1350,7 +1351,7 @@ pub(crate) fn prepare_partition_structure(
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
         if base_geometry.is_some() {
-            apply_outdoor_stock_skies(project, &structure_tags[0], &inspection.scenario_path, &edit, tools, runner, workspace, tags)?;
+            apply_outdoor_stock_skies(project, &structure_tags[0], &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
         }
         with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
             for (name, geometry) in &regions {
@@ -1545,7 +1546,7 @@ pub(crate) fn prepare_native_with_limits(
     }
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
-    apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags)?;
+    apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
     with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
         bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
     })?;
