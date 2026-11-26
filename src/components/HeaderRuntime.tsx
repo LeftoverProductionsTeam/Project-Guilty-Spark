@@ -5,11 +5,15 @@ import { runtimeNames,runtimeProfileName,runtimeProfileLabel,type OpenCeFlavor }
 import type { RuntimeId, RuntimeRegistration } from '../types';
 export default function HeaderRuntime({
   value,
-  onChange,onSetupFlavor,
+  onChange,onSetupFlavor, label, ariaLabel = 'Active Halo runtime', className = 'gs-runtime-switch', includeCompatibility = false,
 }: {
   value: RuntimeId;
   onChange: (id: RuntimeId) => void;
   onSetupFlavor?:(flavor:OpenCeFlavor)=>void;
+  label?: string;
+  ariaLabel?: string;
+  className?: string;
+  includeCompatibility?: boolean;
 }) {
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]),
     [busy, setBusy] = useState(false),
@@ -36,7 +40,7 @@ export default function HeaderRuntime({
   const selected = profiles.find((item) => item.runtimeId === value);
   const multiple = profiles.filter((item) => item.runtimeId === value).length > 1||!!selected&&runtimeProfileName(selected)!==runtimeNames[value];
   const change = async (key: string) => {
-    if(key==='setup:openh1'||key==='setup:faber'||key==='setup:forerunner'){onSetupFlavor?.(key.slice(6) as OpenCeFlavor);return;}
+    if(key==='setup:opence'||key==='setup:openh1'||key==='setup:faber'||key==='setup:forerunner'){onSetupFlavor?.(key.slice(6) as OpenCeFlavor);return;}
     if (!key.startsWith('profile:')) {
       onChange(key as RuntimeId);
       return;
@@ -56,32 +60,47 @@ export default function HeaderRuntime({
       setBusy(false);
     }
   };
+  const forerunnerProfiles = profiles.filter(item => runtimeProfileName(item) === 'Forerunner');
+  const communityProfiles = profiles.filter(item => item.runtimeId === 'openCe' && runtimeProfileName(item) !== 'Forerunner');
+  const compatibility = (Object.keys(runtimeNames) as RuntimeId[]).filter(id =>
+    !['chupathingyCe', 'mccSteam', 'openCe'].includes(id) &&
+    (includeCompatibility || id === value || primaryRuntimes.some(runtime => runtime === id)));
+  const profileOptions = (rows: RuntimeRegistration[]) =>
+    rows.map(item => <option value={'profile:' + item.id} key={item.id}>{runtimeProfileLabel(item)}</option>);
+  function optionsFor(id: 'chupathingyCe' | 'openCe', rows = profiles.filter(item => item.runtimeId === id)) {
+    const custom = profiles.filter(item => item.runtimeId === id).length > 1 ||
+      rows.some(item => runtimeProfileName(item) !== runtimeNames[id]);
+    return custom && rows.length ? profileOptions(rows) : <option value={id}>{runtimeNames[id]}</option>;
+  }
   return (
     <label
-      className="gs-runtime-switch"
+      className={className}
       title={
         error ||
         'Choose the engine for the next Play/Tools launch. Switching never changes a running game or the map source edition. Add engine profiles and share compatible content in Games & tools.'
       }
     >
-      <span className="live-dot" aria-hidden="true" />
+      {label ? <span>{label}</span> : <span className="live-dot" aria-hidden="true" />}
       <select
-        aria-label="Active Halo runtime"
+        aria-label={ariaLabel}
         disabled={busy}
         value={multiple && selected ? 'profile:' + selected.id : value}
         onChange={(event) => void change(event.target.value)}
       >
-        {primaryRuntimes.filter(id=>!['openCe','chupathingyCe'].includes(id)).map(id=><option value={id} key={id}>{runtimeNames[id]}</option>)}
-        <optgroup label="OpenCE flavors · community engines">
-        {(['chupathingyCe','openCe'] as const).flatMap(id=>{
-          const options=profiles.filter(item=>item.runtimeId===id);
-          return options.length>1||options.some(item=>runtimeProfileName(item)!==runtimeNames[id])?options.map(item=><option value={'profile:'+item.id} key={item.id}>{runtimeProfileLabel(item)}</option>):[<option value={id} key={id}>{runtimeNames[id]}</option>];
-        })}
-        {!profiles.some(item=>runtimeProfileName(item)==='OpenH1')&&<option value="setup:openh1">OpenH1 · connect or download…</option>}
-        {!profiles.some(item=>runtimeProfileName(item)==='Faber')&&<option value="setup:faber">Faber · connect or download…</option>}
-        {!profiles.some(item=>runtimeProfileName(item)==='Forerunner')&&<option value="setup:forerunner">Forerunner · connect installed build…</option>}
+        <optgroup label="Flagship">
+          {optionsFor('chupathingyCe')}
+          {profileOptions(forerunnerProfiles)}
+          {!forerunnerProfiles.length && onSetupFlavor && <option value="setup:forerunner">Forerunner · connect installed build…</option>}
+          <option value="mccSteam">{runtimeNames.mccSteam}</option>
         </optgroup>
-        {!primaryRuntimes.some((id) => id === value) && <option value={value}>{runtimeNames[value]}</option>}
+        <optgroup label="Compatibility">
+          {!communityProfiles.length && forerunnerProfiles.length > 0
+            ? onSetupFlavor && <option value="setup:opence">OpenCE · connect or download…</option>
+            : optionsFor('openCe', communityProfiles)}
+          {compatibility.map(id => <option value={id} key={id}>{runtimeNames[id]}</option>)}
+          {onSetupFlavor && !communityProfiles.some(item=>runtimeProfileName(item)==='OpenH1') && <option value="setup:openh1">OpenH1 · connect or download…</option>}
+          {onSetupFlavor && !communityProfiles.some(item=>runtimeProfileName(item)==='Faber') && <option value="setup:faber">Faber · connect or download…</option>}
+        </optgroup>
       </select>
       <span className="sr-only" role="status">
         {error}

@@ -3,10 +3,10 @@
 Task: Product Completion V2.1. P0 compact MegaWorld, P1 creator toolchain, P2 flagship game creation, P3 quality and compatibility.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 Spark 871c4d9b. Native HMV 16 import, Save, reopen and exact export copy passed. Previous is 33ed6884. Forerunner EECBBD64 keeps exact 12649191 and fcfe9d44 MegaWorld ground preview.
+Latest verified revision: Win64 Spark 075c77f8. Native Demo carrier, actor, physics and multiplayer vehicle rules passed normal editing, saving and reopening. Previous 871c4d9b preserves the verified HMV 16 release. Forerunner EECBBD64 keeps exact 12649191 and fcfe9d44 MegaWorld ground preview.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native is a retained regression fixture. The 8ef8f62 checkpoint has the physical seat, flight and HUD evidence.
-Next action: verify the packaged carrier and multiplayer vehicle rule workflow, then compare live rollover with the original Demo. Existing carrier, mounted actor, gravity and Demolisher Slayer default edits re-read from Demo copy 27d42276 with reserved bits protected. Original Demo b38f3550 and banks remain pristine. The two missing cue ranges exceed the original bank. Continue operation-level Forge, guarded reload and the compact Timberland–Blood Gulch join.
+Next action: verify and deliver packaged Forerunner selection in Spark. Retain original Demo b38f3550 and banks. Continue the matched live rollover comparison, operation-level Forge, guarded reload and compact Timberland–Blood Gulch. The two missing original cue ranges exceed the retained bank.
 
 PRODUCT COMPLETION V2.1 sets the current priorities. P0 is reliable compact world construction. P1 is the full creator toolchain. P2 is flagship game creation. P3 is product quality and compatibility. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Existing Be Native and stand-alone tests are retained regression fixtures. Reuse the existing Spark and Forerunner contracts and keep the current Latest ground preview playable.
 

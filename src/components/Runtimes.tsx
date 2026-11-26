@@ -1,4 +1,5 @@
-import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import {PREFERRED_RUNTIME, type OpenCeFlavor} from '../runtimeWorkbench';
+import HeaderRuntime from './HeaderRuntime';
 import Registration from './RuntimeRegistration';
 import BaboonTools from './BaboonTools';
 import ToolEcosystem from './ToolEcosystem';
@@ -17,7 +18,6 @@ import type {
   RuntimeInventory,
   RuntimeReport,
 } from '../types';
-import { primaryRuntimes } from '../useRuntimeConnections';
 import { Empty, Notice, PageTitle, Pill } from './ui';
 import { offeredTools, toolchainHint } from '../toolchainProfiles';
 import '../onboarding.css';
@@ -88,6 +88,7 @@ export default function Runtimes({
   onSave,
   settings,
   onSettings,
+  onSetupFlavor,
   onOpenWorkspace,
   onCollaborate,
   edit,
@@ -97,6 +98,7 @@ export default function Runtimes({
   onSave: () => Promise<void>;
   settings: Settings;
   onSettings: () => void;
+  onSetupFlavor?: (flavor: OpenCeFlavor) => void;
   onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'creator' | 'assets') => void;
   onCollaborate:()=>void;
   edit:(project:Project,description:string)=>void;
@@ -167,23 +169,8 @@ export default function Runtimes({
         </div>
       )}
       {reports.length > 0 && (
-        <label className="runtime-picker">
-          Halo runtime
-          <select
-            aria-label="Runtime adapter"
-            value={selected}
-            onChange={(e) => {setSelected(e.target.value as RuntimeId);setTab('choose');}}
-          >
-            {primaryRuntimes.flatMap(id => reports.filter(item => item.id === id)).map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))}
-            <optgroup label="Advanced · legacy inspection and export">
-              {reports.filter(item => !primaryRuntimes.some(id => id === item.id)).map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
-            </optgroup>
-          </select>
-        </label>
+        <HeaderRuntime label="Halo runtime" ariaLabel="Runtime adapter" className="runtime-picker" includeCompatibility
+          value={selected} onChange={id=>{setSelected(id);setTab('choose');}} onSetupFlavor={onSetupFlavor}/>
       )}
       </div>
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}

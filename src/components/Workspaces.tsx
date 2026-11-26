@@ -1,3 +1,5 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import HeaderRuntime from './HeaderRuntime';
 import ProjectSnapshots from './ProjectSnapshots';
 import NativeTagOperations from './NativeTagOperations';
 import SourceRecovery from './SourceRecovery';
@@ -601,6 +603,7 @@ export function Preferences({
   onAction,
   onRuntimes,
   embedded=false,
+  onSetupFlavor,
   undoLimit=100,onUndoLimit,
 }: {
   data: Bootstrap;
@@ -608,6 +611,7 @@ export function Preferences({
   onAction: (f: () => Promise<unknown>, s?: string) => Promise<void>;
   onRuntimes: () => void;
   embedded?: boolean;
+  onSetupFlavor?: (flavor: import('../runtimeWorkbench').OpenCeFlavor) => void;
   undoLimit?:number;onUndoLimit?:(limit:number)=>void;
 }) {
   const [draft, setDraft] = useState(data.settings);
@@ -667,6 +671,9 @@ export function Preferences({
       <div className="settings-columns">
         <section className="surface path-settings">
           <h3>Tool &amp; runtime paths</h3>
+          <HeaderRuntime label="Preferred Halo runtime" ariaLabel="Preferred Halo runtime" className="field dependency-target"
+            includeCompatibility value={draft.preferredHalo ?? PREFERRED_RUNTIME}
+            onChange={preferredHalo => setDraft(current => ({ ...current, preferredHalo }))} onSetupFlavor={onSetupFlavor}/>
           {rows.map(([key, title, description]) => (
             <div className="setting-row" key={key}>
               <label>{title}</label>

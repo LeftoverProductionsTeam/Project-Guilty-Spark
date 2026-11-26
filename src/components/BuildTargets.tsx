@@ -17,7 +17,7 @@ export default function BuildTargets({
   onSave: () => Promise<void>;
 }) {
   const [error, setError] = useState('');
-  const [newRuntime, setNewRuntime] = useState<RuntimeId>(defaults?.preferredHalo ?? PREFERRED_RUNTIME);
+  const [newRuntime, setNewRuntime] = useState<RuntimeId | 'forerunner'>(defaults?.preferredHalo ?? PREFERRED_RUNTIME);
   const [open, setOpen] = useMapState(project.id, 'tools.targetsOpen', false);
   const [profiles, setProfiles] = useState<RuntimeRegistration[]>([]);
   const selectedProfileId = project.megaworldRuntimeRegistrationId ?? "";
@@ -52,7 +52,8 @@ export default function BuildTargets({
       buildTargets: targets.map((t) => (t.id === target.id ? { ...t, ...change } : t)),
     });
   }
-  function add(runtimeId: RuntimeId) {
+  function add(selection: RuntimeId | 'forerunner') {
+    const runtimeId = selection === 'forerunner' ? 'openCe' : selection;
     const id = crypto.randomUUID();
     onChange({
       ...project,
@@ -60,7 +61,7 @@ export default function BuildTargets({
         ...targets,
         {
           id,
-          name: runtimeNames[runtimeId],
+          name: selection === 'forerunner' ? 'Forerunner' : runtimeNames[runtimeId],
           runtimeId,
           builder:
             runtimeId === 'mccSteam'
@@ -131,8 +132,9 @@ export default function BuildTargets({
           <select
             aria-label="New engine target runtime"
             value={newRuntime}
-            onChange={(e) => setNewRuntime(e.target.value as RuntimeId)}
+            onChange={(e) => setNewRuntime(e.target.value as RuntimeId | 'forerunner')}
           >
+            <option value="forerunner">Forerunner</option>
             {Object.entries(runtimeNames).map(([id, name]) => (
               <option key={id} value={id}>
                 {name}

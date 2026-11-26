@@ -3489,6 +3489,47 @@ test('runtime folders can be moved independently, including Custom Edition, with
 });
 
 
+test('Forerunner is directly selectable from Dependencies and the active runtime picker', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke;
+    let profiles = [
+      { id: 'upstream', runtimeId: 'openCe', root: 'D:/OpenCE', executable: 'D:/OpenCE/halo.exe', version: null },
+      { id: 'reviewed-engine', runtimeId: 'openCe', root: 'D:/HaloEngine/Latest', executable: 'D:/HaloEngine/Latest/halo.exe',
+        reviewedCompanion: { capabilities: { engine: 'Forerunner' } } },
+    ];
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'list_runtime_registrations') return structuredClone(profiles);
+      if (command === 'activate_runtime_registration') {
+        const chosen = profiles.find(profile => profile.id === args.registrationId);
+        if (!chosen) throw Error('Missing runtime fixture');
+        profiles = [chosen, ...profiles.filter(profile => profile !== chosen)];
+        w.__sparkMock.calls.push({ command, args });
+        return [];
+      }
+      return invoke(command, args);
+    };
+    dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+  });
+  await openFixture(page);
+  await chooseTool(page, 'Settings & tools');
+  await page.getByRole('tab', { name: 'Dependencies & setup', exact: true }).click();
+  const target = page.getByRole('combobox', { name: 'Dependency target runtime', exact: true });
+  const flagship = target.locator('optgroup[label="Flagship"] option[value="profile:reviewed-engine"]');
+  await expect(flagship).toHaveText('Forerunner · Latest');
+  await target.selectOption('profile:reviewed-engine');
+  await expect(target).toHaveValue('profile:reviewed-engine');
+  await expect(page.getByRole('tab', { name: 'Dependencies & setup', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await openStudioMenu(page);
+  const header = page.getByRole('combobox', { name: 'Active Halo runtime', exact: true });
+  await expect(header).toHaveValue('profile:reviewed-engine');
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls
+    .filter((entry: any) => entry.command === 'activate_runtime_registration').map((entry: any) => entry.args.registrationId)))
+    .toEqual(['reviewed-engine']);
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls
+    .some((entry: any) => ['launch_registered_runtime', 'community_join'].includes(entry.command)))).toBe(false);
+});
+
 test('saved OpenCE engines switch without launching or changing the map source',async({page})=>{
  await mockDesktop(page);
  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let profiles=['OpenCE','OpenCEFaber'].map((name,i)=>({id:i?'faber':'upstream',runtimeId:'openCe',root:'D:/Runtimes/'+name,executable:'D:/Runtimes/'+name+'/halo.exe',dataRoot:'D:/SharedHalo',version:null,networkVersion:null}));

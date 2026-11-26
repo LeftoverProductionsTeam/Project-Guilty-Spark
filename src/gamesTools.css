@@ -1,5 +1,5 @@
 .application .games-tools-page {
-  padding: 12px 16px;
+  padding: 8px 12px;
 }
 .games-tools-heading {
   display: flex;
@@ -25,7 +25,14 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  margin: 8px 0 12px;
+  margin: 4px 0 6px;
+}
+.games-tools-compatibility {
+  margin-bottom: 6px;
+}
+.games-tools-compatibility > summary {
+  padding: 3px 0;
+  font-size: 11px;
 }
 .halo-runtime-card {
   display: grid;

@@ -93,7 +93,7 @@ export const runtimeNames: Record<RuntimeId, string> = {
 export function runtimeProfileName(profile:RuntimeRegistration):string {
  const identity=[profile.id,profile.version??'',profile.root.replaceAll('\\','/')].join(' ');
  if(profile.runtimeId!=='openCe')return runtimeNames[profile.runtimeId];
- return /forerunner/i.test(identity)?'Forerunner':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames.openCe;
+ return profile.reviewedCompanion?.capabilities.engine==='Forerunner'||/forerunner/i.test(identity)?'Forerunner':/openh1/i.test(identity)?'OpenH1':/faber/i.test(identity)?'Faber':runtimeNames.openCe;
 }
 export function reviewedMcc13Target(profile: RuntimeRegistration) {
   const feature = "maps.mcc13_tag_space_64m.v1";

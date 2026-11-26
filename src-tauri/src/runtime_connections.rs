@@ -27,6 +27,8 @@ fn community_identity(hash: &str) -> Option<(runtime::RuntimeId, &'static str)> 
         // Owner-connected OpenH1 Windows build: data paths and packs only; VR is a separate Linux/OpenXR gate.
         "b9b69d43a6757961152cec070bfa3d59d96209d16f8018befd74c9896209b1ea" | "7aab23553625099ed156faa627d31c7bbc342e4b5d252a348f0d0ddf464ddb46" => Some((runtime::RuntimeId::OpenCe,"OpenH1-Windows")),
         "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3" => Some((runtime::RuntimeId::OpenCe,"Faber-2.3.4")),
+        // The owner-approved local Latest payload. Capability review remains separate.
+        "eecbbd645b46986dc23b11383a2a8c54d5fc95efca74668a4fea83e4ca21a035" => Some((runtime::RuntimeId::OpenCe,"Forerunner")),
         "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b" => Some((runtime::RuntimeId::ChupathingyCe, "0.9.0c")),
         "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4" => Some((runtime::RuntimeId::ChupathingyCe, "0.8.1d")),
         _ => None,
@@ -57,7 +59,8 @@ fn nearby_roots(anchors: impl IntoIterator<Item=PathBuf>) -> Vec<PathBuf> {
         for parent in anchor.ancestors().take(6) {
             let names=["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","OpenCEFaber","OpenH1","OpenH1-Windows","ChupathingyCE","Chupathingy","Arena Evolved","ArenaEvolved"];
             let children=names.into_iter().map(|name|parent.join(name))
-                .chain(names.into_iter().map(|name|parent.join("Runtimes").join(name)));
+                .chain(names.into_iter().map(|name|parent.join("Runtimes").join(name)))
+                .chain([parent.join("Project Forerunner/Latest"), parent.join("Forerunner/Latest")]);
             for candidate in std::iter::once(parent.to_path_buf()).chain(children) {
                 if seen.insert(candidate.clone()) {roots.push(candidate);if roots.len()==256{return roots;}}
             }
@@ -83,7 +86,8 @@ pub(super) fn discover(state: &AppState) -> Reply<Vec<Detected>> {
         }
         anchors
     };
-    anchors.extend([std::env::current_dir().ok(),std::env::current_exe().ok().and_then(|file|file.parent().map(Path::to_path_buf))].into_iter().flatten());
+    let local_anchors = [std::env::current_dir().ok(), std::env::current_exe().ok().and_then(|file| file.parent().map(Path::to_path_buf))];
+    anchors.splice(0..0, local_anchors.into_iter().flatten());
     for root in nearby_roots(anchors) {
         if !found.iter().any(|item|item.runtime_id==runtime::RuntimeId::HaloCustomEdition)&&root.join("haloce.exe").is_file() {
             if let Ok(ce)=ce_setup::inspect_root(&root) {
@@ -214,6 +218,7 @@ mod tests {
         let anchor=PathBuf::from("owned/maps/zombie/maps");let roots=nearby_roots([anchor.clone(),anchor]);
         for child in ["Halo Custom Edition","OpenCE","ChupathingyCE","opencehalo-windows-release","chupathingyce-windows64-release"] {assert!(roots.contains(&PathBuf::from("owned").join(child)));}
         for child in ["Halo Custom Edition","OpenCE","Chupathingy","OpenH1-Windows","OpenCEFaber"] {assert!(roots.contains(&PathBuf::from("owned/Runtimes").join(child)));}
+        assert!(roots.contains(&PathBuf::from("owned/Project Forerunner/Latest")));
         assert_eq!(roots.iter().collect::<std::collections::HashSet<_>>().len(),roots.len());
         assert!(nearby_roots((0..100).map(|n|PathBuf::from(format!("owned-{n}/maps")))).len()<=256);
     }
@@ -222,6 +227,7 @@ mod tests {
         assert_eq!(community_identity(core::runtime_packages::package("chupathingy").unwrap().executable_sha256),Some((runtime::RuntimeId::ChupathingyCe,"0.9.0c")));
         assert_eq!(community_identity("7aab23553625099ed156faa627d31c7bbc342e4b5d252a348f0d0ddf464ddb46"),Some((runtime::RuntimeId::OpenCe,"OpenH1-Windows")));
         assert_eq!(community_identity("5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3"),Some((runtime::RuntimeId::OpenCe,"Faber-2.3.4")));
+        assert_eq!(community_identity("eecbbd645b46986dc23b11383a2a8c54d5fc95efca74668a4fea83e4ca21a035"),Some((runtime::RuntimeId::OpenCe,"Forerunner")));
     }
     #[test]
     fn unrelated_named_binaries_and_changed_identity_never_become_reviewed_clients() {

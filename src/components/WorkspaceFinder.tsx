@@ -1,6 +1,7 @@
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import ToolEcosystem from './ToolEcosystem';
-import {runtimeNames} from '../runtimeWorkbench';
+import HeaderRuntime from './HeaderRuntime';
+import type { OpenCeFlavor } from '../runtimeWorkbench';
 import {useMapState} from '../mapSession';
 import type {Project,Settings,RuntimeId} from '../types';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -9,8 +10,8 @@ import type { Workspace } from '../types';
 import type { WorkspaceFinderItem } from '../workspaceFinder';
 import { filterWorkspaceFinder } from '../workspaceFinder';
 
-export default function WorkspaceFinder({items,onNavigate,onClose,project=null,settings,onSettings}: {
-  project?:Project|null;settings?:Settings;onSettings?:()=>void;
+export default function WorkspaceFinder({items,onNavigate,onClose,project=null,settings,onSettings,onSetupFlavor}: {
+  project?:Project|null;settings?:Settings;onSettings?:()=>void;onSetupFlavor?:(flavor:OpenCeFlavor)=>void;
   items: readonly WorkspaceFinderItem[];
   onNavigate: (id:Workspace)=>void;
   onClose:()=>void;
@@ -57,7 +58,7 @@ export default function WorkspaceFinder({items,onNavigate,onClose,project=null,s
         }}/><kbd>Esc</kbd></div>
       <span id={resultStatusId} className="gs-sr-only" role="status" aria-live="polite">{results.length} matching workspaces. {results.length ? `Selected: ${results[activeIndex].label}.` : 'Try a shorter query.'}</span>
       <div id="gs-finder-results" className="gs-finder-results" aria-label="Matching workspaces">
-        {settings&&<><label>Halo runtime<select aria-label="Tool launcher runtime" value={runtime} onChange={e=>setRuntime(e.target.value as RuntimeId)}>{Object.entries(runtimeNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><ToolEcosystem compact heading="Installed tools & downloads" project={project} settings={settings} runtime={runtime} search={query} onSettings={()=>{onClose();onSettings?.();}} onOpenWorkspace={target=>{onNavigate(target);onClose();}}/></>}
+        {settings&&<><HeaderRuntime label="Halo runtime" ariaLabel="Tool launcher runtime" className="field" includeCompatibility value={runtime} onChange={setRuntime} onSetupFlavor={onSetupFlavor ? flavor => { onClose(); onSetupFlavor(flavor); } : undefined}/><ToolEcosystem compact heading="Installed tools & downloads" project={project} settings={settings} runtime={runtime} search={query} onSettings={()=>{onClose();onSettings?.();}} onOpenWorkspace={target=>{onNavigate(target);onClose();}}/></>}
         {results.map((item,index)=><button key={`${item.id}:${item.label}`} className={activeIndex===index?'gs-finder-item active':'gs-finder-item'} aria-current={activeIndex===index?'true':undefined} onMouseEnter={()=>setSelected(index)} onClick={()=>navigate(item.id)}>
           <span><strong>{item.label}</strong><small>{item.help}</small></span><ArrowRight size={16}/>
         </button>)}

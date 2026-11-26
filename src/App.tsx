@@ -1514,18 +1514,14 @@ export default function App() {
     if (workspace === 'settings')
       return (
         <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings project={current} settings={data.settings} onEditProject={edit} onBeforeSave={persist=>save(persist===true,current?.id)}/>:settingsTab==='dependencies'?<div className="analysis-page">
-          <label className="field dependency-target">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>{
-            if(e.target.value==='forerunner'){openCommunityFlavorSetup('forerunner');return;}
-            setDependencyRuntime(e.target.value as RuntimeId);
-          }}>
-            <optgroup label="Flagship"><option value="chupathingyCe">ChupathingyCE</option><option value="forerunner">Forerunner</option><option value="mccSteam">Halo 1 · MCC (Steam)</option></optgroup>
-            <optgroup label="Compatibility"><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="openCe">OpenCE</option><option value="arenaEvolved">Arena Evolved</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option></optgroup>
-          </select></label>
+          <HeaderRuntime label="Dependency target" ariaLabel="Dependency target runtime" className="field dependency-target"
+            includeCompatibility value={dependencyRuntime} onChange={setDependencyRuntime} onSetupFlavor={openCommunityFlavorSetup}/>
           <DependencyPanel project={current} runtime={dependencyRuntime} onSetupChanged={next=>{setData(next);setEpoch(value=>value+1);}} onProjectUpdated={applyDependencyChoice} onChooseAssets={()=>setWorkspace(current?'assets':'library')} onChooseRuntime={()=>{writeMapSession(current?.id??'global','hosting.runtime',dependencyRuntime);writeMapSession('global','tools.dashboard','setup');writeMapSession('global','tools.connectRuntime',dependencyRuntime);writeMapSession('global','tools.downloadOpen',true);if(dependencyRuntime==='chupathingyCe')writeMapSession('global','tools.enginePackage','chupathingy');setSettingsTab('tools');}}/>
         </div>:<GamesTools data={data} project={current} busy={busy}
           onSelectMap={id=>void openProject(id,'settings')} onLibrary={()=>setWorkspace('library')}
           onSetup={id=>{setDependencyRuntime(id);openDependencySetup();}}
           onOpenWorkspace={target=>setWorkspace(target)}><Preferences embedded
+          onSetupFlavor={openCommunityFlavorSetup}
           data={data}
           undoLimit={history.limit} onUndoLimit={limit=>dispatch({type:'history-limit',limit})}
           onApply={applySettings}
@@ -1538,7 +1534,7 @@ export default function App() {
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save(true)} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save(true)} settings={data.settings} onSettings={openDependencySetup} onSetupFlavor={openCommunityFlavorSetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} onSave={!activeJob&&windowWriters[current.id]!==false?()=>save(false,current.id):undefined} />;
@@ -2068,6 +2064,7 @@ export default function App() {
               project={current}
               settings={data.settings}
               onSettings={openDependencySetup}
+              onSetupFlavor={openCommunityFlavorSetup}
               onNavigate={(target) => {
                 markFirstVisitSeen();
                 setWorkspace(target);
