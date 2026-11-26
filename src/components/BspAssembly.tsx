@@ -422,10 +422,27 @@ export default function BspAssembly({
           </details>
           {!native && <p>Open the desktop app to inspect and compile owned Halo geometry.</p>}
           {Boolean(project.inheritedBspConnections?.length) && (
-            <p className="subtle">
-              The next native build rechecks {project.inheritedBspConnections?.length} inherited
-              {' '}connections alongside the new route.
-            </p>
+            <details className="bsp-help">
+              <summary>Inherited connections · {project.inheritedBspConnections?.length}</summary>
+              <p>The next native build rechecks these connections alongside the new route.</p>
+              {!nativePartitioned && project.inheritedBspConnections?.map((plan, index) => plan.separateNativeBsps ? null : (
+                <label key={plan.donorProjectId + ':' + index} title="Restore door portals between the original sky regions when this BSP is rebuilt.">
+                  <input type="checkbox" checked={plan.restoreDonorSkyPortals ?? false} disabled={busy}
+                    onChange={event => {
+                      const enabled = event.target.checked;
+                      setReport(null);
+                      setError('');
+                      onEdit({
+                        ...project,
+                        inheritedBspConnections: project.inheritedBspConnections?.map(
+                          (route, position) => position === index ? { ...route, restoreDonorSkyPortals: enabled } : route,
+                        ),
+                      }, enabled ? 'Restore ' + plan.donorTitle + ' sky portals' : 'Clear ' + plan.donorTitle + ' sky portal override');
+                    }} />
+                  Restore {plan.donorTitle} sky portals
+                </label>
+              ))}
+            </details>
           )}
           <div className="bsp-actions">
             {canExtend && <label>Connect from BSP

@@ -1443,23 +1443,20 @@ fn same_portal_perimeter(a: &[V], b: &[V]) -> bool {
         && b.iter().all(|&point| is_on_boundary(point, a))
 }
 
-fn match_compiled_sky_portal(
-    outline: &[V],
-    compiled: &[maps::CompiledPortal],
-    matched: &mut std::collections::BTreeSet<usize>,
-) -> Result<()> {
-    let mut candidates = compiled.iter().enumerate().filter(|(_, portal)| {
-        portal.flags == 0 && portal.front_cluster >= 0 && portal.back_cluster >= 0
-            && portal.front_cluster != portal.back_cluster
-            && same_portal_perimeter(outline, &portal.ring)
-    });
-    let Some((index, _)) = candidates.next() else {
-        return invalid("Compiled BSP is missing a restored sky portal between distinct clusters");
+fn find_compiled_sky_portal(outline: &[V], compiled: &[maps::CompiledPortal]) -> Result<Option<usize>> {
+    let mut candidates = compiled.iter().enumerate().filter(|(_, portal)| same_portal_perimeter(outline, &portal.ring));
+    let Some((index, portal)) = candidates.next() else {
+        return Ok(None);
     };
-    if candidates.next().is_some() || !matched.insert(index) {
+    if candidates.next().is_some() {
         return invalid("Compiled BSP has overlapping restored sky portals");
     }
-    Ok(())
+    if portal.flags != 0 || portal.front_cluster < 0 || portal.back_cluster < 0
+        || portal.front_cluster == portal.back_cluster
+    {
+        return invalid("A compiled sky portal with the same outline has incompatible flags or cluster boundaries");
+    }
+    Ok(Some(index))
 }
 
 pub(crate) fn verify_compiled_sky_portals(
@@ -1473,7 +1470,11 @@ pub(crate) fn verify_compiled_sky_portals(
     let compiled = maps::compiled_portals(path, map, 0)?;
     let mut matched = std::collections::BTreeSet::new();
     for outline in &outlines {
-        match_compiled_sky_portal(outline, &compiled, &mut matched)?;
+        let index = find_compiled_sky_portal(outline, &compiled)?
+            .ok_or_else(|| SparkError::Invalid("Compiled BSP is missing a restored sky portal between distinct clusters".into()))?;
+        if !matched.insert(index) {
+            return invalid("Authored sky portal outlines overlap");
+        }
     }
     Ok(matched.len())
 }
@@ -1488,8 +1489,17 @@ fn inherited_sky_portals(
         let source = &plan.donor_source;
         let donor = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
         for outline in donor_sky_portal_outlines(plan, &donor)? {
-            match_compiled_sky_portal(&outline, compiled, &mut matched)
-                .map_err(|err| SparkError::Invalid(format!("Inherited {} sky portal: {err}", plan.donor_title)))?;
+            if outlines.iter().any(|previous: &Vec<V>| same_portal_perimeter(previous, &outline)) {
+                return invalid(format!("Inherited {} sky portal overlaps another selected doorway", plan.donor_title));
+            }
+            if let Some(index) = find_compiled_sky_portal(&outline, compiled)
+                .map_err(|err| SparkError::Invalid(format!("Inherited {} sky portal: {err}", plan.donor_title)))?
+            {
+                matched.insert(index);
+            }
+            // A creator can enable this on an earlier donor whose last build
+            // predates sky-portal restoration. The output must still prove a
+            // unique exact cut between two clusters before it is accepted.
             outlines.push(outline);
         }
     }
@@ -3354,6 +3364,11 @@ mod tests {
         moved[1][1] += 0.04;
         assert!(!same_portal_perimeter(&trapezoid, &moved));
         assert!(!same_portal_perimeter(&trapezoid, &split.map(|[x,y,z]| [x+0.01,y,z])));
+        assert_eq!(find_compiled_sky_portal(&trapezoid, &[]).unwrap(), None);
+        let mut native = maps::CompiledPortal { front_cluster: 6, back_cluster: 4, flags: 0, ring: split.to_vec() };
+        assert_eq!(find_compiled_sky_portal(&trapezoid, std::slice::from_ref(&native)).unwrap(), Some(0));
+        native.back_cluster = 6;
+        assert!(find_compiled_sky_portal(&trapezoid, &[native]).is_err());
     }
 
     #[test]
