@@ -161,8 +161,11 @@ test('native control sides change only the reviewed placement and reset on sourc
  const placement=form.getByRole('combobox',{name:'Native source placement',exact:true});
  await expect(sides).not.toBeChecked();
  await expect(preview).toBeDisabled();
+ const frontHint=form.getByText('For a model with a front marker', {exact:false});
+ await expect(frontHint).toBeVisible();
  await sides.focus();
  await page.keyboard.press('Space');
+ await expect(frontHint).toHaveCount(0);
  await preview.click();
  const op=JSON.parse((await page.getByTestId('device-operation').textContent())!);
  expect(op).toMatchObject({kind:'devicePlacement',sourceSha256:'a'.repeat(64),device:{index:0,position:[1,2,3],rotationRadians:[0,0,0],usableFromBothSides:true}});
