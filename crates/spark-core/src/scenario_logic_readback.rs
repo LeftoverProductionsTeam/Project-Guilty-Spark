@@ -129,6 +129,19 @@ fn with_scenario<T>(path:&Path,inspection:&MapInspection,decode:impl FnOnce(&Rea
     if at<space.begin||at.checked_add(0x5b0).is_none_or(|end|end>space.end){return invalid("Compiled Logic scenario body escapes its tag region");}
     decode(&r,&space,at)
 }
+pub(crate) fn scenario_vehicle_bsp_mask(
+    path: &Path, map: &MapInspection, index: usize,
+) -> Result<u16> {
+    if (map.header.version, map.header.scenario_type) != (13, 1) || map.header.extended {
+        return invalid("Vehicle BSP ownership requires a standard MCC13 multiplayer cache");
+    }
+    with_scenario(path, map, |reader, space, scenario| {
+        let (rows, count) = space.block(reader, scenario + 0x240, 120, 4096)?;
+        if index >= count { return invalid("Compiled aircraft placement index is missing"); }
+        reader.u16(rows + index * 120 + 32)
+    })
+}
+
 pub(crate) fn mcc13_sky_reference_count(path: &Path, inspection: &MapInspection) -> Result<usize> {
     with_scenario(path, inspection, |reader, space, scenario| {
         let (_, count) = space.block(reader, scenario + 0x30, 16, 16)?;

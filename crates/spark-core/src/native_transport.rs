@@ -52,10 +52,18 @@ fn flight_inventory_rejects_unknown_versions_empty_durations_and_duplicate_names
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct TransportAppend {pub name:String,pub tag_path:String,pub position:[f32;3],pub rotation_radians:[f32;3]}
+pub struct TransportAppend {
+    pub name: String,
+    pub tag_path: String,
+    pub position: [f32; 3],
+    pub rotation_radians: [f32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_bsp: Option<u8>,
+}
 impl TransportAppend {
  pub fn validate(&self)->Result<()>{
   if !["extraction_pelican","extraction_spirit"].contains(&self.name.as_str())||self.tag_path.starts_with('-')||self.tag_path.len()>230||self.tag_path.ends_with(".vehicle")||self.position.iter().any(|v|!v.is_finite()||v.abs()>2048.)||self.rotation_radians.iter().any(|v|!v.is_finite()||v.abs()>std::f32::consts::TAU){return invalid("Choose a Pelican/Spirit role, native vehicle tag path and finite world pose within2048units; rotation is radians");}
+  if self.owner_bsp.is_some_and(|slot| slot >= 16) { return invalid("Choose an owning BSP slot from 0 to 15"); }
   safe_relative(&self.tag_path)?;Ok(())
  }
  pub fn group_names(&self)->[String;3]{["boarded","called","landed"].map(|suffix|format!("{}_{suffix}",self.name))}
@@ -71,6 +79,15 @@ fn names(fields:&str,array:&str)->Result<Vec<String>>{let table=array_listing(fi
 fn layout(fields:&str,value:&TransportAppend,regional_mcc:bool)->Result<Layout>{
  value.validate()?;
  let objects=names(fields,"object_names")?;let vehicles=array_listing(fields,"vehicles")?;let palette=names(fields,"vehicle_palette")?;let groups=names(fields,"device_groups")?;
+ if value.owner_bsp.is_some() {
+     if !regional_mcc { return invalid("Explicit aircraft BSP ownership requires regional MCC13 source"); }
+     if let Some(first) = array_items(&vehicles, "vehicles")?.first() {
+         let first = direct_struct_fields(first)?;
+         if !first.lines().any(|line| line.starts_with("bsp_indices (")) {
+             return invalid("Select an Invader editor and compiler that support native vehicle BSP ownership");
+         }
+     }
+ }
  let vehicle_limit=crate::bsp_vehicles::limit(if regional_mcc{13}else{609});
  if objects.len()>=512||vehicles.count>=vehicle_limit||palette.len()>100||groups.len()>125{
   return invalid(format!("Native append capacity reached ({vehicle_limit} vehicles, 100 palette entries, 512 names, 128 groups)"));
@@ -99,6 +116,7 @@ pub fn arguments(tags:&Path,tag:&str,before:&str,value:&TransportAppend,regional
  insert(&mut args,"object_names".into(),1);set(&mut args,format!("object_names[{}].name",p.name),value.name.clone());
  insert(&mut args,"vehicles".into(),1);let prefix=format!("vehicles[{}]",p.vehicle);
  for(key,text)in [("type",p.palette.to_string()),("name",p.name.to_string()),("position",value.position.map(|v|v.to_string()).join(",")),("rotation",value.rotation_radians.map(|v|v.to_string()).join(",")),("body_vitality","1".into())]{set(&mut args,format!("{prefix}.{key}"),text);}
+ if let Some(slot) = value.owner_bsp { set(&mut args, format!("{prefix}.bsp_indices"), (1u16 << slot).to_string()); }
  insert(&mut args,"device_groups".into(),3);
  for(index,name)in value.group_names().into_iter().enumerate(){let prefix=format!("device_groups[{}]",p.group+index);set(&mut args,format!("{prefix}.name"),name);set(&mut args,format!("{prefix}.initial_value"),"0".into());set(&mut args,format!("{prefix}.flags.can_change_only_once"),"0".into());}
  args.push(tag.into());Ok(args)
@@ -113,9 +131,10 @@ pub fn reviewed(before:&str,after:&str,value:&TransportAppend,regional_mcc:bool)
  let p=layout(before,value,regional_mcc)?;preserved_arrays(before,after,&[("vehicles",1),("vehicle_palette",usize::from(p.new_palette)),("object_names",1),("device_groups",3)])?;
  let snapshot=snapshots(after,&[value.name.clone()])?.pop().ok_or_else(||crate::SparkError::Invalid("Appended transport is missing".into()))?;
  if snapshot.vehicle_index as usize!=p.vehicle||snapshot.name_index as usize!=p.name||snapshot.groups!=[p.group as u16,p.group as u16+1,p.group as u16+2]||snapshot.transport.tag_path.replace('\\',"/").to_ascii_lowercase()!=value.tag_path.replace('\\',"/").to_ascii_lowercase()||!positions_close(snapshot.transport.position,value.position)||!snapshot.transport.rotation_radians.iter().zip(value.rotation_radians).all(|(a,b)|facings_close(*a,b)){return invalid("Appended transport pose/reference/binding differs from review");}
+ if snapshot.transport.owner_bsp != value.owner_bsp { return invalid("Appended aircraft owning BSP differs from the review"); }
  let table=array_listing(after,"vehicles")?;let rows=array_items(&table,"vehicles")?;let root=direct_struct_fields(rows[p.vehicle])?;
  if native_index(&root,"type")? as usize!=p.palette||number(&root,"body_vitality")?!=1.{return invalid("Appended vehicle palette/vitality differs from source request");}
- Ok(vec![FieldDifference{before:format!("{} vehicles / {} names / {} groups",p.vehicle,p.name,p.group),after:format!("Append {} at vehicle{} / name{}; tag{}; XYZ{:?}; yaw/pitch/roll{:?}rad; groups{:?}. All original fields/indices retained",value.name,p.vehicle,p.name,value.tag_path,value.position,value.rotation_radians,value.group_names())}])
+ Ok(vec![FieldDifference{before:format!("{} vehicles / {} names / {} groups",p.vehicle,p.name,p.group),after:format!("Append {} at vehicle{} / name{}; tag{}; XYZ{:?}; yaw/pitch/roll{:?}rad; {}; groups{:?}. All original fields/indices retained",value.name,p.vehicle,p.name,value.tag_path,value.position,value.rotation_radians,value.owner_bsp.map_or_else(|| "default BSP placement".into(), |slot| format!("owning BSP {slot}")),value.group_names())}])
 }
 pub fn snapshots(fields:&str,selected:&[String])->Result<Vec<TransportSnapshot>>{
  let source=scenario_transport_choices(fields)?;let objects=names(fields,"object_names")?;let groups=names(fields,"device_groups")?;let table=array_listing(fields,"vehicles")?;let rows=array_items(&table,"vehicles")?;let mut result=vec![];
@@ -124,7 +143,15 @@ pub fn snapshots(fields:&str,selected:&[String])->Result<Vec<TransportSnapshot>>
   let name_index=objects.iter().position(|n|n==name).ok_or_else(||crate::SparkError::Invalid("Missing native transport name".into()))?;
   let placed=rows.iter().enumerate().filter_map(|(i,row)|direct_struct_fields(row).ok().and_then(|root|native_index(&root,"name").ok().filter(|index|*index==name_index as i16).map(|_|(i,root)))).collect::<Vec<_>>();
   if placed.len()!=1{return invalid("Transport name has missing/ambiguous vehicle reverse binding");}let(index,root)=&placed[0];let(position,_)=native_vector(root,"position")?;let(rotation,_)=native_vector(root,"rotation")?;
-  let transport=TransportAppend{name:name.clone(),tag_path:found[0].tag_path.clone(),position,rotation_radians:rotation.map(f32::to_radians)};
+  let owner_bsp = if root.lines().any(|line| line.starts_with("bsp_indices (")) {
+      let mask = number(root, "bsp_indices")?;
+      if !(0. ..=f64::from(u16::MAX)).contains(&mask) || mask.fract() != 0. {
+          return invalid("Invalid native aircraft BSP mask");
+      }
+      let mask = mask as u16;
+      (mask.count_ones() == 1).then(|| mask.trailing_zeros() as u8)
+  } else { None };
+  let transport=TransportAppend{name:name.clone(),tag_path:found[0].tag_path.clone(),position,rotation_radians:rotation.map(f32::to_radians),owner_bsp};
   let mut binding=[0;3];for(i,name)in transport.group_names().iter().enumerate(){if !source.groups.contains(name){return invalid("Missing isolated zero-initialized transport signal");}binding[i]=groups.iter().position(|g|g==name).ok_or_else(||crate::SparkError::Invalid("Transport signal index is missing".into()))? as u16;}
   let row=TransportSnapshot{flight:None,vehicle_index:*index as u16,name_index:name_index as u16,groups:binding,transport};row.validate()?;result.push(row);
  }Ok(result)
@@ -139,6 +166,12 @@ pub fn verify_cache(expected:&[TransportSnapshot],path:&Path,map:&crate::maps::M
   let vehicles=read.vehicles.iter().filter(|v|v.index==row.vehicle_index as usize).collect::<Vec<_>>();
   if name.name!=value.name||name.object_type!=1||name.object_index!=row.vehicle_index as i16||vehicles.len()!=1{return invalid("Compiled transport object/name/index binding differs");}let actual=vehicles[0];
   if actual.name_index!=row.name_index as i16||!actual.tag_path.replace('\\',"/").eq_ignore_ascii_case(&value.tag_path.replace('\\',"/"))||!positions_close(actual.position,value.position)||!actual.rotation_radians.iter().zip(value.rotation_radians).all(|(a,b)|facings_close(*a,b)){return invalid("Compiled transport tag/pose/reverse name differs");}
+  if let Some(slot) = value.owner_bsp {
+      if usize::from(slot) >= map.mesh.parts.len() ||
+          crate::maps::scenario_vehicle_bsp_mask(path, map, row.vehicle_index as usize)? != (1u16 << slot) {
+          return invalid("Compiled aircraft lost its reviewed owning BSP. Use an Invader compiler that preserves native vehicle ownership.");
+      }
+  }
   for(index,name)in row.groups.iter().zip(value.group_names()){signal_indices.insert(*index as i16);let group=read.groups.get(*index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled transport group is missing".into()))?;if group.name!=name||group.initial_value!=0.||group.flags!=0{return invalid("Compiled transport group identity/default/flags differ");}}
  }
  if read.devices.iter().any(|d|d.power_group.is_none_or(|i|signal_indices.contains(&i))||d.position_group.is_none_or(|i|signal_indices.contains(&i))){return invalid("Compiled transport signals are aliased by device power/position");}Ok(())
@@ -226,7 +259,7 @@ pub(crate) fn movement_route(route:&NativeCommandList,volumes:&[crate::maps::Sce
 #[cfg(test)]
 mod tests{
  use super::*;
- fn value()->TransportAppend{TransportAppend{name:"extraction_pelican".into(),tag_path:"vehicles/pelican/pelican".into(),position:[1.,2.,3.],rotation_radians:[0.;3]}}
+ fn value()->TransportAppend{TransportAppend{name:"extraction_pelican".into(),tag_path:"vehicles/pelican/pelican".into(),position:[1.,2.,3.],rotation_radians:[0.;3],owner_bsp:None}}
  fn before()->String{"type (singleplayer) enum\nobject_names[1] array\n    object_names[0] struct\n        name (original) string\nvehicles[0] array\nvehicle_palette[0] array\ndevice_groups[1] array\n    device_groups[0] struct\n        name (original_power) string\n        initial_value (1) float\n        flags bitmask\n            can_change_only_once (1) bitfield\nmachines[0] array\ncontrols[0] array\ncommand_lists[0] array\nencounters[0] array\nscripts[0] array\nsource_metadata (retained) string\n".into()}
  fn after()->String{
   let mut text=before().replace("object_names[1] array","object_names[2] array").replace("vehicles[0] array","vehicles[1] array\n    vehicles[0] struct\n        type (0) index\n        name (1) index\n        position (1,2,3) point3d\n        rotation (0,0,0) euler3d\n        body_vitality (1) float").replace("vehicle_palette[0] array","vehicle_palette[1] array\n    vehicle_palette[0] struct\n        name (vehicles/pelican/pelican.vehicle) tagref").replace("device_groups[1] array","device_groups[4] array");
@@ -280,6 +313,31 @@ mod tests{
   for bad in [VehicleFlightTuning{throttle:f32::NAN,..request.clone()},VehicleFlightTuning{throttle:1.1,..request.clone()},VehicleFlightTuning{avoidance_distance:12.1,..request.clone()},VehicleFlightTuning{pathfinding_radius:-1.,..request.clone()}]{assert!(bad.validate().is_err());}
   let disabled=VehicleFlightTuning{throttle:0.,avoidance_distance:0.,pathfinding_radius:0.};disabled.validate().unwrap();
  }
+ #[test]
+ fn regional_aircraft_append_requires_exact_single_owner() {
+     let mut hubs = String::from("trigger_volumes[2] array\n");
+     for (i, name) in ["extraction_unsc_hub", "extraction_covenant_hub"].into_iter().enumerate() {
+         hubs.push_str(&format!(
+             "    trigger_volumes[{i}] struct\n        name ({name}) string\n        type enum\n            fixed enum value\n            rotational (*) enum value\n        rotation_vector_forward (1,0,0) point3d\n        rotation_vector_up (0,0,1) point3d\n        starting_corner ({i},0,0) point3d\n        ending_corner_offset (1,1,1) point3d\n"
+         ));
+     }
+     let before = before().replace("singleplayer", "multiplayer") + &hubs;
+     let after = after().replace("singleplayer", "multiplayer")
+         .replace("        body_vitality (1)", "        bsp_indices (2048) uint16\n        body_vitality (1)") + &hubs;
+     let request = TransportAppend { owner_bsp: Some(11), ..value() };
+     let selected = |before, regional| arguments(Path::new("tags"), "level.scenario", before, &request, regional);
+     let args = selected(&before, true).unwrap();
+     assert!(args.windows(3).any(|row| row == ["-S", "vehicles[0].bsp_indices", "2048"]));
+     assert!(selected(&before, false).is_err());
+     assert!(reviewed(&before, &after, &request, true).is_ok());
+     for invalid_mask in [0, 1, 2049] {
+         let wrong = after.replace("bsp_indices (2048)", &format!("bsp_indices ({invalid_mask})"));
+         assert!(reviewed(&before, &wrong, &request, true).is_err());
+     }
+     let incompatible = before.replace("vehicles[0] array", "vehicles[1] array\n    vehicles[0] struct\n        type (0) index");
+     assert!(selected(&incompatible, true).unwrap_err().to_string().contains("support native vehicle BSP ownership"));
+ }
+
  #[test]fn transport_draft_and_aircraft_validation_refuse_invalid_inputs(){
   for value in [TransportAppend{name:"not_a_role".into(),..value()},TransportAppend{tag_path:"../original".into(),..value()},TransportAppend{position:[f32::NAN,0.,0.],..value()}]{assert!(value.validate().is_err());}
   let vehicle="vehicle_type enum\n ├──human_tank enum value\n ├──human_jeep enum value\n ├──human_boat enum value\n ├──human_plane (*) enum value\n ├──alien_scout enum value\n ├──alien_fighter enum value\n └──turret enum value\nseats[2] array\n    seats[0] struct\n        label (P-driver) string\n        flags bitmask\n            driver (1) bitfield\n    seats[1] struct\n        label (P-passenger) string\n        flags bitmask\n            driver (0) bitfield\n";
@@ -309,7 +367,7 @@ mod installed {
   for(index,name)in["extraction_pelican","extraction_spirit"].into_iter().enumerate(){
    let vehicle=if index==0{"forerunner/transport/pelican"}else{"forerunner/transport/spirit"};let source=shared.join(format!("{vehicle}.vehicle"));protected.push(source.clone());
    let listing=run(&editor,vec!["-t".into(),shared.to_string_lossy().into_owned(),"-L".into(),format!("{vehicle}.vehicle")]);validate_vehicle_source(&listing).unwrap();
-   let value=TransportAppend{name:name.into(),tag_path:vehicle.into(),position:[if index==active{49.}else{65.},-87.472,0.078429],rotation_radians:[0.25,0.,0.]};let previous=fields();
+   let value=TransportAppend{name:name.into(),tag_path:vehicle.into(),position:[if index==active{49.}else{65.},-87.472,0.078429],rotation_radians:[0.25,0.,0.],owner_bsp:None};let previous=fields();
    let operation=Operation::AppendTransport{transport:value.clone(),source_sha256:crate::maps::hash_file(&file).unwrap(),regional_mcc:false};let args=operation.arguments_with_fields(&tags,"scnr",tag,&previous).unwrap();run(&editor,args);let after=fields();reviewed_difference(&previous,&after,&operation).unwrap();selected.push(name.into());
    assert_eq!(original_scripts,scenario_script_names(&after).unwrap());assert_eq!(serde_json::to_value(&original_squads).unwrap(),serde_json::to_value(scenario_squad_start_choices(&after).unwrap()).unwrap());
   }

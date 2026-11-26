@@ -582,6 +582,15 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     let roots=if let recipes::Operation::AppendTransport{transport,regional_mcc,..}=operation{
         let admitted=if *regional_mcc { regional_faction_source(source)? } else { source.build.target=="gbx-custom" };
         if !admitted { return Err("Native transport append needs CE609 solo or reviewed MCC13 MegaWorld working source".into()); }
+        if let Some(slot) = transport.owner_bsp {
+            if !*regional_mcc { return Err("Explicit aircraft BSP ownership is only available for native regional MCC13.".into()); }
+            let output = source.build.output.as_ref().ok_or("Validated parent output is missing")?;
+            let map = maps::inspect_map(output, None).map_err(error)?;
+            let rows = maps::bsp_point_locations(output, &map, &[transport.position], Some(1.)).map_err(error)?;
+            if rows[0].bsps != [u16::from(slot)] || !rows[0].ground.iter().any(|ground| ground.bsp == u16::from(slot)) {
+                return Err(format!("Place the aircraft on supported ground inside only BSP {slot}."));
+            }
+        }
         let tag=format!("{}.vehicle",transport.tag_path);let listing=fields(state,&source.project,&source.tags,&tag)?;recipes::validate_transport_vehicle_source(&listing).map_err(error)?;
         vec![(tag,"vehi")]
     }else if let recipes::Operation::SquadTerminals{terminals,..}=operation{

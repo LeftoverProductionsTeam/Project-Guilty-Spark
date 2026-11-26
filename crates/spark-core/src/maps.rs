@@ -2,7 +2,7 @@
 //! Known field offsets are deliberately a small audited subset, never guessed from tag names.
 #[path = "scenario_logic_readback.rs"]
 mod scenario_logic_readback;
-pub(crate) use scenario_logic_readback::NAMED_OBJECT_BLOCKS;
+pub(crate) use scenario_logic_readback::{scenario_vehicle_bsp_mask, NAMED_OBJECT_BLOCKS};
 pub use scenario_logic_readback::scenario_gameplay_merge_budget;
 pub(crate) use scenario_logic_readback::{mcc13_sky_reference_count, native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
     NativeItemCollection, NativeNetgameFlag, NativeNetgamePickup, CLASSIC_NETGAME_FLAG_LIMIT, MCC13_REGIONAL_FLAG_LIMIT, NETGAME_EQUIPMENT_LIMIT};

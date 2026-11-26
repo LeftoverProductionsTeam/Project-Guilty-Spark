@@ -5,9 +5,12 @@ import {Notice} from './ui';
 export default function NativeTransportAppend({context,busy,dirty,onPreview,onDraftChange}:{context:NativeTagContext;busy:boolean;dirty:boolean;onPreview:(operation:NativeOperation)=>void;onDraftChange:()=>void}){
  const [name,setName]=useState<Transport['name']>('extraction_pelican'),[tag,setTag]=useState('');
  const [position,setPosition]=useState(['','','']),[rotation,setRotation]=useState(['0','0','0']);
+ const [owner,setOwner]=useState('');
+ const ownerBsp=context.regionalFactionSource&&owner.trim()!==''?Number(owner):undefined;
+ const ownerValid=ownerBsp===undefined||(Number.isInteger(ownerBsp)&&ownerBsp>=0&&ownerBsp<16);
  const blocked=busy||dirty||!context.canAppendTransport;
- const valid=/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&tag.trim().length>0&&tag.trim().length<=230&&!tag.startsWith('-')&&[...position,...rotation].every(value=>value.trim()!==''&&Number.isFinite(Number(value)))&&position.every(value=>Math.abs(Number(value))<=2048)&&rotation.every(value=>Math.abs(Number(value))<=360);
- useEffect(()=>onDraftChange(),[name,tag,...position,...rotation,context.tagSha256]);
+ const valid=ownerValid&&/^[a-f0-9]{64}$/i.test(context.tagSha256??'')&&tag.trim().length>0&&tag.trim().length<=230&&!tag.startsWith('-')&&[...position,...rotation].every(value=>value.trim()!==''&&Number.isFinite(Number(value)))&&position.every(value=>Math.abs(Number(value))<=2048)&&rotation.every(value=>Math.abs(Number(value))<=360);
+ useEffect(()=>onDraftChange(),[name,tag,owner,...position,...rotation,context.tagSha256]);
  return <details className="native-transport-append"><summary>Add native dropship &amp; signals</summary>
   <p className="subtle">Append a native aircraft and its boarding, recall and landing groups. Existing placements, scripts and indices stay in place. Add the pilot and flight recordings in their existing editors.</p>
   {!context.canAppendTransport&&<Notice tone="info">Requires unshared CE609 solo source or reviewed MCC13 MegaWorld source.</Notice>}
@@ -18,7 +21,8 @@ export default function NativeTransportAppend({context,busy,dirty,onPreview,onDr
    <p className="subtle">Use a relative path without .vehicle. Recover/import the complete aircraft and dependencies into this working tagset first. Preview verifies actual aircraft type, one driver, passenger seats and the full dependency closure; a car or missing tag is refused. Originals and unrelated SDK folders are not changed.</p>
    <div className="native-encounter-position">{position.map((value,i)=><label key={i}>World {['X','Y','Z'][i]}<input aria-label={'New aircraft '+['X','Y','Z'][i]} type="number" step="any" value={value} onChange={e=>setPosition(position.map((v,j)=>i===j?e.target.value:v))}/></label>)}</div>
    <div className="native-encounter-position">{rotation.map((value,i)=><label key={i}>{['Yaw','Pitch','Roll'][i]} · degrees<input aria-label={'New aircraft '+['yaw','pitch','roll'][i]} type="number" step="any" value={value} onChange={e=>setRotation(rotation.map((v,j)=>i===j?e.target.value:v))}/></label>)}</div>
-   <button type="button" disabled={!valid} onClick={()=>onPreview({kind:'appendTransport',...(context.regionalFactionSource?{regionalMcc:true}:{}),transport:{name,tagPath:tag.trim(),position:position.map(Number) as [number,number,number],rotationRadians:rotation.map(value=>Number(value)*Math.PI/180) as [number,number,number]},sourceSha256:context.tagSha256!})}>Preview native aircraft append</button>
+   {context.regionalFactionSource&&<label title="Optional. Use an Invader editor and compiler with native vehicle BSP ownership support.">Owning BSP<input aria-label="Aircraft owning BSP" type="number" min={0} max={15} step={1} value={owner} onChange={e=>setOwner(e.target.value)}/></label>}
+   <button type="button" disabled={!valid} onClick={()=>onPreview({kind:'appendTransport',...(context.regionalFactionSource?{regionalMcc:true}:{}),transport:{name,tagPath:tag.trim(),ownerBsp,position:position.map(Number) as [number,number,number],rotationRadians:rotation.map(value=>Number(value)*Math.PI/180) as [number,number,number]},sourceSha256:context.tagSha256!})}>Preview native aircraft append</button>
   </fieldset>
   <p className="subtle">Review → Accept selects a separate source revision. Native Restore recovers the exact original scenario; project Undo is separate. Save and Build working tag edits, inspect the compiled aircraft and signals, then prepare the existing Forerunner dropship controller. Use actual ground/clearance and native pilot routes; compile/readback does not prove boarding, landing, flight or settlement.</p>
  </details>;
