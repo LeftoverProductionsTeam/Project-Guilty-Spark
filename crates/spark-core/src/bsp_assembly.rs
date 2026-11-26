@@ -241,18 +241,20 @@ impl BspAssembly {
         Ok(())
     }
     fn validate_partition_route(&self) -> Result<()> {
-        if self.donor_bsp_index != 0 || self.tunnel_points.len() != 2 || (self.open_road && !self.preserve_donor_bsp)
+        let allows_bends = self.preserve_donor_bsp && !self.open_road;
+        if self.donor_bsp_index != 0 || (!allows_bends && self.tunnel_points.len() != 2)
+            || (self.open_road && !self.preserve_donor_bsp)
             || self.terrain_seam.is_some() || self.arch_segments.is_some()
             || self.infantry_tunnel.is_some() || self.high_ground.is_some()
             || !self.sections.is_empty() || !self.visibility_zones.is_empty()
         {
-            return invalid("Separate native BSPs require a single-BSP donor and one straight connector without custom portal cuts. Open land bridges require Preserve donor BSP.");
+            return invalid("Separate native BSPs require a single-BSP donor and no custom portal cuts. Bends and open bridges require Preserve donor BSP; bridges stay straight.");
         }
         if self.open_road && (self.tunnel_width < 6. || self.tunnel_height < 4.) {
             return invalid("An intact land bridge needs at least six world units of width and four of clearance");
         }
-        let [start, end] = [self.tunnel_points[0], self.tunnel_points[1]];
-        if (end[0] - start[0]).hypot(end[1] - start[1]) < 12. {
+        let end = *self.tunnel_points.last().unwrap();
+        if horizontal_run(self.tunnel_points[0], end) < 12. {
             return invalid("Allow at least twelve world units for separate corridor caps and switch volumes");
         }
         Ok(())
@@ -647,6 +649,30 @@ fn passage_corners(a: V, b: V, side_a: V, side_b: V, height: f64) -> [V; 8] {
     ]
 }
 
+fn passage_floor_needs_center(points: &[V]) -> bool {
+    dot(sub(points[3], points[0]), normal(points[0], points[1], points[2])).abs() > 1e-7
+}
+
+fn mitered_connector_floor(points: &[V], sides: &[V]) -> Result<Vec<crate::bsp_clearance::ConnectorFloor>> {
+    use crate::bsp_clearance::ConnectorFloor;
+    let mut faces = Vec::new();
+    for (points, sides) in points.windows(2).zip(sides.windows(2)) {
+        let [a, b] = [points[0], points[1]];
+        let p = passage_corners(a, b, sides[0], sides[1], 0.);
+        let direction = horizontal_direction(points);
+        if dot(sub(p[3], p[0]), direction) <= 0.002 || dot(sub(p[2], p[1]), direction) <= 0.002 {
+            return invalid("The inside wall folds at a tunnel bend. Move the floor points farther apart or soften the turn.");
+        }
+        let pieces = [[a, p[0], p[3]], [a, p[3], b], [a, b, p[2]], [a, p[2], p[1]]];
+        let flat = [[p[0], p[2], p[1]], [p[0], p[3], p[2]]];
+        let triangles = if passage_floor_needs_center(&p) { &pieces[..] } else { &flat[..] };
+        for &triangle in triangles {
+            faces.push(ConnectorFloor::new(triangle)?);
+        }
+    }
+    Ok(faces)
+}
+
 fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize, sky: Option<usize>) -> Result<Manifold> {
     let up = [0., 0., height];
     let mut p = passage_corners(a, b, side_a, side_b, height).to_vec();
@@ -657,7 +683,7 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
     // A graded miter is generally not a plane. Preserve the authored center
     // line as an edge instead of letting an arbitrary diagonal lift/drop it.
     // Split the end caps too: inserting only floor points creates T-junctions.
-    let split=dot(sub(p[3],p[0]),normal(p[0],p[1],p[2])).abs()>1e-7;
+    let split = passage_floor_needs_center(&p);
     let triangles=if split {
         p.extend([a,b,add(a,up),add(b,up)]);
         vec![8,0,3,8,3,9,8,9,2,8,2,1,
@@ -1798,12 +1824,13 @@ pub fn generate_preserved_connector(
     if plan.translation != [0.; 3] {
         maps::preflight_bsp_relocation(&plan.donor_source.preserved_path, &donor, plan.translation)?;
     }
-    let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
-    let delta = sub(end, start);
-    let length = delta[0].hypot(delta[1]);
-    let forward = [delta[0] / length, delta[1] / length, 0.];
+    let route = &plan.tunnel_points;
+    let (start, end) = (route[0], *route.last().unwrap());
+    let base_forward = horizontal_direction(&route[..2]);
+    let donor_forward = horizontal_direction(&route[route.len() - 2..]);
+    let forward = horizontal_direction(&[start, end]);
+    let bent = route.len() > 2;
     let side = mul([-forward[1], forward[0], 0.], f64::from(plan.tunnel_width) / 2.);
-    let offset = |center, distance| add(center, mul(forward, distance));
     let mut review = plan.clone();
     review.separate_native_bsps = false;
     review.preserve_donor_bsp = false;
@@ -1813,45 +1840,44 @@ pub fn generate_preserved_connector(
 
     let common_separation = intact_common_separation(&base.mesh, base.mesh.parts.len(), &donor.mesh, 0, plan.translation, forward)?;
 
-
     let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
     let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
     let base_vehicles = crate::bsp_vehicles::edited_base_vehicles(project, base)?;
     let donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?;
-    let base_span = intact_span_before_vehicles(start, mul(forward, -1.), plan.tunnel_width, plan.tunnel_height,
+    let base_span = intact_span_before_vehicles(start, mul(base_forward, -1.), plan.tunnel_width, plan.tunnel_height,
         base_vehicles.iter().filter(|row| row.tag.is_some()).map(|row| row.position.map(f64::from)));
     let checker = crate::bsp_clearance::RouteChecker::for_part(&base_collision, plan.base_bsp_index)?;
-    let base_landing = choose_intact_landing_bounded(&checker, &mut review, start, [0.; 3], forward, base_span)
+    let base_landing = choose_intact_landing_bounded(&checker, &mut review, start, [0.; 3], base_forward, base_span)
         .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?;
-    let donor_span = intact_span_before_vehicles(end, forward, plan.tunnel_width, plan.tunnel_height,
+    let donor_span = intact_span_before_vehicles(end, donor_forward, plan.tunnel_width, plan.tunnel_height,
         donor_vehicles.iter().map(|row| add(row.position.map(f64::from), plan.translation)));
     let checker = crate::bsp_clearance::RouteChecker::for_part(&donor_collision, 0)?;
-    let donor_landing = choose_intact_landing_bounded(&checker, &mut review, end, plan.translation, forward, donor_span)
+    let donor_landing = choose_intact_landing_bounded(&checker, &mut review, end, plan.translation, donor_forward, donor_span)
         .map_err(|error| SparkError::Invalid(format!("Donor connector landing: {error}")))?;
     let landings = [base_landing, donor_landing];
     let overlaps = [landings[0].0, landings[1].0];
     let corridor = base.mesh.parts.len();
     let island = corridor + 1;
-    let trigger = |from, to, center, distance: f64| partition_switch(
-        from, to, offset(center, distance - 0.45), forward, plan.tunnel_width, plan.tunnel_height,
+    let trigger = |from, to, center, aim, distance: f64| partition_switch(
+        from, to, add(center, mul(aim, distance - 0.45)), aim, plan.tunnel_width, plan.tunnel_height,
     );
     // Keep the two 0.9-unit triggers disjoint within the verified landing.
     let base_switch = intact_switch_distance(landings[0].1);
     let donor_switch = intact_switch_distance(landings[1].1);
     let switches = [
-        trigger(plan.base_bsp_index, corridor, start, base_switch),
-        trigger(corridor, plan.base_bsp_index, start, -base_switch),
-        trigger(corridor, island, end, donor_switch),
-        trigger(island, corridor, end, -donor_switch),
+        trigger(plan.base_bsp_index, corridor, start, base_forward, base_switch),
+        trigger(corridor, plan.base_bsp_index, start, base_forward, -base_switch),
+        trigger(corridor, island, end, donor_forward, donor_switch),
+        trigger(island, corridor, end, donor_forward, -donor_switch),
     ];
     let prior = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
     let volumes = maps::scenario_volume_readback(&source.preserved_path, base)?;
     verify_intact_switch_spacing(&switches, &prior.transitions, &volumes)?;
     let landing = plan.directional_donor_landing.then(|| {
-        fit_directional_landing(&checker, end, forward, donor_switch, plan.tunnel_width, plan.translation)
+        fit_directional_landing(&checker, end, donor_forward, donor_switch, plan.tunnel_width, plan.translation)
     }).transpose()?;
-    let points = intact_floor_points(overlaps, forward, plan.open_road, landing.as_ref())?;
-    if !common_separation {
+    let points = intact_route_points(overlaps, plan, landing.as_ref())?;
+    if bent || !common_separation {
         verify_intact_neighborhood((&base.mesh, &base_collision), (&donor.mesh, &donor_collision),
             0, plan.translation, base.mesh.parts.len(), plan, &points)?;
     }
@@ -1860,32 +1886,24 @@ pub fn generate_preserved_connector(
 
     let height = f64::from(plan.tunnel_height);
     let width = f64::from(plan.tunnel_width);
+    let sides = bent.then(|| tunnel_sides(&points, width)).transpose()?;
+    let shape = sides.as_ref().map(|sides| mitered_connector_floor(&points, sides)).transpose()?;
     if !plan.open_road {
-        let passage = &points[1..points.len() - 1];
-        for (name, mesh, slot, translation) in [
+        verify_preserved_tunnel_intrusions(&points, sides.as_deref(), width, height, [
             ("Retained", Some(&base_collision), plan.base_bsp_index, [0.; 3]),
             ("Donor", Some(&donor_collision), 0, plan.translation),
             ("Retained render", base.render_mesh.as_ref(), plan.base_bsp_index, [0.; 3]),
             ("Donor render", donor.render_mesh.as_ref(), 0, plan.translation),
-        ] {
-            let Some(mesh) = mesh.filter(|mesh| {
-                mesh.parts.get(slot).is_some_and(|part| part.index_count > 0)
-            }) else {
-                continue;
-            };
-            let source = crate::bsp_clearance::RouteChecker::for_part(mesh, slot)?;
-            if let Some([x, y, z]) = source.connector_intrusion(passage, width, height, translation) {
-                return invalid(format!(
-                    "{name} BSP crosses the tunnel beyond its landing near ({x:.2}, {y:.2}, {z:.2}). \
-                     Move the entrance or cut a clear passage before preserving this BSP."
-                ));
-            }
-        }
+        ])?;
     }
-    verify_intact_connector_vehicles(&points, forward, plan, &base_vehicles, &donor_vehicles)?;
+    let contains = |position| shape.as_ref().map_or_else(
+        || intact_connector_contains_placement(&points, forward, width, height, position),
+        |shape| shape.iter().any(|face| face.contains(position, height)),
+    );
+    verify_connector_vehicle_placements(plan.translation, &base_vehicles, &donor_vehicles, contains)?;
     for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
         let position = add(pickup.position.map(f64::from), plan.translation);
-        if intact_connector_contains_placement(&points, forward, width, height, position) {
+        if contains(position) {
             return invalid(format!("Donor pickup {index} at {position:?} lies inside the new connector; move the passage clear of the original pickup"));
         }
     }
@@ -1900,7 +1918,12 @@ pub fn generate_preserved_connector(
         });
         materials.len() - 1
     });
-    let collision_source = intact_connector_solid(&points, side, height, sky, cancel)?.get_mesh_gl64(-1);
+    let body = if let Some(sides) = &sides {
+        joined_passage_solid(&points, sides, height, sky, cancel)?
+    } else {
+        intact_connector_solid(&points, side, height, sky, cancel)?
+    };
+    let collision_source = body.get_mesh_gl64(-1);
     let (mut mesh, mut triangle_materials) = collision_layer(&collision_source, &mut materials)?;
     for point in mesh.positions.chunks_exact(3) {
         validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
@@ -1924,7 +1947,7 @@ pub fn generate_preserved_connector(
     let directional_drop = landing.as_ref().map(|ramp| verify_directional_landing(&checker, ramp)).transpose()?;
     let level_span = [points[0], *points.last().unwrap()];
     let chart_points = if points.iter().all(|point| point[2] == points[0][2]) { &level_span[..] } else { &points[..] };
-    let mut render = connector_charts(chart_points, side, height, sky);
+    let mut render = if bent { collision_source } else { connector_charts(chart_points, side, height, sky) };
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
     append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
@@ -1946,6 +1969,43 @@ pub fn generate_preserved_connector(
         switches,
         overlaps,
     })
+}
+
+fn verify_preserved_tunnel_intrusions(
+    points: &[V], sides: Option<&[V]>, width: f64, height: f64,
+    sources: [(&str, Option<&MeshData>, usize, V); 4],
+) -> Result<()> {
+    let inner = 1..points.len() - 1;
+    let passage = &points[inner.clone()];
+    let bent_floor = sides.map(|sides| mitered_connector_floor(passage, &sides[inner])).transpose()?;
+    for (name, mesh, slot, translation) in sources {
+        let Some(mesh) = mesh.filter(|mesh| mesh.parts.get(slot).is_some_and(|part| part.index_count > 0)) else {
+            continue;
+        };
+        let source = crate::bsp_clearance::RouteChecker::for_part(mesh, slot)?;
+        let obstruction = if let Some(floor) = &bent_floor {
+            source.mitered_connector_intrusion(floor, height, translation)
+        } else {
+            source.connector_intrusion(passage, width, height, translation)
+        };
+        if let Some([x, y, z]) = obstruction {
+            return invalid(format!(
+                "{name} BSP crosses the tunnel beyond its landing near ({x:.2}, {y:.2}, {z:.2}). \
+                 Adjust the route or cut a clear passage before preserving this BSP."
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn horizontal_run(start: V, end: V) -> f64 {
+    (end[0] - start[0]).hypot(end[1] - start[1])
+}
+
+fn horizontal_direction(pair: &[V]) -> V {
+    let delta = sub(pair[1], pair[0]);
+    let length = horizontal_run(pair[0], pair[1]);
+    [delta[0] / length, delta[1] / length, 0.]
 }
 
 fn intact_common_separation(
@@ -1973,10 +2033,10 @@ fn verify_intact_neighborhood(
     base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
     translation: V, count: usize, plan: &BspAssembly, points: &[V],
 ) -> Result<()> {
-    let difference = sub(plan.tunnel_points[1], plan.tunnel_points[0]);
-    let forward = mul([difference[0], difference[1], 0.], 1. / difference[0].hypot(difference[1]));
+    let route = &plan.tunnel_points;
+    let forward = horizontal_direction(&[route[0], *route.last().unwrap()]);
     let axes = [forward, [-forward[1], forward[0], 0.], [0., 0., 1.]];
-    let side = mul(axes[1], f64::from(plan.tunnel_width) / 2.);
+    let sides = tunnel_sides(points, f64::from(plan.tunnel_width))?;
     let height = f64::from(plan.tunnel_height);
     let box_for = |meshes: (&MeshData, &MeshData), slot, shift| -> Result<[[f64; 2]; 3]> {
         let mut bounds = [[0.; 2]; 3];
@@ -1988,20 +2048,17 @@ fn verify_intact_neighborhood(
         Ok(bounds)
     };
     let donor_bounds = box_for(donor, donor_index, translation)?;
-    let corridor = axes.map(|axis| {
-        points.iter().copied().flat_map(|point| {
-            let upper = add(point, [0., 0., height]);
-            [sub(point, side), add(point, side), sub(upper, side), add(upper, side)]
-        }).map(|point| dot(point, axis)).fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| {
-            [lo.min(value), hi.max(value)]
-        })
-    });
+    let corridor = points.windows(2).zip(sides.windows(2)).map(|(path, side)| {
+        let corners = passage_corners(path[0], path[1], side[0], side[1], height);
+        axes.map(|axis| corners.iter().map(|point| dot(*point, axis))
+            .fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| [lo.min(value), hi.max(value)]))
+    }).collect::<Vec<_>>();
     for slot in 0..count {
         let retained = box_for(base, slot, [0.; 3])?;
         if !separated_bounds(donor_bounds, retained, 8.) {
             return invalid(format!("The intact donor needs eight units of separation from BSP {slot}"));
         }
-        if slot != plan.base_bsp_index && !separated_bounds(retained, corridor, 0.05) {
+        if slot != plan.base_bsp_index && corridor.iter().any(|&section| !separated_bounds(retained, section, 0.05)) {
             return invalid(format!("The proposed passage intersects the bounds of unrelated BSP {slot}"));
         }
     }
@@ -2011,12 +2068,18 @@ fn verify_intact_neighborhood(
 fn verify_intact_connector_vehicles(
     points: &[V], forward: V, plan: &BspAssembly, base: &[maps::NativeVehicle], donor: &[maps::NativeVehicle],
 ) -> Result<()> {
-    let width = f64::from(plan.tunnel_width);
-    let height = f64::from(plan.tunnel_height);
-    for (name, vehicles, translation) in [("Retained", base, [0.; 3]), ("Donor", donor, plan.translation)] {
+    verify_connector_vehicle_placements(plan.translation, base, donor, |position| {
+        intact_connector_contains_placement(points, forward, f64::from(plan.tunnel_width), f64::from(plan.tunnel_height), position)
+    })
+}
+
+fn verify_connector_vehicle_placements(
+    shift: V, base: &[maps::NativeVehicle], donor: &[maps::NativeVehicle], contains: impl Fn(V) -> bool,
+) -> Result<()> {
+    for (name, vehicles, translation) in [("Retained", base, [0.; 3]), ("Donor", donor, shift)] {
         for (index, vehicle) in vehicles.iter().enumerate().filter(|(_, row)| row.tag.is_some()) {
             let position = add(vehicle.position.map(f64::from), translation);
-            if intact_connector_contains_placement(points, forward, width, height, position) {
+            if contains(position) {
                 return invalid(format!("{name} vehicle {index} at {position:?} lies inside the new connector. Move the passage clear of the vehicle."));
             }
         }
@@ -2078,7 +2141,12 @@ fn intact_connector_solid(points: &[V], side: V, height: f64, sky: Option<usize>
     if points.iter().all(|point| point[2] == end[2]) {
         return passage_solid(points[0], end, side, side, height, 0, sky);
     }
-    let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, sky));
+    joined_passage_solid(points, &vec![side; points.len()], height, sky, cancel)
+}
+
+fn joined_passage_solid(points: &[V], sides: &[V], height: f64, sky: Option<usize>, cancel: &AtomicBool) -> Result<Manifold> {
+    let mut solids = points.windows(2).zip(sides.windows(2))
+        .map(|(pair, side)| passage_solid(pair[0], pair[1], side[0], side[1], height, 0, sky));
     let mut body = solids.next().unwrap()?;
     for solid in solids {
         if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
@@ -2251,6 +2319,25 @@ fn verify_directional_landing(
     Ok(max_drop)
 }
 
+fn intact_route_points(overlaps: [[V; 2]; 2], plan: &BspAssembly, landing: Option<&DirectionalLanding>) -> Result<Vec<V>> {
+    let path = &plan.tunnel_points;
+    let first = horizontal_direction(&path[..2]);
+    if path.len() == 2 {
+        return intact_floor_points(overlaps, first, plan.open_road, landing);
+    }
+    let last = horizontal_direction(&path[path.len() - 2..]);
+    let cap = add(overlaps[1][1], mul(last, CONNECTOR_END_CAP));
+    let start = add(overlaps[0][1], mul(first, 0.2));
+    let end = sub(overlaps[1][0], mul(last, 0.2));
+    if dot(sub(path[1], start), first) < 0.5 || dot(sub(end, path[path.len() - 2]), last) < 0.5 {
+        return invalid("A bend overlaps the checked landing. Move it farther from the native switches.");
+    }
+    let mut points = vec![sub(overlaps[0][0], mul(first, CONNECTOR_END_CAP)), start];
+    points.extend_from_slice(&path[1..path.len() - 1]);
+    points.extend([landing.map_or(end, |ramp| ramp.point(end)), landing.map_or(cap, |ramp| ramp.point(cap))]);
+    Ok(points)
+}
+
 fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool, landing: Option<&DirectionalLanding>) -> Result<Vec<V>> {
     let outside = mul(forward, CONNECTOR_END_CAP);
     let slope_margin = mul(forward, 0.2);
@@ -2309,23 +2396,33 @@ pub(crate) fn verify_intact_connector_collision(
         max_delta = max_delta.max(delta);
     }
     if max_delta > 0.02 { return invalid("Compiled intact connector landing floors are misaligned"); }
-    let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
-    let delta = sub(end, start);
-    let forward = mul([delta[0], delta[1], 0.], 1. / delta[0].hypot(delta[1]));
+    let path = &plan.tunnel_points;
+    let end = *path.last().unwrap();
+    let donor_forward = horizontal_direction(&path[path.len() - 2..]);
+    let forward = horizontal_direction(&[path[0], end]);
     let mut directional_review = None;
     let landing = if plan.directional_donor_landing {
         let stock = crate::bsp_clearance::RouteChecker::for_part(&collision, donor_slot)?;
-        let span = dot(sub(overlaps[1][1], end), forward);
-        let ramp = fit_directional_landing(&stock, end, forward, intact_switch_distance(span), plan.tunnel_width, [0.; 3])?;
+        let span = dot(sub(overlaps[1][1], end), donor_forward);
+        let ramp = fit_directional_landing(&stock, end, donor_forward, intact_switch_distance(span), plan.tunnel_width, [0.; 3])?;
         let drop = verify_directional_landing(&connector, &ramp)?;
         max_delta = max_delta.max(drop);
         directional_review = Some(serde_json::json!({"grade": ramp.grade, "maxSwitchDrop": drop, "samples": ramp.samples.len()}));
         Some(ramp)
     } else { None };
-    let points = intact_floor_points(overlaps, forward, plan.open_road, landing.as_ref())?;
-    // Apply the identical neighboring-region proof to the exact compiled
-    // geometry when the donor did not use a single separation plane.
-    if !intact_common_separation(&compiled.mesh, original_count, &compiled.mesh, donor_slot, [0.; 3], forward)? {
+    let points = intact_route_points(overlaps, plan, landing.as_ref())?;
+    if path.len() > 2 {
+        let width = f64::from(plan.tunnel_width);
+        let sides = tunnel_sides(&points, width)?;
+        verify_preserved_tunnel_intrusions(&points, Some(&sides), width, f64::from(plan.tunnel_height), [
+            ("Compiled retained", Some(&collision), plan.base_bsp_index, [0.; 3]),
+            ("Compiled donor", Some(&collision), donor_slot, [0.; 3]),
+            ("Compiled retained render", compiled.render_mesh.as_ref(), plan.base_bsp_index, [0.; 3]),
+            ("Compiled donor render", compiled.render_mesh.as_ref(), donor_slot, [0.; 3]),
+        ])?;
+    }
+    // Apply the same neighboring-region proof to the compiled route.
+    if path.len() > 2 || !intact_common_separation(&compiled.mesh, original_count, &compiled.mesh, donor_slot, [0.; 3], forward)? {
         verify_intact_neighborhood((&compiled.mesh, &collision), (&compiled.mesh, &collision), donor_slot,
             [0.; 3], original_count, plan, &points)?;
     }
@@ -3268,6 +3365,26 @@ mod tests {
     }
 
     #[test]
+    fn a_preserved_connector_turn_has_matching_floor_and_full_clearance() {
+        let points = [[0., 0., 0.], [8., 0., 0.], [16., 8., 2.], [16., 16., 2.]];
+        let sides = tunnel_sides(&points, 2.).unwrap();
+        let floor = mitered_connector_floor(&points, &sides).unwrap();
+        assert!(floor.iter().any(|face| face.contains([12., 4., 1.2], 1.6)));
+        assert!(!floor.iter().any(|face| face.contains([10., 5., 1.2], 1.6)));
+
+        let body = joined_passage_solid(&points, &sides, 1.6, None, &AtomicBool::new(false)).unwrap();
+        assert!(body.get_mesh_gl64(-1).num_tri() > 12);
+        let obstruction = MeshData {
+            positions: vec![12., 4.6, 0., 12., 4.6, 3., 12., 5.8, 3.],
+            indices: vec![0, 1, 2],
+            ..Default::default()
+        };
+        let checker = crate::bsp_clearance::RouteChecker::new(&obstruction).unwrap();
+        assert!(checker.mitered_connector_intrusion(&floor, 1.6, [0.; 3]).is_some());
+        assert!(checker.mitered_connector_intrusion(&floor, 1.6, [0., 5., 0.]).is_none());
+    }
+
+    #[test]
     fn a_long_diagonal_level_connector_bakes_charts_without_collision_slivers() {
         let forward = [std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2, 0.];
         let start = [732., 52., -18.];
@@ -3781,7 +3898,7 @@ mod tests {
     }
 
     #[test]
-    fn separate_native_layout_requires_one_straight_route_and_preserved_bridge_landings() {
+    fn native_bends_require_an_enclosed_preserved_donor_and_clear_end_spans() {
         let mut plan = dual_route_plan();
         assert!(serde_json::to_value(&plan).unwrap().get("separateNativeBsps").is_none());
         plan.separate_native_bsps = true;
@@ -3790,7 +3907,17 @@ mod tests {
         let mut restored: BspAssembly = serde_json::from_value(stored).unwrap();
         restored.validate().unwrap();
         restored.tunnel_points.insert(1, [50., 2., 0.]);
-        assert!(restored.validate().unwrap_err().to_string().contains("straight connector"));
+        assert!(restored.validate().unwrap_err().to_string().contains("Preserve donor BSP"));
+        restored.preserve_donor_bsp = true;
+        restored.validate().unwrap();
+        restored.tunnel_points[1] = [2.5, 0., 0.];
+        let overlaps = [[[-2.3, 0., 0.], [2.3, 0., 0.]], [[97.7, 0., 0.], [102.3, 0., 0.]]];
+        assert!(intact_route_points(overlaps, &restored, None).unwrap_err().to_string().contains("checked landing"));
+        restored.tunnel_points[1] = [50., 2., 0.];
+        restored.open_road = true;
+        assert!(restored.validate().unwrap_err().to_string().contains("bridges stay straight"));
+        restored.open_road = false;
+        restored.preserve_donor_bsp = false;
         restored.tunnel_points.remove(1);
         restored.tunnel_points[1] = [10., 0., 0.];
         assert!(restored.validate().unwrap_err().to_string().contains("twelve world units"));

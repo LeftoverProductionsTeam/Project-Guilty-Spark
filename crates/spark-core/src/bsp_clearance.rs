@@ -251,22 +251,58 @@ fn closest(p: V, t: Tri) -> V {
     }
     add(a, add(mul(ab, vb / denominator), mul(ac, vc / denominator)))
 }
-fn clip_connector_face(polygon: &mut Vec<V>, result: &mut Vec<V>, axis: usize, edge: f64, lower: bool) {
+fn clip_connector_face(polygon: &mut Vec<V>, result: &mut Vec<V>, distance: impl Fn(V) -> f64) {
     let Some(&last) = polygon.last() else { return; };
-    let inside = |point: V| if lower { point[axis] >= edge } else { point[axis] <= edge };
     result.clear();
     let mut previous = last;
+    let mut previous_distance = distance(last);
     for &point in polygon.iter() {
-        if inside(previous) != inside(point) {
-            let fraction = (edge - previous[axis]) / (point[axis] - previous[axis]);
+        let current_distance = distance(point);
+        if (previous_distance >= 0.) != (current_distance >= 0.) {
+            let fraction = previous_distance / (previous_distance - current_distance);
             result.push(add(previous, mul(sub(point, previous), fraction)));
         }
-        if inside(point) {
+        if current_distance >= 0. {
             result.push(point);
         }
         previous = point;
+        previous_distance = current_distance;
     }
     std::mem::swap(polygon, result);
+}
+
+pub(crate) struct ConnectorFloor {
+    vertices: Tri,
+    orientation: f64,
+    normal: V,
+}
+
+impl ConnectorFloor {
+    pub(crate) fn new(vertices: Tri) -> Result<Self> {
+        let normal = cross(sub(vertices[1], vertices[0]), sub(vertices[2], vertices[0]));
+        if normal[2].abs() <= 1e-8 {
+            return invalid("Tunnel bend collapses a floor face; move the floor points farther apart.");
+        }
+        Ok(Self { vertices, orientation: normal[2].signum(), normal })
+    }
+
+    fn edges(&self) -> impl Iterator<Item = (V, V)> + '_ {
+        self.vertices.iter().copied().zip(self.vertices.iter().copied().cycle().skip(1))
+    }
+
+    fn side_distance(&self, point: V, start: V, end: V) -> f64 {
+        let edge = sub(end, start);
+        self.orientation * cross(edge, sub(point, start))[2] / edge[0].hypot(edge[1])
+    }
+
+    fn above_floor(&self, point: V) -> f64 {
+        dot(sub(point, self.vertices[0]), self.normal) / self.normal[2]
+    }
+
+    pub(crate) fn contains(&self, point: V, height: f64) -> bool {
+        self.edges().all(|(a, b)| self.side_distance(point, a, b) >= -1e-8)
+            && (-0.05..=height).contains(&self.above_floor(point))
+    }
 }
 
 pub(crate) struct RouteChecker { index: Index }
@@ -324,13 +360,53 @@ impl RouteChecker {
                     [CONTACT, height - CONTACT],
                 ];
                 for (axis, [low, high]) in bounds.into_iter().enumerate() {
-                    clip_connector_face(&mut polygon, &mut clipped, axis, low, true);
-                    clip_connector_face(&mut polygon, &mut clipped, axis, high, false);
+                    clip_connector_face(&mut polygon, &mut clipped, |p| p[axis] - low);
+                    clip_connector_face(&mut polygon, &mut clipped, |p| high - p[axis]);
                 }
                 if let Some(&[along, across, above]) = polygon.first() {
                     let horizontal = add(mul(forward, along), mul(side, across));
                     let offset = add(horizontal, [0., 0., above + along * grade]);
                     return Some(add(pair[0], offset));
+                }
+            }
+        }
+        None
+    }
+    /// The triangulated miter keeps the same floor on both sides of a turn.
+    pub(crate) fn mitered_connector_intrusion(&self, floor: &[ConnectorFloor], height: f64, shift: V) -> Option<V> {
+        const CONTACT: f64 = 0.002;
+        let mut candidates = Vec::new();
+        let mut polygon = Vec::with_capacity(8);
+        let mut clipped = Vec::with_capacity(8);
+        for face in floor {
+            let mut low = face.vertices[0];
+            let mut high = low;
+            for point in &face.vertices[1..] {
+                for axis in 0..3 {
+                    low[axis] = low[axis].min(point[axis]);
+                    high[axis] = high[axis].max(point[axis]);
+                }
+            }
+            high[2] += height;
+            candidates.clear();
+            self.index.root.query(sub(low, shift), sub(high, shift), &mut candidates);
+            for &index in &candidates {
+                polygon.clear();
+                polygon.extend(self.index.triangles[index].map(|p| add(p, shift)));
+                for (a, b) in face.edges() {
+                    clip_connector_face(&mut polygon, &mut clipped, |p| face.side_distance(p, a, b));
+                }
+                clip_connector_face(&mut polygon, &mut clipped, |p| face.above_floor(p) - CONTACT);
+                clip_connector_face(&mut polygon, &mut clipped, |p| height - CONTACT - face.above_floor(p));
+                // Ignore point and edge contacts. A face crossing the prism
+                // has a nonzero area after clipping.
+                if let Some((&a, rest)) = polygon.split_first() {
+                    if rest.windows(2).any(|edge| {
+                        let area = cross(sub(edge[0], a), sub(edge[1], a));
+                        dot(area, area) > 1e-12
+                    }) {
+                        return Some(a);
+                    }
                 }
             }
         }

@@ -970,10 +970,10 @@ export default function BspAssembly({
                 {draft.separateNativeBsps && <>
                   <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
                   {canExtend && baseParts.length <= 14 && <div>
-                    <label><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
+                    <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends before changing BSP preservation.' : undefined}><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || draft.tunnelPoints.length > 2 || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
                       onChange={event => update({ preserveDonorBsp: event.target.checked, openRoad: event.target.checked && draft.openRoad, tunnelBakeFill: event.target.checked && !draft.openRoad })} /> Preserve donor BSP in native build</label>
-                    {draft.preserveDonorBsp && <label>
-                      <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy}
+                    {draft.preserveDonorBsp && <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends to use a straight land bridge.' : undefined}>
+                      <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy || draft.tunnelPoints.length > 2}
                         onChange={event => update(event.target.checked ? {
                           openRoad: true, tunnelBakeFill: false, tunnelWidth: Math.max(6, draft.tunnelWidth), tunnelHeight: Math.max(4, draft.tunnelHeight),
                         } : { openRoad: false })} /> Open land bridge
@@ -994,7 +994,7 @@ export default function BspAssembly({
                       <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
                       <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
                     </div>
-                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. With preservation enabled, apply and save the connection, then build for MCC13. The new connector gets its own BSP slot.</p>
+                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. With preservation enabled, apply and save the connection, then build for MCC13. The connector gets its own BSP slot. For an enclosed tunnel, add bends to route around stock geometry. Leave straight space around each landing for the native switches.</p>
                   </div>}
                   {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
                     onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
@@ -1005,7 +1005,7 @@ export default function BspAssembly({
               </fieldset>
               <div className="bsp-actions">
                 <button
-                  disabled={busy || draft.separateNativeBsps || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
+                  disabled={busy || (draft.separateNativeBsps && (!draft.preserveDonorBsp || !!draft.openRoad)) || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
                   onClick={() => {
                     const a = routeDraft!.tunnelPoints.at(-2)!,
                       b = routeDraft!.tunnelPoints.at(-1)!;
