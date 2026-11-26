@@ -381,12 +381,20 @@ impl Ribbon {
     }
 
     fn closed_strip(&self,plan:&BspAssembly,materials:[usize;2],sky:Option<usize>,columns:std::ops::RangeInclusive<usize>)->Result<Manifold>{
+        let graded=plan.terrain_seam.as_ref().is_some_and(|seam|seam.grade_road);
         let mut gl=MeshGL64{num_prop:5,..Default::default()};
         let mut emit=|points:[V;3],material:usize,source:usize|->Result<()> {
             let first=gl.num_vert() as u64;
-            for p in points {
-                let local=if source==1{world_to_donor(p,plan)}else{p};
-                let uv = project_uv(local, &self.projections[source])?;
+            let vertices=points.map(|p|if source==1{world_to_donor(p,plan)}else{p});
+            let face_normal=normal(vertices[0],vertices[1],vertices[2]);
+            for (p,local) in points.into_iter().zip(vertices) {
+                // Steep fill sides need height in the source chart. A ground-only
+                // projection makes a vertical cut face collapse to a line in Tool.
+                let uv=if graded && sky != Some(material) {
+                    ridge_uv(local,face_normal,&self.projections[source])?
+                } else {
+                    project_uv(local,&self.projections[source])?
+                };
                 gl.vert_properties.extend(p);gl.vert_properties.extend(uv);
             }
             gl.tri_verts.extend([first,first+1,first+2]);gl.face_id.push(material as u64);Ok(())
@@ -395,7 +403,6 @@ impl Ribbon {
         let bottom=|p:V|if sky.is_some(){p}else{[p[0],p[1],p[2]-ROAD_FILL_DEPTH]};
         let (left,right)=(*columns.start(),*columns.end());
         let last=self.rows.len()-1;
-        let graded=plan.terrain_seam.as_ref().is_some_and(|seam|seam.grade_road);
         let vertex=|row:usize,column:usize| {
             let mut point=self.rows[row][column];
             if graded && (row==0 || row==last) {
@@ -516,6 +523,17 @@ mod tests{
         let support=ribbon.road_support(&plan,[0,1]).unwrap();
         assert!((support.volume()-32.*6.*ROAD_FILL_DEPTH).abs()<1e-8);
         assert!(support.get_mesh_gl64(-1).face_id.iter().all(|id| *id==0 || *id==1));
+        let mut graded_plan=plan.clone();
+        graded_plan.terrain_seam=Some(TerrainSeam {
+            shoulder_width:8., bank_height:0., base_shader_path:"fixture/a".into(), donor_shader_path:"fixture/b".into(),
+            bearing_degrees:Some(0.), grade_road:true,
+        });
+        let graded_mesh=ribbon.road_support(&graded_plan,[0,1]).unwrap().get_mesh_gl64(-1);
+        let uv=|id:u64|&graded_mesh.vert_properties[id as usize*5+3..id as usize*5+5];
+        assert!(graded_mesh.tri_verts.chunks_exact(3).all(|ids| {
+            let (a,b,c)=(uv(ids[0]),uv(ids[1]),uv(ids[2]));
+            ((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])).abs()>1e-8
+        }), "all graded fill faces, including the vertical sides, need two UV axes");
         let mesh=body.get_mesh_gl64(-1);assert!(mesh.face_id.contains(&0)&&mesh.face_id.contains(&1)&&mesh.face_id.contains(&2));
         for (index,tri) in mesh.tri_verts.chunks_exact(3).enumerate(){let material=mesh.face_id[index];if material==2{continue;}
             for id in tri{let values=&mesh.vert_properties[*id as usize*5..*id as usize*5+5];let local_x=values[0]-if material==1{20.}else{0.};assert!((values[3]-local_x/4.).abs()<1e-8);assert!((values[4]-values[1]/4.).abs()<1e-8);}
