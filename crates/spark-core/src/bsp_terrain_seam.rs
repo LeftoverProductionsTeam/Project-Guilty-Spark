@@ -67,12 +67,23 @@ pub(super) fn trim_donor(body:Manifold,inspection:&MapInspection,mesh:&MeshData,
     let clip=passage_solid([cut+plan.translation[0],y,lo[2]],[hi[0],y,lo[2]],side,side,hi[2]-lo[2],sky,Some(sky))?;
     checked(body.boolean_with_engine_and_token(&clip,OpType::Intersect,BooleanEngine::Auto,Some(token)),"Invisible donor sky-buffer trim")
 }
-pub(super) fn plan(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut plan:BspAssembly)->Result<BspAssembly>{
+pub(super) fn plan(base_path:&Path,base:&MapInspection,donor:&MapInspection,plan:BspAssembly)->Result<BspAssembly>{
+    plan_terrain(base_path, base, donor, plan, false)
+}
+
+pub(super) fn plan_placed(base_path:&Path,base:&MapInspection,donor:&MapInspection,plan:BspAssembly)->Result<BspAssembly>{
+    plan_terrain(base_path, base, donor, plan, true)
+}
+
+fn plan_terrain(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut plan:BspAssembly,fixed:bool)->Result<BspAssembly>{
     let (a,af)=maps::collision_source(base_path,base)?;
     let (b,bf)=maps::collision_source(&plan.donor_source.preserved_path,donor)?;
     let min_b=render_edge(donor,plan.donor_bsp_index,false)?-0.25;
     let max_a=a.positions.chunks_exact(3).map(|p|p[0] as f64).fold(f64::NEG_INFINITY,f64::max);
     let start=plan.tunnel_points[0];let end_local=sub(*plan.tunnel_points.last().unwrap(),plan.translation);
+    if fixed && (plan.yaw_degrees.abs() > 1e-7 || !(1.6..=4.).contains(&(min_b + plan.translation[0] - max_a))) {
+        return invalid("Move the Atlas donor to the east boundary with a 1.6–4 unit reconstruction strip and matching yaw");
+    }
     let (end,donor_face)=(0..12).find_map(|step|source_floor(&b,&bf,plan.donor_bsp_index,[min_b+10.+step as f64*2.,end_local[1],0.],0.8).ok()).ok_or_else(||SparkError::Invalid("No nearby walkable donor terrain; choose a different boundary instead of cutting through a building or cliff".into()))?;
     let (_,base_face)=source_floor(&a,&af,0,start,0.65)?;
     let shader=|inspection:&MapInspection,faces:&[CollisionFace],face:usize|->Result<String>{
@@ -80,7 +91,7 @@ pub(super) fn plan(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut 
             .ok_or_else(||SparkError::Invalid("Outdoor floor requires its exact native environment shader".into()))?;
         Ok(tag.path.clone())
     };
-    plan.translation=[max_a+2.-min_b,start[1]-end[1],start[2]-end[2]];
+    if !fixed { plan.translation=[max_a+2.-min_b,start[1]-end[1],start[2]-end[2]]; }
     plan.tunnel_points=vec![start,add(end,plan.translation)];
     plan.tunnel_width=6.;plan.tunnel_height=4.;plan.open_road=true;
     plan.infantry_tunnel=None;plan.high_ground=None;plan.visibility_zones.clear();

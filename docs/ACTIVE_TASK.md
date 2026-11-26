@@ -1,14 +1,14 @@
 # Active engineering checkpoint
 
-Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
+Task: Product Completion. P0 compact MegaWorld, P1 embedded flagship modes, P2 creator workflows.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 ae1f658 SHA-256 b2bb5b342e072f5dd3081369ac74eaaf85b4128e93dae03879014a200547cf32. c20 native cold shader waits improved. Previous 267fda6 (9e25579a). Rotation reclaimed 61,866,496 bytes. ca1960d2 label passed both peers; 11e0b991 corrects its wording.
+Latest verified revision: Win64 fff4e0a SHA-256 8cec2e5f5eef8ad4eafba85df2bb80d72c47aacd418cfb655441a22727b85cc0. Dense native previews. Previous ae1f658 (b2bb5b34).
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native 78ddeb48 passed Elite death, respawn, diagonal movement and jump. On Forerunner 8da3477b, owner deploy 19:22:28 announced field LANDED at 19:23:46 after scraping/circling; seat exit failed. Full Pelican 10.2 × 7.6 footprint reads .895 terrain relief at (79,-124); alternate 1.154 at (80,-122). Native side seats have exits 19/22. Forerunner reproduced circling, then exited once. HUD inherited MCC C40. Private HUD A/B be-native-hud-scale-ab: fcd8e89b vs exact 78ddeb48, fourteen scale bits plus checksums. Native visual review pending.
-Next action: 710a1f7d/55c170b7 on 9262c072 reached the first Spirit recall point, then stalled near (48,-78,4–6.5) under Z12 target. Exact private dc3b8e3d/32b377e1 in black-echo-spirit-recall-merge-WQr814 lowers only that second point to Z8.25, maintains the original merge and HSC. Compiled readback and terrain samples passed. Forerunner has the pair for focused recall touchdown, then continuous co-op evacuation/banking. Retain both controls and the prompt A/B.
+Next action: Build the compact 3–4–5–4–3 Atlas layout through BSP Assembly. First prove stock Timberland–Sidewinder via saved transforms and common terrain, then buried interior and connected 19-region builds. Prove the result from normal controls.
 
-Operation 110% V2 immediate priorities, 25 November 2026. P0 playable Windows testing installations, P1 MegaWorld gameplay, P2 original Zombie Apocalypse, P3 Black Echo Extraction, P4 remaining permanent capabilities, P5 Forge and release polish. Preserve all 475 requirements, M1–M6, CE609 and MCC13 compatibility, and previous-good files. Deliver tested Win64 and playable maps every ten meaningful commits.
+PRODUCT COMPLETION supersedes older priorities below. P0 compact Atlas and native construction. P1 author Extraction, Black Echo, Survival and Firefight inside MegaWorld with valid campaign recordings. Be Native and all standalone candidates are retained fixtures. P2 complete creator workflows. Preserve the 475 requirements, M1–M6, assets, recovery and platforms.
 
 ## Acceptance
 

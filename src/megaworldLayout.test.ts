@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
+import {atlasAdjacentRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
 import type {AtlasRegion} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -29,6 +29,9 @@ describe('source-bound Megaworld layout',()=>{
 it('places the chosen center inside two complete six-sided rings for19 equal native footprints',()=>{
  const plan=addLayoutRegions(null,originalMultiplayerMaps.map((name,i)=>region(name,i))),center=plan.regions[17].regionId,next=spreadLayout(plan,center);
  expect(next.regions[17].translation).toEqual([0,0,0]);
- const ring=next.regions.map(r=>{const row=r.translation[1]/10,q=r.translation[0]/20-row/2;return Math.max(Math.abs(q),Math.abs(row),Math.abs(q+row));});
+ const ring=next.regions.map(r=>{const [q,row]=r.hexSlot!;return Math.max(Math.abs(q),Math.abs(row),Math.abs(q+row));});
+ const widths=[-2,-1,0,1,2].map(row=>next.regions.filter(r=>r.hexSlot?.[1]===row).length);
+ expect(widths).toEqual([3,4,5,4,3]);
+ expect(atlasAdjacentRegions(next.regions,next.regions[17])).toHaveLength(6);
  expect(ring.filter(r=>r===0)).toHaveLength(1);expect(ring.filter(r=>r===1)).toHaveLength(6);expect(ring.filter(r=>r===2)).toHaveLength(12);expect(overlappingRegions(next.regions)).toEqual([]);
 });

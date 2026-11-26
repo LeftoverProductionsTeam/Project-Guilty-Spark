@@ -28,15 +28,38 @@ pub struct LayoutRegion {
     pub region_id:String,pub cache_sha256:String,pub cache_version:u32,pub bsp_index:usize,
     pub map_name:String,pub bsp_name:String,pub minimum:[f64;3],pub maximum:[f64;3],
     pub translation:[f64;3],pub yaw_degrees:f64,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub hex_slot: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if="std::ops::Not::not")]
+    pub underground: bool,
 }
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct Layout {pub schema_version:u32,pub regions:Vec<LayoutRegion>}
 impl Layout {
+    pub fn connection(&self, base: &str, donor: &str) -> Result<(&LayoutRegion, &LayoutRegion)> {
+        self.validate()?;
+        let find = |id| self.regions.iter().find(|region| region.region_id == id)
+            .ok_or_else(|| crate::SparkError::Invalid("Save both Atlas regions before preparing a connection".into()));
+        let (a, b) = (find(base)?, find(donor)?);
+        let (Some([aq, ar]), Some([bq, br])) = (a.hex_slot, b.hex_slot) else {
+            return invalid("Arrange the saved regions in the hex cluster first");
+        };
+        let (q, r) = (bq-aq, br-ar);
+        if q.abs().max(r.abs()).max((q+r).abs()) != 1 {
+            return invalid("Choose adjacent saved Atlas regions");
+        }
+        Ok((a, b))
+    }
+
     pub fn validate(&self)->Result<()> {
         if self.schema_version!=1||self.regions.len()>64{return invalid("Atlas layout supports schema 1 and at most 64 region plans");}
         let mut seen=BTreeSet::new();
+        let mut slots=BTreeSet::new();
         for r in &self.regions {
+            if r.hex_slot.is_some_and(|slot| slot.iter().any(|axis| !(-63..=63).contains(axis)) || !slots.insert(slot)) {
+                return invalid("Atlas hex slots are out of range or duplicated");
+            }
             if r.cache_sha256.len()!=64||!r.cache_sha256.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b))
                 ||r.region_id!=format!("{}:{}",r.cache_sha256,r.bsp_index)||!seen.insert(&r.region_id)
                 ||r.bsp_index>=64||![5,6,7,13,609].contains(&r.cache_version) {

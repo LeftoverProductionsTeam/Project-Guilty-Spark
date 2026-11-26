@@ -2518,6 +2518,52 @@ pub fn plan_from_bsp(
     base_index: usize, index: usize, tags: PathBuf, direction_degrees: f64,
     regional_preset: Option<RegionalConnectionPreset>,
 ) -> Result<BspAssembly> {
+    plan_from_bsp_placement(base_project, base, donor_project, donor, base_index, index, tags,
+        direction_degrees, regional_preset, None)
+}
+
+/// Prepare an actual native connection in the frame of the saved base region.
+pub fn plan_from_atlas(
+    base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
+    from: &crate::megaworld::LayoutRegion, to: &crate::megaworld::LayoutRegion, tags: PathBuf,
+    terrain_seam: bool,
+) -> Result<BspAssembly> {
+    if from.cache_sha256 != base.sha256 || to.cache_sha256 != donor.sha256
+        || from.cache_version != base.header.version || to.cache_version != donor.header.version {
+        return invalid("The open map and donor must match the saved Atlas source identities");
+    }
+    let translation = transform(sub(to.translation, from.translation), [0.; 3], -from.yaw_degrees);
+    let yaw = (to.yaw_degrees - from.yaw_degrees + 180.).rem_euclid(360.) - 180.;
+    let center = |region: &crate::megaworld::LayoutRegion| mul(add(region.minimum, region.maximum), 0.5);
+    let approach = sub(transform(center(to), translation, yaw), center(from));
+    if approach[0].hypot(approach[1]) < 1. {
+        return invalid("Move the neighboring Atlas region to leave a horizontal approach");
+    }
+    if terrain_seam && (from.underground || to.underground || from.bsp_index != 0 || base.mesh.parts.len() != 1) {
+        return invalid("Choose two surface regions with one base BSP for a terrain seam");
+    }
+    let direction = if terrain_seam { 0. } else { approach[1].atan2(approach[0]).to_degrees() };
+    let mut plan = plan_from_bsp_placement(base_project, base, donor_project, donor, from.bsp_index,
+        to.bsp_index, tags, direction, None, Some((translation, yaw)))?;
+    plan.include_donor_scenery = true;
+    if to.underground && !from.underground {
+        let roof = to.maximum[2] + translation[2];
+        if roof >= plan.tunnel_points[0][2] {
+            return invalid("Lower the underground Atlas region below the surface entrance before building");
+        }
+    }
+    if terrain_seam {
+        let source=base_project.source.as_ref().ok_or_else(|| SparkError::Invalid("Destination source is missing".into()))?;
+        return terrain::plan_placed(&source.preserved_path, base, donor, plan);
+    }
+    Ok(plan)
+}
+
+fn plan_from_bsp_placement(
+    base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
+    base_index: usize, index: usize, tags: PathBuf, direction_degrees: f64,
+    regional_preset: Option<RegionalConnectionPreset>, placement: Option<(V, f64)>,
+) -> Result<BspAssembly> {
     if !direction_degrees.is_finite() || direction_degrees.abs() > 360. {
         return invalid("Tunnel direction must be a finite angle within 360 degrees");
     }
@@ -2549,7 +2595,9 @@ pub fn plan_from_bsp(
     };
     let radius = if regional_preset.is_some() { 96. } else { 32. };
     let base_anchors=playable_anchor_candidates(&base_mesh,&faces,base_index,toward,&starts(base),radius)?;
-    let donor_anchors=playable_anchor_candidates(&donor_mesh,&donor_faces,index,mul(toward,-1.),&starts(donor),radius)?;
+    let yaw = placement.map_or(0., |(_, yaw)| yaw);
+    let donor_direction = transform(mul(toward, -1.), [0.; 3], -yaw);
+    let donor_anchors=playable_anchor_candidates(&donor_mesh,&donor_faces,index,donor_direction,&starts(donor),radius)?;
     let (start,face)=base_anchors[0];
     let (end,_)=donor_anchors[0];
     let donor_part = &donor_mesh.parts[index];
@@ -2563,7 +2611,7 @@ pub fn plan_from_bsp(
         mul(toward, base_max + 64. - donor_min),
         add(mul(crosswise, dot(sub(start, end), crosswise)), [0., 0., start[2] - end[2]]),
     );
-    let translation = place(start,end);
+    let translation = placement.map_or_else(|| place(start,end), |(translation, _)| translation);
     let shader = connection_shader(&base.tags, faces[face].shader, &base.header.name)
         .ok_or_else(|| {
             SparkError::Invalid("Choose a real environment shader for the tunnel".into())
@@ -2582,8 +2630,8 @@ pub fn plan_from_bsp(
         directional_donor_landing: false,
         include_donor_scenery: false,
         translation,
-        yaw_degrees: 0.,
-        tunnel_points: vec![start, add(end, translation)],
+        yaw_degrees: yaw,
+        tunnel_points: vec![start, transform(end, translation, yaw)],
         tunnel_width: 2.,
         tunnel_height: 1.6,
         tunnel_shader_path: shader.path.clone(),

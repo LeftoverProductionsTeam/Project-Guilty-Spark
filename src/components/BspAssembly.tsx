@@ -3,7 +3,7 @@ import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import {donorPoint, selectedSeamEdge} from '../seamEdges';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
-import type { LibraryEntry, MapInspection, Project, RuntimeRegistration, Vec3 } from '../types';
+import type { LibraryEntry, MapInspection, OpenProject, Project, RuntimeRegistration, Vec3 } from '../types';
 import { reviewedMcc13Target, runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
 import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
@@ -12,6 +12,7 @@ import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
+import { addOpenedAtlasBsp, type LayoutRegion } from '../megaworldLayout';
 import MapSourceDrop from './MapSourceDrop';
 import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
@@ -311,6 +312,60 @@ export default function BspAssembly({
       if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
     });
   }
+  const projectRef=useRef(project);
+  projectRef.current=project;
+  const atlasRef=useRef(project.megaworldLayout);
+  atlasRef.current=project.megaworldLayout;
+  async function addAtlasSources(){
+    await perform(async current=>{
+      const entry=candidates.find(row=>row.id===donor);
+      if(!entry?.sha256||!inspection)throw Error('Choose an open native map and an imported donor.');
+      const owner=latest.current,original=atlasRef.current;
+      const opened=await call<OpenProject>('open_bsp_assembly_donor',{projectId:project.id,
+        donorProjectId:donor,donorSourceSha256:entry.sha256});
+      if(!current()||atlasRef.current!==original||latest.current.donor!==owner.donor
+        ||latest.current.index!==owner.index||latest.current.baseIndex!==owner.baseIndex)return;
+      if(!opened.inspection||opened.inspection.sha256!==entry.sha256)throw Error('Imported donor no longer matches the selection.');
+      const withBase=addOpenedAtlasBsp(original,inspection,owner.baseIndex);
+      const layout=addOpenedAtlasBsp(withBase,opened.inspection,owner.index);
+      if(layout!==original)onEdit({...projectRef.current,megaworldLayout:layout},'Add opened BSPs to Atlas');
+    });
+  }
+  async function prepareAtlasConnection(from:LayoutRegion,to:LayoutRegion,terrainSeam:boolean) {
+    if(busy)return;
+    await perform(async current=>{
+      const request={...latest.current};
+      const identity=()=>JSON.stringify([from.regionId,to.regionId].map(id=>{
+        const region=atlasRef.current?.regions.find(row=>row.regionId===id);
+        return region?[region.cacheSha256,region.cacheVersion,region.bspIndex,region.translation,
+          region.yawDegrees,region.hexSlot,region.underground??false]:null;
+      }));
+      const requestedLayout=identity();
+      const matches=()=>current()&&identity()===requestedLayout
+        &&latest.current.signature===request.signature&&latest.current.donor===request.donor
+        &&latest.current.index===request.index&&latest.current.baseIndex===request.baseIndex;
+      await onSave();
+      if(!matches())return;
+      let entry=candidates.find(row=>row.sha256===to.cacheSha256&&row.version===to.cacheVersion);
+      if(!entry){
+        const imported=await call<OpenProject>('import_megaworld_region',{regionId:to.regionId});
+        if(!matches())return;
+        const owner=imported.project,inspected=imported.inspection;
+        if(!inspected||inspected.sha256!==to.cacheSha256||inspected.header.version!==to.cacheVersion)
+          throw Error('Imported donor differs from the saved Atlas region.');
+        entry={id:owner.id,title:owner.title,sha256:inspected.sha256,version:inspected.header.version,
+          scenarioType:inspected.header.scenarioType,engine:inspected.header.engine,modifiedAt:'',
+          creator:'',tagCount:inspected.tags.length,objectCount:inspected.objects.length,status:'',projectPath:''};
+        if(!admitsDonor(entry))throw Error('Choose a supported native donor for this map.');
+        setImportedDonors(old=>[...old.filter(row=>row.id!==entry!.id),entry!]);
+      }
+      const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:entry.id,
+        donorBspIndex:to.bspIndex,atlasConnection:[from.regionId,to.regionId],terrainSeam});
+      if(!matches())return;
+      setDonor(entry.id);setIndex(to.bspIndex);setBaseIndex(from.bspIndex);
+      setDraft(plan);setRouteView('primary');setReport(null);
+    });
+  }
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   const savedPlan = project.bspAssembly;
   const donorPositionApplied = !!draft && !!savedPlan && draft.donorProjectId === savedPlan.donorProjectId
@@ -417,7 +472,7 @@ export default function BspAssembly({
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
-          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
+          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
           {(!nativePartitioned || canExtend) && <>
           <details className="bsp-help">
@@ -517,6 +572,8 @@ export default function BspAssembly({
                 ))}
               </select>
             </label>
+            <button disabled={!native||busy||!inspection||!options.some(option=>option.index===index)}
+              onClick={()=>void addAtlasSources()}>Add both BSPs to Atlas</button>
             {canExtend ? <label>Tunnel direction (degrees)
               <NumberField label="Tunnel direction (degrees)" min={-360} max={360} step={1}
                 value={direction} onCommit={setDirection} disabled={busy}/>

@@ -1,7 +1,7 @@
-import type {Vec3} from './types';
+import type {MapInspection,Vec3} from './types';
 export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'] as const;
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
-export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number}
+export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean}
 export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[]}
 export function planRegion(region:AtlasRegion):LayoutRegion {
   return {regionId:region.id,cacheSha256:region.cacheSha256,cacheVersion:region.cacheVersion,bspIndex:region.bspIndex,mapName:region.mapName,bspName:region.bspName,minimum:[...region.minimum],maximum:[...region.maximum],translation:[0,0,0],yawDegrees:0};
@@ -12,6 +12,29 @@ export function addLayoutRegions(layout:MegaworldLayout|undefined|null,regions:A
   if(next.length>64)throw Error('The Atlas layout holds at most 64 region plans.');
   return {schemaVersion:1,regions:next};
 }
+/** Add already opened or user-imported maps without an installation scan. */
+export function addOpenedAtlasBsp(layout:MegaworldLayout|null|undefined,map:MapInspection,bspIndex:number):MegaworldLayout {
+  const part=map.mesh.parts?.[bspIndex];
+  if(!part||!part.indexCount||part.indexStart<0||part.indexStart+part.indexCount>map.mesh.indices.length)
+    throw Error('Choose a BSP with native collision geometry.');
+  const minimum:Vec3=[Infinity,Infinity,Infinity],maximum:Vec3=[-Infinity,-Infinity,-Infinity];
+  for(let at=part.indexStart;at<part.indexStart+part.indexCount;at++){
+    const start=map.mesh.indices[at]*3;
+    for(let axis=0;axis<3;axis++){
+      const value=map.mesh.positions[start+axis];
+      if(!Number.isFinite(value))throw Error('The selected BSP contains invalid native bounds.');
+      minimum[axis]=Math.min(minimum[axis],value);
+      maximum[axis]=Math.max(maximum[axis],value);
+    }
+  }
+  const row:LayoutRegion={regionId:map.sha256+':'+bspIndex,cacheSha256:map.sha256,cacheVersion:map.header.version,
+    bspIndex,mapName:map.header.name,bspName:part.name,minimum,maximum,translation:[0,0,0],yawDegrees:0};
+  const regions=layout?.regions??[];
+  if(regions.some(old=>old.regionId===row.regionId))return layout!;
+  if(regions.length>=64)throw Error('The Atlas layout holds at most 64 region plans.');
+  return {schemaVersion:1,regions:[...regions,row]};
+}
+
 /** Require an explicit edition when a map name has multiple source hashes. */
 export function originalRegions(regions:AtlasRegion[]):{regions:AtlasRegion[];missing:string[]} {
   const result:AtlasRegion[]=[],missing:string[]=[];
@@ -20,6 +43,16 @@ export function originalRegions(regions:AtlasRegion[]):{regions:AtlasRegion[];mi
     if(matches[0])result.push(matches[0]);else missing.push(name);
   }return {regions:result,missing};
 }
+export function atlasAdjacentRegions(regions: readonly LayoutRegion[], base: LayoutRegion): LayoutRegion[] {
+  const slot=base.hexSlot;
+  if(!slot)return [];
+  return regions.filter(region=>{
+    if(!region.hexSlot)return false;
+    const q=region.hexSlot[0]-slot[0],r=region.hexSlot[1]-slot[1];
+    return Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r))===1;
+  });
+}
+
 export function regionFootprint(r:LayoutRegion):[number,number][] {
   const angle=r.yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
   return [[r.minimum[0],r.minimum[1]],[r.maximum[0],r.minimum[1]],[r.maximum[0],r.maximum[1]],[r.minimum[0],r.maximum[1]]].map(([x,y])=>[x*c-y*s+r.translation[0],x*s+y*c+r.translation[1]]);
@@ -43,7 +76,6 @@ export function overlappingRegions(regions:LayoutRegion[]):[string,string][] {
  * Bounds are only a placement proxy; terrain blends/caves require native rebuild. */
 export function spreadLayout(layout:MegaworldLayout,centerId=layout.regions[0]?.regionId):MegaworldLayout {
   const sizes=layout.regions.map(r=>{const p=regionFootprint(r);return [Math.min(...p.map(v=>v[0])),Math.min(...p.map(v=>v[1])),Math.max(...p.map(v=>v[0])),Math.max(...p.map(v=>v[1]))];});
-  const cellX=Math.max(1,...sizes.map(p=>p[2]-p[0])),cellY=Math.max(1,...sizes.map(p=>p[3]-p[1]));
   const order=layout.regions.map((r,i)=>i).sort((a,b)=>Number(layout.regions[b].regionId===centerId)-Number(layout.regions[a].regionId===centerId));
   const slots:[number,number][]=[[0,0]];
   for(let radius=1;slots.length<layout.regions.length;radius++){
@@ -51,7 +83,36 @@ export function spreadLayout(layout:MegaworldLayout,centerId=layout.regions[0]?.
     ring.sort((a,b)=>Math.atan2(a[1],a[0]+a[1]/2)-Math.atan2(b[1],b[0]+b[1]/2));slots.push(...ring);
   }
   const positions=new Map(order.map((index,i)=>[index,slots[i]]));
-  const regions=layout.regions.map((r,i)=>{const [q,row]=positions.get(i)!;return {...r,translation:[r.translation[0]+(q+row/2)*cellX-(sizes[i][0]+sizes[i][2])/2,r.translation[1]+row*cellY-(sizes[i][1]+sizes[i][3])/2,r.translation[2]] as Vec3};});
+  const rows=new Map<number,number[]>();
+  for(const [index,[,row]] of positions){
+    const members=rows.get(row)??[];
+    members.push(index);
+    rows.set(row,members);
+  }
+  const strip=2;
+  const centers=new Map<number,[number,number]>();
+  let y=0;
+  for(const [row,members] of [...rows].sort(([a],[b])=>a-b)){
+    members.sort((a,b)=>positions.get(a)![0]-positions.get(b)![0]);
+    const widths=members.map(i=>Math.max(1,sizes[i][2]-sizes[i][0]));
+    const height=Math.max(1,...members.map(i=>sizes[i][3]-sizes[i][1]));
+    let x=-(widths.reduce((total,width)=>total+width,0)+strip*(members.length-1))/2;
+    members.forEach((i,column)=>{
+      centers.set(i,[x+widths[column]/2,y+height/2]);
+      x+=widths[column]+strip;
+    });
+    y+=height+strip;
+  }
+  const [originX,originY]=centers.get(order[0])??[0,0];
+  const regions=layout.regions.map((r,i)=>{
+    const [x,y]=centers.get(i)!;
+    const [left,bottom,right,top]=sizes[i];
+    return {...r,hexSlot:positions.get(i)!,translation:[
+      r.translation[0]+x-originX-(left+right)/2,
+      r.translation[1]+y-originY-(bottom+top)/2,
+      r.translation[2],
+    ] as Vec3};
+  });
   if(regions.some(r=>r.translation.some(n=>!Number.isFinite(n)||Math.abs(n)>1000000)))throw Error('These bounds exceed the supported layout range. Arrange them individually.');
   return {schemaVersion:1,regions};
 }

@@ -1,5 +1,7 @@
 # MegaWorld seam routes — 8 November 2026
 
+Current Product Completion acceptance requires the compact 3–4–5–4–3 Atlas as the native build source, natural outdoor seams, buried interiors, and normal-controls traversal of all original regions. Earlier route, cache and screenshot results below remain regression evidence. Standalone Be Native and Black Echo are fixtures. Flagship gameplay acceptance is inside the compact world.
+
 Base: local master `5095e9b9ea0979448cd571d56659b4076e5930a2` plus the preserved uncommitted continuation. This records source authoring acceptance, not a playable 19-region world.
 
 ## Creator workflow

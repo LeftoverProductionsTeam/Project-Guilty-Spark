@@ -567,7 +567,7 @@ async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String,assembly_pr
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>,direction_degrees:Option<f64>,base_bsp_index:Option<usize>,regional_preset:Option<core::bsp_assembly::RegionalConnectionPreset>)->Reply<core::bsp_assembly::BspAssembly>{
+async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize,terrain_seam:Option<bool>,edges:Option<[core::bsp_assembly::SeamEdge;2]>,direction_degrees:Option<f64>,base_bsp_index:Option<usize>,regional_preset:Option<core::bsp_assembly::RegionalConnectionPreset>,atlas_connection:Option<[String;2]>)->Reply<core::bsp_assembly::BspAssembly>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};
         // Planning uses the original compiled geometry. Build preflight still
         // requires the matching editable dependencies for a native rebuild.
@@ -579,6 +579,14 @@ async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_
         let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;if let Some(edges)=edges {
             let plan=base.bsp_assembly.as_ref().filter(|p|p.donor_project_id==donor_project_id&&p.donor_bsp_index==donor_bsp_index).ok_or("Apply the current donor connection before adding edge-selected sections")?;
             return core::bsp_assembly::append_edge_section(&base.source.as_ref().ok_or("Original destination source unavailable")?.preserved_path,&i,plan,edges).map_err(error);
+        }
+        if let Some([from, to]) = atlas_connection {
+            let layout = base.megaworld_layout.as_ref().ok_or("Save the Atlas layout first")?;
+            let (from, to) = layout.connection(&from, &to).map_err(error)?;
+            if to.bsp_index != donor_bsp_index || regional_preset.is_some() {
+                return Err("Choose the native source BSP and connection type from Atlas".into());
+            }
+            return core::bsp_assembly::plan_from_atlas(&base,&i,&donor,&j,from,to,tags,terrain_seam.unwrap_or(false)).map_err(error);
         }
         if terrain_seam.unwrap_or(false) {
             if regional_preset.is_some() {return Err("Choose adjacent terrain or a separate native connector".into());}
