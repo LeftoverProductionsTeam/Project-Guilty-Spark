@@ -1,5 +1,5 @@
 use spark_core::{megaworld::{Layout,LayoutRegion},project::{self,Project}};
-fn layout()->Layout{Layout{schema_version:1,regions:vec![LayoutRegion{region_id:format!("{}:0","a".repeat(64)),cache_sha256:"a".repeat(64),cache_version:609,bsp_index:0,map_name:"timberland".into(),bsp_name:"levels/test/timberland".into(),minimum:[-10.,-5.,-2.],maximum:[10.,5.,4.],translation:[0.;3],yaw_degrees:0.,hex_slot:None,underground:false}]}}
+fn layout()->Layout{Layout{schema_version:1,regions:vec![LayoutRegion{region_id:format!("{}:0","a".repeat(64)),cache_sha256:"a".repeat(64),cache_version:609,bsp_index:0,map_name:"timberland".into(),bsp_name:"levels/test/timberland".into(),minimum:[-10.,-5.,-2.],maximum:[10.,5.,4.],translation:[0.;3],yaw_degrees:0.,hex_slot:None,underground:false,surface_access:None}]}}
 #[test]fn layout_save_reopen_preserves_hash_bound_plans_without_invalidating_native_build(){
  let temp=tempfile::tempdir().unwrap();let file=temp.path().join("world.gsproject");let mut p=Project::new("Atlas plan");let before=p.fingerprint().unwrap();
  let legacy=serde_json::to_value(&p).unwrap();assert!(legacy.get("megaworldLayout").is_none());assert!(serde_json::from_value::<Project>(legacy).unwrap().megaworld_layout.is_none());
@@ -110,4 +110,42 @@ fn saved_atlas_edge_reconstructs_stock_timberland_sidewinder_terrain() {
     assert!(mesh.report.output_triangles>0 && mesh.report.walk_samples>0);
     assert_eq!(maps::hash_file(&stock.join(Path::new("timberland.map"))).unwrap(),a.sha256);
     assert_eq!(maps::hash_file(&stock.join(Path::new("sidewinder.map"))).unwrap(),b.sha256);
+}
+
+#[test]
+fn linked_surface_and_room_reopen_without_adjacent_slots() {
+    use spark_core::megaworld::SurfaceAccess;
+
+    let temp = tempfile::tempdir().unwrap();
+    let saved = temp.path().join("covered.gsproject");
+    let mut plan = layout();
+    let surface = plan.regions[0].region_id.clone();
+    let mut room = plan.regions[0].clone();
+    room.cache_sha256 = "b".repeat(64);
+    room.region_id = format!("{}:0", room.cache_sha256);
+    let room_id = room.region_id.clone();
+    room.hex_slot = Some([-2, 2]);
+    room.underground = true;
+    room.translation[2] = -15.;
+    plan.regions[0].hex_slot = Some([0, 0]);
+    plan.regions.push(room);
+    assert!(plan.connection(&surface, &room_id).is_err());
+    plan.regions[1].surface_access = Some(SurfaceAccess {
+        surface_region_id: surface.clone(), roof_clearance: 2., heading_degrees: -90.,
+    });
+    let mut project = Project::new("Covered Atlas passage");
+    project.megaworld_layout = Some(plan.clone());
+    project::save_project(&saved, &project).unwrap();
+    let reloaded = project::load_project(&saved).unwrap().megaworld_layout.unwrap();
+    let (_, room) = reloaded.connection(&surface, &room_id).unwrap();
+    assert_eq!(room, &plan.regions[1]);
+    assert!(reloaded.connection(&room_id, &surface).is_ok());
+    plan.regions[0].underground = true;
+    assert!(plan.validate().is_err());
+    plan.regions[0].underground = false;
+    plan.regions[1].surface_access.as_mut().unwrap().roof_clearance = f64::NAN;
+    assert!(plan.validate().is_err());
+    plan.regions[1].surface_access.as_mut().unwrap().roof_clearance = 2.;
+    plan.regions.swap_remove(0);
+    assert!(plan.validate().is_err());
 }

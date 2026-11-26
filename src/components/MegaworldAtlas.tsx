@@ -5,7 +5,7 @@ import {useMapState} from '../mapSession';
 import {assemblyRoutes} from '../bspAssembly';
 import type {OpenProject,Project} from '../types';
 import {NumberField} from './ui';
-import {addLayoutRegions,atlasAdjacentRegions,atlasCoveringRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
+import {addLayoutRegions,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
 import type {AtlasRegion as Region,LayoutRegion,MegaworldLayout} from '../megaworldLayout';
 type Atlas={regions:Region[];caches:{path:string;error:string|null}[];elapsedMs:number;limitations:string[]};
 type PrepareConnection=(base:LayoutRegion,donor:LayoutRegion,terrain:boolean)=>Promise<void>;
@@ -49,8 +49,9 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
 function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
   const [connectionOrigin,setConnectionOrigin]=useState('');
-  const [coverSurface,setCoverSurface]=useState('');
-  const [coverClearance,setCoverClearance]=useState(2);
+  const [coverSelection,setCoverSelection]=useState<{roomId:string;surfaceId:string}|null>(null);
+  const [clearanceEdit,setClearanceEdit]=useState<{roomId:string;clearance:number}|null>(null);
+  const [headingEdit,setHeadingEdit]=useState<{roomId:string;degrees:number}|null>(null);
   const [checkingCover,setCheckingCover]=useState(false);
   const [coverResult,setCoverResult]=useState<{key:string;result:BurialReview}|{key:string;error:string}|null>(null);
   const [view,setView]=useState<'all'|'surface'|'underground'|'elevation'>('all');
@@ -76,7 +77,14 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
   const high=points.length?[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))]:[0,0];
   const cover=selected?.underground?atlasCoveringRegions(regions,selected):[];
   const surfaces=regions.filter(region=>!region.underground);
-  const surface=surfaces.find(region=>region.regionId===coverSurface)??cover[0]??surfaces[0];
+  const linked=surfaces.find(region=>region.regionId===selected?.surfaceAccess?.surfaceRegionId);
+  const chosen=coverSelection?.roomId===selected?.regionId
+    ? surfaces.find(region=>region.regionId===coverSelection?.surfaceId) : undefined;
+  const surface=chosen??linked??cover[0]??surfaces[0];
+  const heading=headingEdit?.roomId===selected?.regionId
+    ? headingEdit?.degrees??0 : selected?.surfaceAccess?.headingDegrees??0;
+  const coverClearance=clearanceEdit?.roomId===selected?.regionId
+    ? clearanceEdit?.clearance??2 : selected?.surfaceAccess?.roofClearance??2;
   const coverKey=JSON.stringify([selected,surface,coverClearance]);
   const coverResponse=coverResult?.key===coverKey?coverResult:null;
   const reviewedCover=coverResponse&&'result' in coverResponse?coverResponse.result:null;
@@ -90,6 +98,28 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
       });
       setCoverResult({key:coverKey,result});
     }catch(e){setCoverResult({key:coverKey,error:String(e)});}finally{setCheckingCover(false);}
+  }
+  function applyCover() {
+    if(!layout||!selected||!surface||reviewedCover?.coverZ==null||readOnly)return;
+    try {
+      onLayout(applyAtlasSurfaceAccess(layout,selected.regionId,surface.regionId,coverClearance,
+        reviewedCover.suggestedTranslationZ??selected.translation[2],heading),'Set covered Atlas surface passage');
+      setError('');
+    } catch(e) { setError(String(e)); }
+  }
+  function removeRegion() {
+    if(!selected||readOnly)return;
+    onLayout({schemaVersion:1,regions:regions.filter(region=>region!==selected).map(region=>
+      region.surfaceAccess?.surfaceRegionId===selected.regionId?{...region,surfaceAccess:undefined}:region)},
+    'Remove Atlas region');
+  }
+  function setUnderground(underground:boolean) {
+    if(!selected||readOnly)return;
+    onLayout({schemaVersion:1,regions:regions.map(region=>{
+      if(region===selected)return {...region,underground,surfaceAccess:undefined};
+      return underground&&region.surfaceAccess?.surfaceRegionId===selected.regionId
+        ? {...region,surfaceAccess:undefined} : region;
+    })},'Set Atlas elevation role');
   }
   const overlaps=overlappingRegions(regions),missing=atlas?regions.filter(r=>!atlas.regions.some(a=>a.id===r.regionId)):[];
   function transform(axis:number,value:number){if(!selected||readOnly)return;onLayout({schemaVersion:1,regions:regions.map(r=>r.regionId!==selected.regionId?r:axis===3?{...r,yawDegrees:value}:{...r,translation:r.translation.map((n,i)=>i===axis?value:n) as [number,number,number]})},'Move Atlas region');}
@@ -125,17 +155,20 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
         onClick={()=>setSelection(r.regionId)}><title>{r.mapName} / {r.bspName}</title></polygon></g>)}
     </svg>:<p className="atlas-note">No {view} regions in this layout.</p>}
     <label>Planned region <select aria-label="Planned Atlas region" value={selected?.regionId} onChange={e=>setSelection(e.target.value)}>{regions.map(r=><option value={r.regionId} key={r.regionId}>{r.mapName} · v{r.cacheVersion} · BSP {r.bspIndex+1}</option>)}</select></label>
-    {selected&&<><div className="atlas-transform">{['X','Y','Z','Yaw'].map((axis,i)=><label key={axis}>{axis}<NumberField disabled={readOnly} label={'Atlas region '+axis} value={i===3?selected.yawDegrees:selected.translation[i]} onCommit={value=>transform(i,value)} min={i===3?-360000:-1000000} max={i===3?360000:1000000}/></label>)}</div><div className="atlas-controls"><button disabled={readOnly} onClick={()=>onLayout({schemaVersion:1,regions:regions.filter(r=>r.regionId!==selected.regionId)},'Remove Atlas region')}>Remove region plan</button><small title={selected.cacheSha256}>Source {selected.cacheSha256.slice(0,10)} · v{selected.cacheVersion}</small></div></>}
-    {selected&&<label><input type="checkbox" checked={selected.underground??false} disabled={readOnly} onChange={event=>
-      onLayout({schemaVersion:1,regions:regions.map(region=>region.regionId===selected.regionId?{...region,underground:event.target.checked}:region)},'Set Atlas elevation role')}/> Underground region</label>}
+    {selected&&<><div className="atlas-transform">{['X','Y','Z','Yaw'].map((axis,i)=><label key={axis}>{axis}<NumberField disabled={readOnly} label={'Atlas region '+axis} value={i===3?selected.yawDegrees:selected.translation[i]} onCommit={value=>transform(i,value)} min={i===3?-360000:-1000000} max={i===3?360000:1000000}/></label>)}</div><div className="atlas-controls"><button disabled={readOnly} onClick={removeRegion}>Remove region plan</button><small title={selected.cacheSha256}>Source {selected.cacheSha256.slice(0,10)} · v{selected.cacheVersion}</small></div></>}
+    {selected&&<label><input type="checkbox" checked={selected.underground??false} disabled={readOnly}
+      onChange={event=>setUnderground(event.target.checked)}/> Underground region</label>}
     {selected?.underground&&<details className="atlas-region"><summary>Review terrain cover</summary>
       <div className="atlas-controls">
         <label>Surface region <select aria-label="Atlas cover surface" value={surface?.regionId??''}
-          onChange={event=>setCoverSurface(event.target.value)}>
+          onChange={event=>setCoverSelection({roomId:selected.regionId,surfaceId:event.target.value})}>
           {!surfaces.length&&<option value="">Add a surface region first</option>}
           {surfaces.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
         </select></label>
-        <NumberField label="Roof clearance" value={coverClearance} min={0.1} max={64} step={0.1} onCommit={setCoverClearance}/>
+        <NumberField label="Roof clearance" value={coverClearance} min={0.1} max={64} step={0.1}
+          disabled={readOnly} onCommit={clearance=>setClearanceEdit({roomId:selected.regionId,clearance})}/>
+        <NumberField label="Passage heading" value={heading} min={-180} max={180} step={1}
+          disabled={readOnly} onCommit={degrees=>setHeadingEdit({roomId:selected.regionId,degrees})}/>
         <button disabled={!native||!surface||checkingCover} onClick={()=>void checkBurial()}>
           {checkingCover?'Checking native terrain…':'Check terrain cover'}
         </button>
@@ -147,10 +180,16 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
           : reviewedCover.suggestedTranslationZ===null
             ? 'Upward-facing native collision covers the full footprint at this depth.'
             : `The current roof margin leaves ${(100*reviewedCover.uncoveredArea/reviewedCover.footprintArea).toFixed(1)}% of the footprint uncovered.`}</p>
-        {reviewedCover.suggestedTranslationZ!==null&&<button disabled={readOnly}
-          onClick={()=>transform(2,reviewedCover.suggestedTranslationZ!)}>Apply Z {reviewedCover.suggestedTranslationZ.toFixed(2)}</button>}
+        {reviewedCover.coverZ!==null&&<button disabled={readOnly} onClick={applyCover}>
+          {reviewedCover.suggestedTranslationZ===null?'Link surface passage':
+            'Apply Z '+reviewedCover.suggestedTranslationZ.toFixed(2)+' and link surface passage'}
+        </button>}
       </>}
-      <p className="atlas-note">Checks the projected roof rectangle against native collision. Review the passage, lighting and walkability in Construction.</p>
+      {linked&&<div className="atlas-controls"><span>Surface passage via {linked.mapName}</span>
+        <button type="button" disabled={readOnly} onClick={()=>onLayout({schemaVersion:1,regions:regions.map(region=>
+          region===selected?{...region,surfaceAccess:undefined}:region)},'Unlink Atlas surface passage')}>Unlink surface</button>
+      </div>}
+      <p className="atlas-note">Construction checks native cover again before drafting the linked passage. Review its clearance and lighting there.</p>
     </details>}
     {base&&onPrepareConnection&&<div className="atlas-controls">
       {compiledRegions.length>1&&<label>Built region <select aria-label="Atlas connection origin"
@@ -158,7 +197,7 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
         {compiledRegions.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
       </select></label>}
       <label>Connection from {base.mapName} <select aria-label="Atlas connection neighbor" value={selectedNeighbor?.regionId??''} onChange={event=>setSelection(event.target.value)}>
-        <option value="">Choose adjacent region</option>{adjacent.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
+        <option value="">Choose linked or adjacent region</option>{adjacent.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
       </select></label>
       <button disabled={readOnly||preparing||!selectedNeighbor||base.underground||selectedNeighbor.underground} onClick={()=>void prepare(true)}>Draft terrain seam</button>
       <button disabled={readOnly||preparing||!selectedNeighbor} onClick={()=>void prepare(false)}>Draft passage</button>

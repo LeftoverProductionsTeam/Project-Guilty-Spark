@@ -343,7 +343,7 @@ export default function BspAssembly({
       const identity=()=>JSON.stringify([from.regionId,to.regionId].map(id=>{
         const region=atlasRef.current?.regions.find(row=>row.regionId===id);
         return region?[region.cacheSha256,region.cacheVersion,region.bspIndex,region.translation,
-          region.yawDegrees,region.hexSlot,region.underground??false]:null;
+          region.yawDegrees,region.hexSlot,region.underground??false,region.surfaceAccess??null]:null;
       }));
       const requestedLayout=identity();
       const matches=()=>current()&&identity()===requestedLayout

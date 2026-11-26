@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {alignAtlasDonor,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
+import {alignAtlasDonor,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
 import type {AtlasRegion} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -60,4 +60,24 @@ it('copies a native alignment into the neighboring Atlas slot at full precision'
  const continued=alignAtlasDonor(arranged,compiledBase,donor,[4,8,-16],15,origin);
  expect(continued.regions[1].translation).toEqual([16,14,-20]);
  expect(continued.regions[1].yawDegrees).toBe(105);
+});
+
+it('keeps reviewed burial depth and an explicit access edge outside the hex neighbors',()=>{
+  const layout=addLayoutRegions(null,[region('terrain'),region('room',1),region('outside',2)]);
+  const [surface,room,outside]=layout.regions;
+  surface.hexSlot=[0,0];
+  room.hexSlot=[-2,2];
+  room.underground=true;
+  room.translation=[1,2,-10];
+  outside.hexSlot=[2,-2];
+  expect(atlasAdjacentRegions(layout.regions,surface)).toEqual([]);
+  const linked=applyAtlasSurfaceAccess(layout,room.regionId,surface.regionId,2,-19,-90);
+  expect(linked.regions[1].translation).toEqual([1,2,-19]);
+  expect(atlasAdjacentRegions(linked.regions,surface)).toEqual([linked.regions[1]]);
+  expect(atlasAdjacentRegions(linked.regions,linked.regions[1])).toEqual([surface]);
+  expect(linked.regions[0]).toBe(surface);
+  expect(room.translation).toEqual([1,2,-10]);
+  expect(()=>applyAtlasSurfaceAccess(layout,room.regionId,room.regionId,2,-19,0)).toThrow('surface');
+  const shifted=spreadLayout(linked,outside.regionId).regions;
+  expect(shifted[1].translation.map((axis,i)=>axis-shifted[0].translation[i])).toEqual([1,2,-19]);
 });

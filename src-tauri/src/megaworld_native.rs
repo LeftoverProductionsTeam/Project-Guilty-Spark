@@ -40,6 +40,17 @@ fn burial_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megawor
     Ok((path.clone(), Arc::new(map)))
 }
 
+pub(super) fn review_atlas_sources(
+    state: &AppState, surface: &core::megaworld::LayoutRegion,
+    interior: &core::megaworld::LayoutRegion, clearance: f64,
+) -> Reply<core::megaworld::BurialReview> {
+    let atlas = cached(state)?;
+    let (surface_path, surface_map) = burial_source(state, atlas.as_ref(), surface)?;
+    let (interior_path, interior_map) = burial_source(state, atlas.as_ref(), interior)?;
+    core::megaworld::review_burial(surface, interior, (&surface_path, &surface_map),
+        (&interior_path, &interior_map), clearance).map_err(error)
+}
+
 #[tauri::command]
 pub(super) async fn review_atlas_burial(
     app: tauri::AppHandle, layout: core::megaworld::Layout,
@@ -53,11 +64,7 @@ pub(super) async fn review_atlas_burial(
             .ok_or("Choose a surface region from the saved layout")?;
         let interior = layout.regions.iter().find(|region| region.region_id == interior_id)
             .ok_or("Choose an underground region from the saved layout")?;
-        let atlas = cached(&state)?;
-        let (surface_path, surface_map) = burial_source(&state, atlas.as_ref(), surface)?;
-        let (interior_path, interior_map) = burial_source(&state, atlas.as_ref(), interior)?;
-        core::megaworld::review_burial(surface, interior, (&surface_path, &surface_map),
-            (&interior_path, &interior_map), clearance).map_err(error)
+        review_atlas_sources(&state, surface, interior, clearance)
     }).await.map_err(error)?
 }
 

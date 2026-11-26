@@ -2765,13 +2765,19 @@ pub fn plan_from_atlas(
         let local = transform(sub(point, base_translation), [0.; 3], -base_yaw);
         (0..3).all(|axis| (from.minimum[axis] - 0.001..=from.maximum[axis] + 0.001).contains(&local[axis]))
     };
-    if approach[0].hypot(approach[1]) < 1. {
+    let surface_heading = crate::megaworld::surface_access_for(from, to).map(|(surface, _, access)| {
+        let reverse = if from.region_id == surface.region_id { 0. } else { 180. };
+        (access.heading_degrees + reverse - origin.yaw_degrees + 180.).rem_euclid(360.) - 180.
+    });
+    if surface_heading.is_none() && approach[0].hypot(approach[1]) < 1. {
         return invalid("Move the neighboring Atlas region to leave a horizontal approach");
     }
     if terrain_seam && (from.underground || to.underground || from.bsp_index != 0 || base.mesh.parts.len() != 1) {
         return invalid("Choose two surface regions with one base BSP for a terrain seam");
     }
-    let direction = if terrain_seam { 0. } else { approach[1].atan2(approach[0]).to_degrees() };
+    let direction = if terrain_seam { 0. } else {
+        surface_heading.unwrap_or_else(|| approach[1].atan2(approach[0]).to_degrees())
+    };
     let base_index = if continuation { 0 } else { from.bsp_index };
     let mut plan = plan_from_bsp_placement(base_project, base, donor_project, donor, base_index,
         to.bsp_index, tags, direction, None, Some((translation, yaw)), &in_region)?;

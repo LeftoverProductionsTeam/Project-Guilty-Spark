@@ -32,7 +32,18 @@ pub struct LayoutRegion {
     pub hex_slot: Option<[i32; 2]>,
     #[serde(default, skip_serializing_if="std::ops::Not::not")]
     pub underground: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface_access: Option<SurfaceAccess>,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SurfaceAccess {
+    pub surface_region_id: String,
+    pub roof_clearance: f64,
+    pub heading_degrees: f64,
+}
+
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct Layout {pub schema_version:u32,pub regions:Vec<LayoutRegion>}
@@ -42,6 +53,9 @@ impl Layout {
         let find = |id| self.regions.iter().find(|region| region.region_id == id)
             .ok_or_else(|| crate::SparkError::Invalid("Save both Atlas regions before preparing a connection".into()));
         let (a, b) = (find(base)?, find(donor)?);
+        if surface_access_for(a, b).is_some() {
+            return Ok((a, b));
+        }
         let (Some([aq, ar]), Some([bq, br])) = (a.hex_slot, b.hex_slot) else {
             return invalid("Arrange the saved regions in the hex cluster first");
         };
@@ -73,8 +87,31 @@ impl Layout {
                 ||(0..3).any(|a|r.minimum[a]>r.maximum[a]) {
                 return invalid("Atlas layout has invalid bounds or transform");
             }
-        }Ok(())
+        }
+        for room in &self.regions {
+            let Some(access) = &room.surface_access else { continue; };
+            if !room.underground
+                || !access.roof_clearance.is_finite()
+                || !(0.1..=64.).contains(&access.roof_clearance)
+                || !(-180. ..=180.).contains(&access.heading_degrees)
+                || !self.regions.iter().any(|surface|
+                    surface.region_id == access.surface_region_id && !surface.underground)
+            {
+                return invalid("Underground access needs an existing surface, valid roof clearance and passage heading");
+            }
+        }
+        Ok(())
     }
+}
+
+pub fn surface_access_for<'a>(a: &'a LayoutRegion, b: &'a LayoutRegion) -> Option<(&'a LayoutRegion, &'a LayoutRegion, &'a SurfaceAccess)> {
+    let (surface, room) = match (a.underground, b.underground) {
+        (false, true) => (a, b),
+        (true, false) => (b, a),
+        _ => return None,
+    };
+    room.surface_access.as_ref().filter(|access| access.surface_region_id == surface.region_id)
+        .map(|access| (surface, room, access))
 }
 
 #[derive(Debug, Serialize)]
@@ -271,7 +308,7 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
         let region = |id: &str, bounds, translation, yaw, underground| LayoutRegion {
             region_id: id.into(), cache_sha256: "a".repeat(64), cache_version: 609, bsp_index: 0,
             map_name: id.into(), bsp_name: id.into(), minimum: bounds, maximum: [4., 4., 1.],
-            translation, yaw_degrees: yaw, hex_slot: None, underground,
+            translation, yaw_degrees: yaw, hex_slot: None, underground, surface_access: None,
         };
         let surface = region("surface", [0.; 3], [20., 10., 0.], 90., false);
         let mut interior = region("interior", [0.; 3], [18., 11., 1.], 0., true);

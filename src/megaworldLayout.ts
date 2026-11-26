@@ -1,7 +1,7 @@
 import type {MapInspection,Vec3} from './types';
 export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'] as const;
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
-export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean}
+export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean;surfaceAccess?:{surfaceRegionId:string;roofClearance:number;headingDegrees:number}}
 export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[]}
 export function planRegion(region:AtlasRegion):LayoutRegion {
   return {regionId:region.id,cacheSha256:region.cacheSha256,cacheVersion:region.cacheVersion,bspIndex:region.bspIndex,mapName:region.mapName,bspName:region.bspName,minimum:[...region.minimum],maximum:[...region.maximum],translation:[0,0,0],yawDegrees:0};
@@ -43,11 +43,15 @@ export function originalRegions(regions:AtlasRegion[]):{regions:AtlasRegion[];mi
     if(matches[0])result.push(matches[0]);else missing.push(name);
   }return {regions:result,missing};
 }
+function linkedSurface(a: LayoutRegion, b: LayoutRegion): boolean {
+  return Boolean(a.underground && !b.underground && a.surfaceAccess?.surfaceRegionId === b.regionId);
+}
+
 export function atlasAdjacentRegions(regions: readonly LayoutRegion[], base: LayoutRegion): LayoutRegion[] {
   const slot=base.hexSlot;
-  if(!slot)return [];
   return regions.filter(region=>{
-    if(!region.hexSlot)return false;
+    if(linkedSurface(base,region)||linkedSurface(region,base))return true;
+    if(!slot||!region.hexSlot)return false;
     const q=region.hexSlot[0]-slot[0],r=region.hexSlot[1]-slot[1];
     return Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r))===1;
   });
@@ -63,6 +67,21 @@ export function alignAtlasDonor(layout:MegaworldLayout,base:LayoutRegion,donor:L
   return {...layout,regions:layout.regions.map(region=>region.regionId!==donor.regionId?region:{...region,
     translation:[origin.translation[0]+c*x-s*y,origin.translation[1]+s*x+c*y,origin.translation[2]+z],
     yawDegrees:origin.yawDegrees+yawDegrees})};
+}
+
+export function applyAtlasSurfaceAccess(layout: MegaworldLayout, interiorId: string, surfaceId: string,
+  roofClearance: number, translationZ: number, headingDegrees: number): MegaworldLayout {
+  const interior=layout.regions.find(region=>region.regionId===interiorId);
+  const surface=layout.regions.find(region=>region.regionId===surfaceId);
+  if(!interior?.underground||!surface||surface.underground||!Number.isFinite(roofClearance)
+      ||roofClearance<0.1||roofClearance>64||!Number.isFinite(translationZ)||Math.abs(translationZ)>1_000_000
+      ||!Number.isFinite(headingDegrees)||Math.abs(headingDegrees)>180){
+    throw Error('Choose a surface region, supported roof clearance and passage heading.');
+  }
+  return {...layout,regions:layout.regions.map(region=>region===interior?{
+    ...region,translation:[region.translation[0],region.translation[1],translationZ],
+    surfaceAccess:{surfaceRegionId:surfaceId,roofClearance,headingDegrees},
+  }:region)};
 }
 
 export function regionFootprint(r:LayoutRegion):[number,number][] {
@@ -140,6 +159,14 @@ export function spreadLayout(layout:MegaworldLayout,centerId=layout.regions[0]?.
       r.translation[2],
     ] as Vec3};
   });
-  if(regions.some(r=>r.translation.some(n=>!Number.isFinite(n)||Math.abs(n)>1000000)))throw Error('These bounds exceed the supported layout range. Arrange them individually.');
-  return {schemaVersion:1,regions};
+  const moved=new Map(regions.map((region,index)=>[region.regionId,index]));
+  const attached=regions.map((region,index):LayoutRegion=>{
+    const parent=region.surfaceAccess&&moved.get(region.surfaceAccess.surfaceRegionId);
+    if(parent===undefined||!linkedSurface(region,regions[parent]))return region;
+    const original=layout.regions[index].translation;
+    const before=layout.regions[parent].translation,after=regions[parent].translation;
+    return {...region,translation:[original[0]+after[0]-before[0],original[1]+after[1]-before[1],original[2]]};
+  });
+  if(attached.some(r=>r.translation.some(n=>!Number.isFinite(n)||Math.abs(n)>1000000)))throw Error('These bounds exceed the supported layout range. Arrange them individually.');
+  return {schemaVersion:1,regions:attached};
 }

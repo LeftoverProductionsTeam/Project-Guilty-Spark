@@ -593,6 +593,12 @@ async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_
             if to.bsp_index != donor_bsp_index || regional_preset.is_some() {
                 return Err("Choose the native source BSP and connection type from Atlas".into());
             }
+            if let Some((surface, interior, access)) = core::megaworld::surface_access_for(from, to) {
+                let cover = megaworld_native::review_atlas_sources(&state, surface, interior, access.roof_clearance)?;
+                if cover.cover_z.is_none() || cover.suggested_translation_z.is_some() {
+                    return Err("The saved surface link needs full native roof cover. Review terrain cover again or move the underground region.".into());
+                }
+            }
             return core::bsp_assembly::plan_from_atlas(&base,&i,&donor,&j,from,to,tags,terrain_seam.unwrap_or(false)).map_err(error);
         }
         if terrain_seam.unwrap_or(false) {
