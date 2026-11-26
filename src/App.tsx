@@ -1435,7 +1435,13 @@ export default function App() {
           data={data}
           onWorkspace={setWorkspace}
           onImport={() => void importFiles()}
-          onRuntime={id=>{setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');}}
+          onForerunner={()=>openCommunityFlavorSetup('forerunner')}
+          onRuntime={id=>{
+            writeMapSession(current?.id??'global','hosting.runtime',id);
+            writeMapSession('global','tools.dashboard','tools');
+            if(id!=='chupathingyCe'&&id!=='mccSteam')writeMapSession('global','tools.compatibilityOpen',true);
+            setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');
+          }}
           onMccTools={()=>{setDependencyRuntime('mccSteam');openDependencySetup();}}
           onNew={() => setCreateModal(true)}
           onNewMap={() => setCreateModal('multiplayer')}

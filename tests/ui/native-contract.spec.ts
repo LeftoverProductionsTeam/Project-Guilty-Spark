@@ -1847,7 +1847,8 @@ test('home exposes existing Halos plus Arena Evolved and connects a discovered c
   await chooseTool(page, 'Settings & tools');
   await chooseTool(page,'Map library');
   const homes = page.getByRole('group', { name: 'Your Halo installations', exact: true });
-  await expect(homes.getByRole('button')).toHaveCount(5);
+  await expect(homes.getByRole('button')).toHaveCount(6);
+  await expect(homes.getByRole('button',{name:/^Forerunner ·/})).toBeVisible();
   await homes.getByRole('button', { name: 'OpenCE · Detected', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'OpenCE tools', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'OpenCE · Detected', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -1878,6 +1879,7 @@ test('refreshing discovery during a pending runtime connection does not strand i
     };
   });
   await chooseTool(page,'Settings & tools');
+  await page.getByText('Compatibility runtimes',{exact:true}).click();
   await page.getByRole('button',{name:'OpenCE · Detected',exact:true}).click();
   await page.getByRole('button',{name:'Connect detected Halo',exact:true}).click();
   await expect.poll(() => page.evaluate(() => typeof (window as any).__releasePendingConnection)).toBe('function');
@@ -1909,7 +1911,10 @@ test('games and tools scopes connected Halo versions, editors and map handoffs',
     };
   });
   await chooseTool(page, 'Settings & tools');
-  await expect(page.getByRole('group', { name: 'Halo versions' }).getByRole('button')).toHaveCount(5);
+  await expect(page.getByRole('group', { name: 'Flagship Halo runtimes' }).getByRole('button')).toHaveCount(3);
+  await expect(page.getByRole('group', { name: 'Compatibility runtimes' })).toBeHidden();
+  await page.getByText('Compatibility runtimes',{exact:true}).click();
+  await expect(page.getByRole('group', { name: 'Compatibility runtimes' }).getByRole('button')).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'MCC Halo 1 · Connected', exact: true })).toHaveAttribute('data-connected', 'true');
   await expect(page.getByRole('button', { name: 'OpenCE · Not connected', exact: true })).toHaveAttribute('data-connected', 'false');
   await expect(page.getByRole('button', { name: /Halo PC · / })).toHaveCount(0);
@@ -3467,9 +3472,10 @@ test('runtime folders can be moved independently, including Custom Edition, with
   };
  });
  await chooseTool(page,'Settings & tools');
+ await page.getByText('Compatibility runtimes',{exact:true}).click();
  for(const [id,name]of [['haloCustomEdition','Custom Edition'],['openCe','OpenCE'],['chupathingyCe','ChupathingyCE']]){
   await page.evaluate(id=>(window as any).__folderRuntime=id,id);
-  await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:new RegExp(name)}).click();
+  await page.getByRole('group',{name:id==='chupathingyCe'?'Flagship Halo runtimes':'Compatibility runtimes',exact:true}).getByRole('button',{name:new RegExp(name)}).click();
   await (await pagedControl(page,'button','Runtime folders…')).click();
   const form=page.locator('.registration:visible'),root=(await pagedControl(page,'textbox','Installation directory',form));
   const browse=form.locator('.path-input').first().getByRole('button',{name:'Browse',exact:true,includeHidden:true});await revealPagedControl(browse);await browse.click();
@@ -3724,7 +3730,8 @@ test('presentation packs keep engine-profile choices separate and show missing o
   };
  });
  await chooseTool(page,'Settings & tools');
- await page.getByRole('group',{name:'Halo versions'}).getByRole('button',{name:/^OpenCE ·/}).click();
+ await page.getByText('Compatibility runtimes',{exact:true}).click();
+ await page.getByRole('group',{name:'Compatibility runtimes'}).getByRole('button',{name:/^OpenCE ·/}).click();
  await page.getByRole('tab',{name:'Packs',exact:true}).click();
  const panel=page.getByRole('region',{name:'Runtime presentation packs',exact:true});
  await expect((await pagedControl(page,'checkbox','Uncompressed textures',panel))).toBeChecked();
@@ -3736,7 +3743,7 @@ test('presentation packs keep engine-profile choices separate and show missing o
  await (await pagedControl(page,'checkbox','Tasteful enhancements',panel)).click();
  await expect(panel.getByRole('alert')).toContainText('Recheck');
  await expect((await pagedControl(page,'checkbox','Tasteful enhancements',panel))).toBeChecked();
- await page.getByRole('group',{name:'Halo versions'}).getByRole('button',{name:/^ChupathingyCE ·/}).click();
+ await page.getByRole('group',{name:'Flagship Halo runtimes'}).getByRole('button',{name:/^ChupathingyCE ·/}).click();
  await expect(panel).toContainText('No verified compatible pack loader');
  await expect((await pagedControl(page,'checkbox','Uncompressed textures',panel))).toBeDisabled();
 });
@@ -3800,7 +3807,7 @@ test('runtime setup offers owned folders or an explicitly chosen Spark dynamic f
   };
  });
  await chooseTool(page,'Settings & tools');
- await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:/^ChupathingyCE ·/}).click();
+ await page.getByRole('group',{name:'Flagship Halo runtimes',exact:true}).getByRole('button',{name:/^ChupathingyCE ·/}).click();
  await page.getByRole('tab',{name:'Runtime setup',exact:true}).click();
  const panel=page.locator('.managed-runtimes');await panel.getByText('Get runtimes · one shared Halo library',{exact:true}).click();
  await panel.getByRole('button',{name:'Use my runtime folders',exact:true}).click();
@@ -6455,7 +6462,7 @@ test('Forerunner capability inspection displays native requirements without gran
    return invoke(command,args);
   };
  });
- await chooseTool(page,'Settings & tools');await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:/OpenCE/}).click();await(await pagedControl(page,'button','Runtime folders…')).click();
+ await chooseTool(page,'Settings & tools');await page.getByRole('group',{name:'Flagship Halo runtimes',exact:true}).getByRole('button',{name:/Forerunner/}).click();await(await pagedControl(page,'button','Runtime folders…')).click();
  const form=page.locator('.registration:visible');await(await pagedControl(page,'button','Add another OpenCE engine',form)).click();for(const[name,value]of [['Installation directory','D:/NewForerunner'],['Installed executable','D:/NewForerunner/halo.exe'],['Runtime data root','D:/SyntheticLibrary']])await(await pagedControl(page,'textbox',name,form)).fill(value);
  await page.evaluate(()=>(window as any).__refuseCompanionActivation=true);
  await form.getByRole('combobox',{name:'Saved engine profile',exact:true}).selectOption('native-companion');
@@ -6468,7 +6475,7 @@ test('Forerunner capability inspection displays native requirements without gran
  await expect(form).toContainText('Declared native features: extraction.squad_objectives.v1');await expect(form).toContainText('does not confirm a loaded map');expect(await page.evaluate(()=>(window as any).__companionQueries)).toHaveLength(1);
  const review=await pagedControl(page,'button','Review and save this Forerunner build',form);await expect(review).toBeEnabled();await page.evaluate(()=>(window as any).__companionReviewFailure=true);await review.click();await expect(form).toContainText('Executable changed during review');expect(await page.evaluate(()=>(window as any).__companionProfile.reviewedCompanion)).toBeUndefined();
  await page.evaluate(()=>(window as any).__companionReviewFailure=false);await revealPagedControl(review);await review.click();await expect(form).toContainText('exact Forerunner build and its SDL library are saved');const retained=await page.evaluate(()=>(window as any).__companionProfile.reviewedCompanion);expect(retained).toMatchObject({executableSha256:'30a989a048022bf08c32e2fb683f65395c9285f92df8d8eef3f369700fbb7169',dependencySha256:'d'.repeat(64),capabilities:{contract_version:1,engine:'Forerunner'}});
- await chooseTool(page,'Map library');await chooseTool(page,'Settings & tools');await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:/OpenCE/}).click();await(await pagedControl(page,'button','Runtime folders…')).click();await expect(form).toContainText('Reviewed build a6f7b06b');
+ await chooseTool(page,'Map library');await chooseTool(page,'Settings & tools');await page.getByRole('group',{name:'Flagship Halo runtimes',exact:true}).getByRole('button',{name:/Forerunner/}).click();await(await pagedControl(page,'button','Runtime folders…')).click();await expect(form).toContainText('Reviewed build a6f7b06b');
  const root=await pagedControl(page,'textbox','Installation directory',form);await root.fill('D:/MovedForerunner');await revealPagedControl(read);await expect(read).toBeDisabled();await expect(form.getByText('Declared native features:',{exact:false})).toHaveCount(0);
  await(await pagedControl(page,'button','Clear build review from draft',form)).click();await expect(form.getByText('Reviewed build a6f7b06b',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__companionProfile.reviewedCompanion)).toEqual(retained);expect(errors).toEqual([]);
 });

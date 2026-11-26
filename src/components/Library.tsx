@@ -32,6 +32,7 @@ export default function Library({
   onInbox,
   onInitializeInbox,
   onRuntime,
+  onForerunner,
   onMccTools,
   onWorkspace,
   busy,
@@ -45,6 +46,7 @@ export default function Library({
   onInbox: () => void;
   onInitializeInbox: () => void;
   onRuntime: (id: RuntimeId) => void;
+  onForerunner: () => void;
   onMccTools: () => void;
   onWorkspace: (workspace:Workspace) => void;
   busy: boolean;
@@ -107,7 +109,7 @@ export default function Library({
         </Notice>
       )}
       <div className="runtime-strip home-runtime-strip">
-        <HomeRuntimes data={data} onSelect={onRuntime}/>
+        <HomeRuntimes data={data} onSelect={onRuntime} onForerunner={onForerunner}/>
         <span className="strip-divider" />
         <div className="inbox-state">
           <Watch size={16} />

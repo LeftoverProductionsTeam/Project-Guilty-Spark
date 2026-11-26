@@ -57,6 +57,7 @@ export default function GamesTools({
   function openFolders(){chooseSection('setup');if(runtime==='mccSteam')onSetup(runtime);else setFoldersFor(runtime);}
 
   const selectedReport=reports.find(report=>report.id===runtime);
+  const selectedReportFor=(id:RuntimeId)=>reports.find(report=>report.id===id)?.installation;
   const forerunner = profiles.find(profile => runtimeProfileName(profile) === 'Forerunner');
   const detectedForerunner = detected.find(item => item.runtimeId === 'openCe' && item.version === 'Forerunner');
   const forerunnerActive = runtime==='openCe' && !!forerunner &&
@@ -97,7 +98,7 @@ export default function GamesTools({
       </header>
       {error && <Notice tone="error">{error}</Notice>}
       {(['flagship','compatibility'] as const).map(group => {
-        const cards = <div className="halo-runtime-grid" role="group" aria-label={group==='flagship'?'Flagship Halo runtimes':'Compatibility runtimes'}>
+        const cards = <div key={group} className="halo-runtime-grid" role="group" aria-label={group==='flagship'?'Flagship Halo runtimes':'Compatibility runtimes'}>
         {(group==='flagship' ? ['chupathingyCe','forerunner','mccSteam'] as const :
           primaryRuntimes.filter(id=>id!=='chupathingyCe'&&id!=='mccSteam')).map((id) => {
           if(id==='forerunner') return <button key={id} className="halo-runtime-card" data-connected={forerunnerConnected}
@@ -106,8 +107,9 @@ export default function GamesTools({
             <Gamepad2 size={16}/><strong>Forerunner</strong>
             <span>{forerunnerConnected&&<Check size={11}/>} {forerunnerConnected?'Connected':forerunner?'Choose profile':detectedForerunner?.contentReady?'Connect detected build':'Connect build'}</span>
           </button>;
-          const found = reports.find((report) => report.id === id)?.installation;
-          const available = detected.find(item => item.runtimeId === id);
+          const found = id === 'openCe' && forerunner && selectedReportFor('openCe')?.registrationId === forerunner.id
+            ? undefined : selectedReportFor(id);
+          const available = detected.find(item => item.runtimeId === id && item.version !== 'Forerunner');
           const connected = found?.validation === 'pass';
           const status = connected
             ? 'Connected'
@@ -152,7 +154,7 @@ export default function GamesTools({
           );
         })}
         </div>;
-        return group==='flagship' ? <div key={group}>{cards}</div> : (
+        return group==='flagship' ? cards : (
           <details key={group} className="games-tools-compatibility" open={showCompatibility}
             onToggle={event => setShowCompatibility(event.currentTarget.open)}>
             <summary>Compatibility runtimes</summary>
