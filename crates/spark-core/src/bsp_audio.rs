@@ -72,19 +72,29 @@ pub struct ListenerTree {
     pub leaf_clusters: Vec<Option<usize>>,
 }
 impl ListenerTree {
-    fn contains(&self, position: [f32; 3]) -> bool {
+    /// Returns the native cluster containing this point, if it has a valid leaf.
+    pub fn cluster_at(&self, position: [f32; 3]) -> Option<usize> {
+        if !position.iter().all(|axis| axis.is_finite()) {
+            return None;
+        }
         let mut child = 0u32;
         for _ in 0..=self.nodes.len() {
-            if child == u32::MAX { return false; }
-            if child & 0x8000_0000 != 0 {
-                return self.leaf_clusters.get((child & 0x7fff_ffff) as usize).is_some_and(Option::is_some);
+            if child == u32::MAX {
+                return None;
             }
-            let Some(&[plane, back, front]) = self.nodes.get(child as usize) else { return false };
-            let Some(&[x, y, z, distance]) = self.planes.get(plane as usize) else { return false };
+            if child & 0x8000_0000 != 0 {
+                return self.leaf_clusters.get((child & 0x7fff_ffff) as usize).copied().flatten();
+            }
+            let &[plane, back, front] = self.nodes.get(child as usize)?;
+            let &[x, y, z, distance] = self.planes.get(plane as usize)?;
             let side = x * position[0] + y * position[1] + z * position[2] - distance;
             child = if side >= 0. { front } else { back };
         }
-        false
+        None
+    }
+
+    fn contains(&self, position: [f32; 3]) -> bool {
+        self.cluster_at(position).is_some()
     }
 
     /// Floor-plane origins retain their authored position. The second query is
@@ -1398,6 +1408,9 @@ mod tests {
         assert_eq!(tree.leaf_clusters, vec![Some(0), Some(1)]);
         assert_eq!(tree.nodes, vec![[0, 0x80000000, 0x80000001]]);
         let points = [[-1., 0., 0.], [1., 0., 0.]];
+        assert_eq!(tree.cluster_at(points[0]), Some(0));
+        assert_eq!(tree.cluster_at(points[1]), Some(1));
+        assert_eq!(tree.cluster_at([f32::NAN, 0., 0.]), None);
         let mut regions = PlacementRegions::default();
         for point in points {
             regions.masks.insert(point.map(f32::to_bits), 0);
