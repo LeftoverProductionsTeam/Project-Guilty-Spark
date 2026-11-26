@@ -494,6 +494,7 @@ mod tests {
             visibility_zones: vec![],
             native_seals: vec![],
             restore_donor_sky_portals: false,
+            outdoor_sky_split: None,
         }
     }
     fn quad(mesh: &mut MeshData, p: [V; 4]) {

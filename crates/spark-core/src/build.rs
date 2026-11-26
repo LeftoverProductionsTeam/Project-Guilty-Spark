@@ -1266,6 +1266,7 @@ fn run_build_with_retention(
             let expected:std::collections::BTreeMap<_,_>=materials.iter().filter(|m|m.collision_only).map(|m|(m.name.as_str(),m.flags&15)).collect();
             for face in &compiled_faces{if let Some(id)=face.shader{let tag=validated.tags.iter().find(|t|t.id==id).ok_or_else(||SparkError::Invalid("Compiled collision shader is not indexed".into()))?;let name=tag.path.rsplit(['\\','/']).next().unwrap_or("");if expected.get(name).copied()!=Some(face.flags&15){return invalid("MCC cache collision surface flags differ from their source identities; output was not accepted");}}}
             crate::bsp_assembly::verify_compiled_sky_portals(&manifest, &output, &validated)?;
+            crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &output, &validated)?;
             crate::bsp_netgame_flags::verify_merged_manifest(&manifest,&output,&validated)?;
             crate::bsp_pickups::verify_merged_manifest(&manifest,&output,&validated)?;
             crate::bsp_player_starts::verify_merged_manifest(&manifest,&output,&validated)?;

@@ -275,19 +275,45 @@ fn native_contours(polygons: Vec<Vec<manifold_rust::linalg::Vec2>>, world_scale:
     Ok(cleaned)
 }
 pub(crate) fn clipped_portal(space:&manifold_rust::manifold::Manifold, center:Point, direction:Point, probe_height:f64)->Result<SourcePortal>{
+    if !probe_height.is_finite() || probe_height <= 0. {
+        return invalid("Invalid native visibility probe");
+    }
+    portal_section(space, center, direction, Some(probe_height))
+}
+
+pub(crate) fn complete_portal_section(
+    space: &manifold_rust::manifold::Manifold,
+    center: Point,
+    direction: Point,
+) -> Result<SourcePortal> {
+    portal_section(space, center, direction, None)
+}
+
+fn portal_section(
+    space: &manifold_rust::manifold::Manifold,
+    center: Point,
+    direction: Point,
+    route_probe: Option<f64>,
+) -> Result<SourcePortal> {
     use manifold_rust::linalg::{Vec2,Vec3};
     let length=direction[0].hypot(direction[1]);
-    if !length.is_finite()||length<0.5||center.iter().any(|v|!v.is_finite())||!probe_height.is_finite()||probe_height<=0. {return invalid("Invalid native visibility section");}
+    if !length.is_finite()||length<0.5||center.iter().any(|v|!v.is_finite()) {return invalid("Invalid native visibility section");}
     let normal=[direction[0]/length,direction[1]/length,0.];let side=[-normal[1],normal[0],0.];
     let local=space.translate(Vec3::new(-center[0],-center[1],-center[2])).rotate(0.,0.,-direction[1].atan2(direction[0]).to_degrees()).rotate(0.,90.,0.);
     let polygons=local.slice(0.).to_polygons();
     if polygons.len()>256||polygons.iter().map(Vec::len).sum::<usize>()>4096 {return invalid("Native visibility section exceeds its bounded source complexity");}
     let area=|p:&Vec<Vec2>|p.iter().zip(p.iter().cycle().skip(1)).map(|(a,b)|a.x*b.y-b.x*a.y).sum::<f64>()*0.5;
     let contains=|p:&Vec<Vec2>,point:Vec2|{let mut inside=false;for(a,b)in p.iter().zip(p.iter().cycle().skip(1)){if (a.y>point.y)!=(b.y>point.y)&&point.x<(b.x-a.x)*(point.y-a.y)/(b.y-a.y)+a.x{inside=!inside;}}inside};
+    let selected = if let Some(probe_height) = route_probe {
     let probe=Vec2::new(probe_height,0.);
     let outer=polygons.iter().filter(|p|area(p)>0.&&contains(p,probe)).min_by(|a,b|area(a).total_cmp(&area(b))).ok_or_else(||crate::SparkError::Invalid("Visibility cut has no closed air section at the route; move the handle away from walls or junctions".into()))?;
     let mut selected=vec![outer.clone()];
     for hole in polygons.iter().filter(|p|area(p)<0.&&p.first().is_some_and(|point|contains(outer,*point))){if contains(hole,probe){return invalid("Visibility cut lies inside a structural obstruction");}selected.push(hole.clone());}
+    selected
+    } else {
+        if polygons.is_empty() { return invalid("Outdoor sky split crosses no closed air section"); }
+        polygons
+    };
     let world_scale=selected.iter().flatten().flat_map(|p|[center[0]+side[0]*p.y,center[1]+side[1]*p.y,center[2]+p.x]).map(f64::abs).fold(1.,f64::max);
     let selected=native_contours(selected,world_scale)?;
     let flat:Vec<_>=selected.iter().flatten().copied().collect();
@@ -420,6 +446,16 @@ mod tests {
         assert!(cut.points.iter().all(|p|(p[0]-6.).abs()<1e-8));assert!((area(&cut)-76.).abs()<1e-7);
         assert!(cut.points.iter().any(|p|(p[1]+5.).abs()<1e-8));assert!(cut.points.iter().any(|p|(p[2]-8.).abs()<1e-8));
     }
+    #[test]
+    fn complete_outdoor_cut_closes_both_disconnected_air_openings() {
+        let road = Manifold::cube(Vec3::new(12., 6., 10.), false).translate(Vec3::new(0., -3., 0.));
+        let cave = Manifold::cube(Vec3::new(12., 2., 2.), false).translate(Vec3::new(0., 10., 0.));
+        let cut = complete_portal_section(&road.union(&cave), [6., 0., 0.], [1., 0., 0.]).unwrap();
+        assert!((area(&cut) - 64.).abs() < 1e-7);
+        assert!(cut.points.iter().all(|point| (point[0] - 6.).abs() < 1e-8));
+        assert!(cut.points.iter().any(|point| point[1] > 9.));
+    }
+
     #[test] fn independent_cave_cut_does_not_include_an_unrelated_outdoor_region(){
         let road=Manifold::cube(Vec3::new(12.,6.,10.),false).translate(Vec3::new(0.,-3.,0.));
         let cave=Manifold::cube(Vec3::new(12.,2.,2.),false).translate(Vec3::new(0.,10.,0.));

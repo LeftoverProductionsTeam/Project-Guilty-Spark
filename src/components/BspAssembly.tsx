@@ -426,7 +426,8 @@ export default function BspAssembly({
               <summary>Inherited connections · {project.inheritedBspConnections?.length}</summary>
               <p>The next native build rechecks these connections alongside the new route.</p>
               {!nativePartitioned && project.inheritedBspConnections?.map((plan, index) => plan.separateNativeBsps ? null : (
-                <label key={plan.donorProjectId + ':' + index} title="Restore door portals between the original sky regions when this BSP is rebuilt.">
+                <div key={plan.donorProjectId + ':' + index}>
+                <label title="Restore door portals between the original sky regions when this BSP is rebuilt.">
                   <input type="checkbox" checked={plan.restoreDonorSkyPortals ?? false} disabled={busy}
                     onChange={event => {
                       const enabled = event.target.checked;
@@ -441,6 +442,22 @@ export default function BspAssembly({
                     }} />
                   Restore {plan.donorTitle} sky portals
                 </label>
+                {plan.openRoad && plan.terrainSeam && plan.tunnelPoints.length === 2 && <label>
+                  <input type="checkbox" checked={plan.outdoorSkySplit !== undefined} disabled={busy}
+                    onChange={event => {
+                      const outdoorSkySplit = event.target.checked ? 0.5 : undefined;
+                      setReport(null);
+                      setError('');
+                      onEdit({
+                        ...project,
+                        inheritedBspConnections: project.inheritedBspConnections?.map(
+                          (route, position) => position === index ? { ...route, outdoorSkySplit } : route,
+                        ),
+                      }, 'Set outdoor sky split for ' + plan.donorTitle);
+                    }} />
+                  Split outdoor sky at {plan.donorTitle} seam
+                </label>}
+                </div>
               ))}
             </details>
           )}

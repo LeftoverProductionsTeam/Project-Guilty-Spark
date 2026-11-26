@@ -342,6 +342,7 @@ fn build_partition_cache(
         }
     }
     crate::bsp_compile::verify_compiled_base(project, source, &map)?;
+    crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &path, &map)?;
     if !prepared.scenery.is_empty() {
         crate::bsp_scenery::verify_compiled(source, &map, &path, &prepared.scenery, &format!("gsbsp_{}_1", &runner.id[..8]), 0)?;
     }
@@ -563,6 +564,10 @@ pub fn run_with_reviewed_runtime(
     let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
     let verified_sky_portals = crate::bsp_assembly::verify_compiled_sky_portals(&manifest, &file, &compiled)?;
+    let verified_splits = crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &file, &compiled)?;
+    if verified_splits > 0 {
+        runner.emit("outdoor-sky-readback", format!("{verified_splits} complete outdoor cuts separated native road clusters"), 92, "success");
+    }
     if verified_sky_portals > 0 {
         runner.emit("sky-portal-readback", format!("{verified_sky_portals} restored doorway outlines matched the compiled cluster boundaries"), 92, "success");
     }

@@ -69,6 +69,8 @@ pub struct BspAssembly {
     pub preserve_donor_bsp: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub restore_donor_sky_portals: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outdoor_sky_split: Option<f64>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub tunnel_bake_fill: bool,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -195,6 +197,12 @@ impl BspAssembly {
             return invalid("Tunnel shader path is too long");
         }
         crate::bsp_visibility::validate(&self.visibility_zones, &self.tunnel_points)?;
+        if self.outdoor_sky_split.is_some_and(|fraction|
+            !(0.05..=0.95).contains(&fraction) || !self.open_road || self.terrain_seam.is_none()
+                || self.tunnel_points.len() != 2 || self.separate_native_bsps || self.preserve_donor_bsp)
+        {
+            return invalid("Outdoor sky splits require a straight combined terrain seam and a cut between 5% and 95%");
+        }
         if self.restore_donor_sky_portals && (self.separate_native_bsps || self.preserve_donor_bsp) {
             return invalid("Restore donor sky portals applies to combined BSP geometry");
         }
@@ -1188,7 +1196,7 @@ fn visibility_solid(mesh:&MeshData,slots:&[usize],materials:&[AssemblyMaterial])
         // The portal sectioner operates on the original manifold. Reviewed
         // native seals close holes that Tool introduces when it omits two-sided
         // faces from its structural hull.
-        if material.name == "+seamsealer" || !material.collision_only && material.shader_path.is_some() {
+        if matches!(material.name.as_str(), "+seamsealer" | "+portal" | "+exactportal") || !material.collision_only && material.shader_path.is_some() {
             continue;
         }
         let start=gl.num_vert() as u64;
@@ -1418,7 +1426,68 @@ pub fn generate_project(
         .ok_or_else(|| SparkError::Invalid("No BSP assembly is authored".into()))?;
     let mut geometry = generate(&source.preserved_path, base, assembly, cancel)?;
     retain_base_portals(project, base, &mut geometry)?;
+    add_outdoor_sky_splits(project, assembly, &mut geometry)?;
     Ok(geometry)
+}
+
+fn outdoor_cut(plan: &BspAssembly) -> Option<(V, V)> {
+    let (Some(fraction), [start, end]) = (plan.outdoor_sky_split, plan.tunnel_points.as_slice()) else {
+        return None;
+    };
+    let delta = sub(*end, *start);
+    Some((add(*start, mul(delta, fraction)), delta))
+}
+
+pub(crate) fn verify_compiled_outdoor_sky_splits(project: &Project, path: &Path, map: &MapInspection) -> Result<usize> {
+    let cuts = project.inherited_bsp_connections.iter().chain(project.bsp_assembly.iter())
+        .filter_map(outdoor_cut).collect::<Vec<_>>();
+    if cuts.is_empty() { return Ok(0); }
+    let ambience = crate::bsp_audio::inspect_ambience_for_bsp(path, &map.sha256, Some(0))?;
+    let tree = ambience.bsps.first().and_then(|bsp| bsp.listener_tree.as_ref())
+        .ok_or_else(|| SparkError::Invalid("Outdoor sky split output has no native cluster tree".into()))?;
+    for &(center, delta) in &cuts {
+        let shift = mul(delta, 0.5 / delta[0].hypot(delta[1]));
+        let eye = add(center, [0., 0., 0.65]);
+        let behind = tree.cluster_at(sub(eye, shift).map(|v| v as f32));
+        let ahead = tree.cluster_at(add(eye, shift).map(|v| v as f32));
+        if behind.is_none() || ahead.is_none() || behind == ahead {
+            return invalid(format!("Outdoor sky split at ({:.2}, {:.2}, {:.2}) did not separate native road clusters. Adjust the seam plane before accepting this build.", center[0], center[1], center[2]));
+        }
+    }
+    Ok(cuts.len())
+}
+
+fn add_outdoor_sky_splits(
+    project: &Project,
+    assembly: &BspAssembly,
+    geometry: &mut AssemblyGeometry,
+) -> Result<()> {
+    let plans = project.inherited_bsp_connections.iter().chain(std::iter::once(assembly));
+    let splits = plans.filter_map(outdoor_cut).collect::<Vec<_>>();
+    if splits.is_empty() { return Ok(()); }
+    let hull = visibility_solid(&geometry.mesh, &geometry.triangle_materials, &geometry.materials)?;
+    let slot = geometry.materials.iter().position(|material| material.name == "+portal")
+        .ok_or_else(|| SparkError::Invalid("Outdoor sky split has no native portal material".into()))?;
+    for (center, delta) in splits {
+        let surface = crate::bsp_visibility::complete_portal_section(&hull, center, delta)?;
+        if geometry.mesh.indices.len() / 3 + surface.triangles.len() > MAX_OUTPUT_TRIANGLES {
+            return invalid("Outdoor sky boundary exceeds the native source triangle budget");
+        }
+        let first = (geometry.mesh.positions.len() / 3) as u32;
+        let n = [-delta[0] / delta[0].hypot(delta[1]), -delta[1] / delta[0].hypot(delta[1]), 0.];
+        for point in surface.points {
+            geometry.mesh.positions.extend(point.map(|axis| axis as f32));
+            geometry.mesh.normals.extend(n.map(|axis| axis as f32));
+            geometry.mesh.uvs.extend([0., 0.]);
+        }
+        for triangle in surface.triangles {
+            geometry.mesh.indices.extend(triangle.map(|i| first + i as u32));
+            geometry.triangle_materials.push(slot);
+        }
+        geometry.report.portal_count += 1;
+        geometry.report.output_triangles = geometry.mesh.indices.len() / 3;
+    }
+    Ok(())
 }
 
 fn same_portal_perimeter(a: &[V], b: &[V]) -> bool {
@@ -1516,8 +1585,12 @@ fn retain_base_portals(project: &Project, base: &MapInspection, geometry: &mut A
         }
         let rings = maps::compiled_portals(&source.preserved_path, base, 0)?;
         let (exact, matched) = inherited_sky_portals(&project.inherited_bsp_connections, &rings)?;
+        let sky_planes = project.inherited_bsp_connections.iter().chain(project.bsp_assembly.iter())
+            .filter_map(outdoor_cut).collect::<Vec<_>>();
+        let on_rebuilt_plane = |ring: &[V]| sky_planes.iter().any(|&(center, delta)| ring.iter().all(|&p|
+            dot(sub(p, center), [delta[0], delta[1], 0.]).abs() <= 0.002 * delta[0].hypot(delta[1])));
         let cuts: Vec<_> = rings.iter().enumerate()
-            .filter(|(index, portal)| !matched.contains(index) && portal.flags == 0)
+            .filter(|(index, portal)| !matched.contains(index) && portal.flags == 0 && !on_rebuilt_plane(&portal.ring))
             .filter_map(|(_, portal)| crate::bsp_visibility::retained_tunnel_quad(&portal.ring).ok())
             .collect();
         let needs_review = rings.len() - cuts.len() - matched.len();
@@ -1626,6 +1699,7 @@ pub fn generate_partitioned_project(
     } else {
         let (mut geometry, floor) = generate_end(&source.preserved_path, base, assembly, cancel, Some((&seam, PartitionEnd::Base)), &project.inherited_bsp_connections)?;
         retain_base_portals(project, base, &mut geometry)?;
+        add_outdoor_sky_splits(project, assembly, &mut geometry)?;
         (Some(geometry), floor)
     };
     let (right, right_floor) = generate_end(&source.preserved_path, base, assembly, cancel, Some((&seam, PartitionEnd::Donor)), &[])?;
@@ -2358,6 +2432,7 @@ pub fn plan_from_bsp(
         visibility_zones: vec![],
         native_seals: vec![],
         restore_donor_sky_portals: false,
+        outdoor_sky_split: None,
     };
     if let Some(preset) = regional_preset {
         if !retaining || base.mesh.parts.len() > 14 {
