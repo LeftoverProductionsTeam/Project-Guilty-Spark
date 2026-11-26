@@ -1308,6 +1308,10 @@ pub(crate) fn prepare_partition_structure(
             let parts = bsp_assembly::generate_partitioned_project(project, inspection, runner.cancel)?;
             (parts.base, parts.donor, Vec::from(parts.switches), parts.overlap, Some(parts.overlap_samples), Some(parts.max_floor_delta), None)
         };
+    if let Some(base) = &base_geometry {
+        base.source_preflight()?.require_buildable()?;
+    }
+    added_geometry.source_preflight()?.require_buildable()?;
     let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
     let base_source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing partition base source".into()))?;
     let original_structures = maps::scenario_bsp_tag_paths(&base_source.preserved_path, inspection)?;
@@ -1497,6 +1501,7 @@ pub(crate) fn prepare_native_with_limits(
         return invalid(format!("Combined teleporter markers exceed the {} slots for the selected target", limits.flags));
     }
     let geometry = bsp_assembly::generate_project(project, inspection, runner.cancel)?;
+    geometry.source_preflight()?.require_buildable()?;
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
     let donor_bsp = bsp_tag(&assembly.donor_source.preserved_path, &donor, assembly.donor_bsp_index)?;

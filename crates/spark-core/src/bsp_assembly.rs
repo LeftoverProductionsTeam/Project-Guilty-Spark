@@ -332,6 +332,37 @@ pub struct AssemblyReport {
     pub donor_scenery: usize,
     pub warnings: Vec<String>,
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssemblySourceIssue {
+    pub triangle: usize,
+    pub material: String,
+    pub center: V,
+    pub reason: &'static str,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssemblySourcePreflight {
+    pub blocked_faces: usize,
+    pub lighting_risks: usize,
+    pub lighting_examples: Vec<AssemblySourceIssue>,
+    pub examples: Vec<AssemblySourceIssue>,
+}
+
+impl AssemblySourcePreflight {
+    pub(crate) fn require_buildable(&self) -> Result<()> {
+        if let Some(issue) = self.examples.first() {
+            return invalid(format!(
+                "Join BSP source preflight found {} blocked faces. Triangle {} ({}) at ({:.3}, {:.3}, {:.3}): {}. Inspect the connection preview and adjust the join before building.",
+                self.blocked_faces, issue.triangle, issue.material,
+                issue.center[0], issue.center[1], issue.center[2], issue.reason
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub struct AssemblyGeometry {
     pub mesh: MeshData,
     pub materials: Vec<AssemblyMaterial>,
@@ -339,6 +370,97 @@ pub struct AssemblyGeometry {
     pub exact_sky_portals: Vec<Vec<V>>,
     pub report: AssemblyReport,
 }
+impl AssemblyGeometry {
+    /// Check the precision passed to Tool, before namespace extraction or compilation.
+    /// Collision and render layers can intentionally cover the same footprint.
+    pub fn source_preflight(&self) -> Result<AssemblySourcePreflight> {
+        let mesh = &self.mesh;
+        let vertices = mesh.positions.len() / 3;
+        if mesh.positions.len() != vertices * 3
+            || mesh.normals.len() != vertices * 3
+            || mesh.uvs.len() != vertices * 2
+            || mesh.indices.len() != self.triangle_materials.len() * 3
+            || mesh.indices.iter().any(|&index| index as usize >= vertices)
+            || self.triangle_materials.iter().any(|&slot| slot >= self.materials.len())
+            || mesh.positions.iter().chain(&mesh.normals).any(|value| !value.is_finite())
+        {
+            return invalid("Join BSP source has invalid geometry attributes");
+        }
+
+        let mut report = AssemblySourcePreflight::default();
+        let mut collision_faces = std::collections::BTreeSet::new();
+        for (triangle, (ids, &slot)) in mesh.indices.chunks_exact(3)
+            .zip(&self.triangle_materials).enumerate()
+        {
+            let material = &self.materials[slot];
+            let points: [V; 3] = std::array::from_fn(|corner| {
+                let start = ids[corner] as usize * 3;
+                std::array::from_fn(|axis| {
+                    // Tool reads positions in centimeters, rounded to six decimals by JMS.
+                    (f64::from(mesh.positions[start + axis]) * 1e8).round() / 1e8
+                })
+            });
+            let [a, b, c] = points;
+            let ab = sub(b, a);
+            let ac = sub(c, a);
+            let bc = sub(c, b);
+            let area_normal = cross(ab, ac);
+            let twice_area = dot(area_normal, area_normal).sqrt();
+            let uv: [[f64; 2]; 3] = std::array::from_fn(|corner| {
+                let start = ids[corner] as usize * 2;
+                std::array::from_fn(|axis| {
+                    (f64::from(mesh.uvs[start + axis]) * 1e6).round() / 1e6
+                })
+            });
+
+            let mut lighting_risk = false;
+            let reason = if uv.iter().flatten().any(|value| !value.is_finite()) {
+                Some("a UV coordinate is invalid")
+            } else if twice_area == 0. {
+                Some("triangle collapses at native export precision")
+            } else if material.collision_only || material.name == "+sky" {
+                let mut footprint = points.map(|point| {
+                    point.map(|coordinate| (coordinate * 1e8).round() as i64)
+                });
+                footprint.sort_unstable();
+                (!collision_faces.insert(footprint)).then_some("coincident coplanar collision faces")
+            } else if material.name.starts_with("gster") && material.shader_path.is_some() {
+                // The west-valley lightmapper rejected a shallow terrain sliver while
+                // accepting larger charts with the same stock texture scale. Limit
+                // this guard to newly authored terrain and require both conditions.
+                let longest_edge = dot(ab, ab).max(dot(ac, ac)).max(dot(bc, bc)).sqrt();
+                let [u, v, w] = uv;
+                let uv_area = ((v[0] - u[0]) * (w[1] - u[1])
+                    - (v[1] - u[1]) * (w[0] - u[0])).abs();
+                lighting_risk = twice_area / longest_edge < 0.006 && uv_area > 0. && uv_area < 1e-7;
+                (uv_area == 0.).then_some("terrain UVs collapse at native export precision")
+            } else {
+                None
+            };
+            if lighting_risk {
+                report.lighting_risks += 1;
+                if report.lighting_examples.len() < 8 {
+                    report.lighting_examples.push(AssemblySourceIssue {
+                        triangle, material: material.name.clone(),
+                        center: mul(add(add(a, b), c), 1. / 3.),
+                        reason: "thin terrain chart may fail native lighting",
+                    });
+                }
+            }
+            if let Some(reason) = reason {
+                report.blocked_faces += 1;
+                if report.examples.len() < 8 {
+                    report.examples.push(AssemblySourceIssue {
+                        triangle, material: material.name.clone(),
+                        center: mul(add(add(a, b), c), 1. / 3.), reason,
+                    });
+                }
+            }
+        }
+        Ok(report)
+    }
+}
+
 /// The editor displays this same validated source mesh, using each original
 /// map's shader IDs. It is not a compiled lightmap or gameplay receipt.
 #[derive(Clone, Debug, Serialize)]
@@ -681,16 +803,21 @@ fn mitered_connector_floor(points: &[V], sides: &[V]) -> Result<Vec<crate::bsp_c
 }
 
 fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize, sky: Option<usize>) -> Result<Manifold> {
+    let points = passage_corners(a, b, side_a, side_b, height);
+    let mut gl = MeshGL64 { num_prop: 5, ..Default::default() };
+    append_passage_shell(&mut gl, points, [a, b], height, [true, true], passage_floor_needs_center(&points), material, sky);
+    gl.merge();
+    checked(Manifold::from_mesh_gl64(&gl), "Tunnel")
+}
+
+fn append_passage_shell(
+    gl: &mut MeshGL64, points: [V; 8], center: [V; 2], height: f64, caps: [bool; 2], split: bool,
+    material: usize, sky: Option<usize>,
+) {
+    let [a, b] = center;
     let up = [0., 0., height];
-    let mut p = passage_corners(a, b, side_a, side_b, height).to_vec();
-    let mut gl = MeshGL64 {
-        num_prop: 5,
-        ..Default::default()
-    };
-    // A graded miter is generally not a plane. Preserve the authored center
-    // line as an edge instead of letting an arbitrary diagonal lift/drop it.
-    // Split the end caps too: inserting only floor points creates T-junctions.
-    let split = passage_floor_needs_center(&p);
+    let mut p = points.to_vec();
+    // Graded miters keep the authored centerline. Neighboring panels use the same split at their shared section.
     let triangles=if split {
         p.extend([a,b,add(a,up),add(b,up)]);
         vec![8,0,3,8,3,9,8,9,2,8,2,1,
@@ -699,8 +826,15 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
              1,2,6,1,6,5,
              2,9,11,2,11,6,9,3,7,9,7,11,
              3,0,4,3,4,7]
-    }else{LEVEL_PASSAGE_TRIANGLES.into_iter().flatten().collect()};
-    for t in triangles.chunks_exact(3) {
+    } else {
+        LEVEL_PASSAGE_TRIANGLES.into_iter().flatten().collect()
+    };
+    let (start_cap, end_cap) = if split { (8..12, 14..18) } else { (4..6, 8..10) };
+    let floor_faces = if split { 4 } else { 2 };
+    for (index, t) in triangles.chunks_exact(3).enumerate() {
+        if (start_cap.contains(&index) && !caps[0]) || (end_cap.contains(&index) && !caps[1]) {
+            continue;
+        }
         let points = [p[t[0]], p[t[2]], p[t[1]]];
         let n = normal(points[0], points[1], points[2]);
         let first = gl.num_vert() as u64;
@@ -709,11 +843,9 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
             gl.vert_properties.extend(planar_uv(point, n));
         }
         gl.tri_verts.extend([first, first + 1, first + 2]);
+        let face_material = if (floor_faces..2 * floor_faces).contains(&index) { sky.unwrap_or(material) } else { material };
+        gl.face_id.push(face_material as u64);
     }
-    gl.face_id = vec![material as u64; triangles.len()/3];
-    if let Some(sky) = sky { let floor=if split{4}else{2};gl.face_id[floor..floor*2].fill(sky as u64); }
-    gl.merge();
-    checked(Manifold::from_mesh_gl64(&gl), "Tunnel")
 }
 // A route volume joined into existing outdoor sky cannot raise its floor:
 // it is already inside free space. Remove only the explicitly authored strip
@@ -2296,6 +2428,37 @@ fn intact_connector_solid(points: &[V], side: V, height: f64, sky: Option<usize>
 }
 
 fn joined_passage_solid(points: &[V], sides: &[V], height: f64, sky: Option<usize>, cancel: &AtomicBool) -> Result<Manifold> {
+    // With strictly ordered cross-sections, panels can only touch at their shared
+    // boundary. Retain the existing union for routes that double back or overlap
+    // on this axis. It still operates solely on the generated passage.
+    let forward = horizontal_direction(&[points[0], *points.last().unwrap()]);
+    let projected = points.iter().zip(sides).map(|(&point, &side)| {
+        let center = dot(point, forward);
+        let extent = dot(side, forward).abs();
+        [center - extent, center + extent]
+    }).collect::<Vec<_>>();
+    let ordered = projected.windows(2).all(|pair| pair[0][1] + 0.002 < pair[1][0]);
+    let matched_caps = points.windows(2).zip(sides.windows(2)).all(|(pair, sides)| {
+        let advance = sub(pair[1], pair[0]);
+        let normal = |side: V| [side[1], -side[0], 0.];
+        let [a, b] = [normal(sides[0]), normal(sides[1])];
+        dot(advance, a) > dot(sides[1], a).abs() + 0.002
+            && dot(advance, b) > dot(sides[0], b).abs() + 0.002
+    });
+    if ordered && matched_caps {
+        let corners = points.windows(2).zip(sides.windows(2)).map(|(pair, side)| {
+            passage_corners(pair[0], pair[1], side[0], side[1], height)
+        }).collect::<Vec<_>>();
+        let split = corners.iter().any(|points| passage_floor_needs_center(points));
+        let mut shell = MeshGL64 { num_prop: 5, ..Default::default() };
+        for (index, panel) in corners.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
+            append_passage_shell(&mut shell, *panel, [points[index], points[index + 1]], height,
+                [index == 0, index + 1 == corners.len()], split, 0, sky);
+        }
+        shell.merge();
+        return checked(Manifold::from_mesh_gl64(&shell), "Stitched BSP connector");
+    }
     let mut solids = points.windows(2).zip(sides.windows(2))
         .map(|(pair, side)| passage_solid(pair[0], pair[1], side[0], side[1], height, 0, sky));
     let mut body = solids.next().unwrap()?;
@@ -3554,6 +3717,48 @@ mod tests {
     use super::*;
 
     #[test]
+    fn join_preflight_distinguishes_collision_overlaps_from_render_and_portals() {
+        let material = |name: &str, collision_only| AssemblyMaterial {
+            name: name.into(), source: 0, shader_path: (!name.starts_with('+')).then(|| "floor".into()),
+            shader_class: None, flags: 0, collision_only,
+        };
+        let mut geometry = AssemblyGeometry {
+            mesh: MeshData {
+                positions: vec![0., 0., 0., 1., 0., 0., 0., 1., 0., 1., 0.004, 0.],
+                normals: vec![0.; 12],
+                uvs: vec![0., 0., 0.25, 0., 0., 0.25, 0.25, 0.0000001],
+                indices: vec![0, 1, 2, 2, 0, 1, 0, 1, 2, 0, 2, 1, 0, 1, 3, 0, 1, 1],
+                ..Default::default()
+            },
+            materials: vec![
+                material("collision", true), material("render", false),
+                material("+exactportal", false), material("gster_test", false),
+            ],
+            triangle_materials: vec![0, 1, 2, 0, 3, 1],
+            exact_sky_portals: Vec::new(),
+            report: AssemblyReport {
+                input_triangles: 0, output_triangles: 6, connector_triangles: 1, generated_uv_faces: 1,
+                walk_samples: 0, portal_count: 1, route_clearance: vec![], donor_scenery: 0, warnings: vec![],
+            },
+        };
+        let report = geometry.source_preflight().unwrap();
+        assert_eq!(report.blocked_faces, 3);
+        assert_eq!(report.examples.into_iter().map(|issue| issue.triangle).collect::<Vec<_>>(), [3, 4, 5]);
+        geometry.mesh.uvs[7] = f32::NAN;
+        assert_eq!(geometry.source_preflight().unwrap().examples[1].reason, "a UV coordinate is invalid");
+        geometry.mesh.uvs[2] = 0.03;
+        geometry.mesh.uvs[7] = 0.000001;
+        let report = geometry.source_preflight().unwrap();
+        assert_eq!(report.blocked_faces, 2);
+        assert_eq!(report.lighting_risks, 1);
+        assert_eq!(report.lighting_examples[0].triangle, 4);
+        geometry.mesh.uvs[7] = 0.001;
+        geometry.mesh.indices.truncate(9);
+        geometry.triangle_materials.truncate(3);
+        geometry.source_preflight().unwrap().require_buildable().unwrap();
+    }
+
+    #[test]
     fn native_structure_bound_includes_exact_edges_and_checks_each_axis() {
         for axis in 0..3 {
             let mut point = [0.; 3];
@@ -3938,6 +4143,9 @@ mod tests {
         }
         assert_eq!(joined.decompose().len(),1,"All tunnel sections must form one connected solid");
         assert!((joined.volume()-separate).abs()<1e-5,"Matching bend caps must meet without a gap or overlapping wedge");
+        let stitched = joined_passage_solid(&points, &sides, 1.6, None, &AtomicBool::new(false)).unwrap();
+        assert_eq!(stitched.decompose().len(), 1);
+        assert!((stitched.volume() - separate).abs() < 1e-5);
         assert!(tunnel_sides(&[[0.,0.,0.],[5.,0.,0.],[0.,0.01,0.]],2.).is_err());
     }
 

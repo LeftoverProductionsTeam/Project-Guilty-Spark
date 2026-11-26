@@ -54,6 +54,13 @@ interface ScenarioPlacementBudget {
   donor: number;
   limit: number;
 }
+interface AssemblySourceIssue {
+  triangle: number;
+  material: string;
+  center: [number, number, number];
+  reason: string;
+}
+
 export interface AssemblyReport {
   inputTriangles: number;
   outputTriangles: number;
@@ -77,6 +84,12 @@ export interface AssemblyReport {
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];
   warnings: string[];
+  sourcePreflight?: {
+    blockedFaces: number;
+    lightingRisks: number;
+    examples: AssemblySourceIssue[];
+    lightingExamples: AssemblySourceIssue[];
+  };
   viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;surfaces:{source:number;mesh:import('./types').MeshData}[]};
 }
 /** Semantic identity across IPC object-key ordering and old omitted options. */

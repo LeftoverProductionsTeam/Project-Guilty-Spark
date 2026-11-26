@@ -735,6 +735,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
             (core::bsp_assembly::generate_project(&p, &i, &cancel).map_err(error)?, None)
         };
         let mut result=serde_json::to_value(&geometry.report).map_err(error)?;
+        result["sourcePreflight"] = serde_json::to_value(geometry.source_preflight().map_err(error)?).map_err(error)?;
         if let Some(report) = partition_report { result["nativePartitions"] = report; }
         if let Some(switches) = intact_switches { result["intactSwitches"] = serde_json::json!(switches); }
         if include_geometry==Some(true){let plan=p.bsp_assembly.as_ref().ok_or("No BSP connection to preview")?;

@@ -1077,7 +1077,22 @@ export default function BspAssembly({
                       : (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}
                   {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
-                  <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>
+                  {!!report.sourcePreflight?.lightingRisks && (
+                    <div>
+                      <p>{report.sourcePreflight.lightingRisks} thin terrain faces may fail native lighting.</p>
+                      <ul>{report.sourcePreflight.lightingExamples.map(issue => (
+                        <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')}</li>
+                      ))}</ul>
+                    </div>
+                  )}
+                  {report.sourcePreflight && report.sourcePreflight.blockedFaces > 0 ? (
+                    <div role="alert">
+                      <p>Native build blocked by {report.sourcePreflight.blockedFaces} source faces. Adjust the join and check the preview again.</p>
+                      <ul>{report.sourcePreflight.examples.map(issue => (
+                        <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')} · {issue.reason}</li>
+                      ))}</ul>
+                    </div>
+                  ) : <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>}
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}
