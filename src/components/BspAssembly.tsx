@@ -18,7 +18,7 @@ import { useWorkspaceActivity } from './WorkspaceActivity';
 import { volumeCenter } from '../nativeTriggerVolume';
 import type { NativeVolumeGeometry } from '../nativeOperations';
 interface NativeBspTransitions {
-  extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[]; terminalIndex?: number; services?: { service: string; controlIndex: number }[] }[];
+  extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[]; terminalIndex?: number; services?: { service: string; controlIndex: number }[]; returnPad?: { name: string; volumeIndex: number; bspIndex: number; geometry: NativeVolumeGeometry } }[];
   extractionHubIssue?: string;
   cacheSha256: string;
   bspCount: number;
@@ -54,9 +54,13 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
       <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
       {report.extractionHubIssue && <p role="alert" className="bsp-error">{report.extractionHubIssue}</p>}
       {!!report.extractionHubStarts?.length && <ul aria-label="Extraction faction hub starts">
-        {report.extractionHubStarts.map(hub => <li key={hub.name}>
+        {report.extractionHubStarts.map(({returnPad, ...hub}) => <li key={hub.name}>
           <strong>{hub.name}</strong> · volume {hub.volumeIndex} · BSP {hub.bspIndex} · starts {hub.startIndices.join(', ')}{hub.terminalIndex===undefined ? '' : ' · terminal '+hub.terminalIndex}{hub.services?.map(row=>' · '+row.service+' '+row.controlIndex).join('')}
           <button type="button" disabled={hub.bspIndex>=partCount} onClick={()=>viewBsp(hub.bspIndex)}>View hub BSP {hub.bspIndex}</button>
+          {returnPad && <div>
+            <strong>{returnPad.name}</strong> · volume {returnPad.volumeIndex} · BSP {returnPad.bspIndex} · center {volumeCenter(returnPad.geometry).map(value=>value.toFixed(2)).join(" / ")}
+            <button type="button" disabled={returnPad.bspIndex>=partCount} onClick={()=>viewBsp(returnPad.bspIndex)}>View return pad BSP</button>
+          </div>}
         </li>)}
       </ul>}
       {!!report.bspTagPaths?.length && <ol start={0} aria-label="Native structure tags">{report.bspTagPaths.map((path, index) => <li key={index}><code className="path-text" title={path}>{path}</code></li>)}</ol>}

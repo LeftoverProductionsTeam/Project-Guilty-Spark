@@ -126,6 +126,7 @@ impl NativeFactionService {
 const FACTION_SERVICES: [&str; 3] = ["deploy", "loadout", "debrief"];
 const FIELD_PICKUP_CONTROLS: [&str; 2] = ["extraction_pelican_activate", "extraction_spirit_activate"];
 const FIELD_PICKUP_ZONES: [&str; 2] = ["extraction_pelican_zone", "extraction_spirit_zone"];
+const RETURN_PADS: [&str; 2] = ["pelican_return", "spirit_return"];
 pub fn faction_service_owner(name: &str) -> Option<usize> {
     let name = name.strip_prefix("extraction_")?;
     let (faction, service) = name.split_once('_')?;
@@ -1162,6 +1163,8 @@ pub struct MegaWorldHubStarts {
     pub services: Vec<MegaWorldHubService>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field_pickup: Option<MegaWorldFieldPickup>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_pad: Option<MegaWorldReturnPad>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1180,6 +1183,57 @@ pub struct MegaWorldFieldPickup {
     pub bsp_index: u16,
     pub position: [f32; 3],
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MegaWorldReturnPad {
+    pub name: String,
+    pub volume_index: usize,
+    pub bsp_index: u16,
+    pub geometry: crate::maps::ScenarioLogicVolumeGeometry,
+}
+
+fn regional_return_pad(
+    path: &Path,
+    map: &crate::maps::MapInspection,
+    volumes: &[crate::maps::ScenarioLogicVolume],
+    faction: usize,
+) -> Result<Option<MegaWorldReturnPad>> {
+    let name = RETURN_PADS[faction];
+    let Some(index) = volumes.iter().position(|row| row.name.eq_ignore_ascii_case(name)) else {
+        return Ok(None);
+    };
+    let geometry = unique_volume(volumes, name)?;
+    for other in FIELD_PICKUP_ZONES.into_iter().chain([RETURN_PADS[1 - faction]]) {
+        if volumes.iter().any(|row| row.name.eq_ignore_ascii_case(other))
+            && geometry.intersects(unique_volume(volumes, other)?)
+        {
+            return invalid(format!("Native return pad {name} overlaps {other}"));
+        }
+    }
+    let [fx, fy, fz] = geometry.forward;
+    let [ux, uy, uz] = geometry.up;
+    let right = [uy * fz - uz * fy, uz * fx - ux * fz, ux * fy - uy * fx];
+    let [length, width, height] = geometry.dimensions.map(|size| size * 0.5);
+    let center = std::array::from_fn(|axis| {
+        geometry.corner[axis] + length * geometry.forward[axis] + width * right[axis]
+            + height * geometry.up[axis]
+    });
+    let locations = crate::maps::bsp_point_locations(path, map, &[center], Some(height * 2.))?;
+    let [bsp_index] = locations[0].bsps.as_slice() else {
+        return invalid(format!("Native return pad {name} needs a center in exactly one BSP"));
+    };
+    if !locations[0].ground.iter().any(|ground| ground.bsp == *bsp_index) {
+        return invalid(format!("Native return pad {name} needs nearby ground in BSP {bsp_index}"));
+    }
+    Ok(Some(MegaWorldReturnPad {
+        name: name.to_owned(),
+        volume_index: index,
+        bsp_index: *bsp_index,
+        geometry: geometry.clone(),
+    }))
+}
+
 
 /// Read the faction starts from the exact MCC13 cache. Stock starts outside
 /// the paired hubs stay ordinary multiplayer starts.
@@ -1303,6 +1357,7 @@ pub fn megaworld_hub_starts(
         }
         Ok(MegaWorldHubStarts {
             name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services, field_pickup,
+            return_pad: regional_return_pad(path, map, &volumes, faction)?,
             start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
         })
     };
