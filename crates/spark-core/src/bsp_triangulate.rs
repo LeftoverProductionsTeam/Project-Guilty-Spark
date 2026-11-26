@@ -137,9 +137,8 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
 /// Weld sub-centimetre slivers at the join between generated and stock solids.
 /// Stock vertices are fixed. A Boolean cut in a stock face may slide within
 /// its original plane and UV chart, even when it meets multiple materials.
-pub(crate) fn weld_generated_slivers(
-    mesh: &mut MeshGL64, materials: &[usize], stock_points: &[V], max_edge: f64,
-) -> usize {
+pub(crate) fn weld_generated_slivers(mesh: &mut MeshGL64, materials: &[usize], stock_points: &[V]) -> usize {
+    const MAX_EDGE: f64 = 0.012;
     const MAX_ALTITUDE: f64 = 0.01;
     const MAX_WELDS: usize = 32;
     let generated = |face: usize| materials.iter().any(|&id| mesh.face_id[face] == id as u64);
@@ -158,7 +157,7 @@ pub(crate) fn weld_generated_slivers(
         let shortest = (0..3).min_by(|&a, &b| lengths[a].total_cmp(&lengths[b])).unwrap();
         let longest = lengths.into_iter().fold(0., f64::max);
         let quality = face(mesh, [ids[0], ids[1], ids[2]]).1;
-        if lengths[shortest] <= max_edge && quality < 0.03 && quality * longest < MAX_ALTITUDE {
+        if lengths[shortest] <= MAX_EDGE && quality < 0.03 && quality * longest < MAX_ALTITUDE {
             let a = key(mesh, ids[shortest]);
             let b = key(mesh, ids[(shortest + 1) % 3]);
             if a != b {
@@ -368,10 +367,8 @@ mod tests {
 
     #[test]
     fn welds_generated_edge_even_at_a_protected_anchor() {
-        // Reproduce a short edge in the size range that the compact native
-        // lightmap build rejected, while pinning the original stock anchor.
         let points = [
-            [1., 0., 0.], [1., 0.013, 0.], [1., 1., 0.],
+            [1., 0., 0.], [1., 0.005, 0.], [1., 1., 0.],
             [-1., 1., 0.], [-1., -1., 0.], [1., -1., 0.],
             [0., 0., 1.], [0., 0., -1.],
         ];
@@ -391,11 +388,10 @@ mod tests {
         let faces = mesh.num_tri();
         // An authored short edge may never collapse across a stock face.
         mesh.face_id[2] = 29;
-        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &points, 0.015), 0);
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &points), 0);
         // A generated intersection borrowed by a stock plane may slide along
         // that plane as long as the original anchor and UV chart stay fixed.
-        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &[points[0]], 0.012), 0);
-        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &[points[0]], 0.015), 1);
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &[points[0]]), 1);
         assert_eq!(mesh.num_tri(), faces - 2);
         let (tri, _) = mesh.tri_verts.chunks_exact(3).zip(&mesh.face_id)
             .filter(|(_, slot)| **slot == 29).last().unwrap();

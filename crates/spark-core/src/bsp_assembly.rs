@@ -1034,12 +1034,7 @@ fn generate_end(
                 transform([p[0].into(), p[1].into(), p[2].into()], assembly.translation, assembly.yaw_degrees)
             }))
             .collect::<Vec<_>>();
-        // The projected terrain seam can leave short edges just over one
-        // hundredth of a unit. Keep stock vertices and their UV charts pinned.
-        let max_weld_edge=if assembly.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some()) {
-            0.015
-        } else {0.012};
-        crate::bsp_triangulate::weld_generated_slivers(&mut gl, &weld_materials, &stock_points, max_weld_edge);
+        crate::bsp_triangulate::weld_generated_slivers(&mut gl, &weld_materials, &stock_points);
     }
     for material in passage_materials.iter().copied().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
