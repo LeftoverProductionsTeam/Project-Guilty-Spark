@@ -456,6 +456,8 @@ function Scene({
   },[lightMesh,lightIndexPending,lightPoints,lightBitmaps,shaderMetadata]);
   const localLightState=useNativeObjectLighting(project.id,project.source?.sha256===inspection?.sha256?inspection?.sha256:undefined,bitmapResourceSha256(project.source),inspection?.header.version,lightProbes);
   const nativeLights=localLightState.lights;
+  const materialRevision = useMemo(() => ({}), [previewMesh, viewMode, inspection, shaderTextures,
+    lightmapTextures, extraTextures, ownedModels, assetMeshes, nativeLights, sourceAppearance?.skyMesh]);
   useEffect(()=>{gl.domElement.dataset.gsOriginalMips=JSON.stringify(Object.entries(shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps})));},[gl,shaderTextures]);
   useEffect(()=>{gl.domElement.dataset.gsOriginalCubeMips=JSON.stringify(Object.entries(extraTextures).filter(([,texture])=>texture instanceof THREE.CubeTexture).map(([key,texture])=>({key,bitmapTagId:texture.userData.sourceTagId,levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps,rgbaBytes:texture.userData.rgbaBytes})));},[gl,extraTextures]);
   useEffect(()=>{gl.domElement.dataset.gsObjectLighting=JSON.stringify({probed:lightProbes.length,applied:nativeLights?.size??0,sourceSha256:inspection?.sha256??null,method:'native-default-pose-centre',runtimeCornerSampling:false,pending:lightIndexPending||localLightState.pending,reason:localLightState.reason,milliseconds:localLightState.milliseconds,lights:[...(nativeLights??[])].map(([id,value])=>({id,...value}))});},[gl,lightProbes,nativeLights,inspection?.sha256,lightIndexPending,localLightState.pending,localLightState.reason,localLightState.milliseconds]);
@@ -475,7 +477,7 @@ function Scene({
       <ViewportTelemetry/>
       <NativeObjectShadows terrain={previewMesh} enabled={viewMode==='render'&&!greenScreen&&!joinedPreview&&!assembly}/>
       <SpatialAudioListener mapId={project.id}/>
-      {!cinematic&&<SceneEffects settings={project.renderFeatures}/>}
+      {!cinematic&&<SceneEffects settings={project.renderFeatures} materialRevision={inspection && viewMode==='render' ? materialRevision : undefined}/>}
       {ortho ? (
         <OrthographicCamera
           makeDefault

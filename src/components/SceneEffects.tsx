@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { createVisualPipeline } from '../visualPipeline';
 import { renderFeatures } from '../renderFeatures';
@@ -6,12 +6,14 @@ import type { RenderFeatures } from '../renderFeatures';
 export default function SceneEffects({
   settings,
   transparentBackground = false,
+  materialRevision,
 }: {
   settings?: RenderFeatures | null;
   transparentBackground?: boolean;
+  materialRevision?: object;
 }) {
   const profile = renderFeatures(settings),
-    { gl, scene, camera, size, viewport } = useThree();
+    { gl, scene, camera, size, viewport, invalidate } = useThree();
   const pipeline = useMemo(
     () =>
       profile.enabled
@@ -38,7 +40,35 @@ export default function SceneEffects({
     },
     [scene, gl],
   );
+  const preparation = useRef<{ revision: object; frameReady: boolean } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useLayoutEffect(() => () => {
+    clearTimeout(timer.current);
+    preparation.current = null;
+  }, [gl, camera, pipeline, materialRevision]);
   useFrame(() => {
+    if (materialRevision && !pipeline && !gl.xr.isPresenting && !gl.getContext().isContextLost() &&
+      gl.extensions.has('KHR_parallel_shader_compile')) {
+      if (preparation.current?.revision !== materialRevision) {
+        const batch = { revision: materialRevision, frameReady: false };
+        preparation.current = batch;
+        const ready = () => {
+          if (preparation.current !== batch || batch.frameReady) return;
+          clearTimeout(timer.current);
+          batch.frameReady = true;
+          invalidate();
+        };
+        try {
+          // Keep the previous framebuffer until the driver has linked this
+          // material revision. Rendering sooner forces shader-log readback.
+          timer.current = setTimeout(ready, 2500);
+          void gl.compileAsync(scene, camera).then(ready, ready);
+        } catch {
+          ready();
+        }
+      }
+      if (!preparation.current?.frameReady) return;
+    }
     if (pipeline) {
       pipeline.composer.render();
     } else gl.render(scene, camera);
