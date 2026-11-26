@@ -1,11 +1,22 @@
 //! Read-only metadata probe; native build acceptance is a separate path.
 fn main() -> spark_core::Result<()> {
     let args: Vec<_> = std::env::args().collect();
-    if args.len() == 4 && args[1] == "--sky-starts" {
+    if args.len() == 4 && matches!(args[1].as_str(), "--sky-starts" | "--portals") {
         let Ok(bsp) = args[3].parse() else {
             return spark_core::invalid("BSP index must be a nonnegative integer");
         };
-        return inspect_start_skies(std::path::Path::new(&args[2]), bsp);
+        let path = std::path::Path::new(&args[2]);
+        if args[1] == "--portals" {
+            let map = spark_core::maps::inspect_map(path, None)?;
+            let portals = spark_core::maps::compiled_portals(path, &map, bsp)?;
+            println!("{}", serde_json::json!({
+                "cacheSha256": map.sha256,
+                "bspIndex": bsp,
+                "portals": portals,
+            }));
+            return Ok(());
+        }
+        return inspect_start_skies(path, bsp);
     }
     if args.len() == 5 && args[1] == "--workspace" {
         let cache = std::path::Path::new(&args[2]);
@@ -56,7 +67,7 @@ fn main() -> spark_core::Result<()> {
         return Ok(());
     }
     if args.len() != 2 {
-        return spark_core::invalid("qa_bsp_audio <owned.map> or --sky-starts <owned.map> <bsp>");
+        return spark_core::invalid("qa_bsp_audio <owned.map> or --sky-starts/--portals <owned.map> <bsp>");
     }
     let path = std::path::Path::new(&args[1]);
     let sha = spark_core::maps::hash_file(path)?;

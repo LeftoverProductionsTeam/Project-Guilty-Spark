@@ -1345,9 +1345,12 @@ fn retain_base_portals(project: &Project, base: &MapInspection, geometry: &mut A
         let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
         let slot = geometry.materials.iter().position(|material| material.name == "+portal")
             .ok_or_else(|| SparkError::Invalid("Connected world has no portal source material".into()))?;
-        let rings = maps::compiled_portal_rings(&source.preserved_path, base)?;
-        let cuts: Vec<_> = rings.iter().filter(|(flags, _)| *flags == 0)
-            .filter_map(|(_, ring)| crate::bsp_visibility::retained_tunnel_quad(ring).ok())
+        if base.mesh.parts.len() != 1 {
+            return invalid("Retaining visibility cuts requires a single compiled BSP");
+        }
+        let rings = maps::compiled_portals(&source.preserved_path, base, 0)?;
+        let cuts: Vec<_> = rings.iter().filter(|portal| portal.flags == 0)
+            .filter_map(|portal| crate::bsp_visibility::retained_tunnel_quad(&portal.ring).ok())
             .collect();
         let needs_review = rings.len() - cuts.len();
         if needs_review > 0 {

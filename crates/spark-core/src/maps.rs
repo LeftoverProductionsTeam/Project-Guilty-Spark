@@ -815,7 +815,22 @@ mod resident_tag_window_tests {
 
 /// Read the clip-plane portals of an exact, single-BSP connected cache.
 /// Layout follows the native ScenarioStructureBSPClusterPortal definition.
-pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> Result<Vec<(u32, Vec<[f64; 3]>)>> {
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledPortal {
+    pub front_cluster: i16,
+    pub back_cluster: i16,
+    pub flags: u32,
+    pub ring: Vec<[f64; 3]>,
+}
+
+/// Reads cluster adjacency and the exact compiled polygons of one native BSP.
+/// Layout follows the pinned Invader ScenarioStructureBSPClusterPortal schema.
+pub fn compiled_portals(
+    path: &Path,
+    inspection: &MapInspection,
+    bsp_index: usize,
+) -> Result<Vec<CompiledPortal>> {
     let (header, bytes, sha) = read_cache_snapshot_shared(path)?;
     if sha != inspection.sha256 {
         return invalid("Connected cache changed before its visibility cuts were read");
@@ -827,7 +842,10 @@ pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> 
         .and_then(|tag| tag.data_offset)
         .ok_or_else(|| SparkError::Invalid("Scenario is missing from the connected cache".into()))? as usize;
     let (reference, count) = tags.block(&reader, scenario + 0x5a4, 32, 16)?;
-    if count != 1 { return invalid("Retaining visibility cuts requires a single compiled BSP"); }
+    if bsp_index >= count {
+        return invalid("Selected native BSP is missing");
+    }
+    let reference = reference + bsp_index * 32;
     let begin = reader.u32(reference)? as usize;
     let size = reader.u32(reference + 4)? as usize;
     reader.bytes(begin, size)?;
@@ -845,7 +863,12 @@ pub(crate) fn compiled_portal_rings(path: &Path, inspection: &MapInspection) -> 
             let at = vertices + vertex * 12;
             ring.push(vec3(&reader, at)?.map(f64::from));
         }
-        rings.push((flags, ring));
+        rings.push(CompiledPortal {
+            front_cluster: reader.u16(row)? as i16,
+            back_cluster: reader.u16(row + 2)? as i16,
+            flags,
+            ring,
+        });
     }
     Ok(rings)
 }
@@ -2405,10 +2428,13 @@ mod portal_readback_tests {
         let source_sha = "f9684cb7e5436fd2901b7ea226726a6089957b91459923421264a5436f743244";
         let map = inspect_map(&path, path.parent()).unwrap();
         assert_eq!(map.sha256, source_sha);
-        let portals = compiled_portal_rings(&path, &map).unwrap();
+        let portals = compiled_portals(&path, &map, 0).unwrap();
         assert_eq!(portals.len(), 240);
-        assert_eq!(portals.iter().map(|(_, ring)| ring.len()).sum::<usize>(), 2183);
-        assert!(portals.iter().all(|(flags, ring)| *flags == 0 && (3..=27).contains(&ring.len())));
+        assert_eq!(portals.iter().map(|portal| portal.ring.len()).sum::<usize>(), 2183);
+        assert!(portals.iter().all(|portal| portal.flags == 0 && (3..=27).contains(&portal.ring.len())));
+        assert!(portals.iter().any(|portal| portal.front_cluster >= 0
+            && portal.back_cluster >= 0 && portal.front_cluster != portal.back_cluster));
+        assert!(compiled_portals(&path, &map, 1).is_err());
         assert_eq!(hash_file(&path).unwrap(), source_sha);
     }
 }
