@@ -805,9 +805,9 @@ fn with_native_bake_scenario<'a>(
     let source = tags.join(safe_relative(&scenario_tag)?);
     let original_hash = maps::hash_file(&source)?;
     let copy = safe_relative(scenario_path)?.with_file_name(format!("gsbake_{}", &runner.id[..8]));
-    let copy = copy.to_string_lossy().replace('/', "\\");
-    let copy_tag = format!("{copy}.scenario");
-    let file = tags.join(safe_relative(&copy_tag)?);
+    // Invader's save-as joins this path directly to its host tags directory.
+    let copy_tag = format!("{}.scenario", copy.to_string_lossy().replace('\\', "/"));
+    let file = tags.join(copy.with_extension("scenario"));
     reject_links(&file)?;
     if file.try_exists()? {
         return invalid("The bake-only scenario path already exists");
@@ -820,12 +820,19 @@ fn with_native_bake_scenario<'a>(
     }
     args.extend(["-O".into(), copy_tag.clone(), scenario_tag]);
     runner.run(edit, &args, workspace, "bsp-bake-scenario", 64)?;
+    if maps::hash_file(&source)? != original_hash {
+        return invalid("Native lighting changed the original gameplay scenario");
+    }
+    reject_links(&file)?;
+    if !file.is_file() {
+        return invalid(format!("Invader did not write the bake-only scenario at {copy_tag}"));
+    }
     let operation = (|| {
         let expected = blocks.iter().zip(&counts).map(|((_, limit), count)| (*count).min(*limit));
         if !query_counts(&copy_tag)?.into_iter().eq(expected) || maps::hash_file(&source)? != original_hash {
             return invalid("The bake-only scenario differs from the reviewed scenario copy");
         }
-        bake(&copy)
+        bake(&copy.to_string_lossy().replace('/', "\\"))
     })();
     if maps::hash_file(&source)? != original_hash {
         return invalid("Native lighting changed the original gameplay scenario");
