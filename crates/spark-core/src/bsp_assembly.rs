@@ -1591,11 +1591,9 @@ pub fn generate_preserved_connector(
             return invalid("Connector surface does not match a reviewed landing");
         }
     }
-    let mut render = if points[0][2] == points.last().unwrap()[2] {
-        level_connector_charts(points[0], *points.last().unwrap(), side, height, sky)
-    } else {
-        collision_source
-    };
+    let level_span = [points[0], *points.last().unwrap()];
+    let chart_points = if level_span[0][2] == level_span[1][2] { &level_span[..] } else { &points[..] };
+    let mut render = connector_charts(chart_points, side, height, sky);
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
     append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
@@ -1705,26 +1703,31 @@ fn intact_connector_contains_placement(points: &[V], forward: V, width: f64, hei
     false
 }
 
-fn level_connector_charts(start: V, end: V, side: V, height: f64, sky: Option<usize>) -> MeshGL64 {
-    let delta = sub(end, start);
-    let count = (dot(delta, delta).sqrt() / 48.).ceil() as usize;
-    let point = |index| if index == count { end } else { add(start, mul(delta, index as f64 / count as f64)) };
-    let full = passage_corners(start, end, side, side, height);
+fn connector_charts(points: &[V], side: V, height: f64, sky: Option<usize>) -> MeshGL64 {
     let mut render = MeshGL64 { num_prop: 5, ..Default::default() };
-    for panel in 0..count {
-        let corners = passage_corners(point(panel), point(panel + 1), side, side, height);
-        for (index, [a, c, b]) in LEVEL_PASSAGE_TRIANGLES.into_iter().enumerate() {
-            if ((4..=5).contains(&index) && panel > 0) || ((8..=9).contains(&index) && panel + 1 < count) {
-                continue; // Only the two exterior caps are part of the surface.
+    for (segment, pair) in points.windows(2).enumerate() {
+        let [start, end] = [pair[0], pair[1]];
+        let delta = sub(end, start);
+        let panels = (dot(delta, delta).sqrt() / 48.).ceil() as usize;
+        let point = |index| if index == panels { end } else { add(start, mul(delta, index as f64 / panels as f64)) };
+        let full = passage_corners(start, end, side, side, height);
+        for panel in 0..panels {
+            let corners = passage_corners(point(panel), point(panel + 1), side, side, height);
+            for (index, [a, c, b]) in LEVEL_PASSAGE_TRIANGLES.into_iter().enumerate() {
+                let internal_start = (4..=5).contains(&index) && (segment > 0 || panel > 0);
+                let internal_end = (8..=9).contains(&index) && (segment + 2 < points.len() || panel + 1 < panels);
+                if internal_start || internal_end {
+                    continue;
+                }
+                let uv_normal = normal(full[a], full[b], full[c]);
+                let first = render.num_vert() as u64;
+                for corner in [corners[a], corners[b], corners[c]] {
+                    render.vert_properties.extend(corner);
+                    render.vert_properties.extend(planar_uv(corner, uv_normal));
+                }
+                render.tri_verts.extend([first, first + 1, first + 2]);
+                render.face_id.push(if (2..=3).contains(&index) { sky.unwrap_or(0) as u64 } else { 0 });
             }
-            let uv_normal = normal(full[a], full[b], full[c]);
-            let first = render.num_vert() as u64;
-            for corner in [corners[a], corners[b], corners[c]] {
-                render.vert_properties.extend(corner);
-                render.vert_properties.extend(planar_uv(corner, uv_normal));
-            }
-            render.tri_verts.extend([first, first + 1, first + 2]);
-            render.face_id.push(if (2..=3).contains(&index) { sky.unwrap_or(0) as u64 } else { 0 });
         }
     }
     render
@@ -2672,10 +2675,23 @@ mod tests {
         let side = [-forward[1], forward[0], 0.];
         let body = intact_connector_solid(&points, side, 1.6, None, &AtomicBool::new(false)).unwrap();
         assert_eq!(body.get_mesh_gl64(-1).num_tri(), 12);
-        let mut render = level_connector_charts(start, end, side, 1.6, None);
+        let mut render = connector_charts(&[start, end], side, 1.6, None);
         assert_eq!(render.num_tri(), 156);
         assert_eq!(crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES).unwrap(), 0);
 
+    }
+
+    #[test]
+    fn a_long_graded_connector_uses_chart_panels_without_internal_caps() {
+        use std::f64::consts::FRAC_1_SQRT_2 as DIAG;
+        let start = [790., -35., -32.];
+        let section = |distance, elevation| add(start, [DIAG * distance, -DIAG * distance, elevation]);
+        let points = [start, section(4., 0.), section(840., 14.), section(844., 14.)];
+        let side = [DIAG, DIAG, 0.];
+        let mut render = connector_charts(&points, side, 1.6, None);
+        // Two short approaches, eighteen grade panels, and just two outer caps.
+        assert_eq!(render.num_tri(), 20 * 8 + 4);
+        assert_eq!(crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES).unwrap(), 0);
     }
 
     #[test]
@@ -2695,7 +2711,7 @@ mod tests {
             }
             let body = intact_connector_solid(&points, side, 4., Some(1), &AtomicBool::new(false)).unwrap();
             assert!(body.get_mesh_gl64(-1).face_id.contains(&1));
-            let flat = level_connector_charts([0., 0., 0.], [36., 0., 0.], side, 4., Some(1));
+            let flat = connector_charts(&[[0., 0., 0.], [36., 0., 0.]], side, 4., Some(1));
             assert_eq!(flat.face_id.iter().filter(|&&slot| slot == 1).count(), 2);
         }
         let too_steep = [[[0., 0., 0.], [3., 0., 0.]], [[11., 0., 3.], [14., 0., 3.]]];
