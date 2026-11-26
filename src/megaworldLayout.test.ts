@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {atlasAdjacentRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
+import {alignAtlasDonor,atlasAdjacentRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
 import type {AtlasRegion} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -34,4 +34,14 @@ it('places the chosen center inside two complete six-sided rings for19 equal nat
  expect(widths).toEqual([3,4,5,4,3]);
  expect(atlasAdjacentRegions(next.regions,next.regions[17])).toHaveLength(6);
  expect(ring.filter(r=>r===0)).toHaveLength(1);expect(ring.filter(r=>r===1)).toHaveLength(6);expect(ring.filter(r=>r===2)).toHaveLength(12);expect(overlappingRegions(next.regions)).toEqual([]);
+});
+
+it('copies a native alignment into the neighboring Atlas slot at full precision',()=>{
+ const arranged=spreadLayout(addLayoutRegions(null,[region('timberland'),region('sidewinder',1)]));
+ const [base,donor]=arranged.regions;
+ const native=[68.88340761726377,32.66749670335764,-21.075047395103685] as [number,number,number];
+ const result=alignAtlasDonor(arranged,base,donor,native,0);
+ expect(result.regions[0]).toBe(base);
+ expect(result.regions[1].hexSlot).toEqual(donor.hexSlot);
+ expect(result.regions[1].translation).toEqual(native);
 });

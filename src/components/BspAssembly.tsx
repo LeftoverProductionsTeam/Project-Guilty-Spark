@@ -12,7 +12,7 @@ import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
-import { addOpenedAtlasBsp, type LayoutRegion } from '../megaworldLayout';
+import { addOpenedAtlasBsp, alignAtlasDonor, atlasAdjacentRegions, type LayoutRegion } from '../megaworldLayout';
 import MapSourceDrop from './MapSourceDrop';
 import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
@@ -366,6 +366,10 @@ export default function BspAssembly({
       setDraft(plan);setRouteView('primary');setReport(null);
     });
   }
+  const placedLayout=project.megaworldLayout;
+  const atlasBase=placedLayout?.regions.find(region=>region.cacheSha256===sourceSha256&&region.bspIndex===baseIndex);
+  const atlasDonor=atlasBase&&draft&&placedLayout&&atlasAdjacentRegions(placedLayout.regions,atlasBase)
+    .find(region=>region.cacheSha256===draft.donorSource.sha256&&region.bspIndex===draft.donorBspIndex);
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   const savedPlan = project.bspAssembly;
   const donorPositionApplied = !!draft && !!savedPlan && draft.donorProjectId === savedPlan.donorProjectId
@@ -606,6 +610,8 @@ export default function BspAssembly({
                 :'Plan connected tunnel'}
             </button>
             {!canExtend && <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>}
+            {placedLayout&&atlasBase&&atlasDonor&&draft?.terrainSeam&&selectionMatches&&<button disabled={busy}
+              onClick={()=>onEdit({...project,megaworldLayout:alignAtlasDonor(placedLayout,atlasBase,atlasDonor,draft.translation,draft.yawDegrees)},'Align Atlas to terrain draft')}>Use terrain alignment in Atlas</button>}
           </div>
           {optionsError && (
             <p role="alert" className="bsp-error">

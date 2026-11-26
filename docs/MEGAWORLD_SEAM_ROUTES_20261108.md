@@ -2,6 +2,8 @@
 
 Current Product Completion acceptance requires the compact 3–4–5–4–3 Atlas as the native build source, natural outdoor seams, buried interiors, and normal-controls traversal of all original regions. Earlier route, cache and screenshot results below remain regression evidence. Standalone Be Native and Black Echo are fixtures. Flagship gameplay acceptance is inside the compact world.
 
+A private Windows editor run imported original CE Timberland and Sidewinder, arranged their Atlas slots, entered the exact terrain adjustment, then used Atlas Draft terrain seam, Apply and Preview. Saved relative transform matched (114.02209091186523, 9.3280029296875, −17.233085022040342). The preview reconstructed 32,217 source triangles and checked 133 clearance points. Rounded displayed coordinates failed triangle conditioning, so Construction now copies the terrain draft’s full-precision alignment into the saved Atlas through the existing Undo/Redo history. The new copy action, actual cache compile, non-east/west terrain seams, underground mouth, and normal runtime traversal remain open. Receipt: spark-viewport-index-GwsjsV.json in the Windows temporary folder.
+
 Base: local master `5095e9b9ea0979448cd571d56659b4076e5930a2` plus the preserved uncommitted continuation. This records source authoring acceptance, not a playable 19-region world.
 
 ## Creator workflow
