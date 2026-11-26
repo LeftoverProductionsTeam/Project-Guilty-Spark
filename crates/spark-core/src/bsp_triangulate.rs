@@ -134,10 +134,10 @@ pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_
 }
 
 
-/// Weld sub-centimetre slivers left where generated outdoor solids intersect.
+/// Weld sub-centimetre slivers at the join between generated and stock solids.
 /// Stock vertices are fixed. A Boolean cut in a stock face may slide within
 /// its original plane and UV chart, even when it meets multiple materials.
-pub(crate) fn weld_terrain_slivers(mesh: &mut MeshGL64, materials: &[usize], stock_points: &[V]) -> usize {
+pub(crate) fn weld_generated_slivers(mesh: &mut MeshGL64, materials: &[usize], stock_points: &[V]) -> usize {
     const MAX_EDGE: f64 = 0.012;
     const MAX_ALTITUDE: f64 = 0.01;
     const MAX_WELDS: usize = 32;
@@ -170,8 +170,8 @@ pub(crate) fn weld_terrain_slivers(mesh: &mut MeshGL64, materials: &[usize], sto
         if welds == MAX_WELDS {
             break;
         }
-        if weld_terrain_edge(mesh, a, b, materials, stock_points)
-            || weld_terrain_edge(mesh, b, a, materials, stock_points)
+        if weld_generated_edge(mesh, a, b, materials, stock_points)
+            || weld_generated_edge(mesh, b, a, materials, stock_points)
         {
             welds += 1;
         }
@@ -179,7 +179,7 @@ pub(crate) fn weld_terrain_slivers(mesh: &mut MeshGL64, materials: &[usize], sto
     welds
 }
 
-fn weld_terrain_edge(
+fn weld_generated_edge(
     mesh: &mut MeshGL64,
     from: [u64; 3],
     to: [u64; 3],
@@ -388,10 +388,10 @@ mod tests {
         let faces = mesh.num_tri();
         // An authored short edge may never collapse across a stock face.
         mesh.face_id[2] = 29;
-        assert_eq!(weld_terrain_slivers(&mut mesh, &[17], &points), 0);
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &points), 0);
         // A generated intersection borrowed by a stock plane may slide along
         // that plane as long as the original anchor and UV chart stay fixed.
-        assert_eq!(weld_terrain_slivers(&mut mesh, &[17], &[points[0]]), 1);
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &[points[0]]), 1);
         assert_eq!(mesh.num_tri(), faces - 2);
         let (tri, _) = mesh.tri_verts.chunks_exact(3).zip(&mesh.face_id)
             .filter(|(_, slot)| **slot == 29).last().unwrap();
