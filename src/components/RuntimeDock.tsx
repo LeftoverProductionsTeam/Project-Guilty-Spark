@@ -1,6 +1,7 @@
 import {inspectScenarioBindings} from '../scenarioBindings';
 import {emptyCreatorStudio,exportStudioEvidence} from '../creatorStudio';
 import MissionSourceReview from './MissionSourceReview';
+import {missionExtractionFields} from '../nativeLogic';
 import {appendNativeCameraShot,nativeCinematicSource,nativeCinematicPrefix,nativeCinematicTakeKey} from '../nativeCinematic';
 import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {beginProjectMutation} from '../projectMutation';
@@ -688,9 +689,13 @@ export default function RuntimeDock({
         if(matches[0].initiallyCreated)throw Error('Mission encounters must be script-created; disable initial actor creation through the reviewed native source editor.');
         if(refs.protectedEncounters.includes(name))throw Error('This encounter is recipe-owned; use its existing controller instead of a second spawn owner.');
       }
-      if(studio.missions.some(beat=>beat.trigger==='forerunnerExtractionSettled')){
-        for(const name of ['extraction_zone','extraction_return'])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Native extraction pad is missing or ambiguous: '+name);
-        for(const name of ['extraction_deploy','extraction_activate'])if(refs.devices.filter(value=>value.name===name&&value.class==='ctrl').length!==1)throw Error('Native extraction control is missing or ambiguous: '+name);
+      const settlement=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
+      if(settlement.length){
+        const shared=settlement.find(beat=>beat.squadNumber==null);
+        const field=missionExtractionFields.find(row=>row.control===(shared?.triggerRef??'extraction_activate'));
+        if(!field)throw Error('Choose a supported native evacuation control.');
+        for(const name of ['extraction_return',field.zone])if(review.triggerVolumes.filter(value=>value===name).length!==1)throw Error('Native extraction pad is missing or ambiguous: '+name);
+        for(const name of ['extraction_deploy',field.control])if(refs.devices.filter(value=>value.name===name&&value.class==='ctrl').length!==1)throw Error('Native extraction control is missing or ambiguous: '+name);
       }
       const previous=inventory.modules.find(module=>module.filename.toLowerCase()===generated.filename.toLowerCase());
       let original:string|undefined;

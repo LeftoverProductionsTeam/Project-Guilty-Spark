@@ -230,6 +230,14 @@ pub(crate) fn cinematic_markers(shots:&[CameraShot])->Result<Vec<String>> {
     }).collect()
 }
 /// Authoring metadata does not replace source/geometry or compiled-cache checks.
+fn supported_recovered_extraction_control(beat: &MissionBeat) -> bool {
+    match beat.trigger_ref.as_deref() {
+        Some("extraction_activate") => true,
+        Some("extraction_pelican_activate" | "extraction_spirit_activate") => beat.squad_number.is_none(),
+        _ => false,
+    }
+}
+
 fn mission_scope_last(missions:&[MissionBeat],index:usize)->bool{missions[index+1..].iter().all(|other|other.squad_number!=missions[index].squad_number)}
 fn validate_mission_scopes(missions:&[MissionBeat])->Result<()>{
  if missions.iter().any(|beat|beat.guidance.as_ref().is_some_and(|g|g.target().is_none_or(|name|!script_ident(name))||!g.height.is_finite()||g.height.abs()>100.)){return invalid("Mission guidance needs one native flag or object and a finite height");}
@@ -326,7 +334,7 @@ pub fn recovered_mission_binding_for_module(project:&crate::project::Project,sou
     if !config.forerunner&&binding.missions.iter().any(|beat|beat.guidance.is_some()){return invalid("Native objective waypoints require Forerunner mission export");}
     if project.studio.as_ref().is_none_or(|studio|studio.shots!=config.shots){return invalid("Recovered mission camera references changed; prepare again");}
     for (index,beat) in binding.missions.iter().enumerate() {
-        if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||!mission_scope_last(&binding.missions,index)||beat.trigger_ref.as_deref()!=Some("extraction_activate")||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
+        if beat.trigger=="forerunnerExtractionSettled" && (!config.forerunner||!mission_scope_last(&binding.missions,index)||!supported_recovered_extraction_control(beat)||beat.condition_volume.is_some()||beat.condition_result.is_some()||beat.checkpoint==Some(true)||beat.complete_mission==Some(true)) {
             return invalid("Forerunner settlement must be the final unconditional objective on a reviewed CE solo target");
         }
     }
@@ -569,6 +577,16 @@ pub(crate) fn verify_native_mission_with_hud(binding:&NativeMissionBinding,map:&
             if controls.len()!=1||controls[0].1.object_type!=8||!markers.devices.iter().any(|device|device.class=="ctrl"&&device.index==controls[0].1.object_index as usize&&device.name_index==controls[0].0 as i16){return invalid("Compiled squad mission needs its unique native selection control");}
         }
         let _=compiled_extraction_requirements(cache,map)?;
+    }
+    if let Some(control) = binding.missions.iter().find_map(|beat| {
+        if beat.trigger != "forerunnerExtractionSettled" || beat.squad_number.is_some() { return None; }
+        beat.trigger_ref.as_deref().filter(|name| *name != "extraction_activate")
+    }) {
+        let markers = crate::maps::scenario_logic_readback(cache, map)?;
+        crate::native_logic::validate_compiled_extraction_layout(map, &markers)?;
+        if markers.names.iter().filter(|row| row.name == control).count() != 1 {
+            return invalid(format!("Compiled mission evacuation control is missing or ambiguous: {control}"));
+        }
     }
     if binding.cinematic.is_some()&&binding.cinematic_intro!=Some(false){expected.push(("gs_cinematic".into(),3));}
     if binding.activation=="startup"{expected.push(("gs_mission_bootstrap".into(),0));}
@@ -895,6 +913,16 @@ mod tests {
         assert!(recovered_mission_binding(&project,"(script dormant manual (sleep 1))").unwrap().is_none());
         assert!(recovered_mission_binding(&project,&source(&document,"unknown")).is_err());
         document.missions[0].title="Changed".into();assert!(recovered_mission_binding(&project,&source(&document,"manual")).unwrap_err().to_string().contains("Mission beats changed"));
+        let mut faction = document.clone();
+        faction.missions.push(serde_json::from_value(serde_json::json!({
+            "id":"settle","title":"Return","objective":"Bank gear","trigger":"forerunnerExtractionSettled",
+            "triggerRef":"extraction_spirit_activate","encounterName":""
+        })).unwrap());
+        project.studio = Some(faction.clone());
+        assert!(recovered_mission_binding(&project, &source(&faction, "manual")).unwrap().is_some());
+        faction.missions.last_mut().unwrap().trigger_ref = Some("other_control".into());
+        project.studio = Some(faction.clone());
+        assert!(recovered_mission_binding(&project, &source(&faction, "manual")).is_err());
         let root=tempfile::tempdir().unwrap();let map_path=root.path().join("synthetic.map");std::fs::write(&map_path,test_fixture::fixture(609)).unwrap();
         let map=crate::maps::inspect_map(&map_path,None).unwrap();
         assert!(verify_native_mission(&binding,&map,&map_path).is_err(),"A readable cache without the authored mission is never accepted");

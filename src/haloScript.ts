@@ -6,7 +6,7 @@
  */
 import type { CameraShot, CreatorStudioDocument } from './creatorStudio';
 import { emptyCreatorStudio, missionBranchGroups, validateCreatorStudio, missionSoundProblems, missionCinematicShots,validMissionWeaponPath } from './creatorStudio.ts';
-import {extractionLayout} from './nativeLogic.ts';
+import {extractionLayout, missionExtractionFields} from './nativeLogic.ts';
 import { inspectScenarioBindings } from './scenarioBindings.ts';
 import { sameJson } from './semanticJson.ts';
 import { defaultNativePlayerProfile, nativeFirefightHudMessages, type NativeFirefightHudMessage, type FirefightConfig, type NativeEncounterCandidate, type FirefightCatalog } from './firefight.ts';
@@ -84,6 +84,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
   if(guided&&!options.forerunner)throw Error('Native objective waypoints require Forerunner mission export.');
   const extractionBeats=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
   if(extractionBeats.length&&(!options.forerunner||extractionBeats.length!==1||studio.missions.at(-1)!==extractionBeats[0]||extractionBeats[0].conditionVolume!=null||extractionBeats[0].conditionResult!=null||extractionBeats[0].completeMission||extractionBeats[0].checkpoint))throw Error('Forerunner settled extraction must be the single final unconditional objective, without a checkpoint or level exit. Select its reviewed runtime; legacy engines cannot complete this callback.');
+  const extractionControl=extractionBeats[0]?.triggerRef;
   const early=extractionBeats[0]?.earlyExtraction===true;
   const lifecycle=extractionBeats[0]?.resetOnDeployment===true;
   const arrival=studio.missions[0];
@@ -196,7 +197,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
       }
       case 'forerunnerExtractionSettled': {
         const control=ensureName(beat.triggerRef??undefined,'Forerunner extraction control');
-        if(control!=='extraction_activate')throw Error('Forerunner contract 1 requires the native extraction_activate control.');
+        if(!missionExtractionFields.some(field=>field.control===control)||scope&&control!=='extraction_activate')throw Error('Choose a supported Forerunner evacuation control for this mission scope.');
         deps.push('forerunner_extraction:'+control);const settled='gs_settled_'+(i+1),armed='gs_extraction_armed';
         globals.push('(global boolean '+armed+' false)','(global boolean '+settled+' false)');
         if(scope){
@@ -205,7 +206,9 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         }else{
           manualSetters.push('(script dormant forerunner_extraction_complete',...(guided?['  (if '+armed+' (begin','    (set gs_nav_stage 0)','    (set '+settled+' true)','  ))']:['  (if '+armed+' (set '+settled+' true))']),')','');
           if(early){
-            manualSetters.push('(script dormant gs_optional_contracts',...scripted.splice(optionalStart),')','');
+            const optionalBody=scripted.splice(optionalStart);
+            if(!optionalBody.some(line=>line.trimStart().startsWith('(')))optionalBody.push('  (sleep 1)');
+            manualSetters.push('(script dormant gs_optional_contracts',...optionalBody,')','');
             scripted.push('  (if (not '+settled+') (wake gs_optional_contracts))','  (sleep_until '+settled+' 1)',
               '  (sleep -1 gs_optional_contracts)','  (show_hud_help_text false)');
           }else scripted.push('  (set '+armed+' true)','  (device_set_power '+control+' 1)','  (sleep_until '+settled+' 1)');
@@ -283,7 +286,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
         scripted.push(...wait('(= (ai_living_count '+ref+') 0)',15));break;
       }
     }
-    if(early&&local===0)scripted.push('  (set gs_extraction_armed true)','  (device_set_power extraction_activate 1)');
+    if(early&&local===0)scripted.push('  (set gs_extraction_armed true)','  (device_set_power '+extractionControl+' 1)');
     if(scope)scripted.push('  (if '+running+' (begin');
     scripted.push(...cueLines(beat,i,'complete'),...sceneCall(beat,i,'complete'));
     scripted.push('  (print "gs objective complete")');
@@ -347,7 +350,7 @@ function exportMissionFlow(studio:CreatorStudioDocument,options:MissionExportOpt
     ...(studio.missions.some(beat=>beat.trigger==='weaponOwned')?[scope?"Collection scans current issued squad participants, requerying each tick. Use a technology tag absent from starting loadouts. This does not bank or award inventory.":'Collection scans one actual native player inventory per tick, including later players. Any matching owned weapon satisfies this shared objective; use a unique technology tag absent from starting loadouts if only one pickup should qualify. No pickup, duplication, bank award or per-squad quest is fabricated.']:[]),
     ...(lifecycle?['Confirmed native deployments start this squad’s objectives and clear its authored AI encounters and objective state. Native abort closes an unsuccessful operation. No inventory, encounter seed or aircraft reset is added.']:[]),
     ...(early?['Evacuation opens after the first arrival objective. Later contracts are optional and unfinished objectives stop when the native one-shot settlement callback confirms return. The current shared mission does not reset those contracts on redeployment.']:[]),
-    ...(extractionBeats.length?[scope?"Forerunner-only squad operation: author the matching numbered terminal and unique readiness group, deployment/extraction volumes and hub starts. Readiness arms only after this squad finishes its objectives; the native callback confirms settlement. No global extraction control, reward writer, raid timer or teleport is added.":'Forerunner-only: enable its native Extraction mode and supply powered deployment control, initially unpowered extraction_activate, extraction_zone/extraction_return volumes and safe hub starts. The native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
+    ...(extractionBeats.length?[scope?"Forerunner-only squad operation: author the matching numbered terminal and unique readiness group, deployment/extraction volumes and hub starts. Readiness arms only after this squad finishes its objectives; the native callback confirms settlement. No global extraction control, reward writer, raid timer or teleport is added.":'Forerunner-only: enable its native Extraction mode and supply powered deployment control, the initially unpowered selected evacuation control and its matching field volume, extraction_return and safe hub starts. The native one-shot callback arrives only after actual survivor/gear settlement. No timer, reward writer, teleport or independent squad quest is added. Legacy runtime exports are refused.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='deviceActivated')?[scope?"Numbered squad deployment is detected through the native issued-participant query. Other terminal objectives observe shared control transitions; use independent controls when interaction must be isolated. Scripts may also activate controls; no terminal reset or inventory grant is added.":'Terminal objectives wait for the named native control below half position, then a new activation. Scripted device changes may also satisfy this shared scenario condition. This does not acquire an item, bank loot, reset a terminal or create independent squad state. Native use behavior and gameplay require testing.']:[]),
     ...(studio.missions.some(beat=>beat.trigger==='escort')?[scope?"Scoped rescue follows a current squad participant and uses its explicit encounter team, or preserves source teams when no override is selected. All surviving actors must reach the destination with the required minimum alive. Failure stops this operation or follows the authored rescue-result path. AI allegiance, navigation and multiplayer behavior require gameplay testing.":'Survivor escort places its source group and follows the closest players. Its selected encounter team applies; the legacy default assigns the native human team and player-human allegiance. All surviving actors must enter the destination with the configured minimum alive. Default casualty failure stops this mission script, not the world. Continue to failure handling records its result and skips its success cues/checkpoint; later result conditions select success or failure routes. A skipped rescue has no result. No loot or extraction settlement is awarded. Native navigation/gameplay and multiplayer behavior require testing.']:[]),
     ...(studio.missions.some(beat=>beat.soundCue)?['Radio cues use the complete imported native sound and its sound-class settings; the game selects permutations. They are unpositioned, shared scenario cues, not per-squad voice chat. Playback waits at most ten minutes; captions use the standard HUD help channel and can be replaced by other scripts. Editor audition does not prove game audio.']:[]),

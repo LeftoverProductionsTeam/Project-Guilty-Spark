@@ -330,6 +330,25 @@ it('connects Forerunner Black Echo to real ownership and settled-return source w
  const legacy=structuredClone(connected);legacy.quickForge!.runtimeId='mccSteam';await expect(attachNativeCampaignMission(legacy,'startup')).rejects.toThrow(/legacy/);
  const starting=structuredClone(connected);starting.studio!.missions[3].weaponPath=starting.quickForge!.startingProfile!.primaryWeapon;starting.quickForge!.placements[0].tagPath=starting.studio!.missions[3].weaponPath!;await expect(attachNativeCampaignMission(starting,'startup')).rejects.toThrow(/starting equipment/);
 });
+it('powers the selected native faction control for normal and early evacuation',()=>{
+ const studio=emptyCreatorStudio();
+ studio.missions=[
+  {id:'arrival',title:'Arrive',objective:'Reach the field',trigger:'triggerVolume',triggerRef:'extraction_spirit_zone',encounterName:''},
+  {id:'return',title:'Return',objective:'Bank gear',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_spirit_activate',encounterName:''},
+ ];
+ for(const earlyExtraction of [false,true]){
+  studio.missions[1].earlyExtraction=earlyExtraction;
+  const result=recoveredCampaignMission(studio,'startup',true);
+  expect(result.dependencies).toContain('forerunner_extraction:extraction_spirit_activate');
+  expect(result.content).toContain('(device_set_power extraction_spirit_activate 0)');
+  expect(result.content).toContain('(device_set_power extraction_spirit_activate 1)');
+  expect(result.content).not.toContain('(device_set_power extraction_activate');
+  expect(result.content).toContain('(script dormant forerunner_extraction_complete');
+  if(earlyExtraction)expect(result.content).toMatch(/\(script dormant gs_optional_contracts\r?\n  ;[^\r\n]+\r?\n  \(sleep 1\)\r?\n\)/);
+ }
+ studio.missions[1].triggerRef='extraction_wrong_activate';
+ expect(()=>recoveredCampaignMission(studio,'startup',true)).toThrow(/supported Forerunner evacuation control/);
+});
 it('refuses injected collection paths and early or conditional Forerunner settlement',()=>{
  const studio=emptyCreatorStudio();studio.missions=[{id:'collect',title:'Collect',objective:'Acquire',trigger:'weaponOwned',weaponPath:'bad" ) (ai_erase_all)',encounterName:''}];expect(()=>exportHaloCeMission(studio)).toThrow();
  studio.missions=[{id:'settle',title:'Return',objective:'Settle',trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',encounterName:'',conditionVolume:'branch'}];expect(()=>exportHaloCeMission(studio,{forerunner:true})).toThrow(/unconditional/);

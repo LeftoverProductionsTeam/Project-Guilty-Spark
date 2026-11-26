@@ -123,6 +123,12 @@ export function setNativeTransportSignals(doc:QuickForgeDocument,node:ForgeNode,
   if((vehicle.transportSignals===true)===enabled)return doc;
   return {...doc,logic:logicDocument(doc),placements:doc.placements.map(p=>{if(p.id!==vehicle.id)return p;const next={...p};next.transportSignals=enabled;return next;})};
 }
+/** Existing native field-control and transfer-volume pairs for recovered Forerunner campaign missions. */
+export const missionExtractionFields = [
+  {control:'extraction_activate', zone:'extraction_zone', label:'Shared evacuation'},
+  {control:'extraction_pelican_activate', zone:'extraction_pelican_zone', label:'UNSC Pelican'},
+  {control:'extraction_spirit_activate', zone:'extraction_spirit_zone', label:'Covenant Spirit'},
+] as const;
 /** Authoring-space review only. Native collision, use distance, source tags and
  * actual runtime admission still need independent native/game verification. */
 export function extractionLayout(doc:QuickForgeDocument,options:{activationPowered?:boolean}={}) {
