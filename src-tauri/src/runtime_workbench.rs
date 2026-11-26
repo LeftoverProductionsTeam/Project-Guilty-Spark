@@ -429,7 +429,7 @@ pub(super) struct WorkingScriptSources {
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub(super) struct WorkingMissionReview {objects:Option<Vec<core::maps::NativeNamedObject>>,object_issue:Option<String>,flags:Vec<core::maps::NativeCutsceneFlag>,extraction_squads:Vec<core::native_operations::NativeSquadTerminalSnapshot>,weapons:Vec<core::native_operations::NativeMissionWeapon>,encounters:Vec<core::native_operations::NativeMissionEncounter>,squads:Vec<core::native_operations::ScenarioSquadChoice>,devices:Vec<core::native_operations::NativeDevicePlacement>,protected_encounters:Vec<String>,escort_routes:Option<Vec<core::native_operations::NativeMovementRoute>>}
+pub(super) struct WorkingMissionReview {#[serde(skip_serializing_if="Vec::is_empty")] collector_advisories:Vec<String>,objects:Option<Vec<core::maps::NativeNamedObject>>,object_issue:Option<String>,flags:Vec<core::maps::NativeCutsceneFlag>,extraction_squads:Vec<core::native_operations::NativeSquadTerminalSnapshot>,weapons:Vec<core::native_operations::NativeMissionWeapon>,encounters:Vec<core::native_operations::NativeMissionEncounter>,squads:Vec<core::native_operations::ScenarioSquadChoice>,devices:Vec<core::native_operations::NativeDevicePlacement>,protected_encounters:Vec<String>,escort_routes:Option<Vec<core::native_operations::NativeMovementRoute>>}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub(super) struct WorkingCameraReview {tag_identity:String,cameras:Vec<maps::NativeCameraPoint>,script_names:Vec<String>,trigger_volumes:Vec<String>,scenario_type:u16}
@@ -466,6 +466,33 @@ fn working_script_inventory(state:&AppState,project_id:&str,build_id:&str,tags:&
     Ok((WorkingScriptSources{project_id:project.id,build_id:context.build.id,tags_directory:context.tags,
         project_fingerprint:fingerprint.into(),source_sha256:identity,modules,camera_review:None,transport_review:None,transport_recordings:None,mission_review:None},data.join(scenario.parent().unwrap_or(Path::new(""))).join("scripts")))
 }
+fn collector_advisories(state:&AppState,project:&Project,tags:&std::path::Path,scenario:&str)->Vec<String>{
+    let Some(studio)=&project.studio else{return vec![];};
+    let weapons:std::collections::BTreeSet<_>=studio.missions.iter().filter(|beat|beat.trigger=="weaponOwned")
+        .filter_map(|beat|beat.weapon_path.as_deref()).collect();
+    if weapons.is_empty(){return vec![];}
+    let Ok(factions)=core::native_operations::native_faction_snapshots(scenario) else{return vec![];};
+    let bodies=factions.iter().filter_map(|entry|{
+        let body=entry.body.as_ref()?;
+        let biped=format!("{}.biped",body.biped_tag_path);
+        let source=native_operations_native::fields(state,project,tags,&biped).ok()?;
+        let graph=core::native_operations::native_biped_animation_graph(&source).ok()??;
+        let labels=native_operations_native::standing_weapon_labels(state,project,tags,&format!("{graph}.model_animations")).ok()?;
+        Some((&entry.kit.faction,&body.biped_tag_path,labels))
+    }).collect::<Vec<_>>();
+    if bodies.is_empty(){return vec![];}
+    let mut issues=vec![];
+    for weapon in weapons{
+        let Ok(label)=native_operations_native::weapon_animation_label(state,project,tags,&format!("{weapon}.weapon")) else{continue;};
+        for (faction,body,labels) in &bodies{
+            if !labels.iter().any(|known|known.eq_ignore_ascii_case(&label)){
+                issues.push(format!("{weapon} uses animation label {label}. The {faction} body {body} has no matching standing weapon animation."));
+            }
+        }
+    }
+    issues
+}
+
 #[tauri::command]
 pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:String,expected_build_id:String,
     expected_source_directory:PathBuf,expected_project_fingerprint:String,include_cameras:Option<bool>,include_transport:Option<bool>,include_mission:Option<bool>)->Reply<WorkingScriptSources> {
@@ -482,7 +509,7 @@ pub(super) async fn working_script_sources(app:tauri::AppHandle,project_id:Strin
             if include_mission==Some(true){
                 let mission=core::native_operations::native_mission_source(&values).map_err(error)?;
                 let(objects,object_issue)=match core::native_operations::native_guidance_objects(&values){Ok(rows)=>(Some(rows),None),Err(issue)=>(None,Some(error(issue)))};
-                view.mission_review=Some(WorkingMissionReview{objects,object_issue,flags:core::native_operations::scenario_flag_choices(&values).map_err(error)?,extraction_squads:if context.build.target=="gbx-custom"{core::native_operations::native_squad_terminal_snapshots(&values).map_err(error)?}else{vec![]},weapons:mission.weapons,encounters:mission.encounters,squads:core::native_operations::scenario_squad_choices(&values).map_err(error)?,devices:core::native_operations::scenario_device_choices(&values).map_err(error)?,protected_encounters:native_operations_native::protected_mission_encounters(&state,&project,&context.build)?.into_iter().collect(),escort_routes:core::native_operations::native_escort_routes(&values).ok()});
+                view.mission_review=Some(WorkingMissionReview{collector_advisories:collector_advisories(&state,&project,&context.tags,&values),objects,object_issue,flags:core::native_operations::scenario_flag_choices(&values).map_err(error)?,extraction_squads:if context.build.target=="gbx-custom"{core::native_operations::native_squad_terminal_snapshots(&values).map_err(error)?}else{vec![]},weapons:mission.weapons,encounters:mission.encounters,squads:core::native_operations::scenario_squad_choices(&values).map_err(error)?,devices:core::native_operations::scenario_device_choices(&values).map_err(error)?,protected_encounters:native_operations_native::protected_mission_encounters(&state,&project,&context.build)?.into_iter().collect(),escort_routes:core::native_operations::native_escort_routes(&values).ok()});
             }
             if include_transport==Some(true){
                 let mut choices=core::native_operations::scenario_transport_choices(&values).map_err(error)?;

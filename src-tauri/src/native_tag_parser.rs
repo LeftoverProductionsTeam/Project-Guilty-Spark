@@ -64,6 +64,28 @@ pub(super) fn animation_seats(executable:&Path,tags:&Path,relative:&str)->Reply<
     let(valid,text,cut)=read_keys(executable,tags,relative,&keys)?;if !valid||cut{return Err(format!("Native animation seat labels unavailable: {}",text.chars().take(240).collect::<String>()));}
     let labels=text.lines().map(str::to_owned).collect::<Vec<_>>();if labels.len()!=count||labels.iter().any(|label|label.len()>31||label.chars().any(char::is_control)){return Err("Native animation seat labels differ from their count or shape".into());}Ok(labels)
 }
+pub(super) fn weapon_animation_label(executable:&Path,tags:&Path,relative:&str)->Reply<String>{
+    let (valid,text,cut)=read_keys(executable,tags,relative,&["-G".into(),"label".into()])?;
+    let label=text.trim();
+    if !valid||cut||label.is_empty()||label.len()>31||label.chars().any(char::is_control){
+        return Err("Native weapon animation label is unavailable".into());
+    }
+    Ok(label.to_string())
+}
+pub(super) fn standing_weapon_labels(executable:&Path,tags:&Path,relative:&str)->Reply<Vec<String>>{
+    let seats=animation_seats(executable,tags,relative)?;
+    let keys=seats.iter().enumerate().filter(|(_,seat)|seat.eq_ignore_ascii_case("stand")).flat_map(|(index,_)|
+        ["-G".into(),format!("units[{index}].weapons[*].weapon_types[*].label")]).collect::<Vec<String>>();
+    if keys.is_empty(){return Ok(vec![]);}
+    let (valid,text,cut)=read_keys(executable,tags,relative,&keys)?;
+    if !valid||cut{return Err("Native standing weapon animation labels are unavailable".into());}
+    let labels=text.lines().map(str::trim).filter(|value|!value.is_empty()).collect::<Vec<_>>();
+    if labels.len()>1024||labels.iter().any(|label|label.len()>31||label.chars().any(char::is_control)){
+        return Err("Native standing weapon labels exceed their bounds".into());
+    }
+    Ok(labels.into_iter().map(str::to_string).collect())
+}
+
 fn read_keys(executable:&Path,tags:&Path,relative:&str,keys:&[String])->Reply<(bool,String,bool)>{read_keys_mode(executable,tags,relative,keys,false)}
 // Full native deserialization and field traversal, bounded in time and total
 // bytes. Hash every emitted field instead of retaining a truncated listing.

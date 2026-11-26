@@ -1565,6 +1565,10 @@ pub struct NativeMissionSource {pub encounters:Vec<NativeMissionEncounter>,pub w
 /// Current native placements and every starting profile, never a stale cache's
 /// palette alone. This is source selection, not a claim that an item spawns.
 /// One checked native reader reference shape, shared by weapons and pilot chains.
+pub fn native_biped_animation_graph(fields:&str)->Result<Option<String>> {
+    native_dependency_path(fields,"animation_graph","model_animations")
+}
+
 fn native_dependency_path(root:&str,key:&str,extension:&str)->Result<Option<String>>{
  let prefix=format!("{key} (");let lines=root.lines().collect::<Vec<_>>();
  // Invader's actual listing prints an empty dependency without parentheses.

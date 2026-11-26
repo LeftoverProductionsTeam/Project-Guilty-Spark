@@ -423,6 +423,12 @@ pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str
 pub(super) fn animation_seats(state:&AppState,project:&Project,tags:&Path,tag:&str)->Reply<Vec<String>>{
     checked_read(state,project,tags,tag,native_tag_parser::animation_seats)
 }
+pub(super) fn weapon_animation_label(state:&AppState,project:&Project,tags:&Path,tag:&str)->Reply<String>{
+    checked_read(state,project,tags,tag,native_tag_parser::weapon_animation_label)
+}
+pub(super) fn standing_weapon_labels(state:&AppState,project:&Project,tags:&Path,tag:&str)->Reply<Vec<String>>{
+    checked_read(state,project,tags,tag,native_tag_parser::standing_weapon_labels)
+}
 fn checked_read<T>(state:&AppState,project:&Project,tags:&Path,tag:&str,read:impl FnOnce(&Path,&Path,&str)->Reply<T>)->Reply<T>{
     let file = tags.join(core::safe_relative(tag).map_err(error)?);
     let before = maps::hash_file(&file).map_err(error)?;
