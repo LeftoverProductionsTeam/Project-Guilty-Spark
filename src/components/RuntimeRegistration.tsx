@@ -362,6 +362,7 @@ export default function Registration({
                 {target.max_player_starts != null && ` · ${target.max_player_starts.toLocaleString()} player starts`}
                 {target.max_netgame_equipment != null && ` · ${target.max_netgame_equipment.toLocaleString()} pickups`}
                 {target.max_netgame_flags != null && ` · ${target.max_netgame_flags.toLocaleString()} multiplayer flags`}
+                {' · '}{target.max_sky_references ?? 8} sky slots
                 {target.required_feature && <> · Requires <code>{target.required_feature}</code></>}
               </li>)}
             </ul>

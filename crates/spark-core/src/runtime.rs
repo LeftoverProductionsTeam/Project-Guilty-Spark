@@ -281,7 +281,7 @@ pub struct CapabilityEvidence {
         review.capabilities.map_targets.push(CompanionMapTarget {
             cache_version: 13, tag_space_bytes: 64 * 1024 * 1024,
             invader_engine: "mcc-cea".into(), required_feature: Some(feature.clone()), is_default: false,
-            max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
+            max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None, max_sky_references: None,
         });
         assert!(GameplayLimits::for_review(&review).is_err());
         review.capabilities.native_features.push(feature);
@@ -318,11 +318,11 @@ pub struct CapabilityEvidence {
         let mut current = previous.clone();
         let classic = CompanionMapTarget {
             cache_version: 609, tag_space_bytes: 23 << 20, invader_engine: "gbx-custom".into(),
-            required_feature: None, is_default: true, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
+            required_feature: None, is_default: true, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None, max_sky_references: None,
         };
         let expanded = CompanionMapTarget {
             cache_version: 13, tag_space_bytes: 64 << 20, invader_engine: "mcc-cea".into(),
-            required_feature: Some("maps.mcc13_tag_space_64m.v1".into()), is_default: false, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None,
+            required_feature: Some("maps.mcc13_tag_space_64m.v1".into()), is_default: false, max_netgame_flags: None, max_player_starts: None, max_netgame_equipment: None, max_sky_references: None,
         };
         current.map_targets = vec![classic, expanded];
         current.profile_machine().unwrap();
@@ -337,7 +337,24 @@ pub struct CapabilityEvidence {
         current.map_targets[1].max_netgame_equipment = Some(512);
         current.validate().unwrap();
         assert!(current.matches_reviewed(&flags_only));
+        current.map_targets[0].max_sky_references = Some(8);
+        current.map_targets[1].max_sky_references = Some(16);
+        assert!(current.validate().is_err());
+        current.native_features.push("maps.mcc13_sky_slots_16.v1".into());
+        current.validate().unwrap();
         let reviewed = current.clone();
+        assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_sky_references"], 16);
+        current.map_targets[0].max_sky_references = Some(16);
+        assert!(current.validate().is_err());
+        current.map_targets[0].max_sky_references = Some(8);
+        current.map_targets[1].max_sky_references = Some(17);
+        assert!(current.validate().is_err());
+        current.map_targets[1].max_sky_references = Some(8);
+        assert!(!current.matches_reviewed(&reviewed));
+        current.map_targets[1].max_sky_references = Some(16);
+        let mut old_sky_review = reviewed.clone();
+        for target in &mut old_sky_review.map_targets { target.max_sky_references = None; }
+        assert!(current.matches_reviewed(&old_sky_review));
         assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_player_starts"], 1024);
         assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_netgame_equipment"], 512);
         current.map_targets[1].max_netgame_equipment = None;
@@ -427,6 +444,8 @@ pub struct CompanionMapTarget {
     pub max_player_starts: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_netgame_equipment: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_sky_references: Option<u16>,
     #[serde(rename = "default")]
     pub is_default: bool,
 }
@@ -463,6 +482,10 @@ impl CompanionCapabilities {
                 row.required_feature.as_deref().is_some_and(|name| !identifier(name)) ||
                 [row.max_netgame_flags, row.max_player_starts, row.max_netgame_equipment].into_iter()
                     .flatten().any(|limit| !(1..=32767).contains(&limit)) ||
+                row.max_sky_references.is_some_and(|limit| {
+                    !(1..=16).contains(&limit) || (limit > 8 && (row.cache_version != 13 ||
+                        !self.native_features.iter().any(|feature| feature == "maps.mcc13_sky_slots_16.v1")))
+                }) ||
                 !targets.insert((row.cache_version, row.invader_engine.as_str()))
             });
         if invalid_targets || !(1..=1000).contains(&self.simulation_hz) ||
@@ -498,6 +521,9 @@ impl CompanionCapabilities {
                 }
                 if saved.max_netgame_equipment.is_none() {
                     current.max_netgame_equipment = None;
+                }
+                if saved.max_sky_references.is_none() {
+                    current.max_sky_references = None;
                 }
             }
         }
