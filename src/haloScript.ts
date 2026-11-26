@@ -1070,7 +1070,7 @@ export const nativeTransportPrefix='; Spark native transport controller v1\n';
 export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExport {
   return generateNativeTransport(options);
 }
-function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false):ScriptExport {
+function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false,legacyFlightHold=false):ScriptExport {
   if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','pickupCue','hoverFieldTransfer','returnAfterInsertion','emptyInbound','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats','recordings'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
@@ -1196,11 +1196,15 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
   const clearHover = '  (vehicle_hover '+craft+' false)';
   const hasRecordedFlight = legs.some(leg => nativeTransportRecording(options, leg));
   const awaitPlayback = ['  (sleep (recording_time '+craft+'))', '  (sleep 1)'];
-  const playRecording = (name: string) =>
-    '  (if (not (recording_play_and_hover '+craft+' '+name+')) (sleep -1))';
+  const playRecording = (name: string, holdAtEnd: boolean) => {
+    const command = holdAtEnd ? 'recording_play_and_hover' : 'recording_play';
+    return '  (if (not ('+command+' '+craft+' '+name+')) (sleep -1))';
+  };
+  const holdEveryClip = !options.hoverFieldTransfer || legacyFlightHold;
+  const holdAtArrival = (leg: NativeTransportLeg) => holdEveryClip || leg === 'outbound';
   const arriveAt=(volume:string,leg:NativeTransportLeg)=>{
     const recording = nativeTransportRecording(options, leg);
-    const finish = recording ? [...awaitPlayback, ...(recording.hover ? [clearHover, playRecording(recording.landing), ...awaitPlayback] : [])] : [];
+    const finish = recording ? [...awaitPlayback, ...(recording.hover ? [clearHover, playRecording(recording.landing, holdAtArrival(leg)), ...awaitPlayback] : [])] : [];
     return [...finish,waitFor(pad(volume)),...setPilotStandby(true)];
   };
   const boarded='(> (device_group_get '+craft+'_boarded) 0.5)',called='(> (device_group_get '+craft+'_called) 0.5)';
@@ -1215,7 +1219,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
     ...(close?[enter(false)]:[]),...beforeCue,
     ...(!options.holdParkedPilot&&close?departureCue:[]),...afterCue,
     ...(recording
-      ? [clearHover, playRecording(recording.hover ?? recording.landing)]
+      ? [clearHover, playRecording(recording.hover ?? recording.landing, holdEveryClip || (!recording.hover && holdAtArrival(leg)))]
       : [...(hasRecordedFlight ? [clearHover] : []),...setPilotStandby(false),'  (ai_command_list '+pilot+' '+routeFor(leg)+')']),
   ];};
   const lines=[nativeTransportPrefix.trimEnd(),'; configuration: '+JSON.stringify(options),...heading('Native '+role+' insertion and evacuation'),
@@ -1311,6 +1315,10 @@ export function readNativeTransportSource(content:string):NativeTransportOptions
   // Never rewrite stored source merely by opening it, or accept unrelated hand edits.
   const legacySeatCast=(source:string)=>source.replace(/\(vehicle_test_seat_list (extraction_(?:pelican|spirit)) /g,'(vehicle_test_seat_list (unit $1) ');
   if(expected===content||legacySeatCast(expected)===content)return options;
+  if(options.hoverFieldTransfer){
+    const previous=generateNativeTransport(options,false,true).content;
+    if(previous===content||legacySeatCast(previous)===content)return options;
+  }
   if(options.holdParkedPilot){
     const previous=generateNativeTransport(options,true).content;
     if(previous===content||legacySeatCast(previous)===content)return options;

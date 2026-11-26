@@ -39,7 +39,7 @@ import type {
   ToolLaunchPlan,
   ToolProcessView,
 } from '../runtimeWorkbench';
-import { availabilityLabel, evidenceLabel, nativeTransportRouteIssue, nativeTransportRecordingIssue, runtimeNames } from '../runtimeWorkbench';
+import { availabilityLabel, evidenceLabel, nativeRegionalTransportIssue, nativeTransportRouteIssue, nativeTransportRecordingIssue, nativeTransportSourceKind, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import { integrityBlocks, type NativeTagIntegrityReport } from '../nativeTagIntegrity';
@@ -214,6 +214,7 @@ export default function RuntimeDock({
     window.addEventListener('guilty-spark-open-native-mission',open);return()=>window.removeEventListener('guilty-spark-open-native-mission',open);
   },[project?.id]);
   const nativeCameras=modules?.cameraReview;
+  const transportSourceKind=nativeTransportSourceKind(report?.workingSource?.target,nativeCameras?.scenarioType,nativeCameras?.triggerVolumes??[]);
   const takeCamera=nativeCameras?.cameras.find(p=>String(p.index)===cinematicCamera)??nativeCameras?.cameras[0];
   const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.tagIdentity===nativeCameras?.tagIdentity&&cinematicPlan.shotsKey===nativeCinematicTakeKey(project?.studio)&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
   const nativeCinematicDraft=selectedScript?.content.startsWith(nativeCinematicPrefix)??false;
@@ -232,7 +233,8 @@ export default function RuntimeDock({
     return null;
   }
   function transportRouteIssue(options:NativeTransportOptions){
-    return nativeTransportRecordingIssue(options, modules?.transportRecordings)
+    return (transportSourceKind==='regional'?nativeRegionalTransportIssue(options):null)
+      ?? nativeTransportRecordingIssue(options, modules?.transportRecordings)
       ?? nativeTransportRouteIssue(options,nativeCameras?.triggerVolumes??[],modules?.transportReview?.flightRoutes);
   }
   function updateTransportRecording(leg: NativeTransportLeg, landing: string, hover?: string) {
@@ -300,7 +302,7 @@ export default function RuntimeDock({
       ['_boarded','_called','_landed'].every(suffix=>refs.groups.includes(name+suffix));
   }
   let currentTransportIdentity:string|null=null, transportDraftSeatsChanged=false;
-  if(nativeTransportDraft&&nativeCameras&&report?.workingSource?.target==='gbx-custom'&&nativeCameras.scenarioType===0){
+  if(nativeTransportDraft&&nativeCameras&&transportSourceKind){
     try{
       const options=readNativeTransportSource(selectedScript!.content);
       transportDraftSeatsChanged=!!modules?.transportReview&&!transportSeatsMatch(options);
@@ -719,7 +721,7 @@ export default function RuntimeDock({
     const request=++moduleRequest.current,selection=++scriptSelection.current,key=scriptSourceKey,options=transport,draft=input.scenarioScriptDraft;
     setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
     try{
-      if(source.target!=='gbx-custom'||review.scenarioType!==0)throw Error('Transport controllers need reviewed CE609 solo source for Forerunner. Other engines do not drive these signals.');
+      if(!nativeTransportSourceKind(source.target,review.scenarioType,review.triggerVolumes))throw Error('Review CE609 solo source or MCC13 multiplayer source with both native MegaWorld faction hubs.');
       const occupancySeats=reviewedTransportSeats(options);
       if(!occupancySeats)throw Error('Read native transport source with a complete set of unique, named aircraft seats.');
       const reviewed={...options,occupancySeats};
@@ -1176,7 +1178,7 @@ export default function RuntimeDock({
               <p className="subtle">Author native insertion and evacuation using existing named aircraft, pilot AI, command lists and pad volumes. Spark prepares an ordinary .hsc module in the same project draft; Forerunner owns deployment, physical boarding and durable banking. No mandatory raid timer.</p>
               <button disabled={!native||busy||working||moduleBusy||dirty} onClick={()=>void listScriptModules(true,true)}>Read native transport source</button>
               {nativeTransportDraft&&<div className="button-row"><button type="button" disabled={busy||working||moduleBusy} onClick={()=>{try{setTransport(readNativeTransportSource(selectedScript!.content));}catch(problem){setError(String(problem));}}}>Load transport configuration from draft</button><button type="button" disabled={busy||working||moduleBusy} onClick={()=>{if(selectedScript)keepScriptDraft({...selectedScript,content:selectedScript.content.slice(nativeTransportPrefix.length),reviewed:false});}}>Use transport draft as manual HaloScript</button></div>}
-              {nativeCameras&&<fieldset disabled={busy||working||moduleBusy||dirty||report.workingSource?.target!=='gbx-custom'||nativeCameras.scenarioType!==0}>
+              {nativeCameras&&<fieldset disabled={busy||working||moduleBusy||dirty||!transportSourceKind}>
                 <label>Aircraft faction<select aria-label="Transport faction" value={transport.faction} onChange={event=>setTransport({...transport,faction:event.target.value as NativeTransportOptions['faction']})}><option value="unsc">UNSC · Pelican</option><option value="covenant">Covenant · Spirit</option></select></label>
                 {([['pilot','Pilot encounter / squad'],['pilotSeat','Pilot native seat label'],['outbound','Insertion command list'],['inbound','Return command list'],['hub','Hub pad volume'],['field','Landing pad volume']] as const).map(([field,label])=>{
                   const refs=modules?.transportReview;
@@ -1256,7 +1258,7 @@ export default function RuntimeDock({
                 {transportDraftSeatsChanged&&<Notice>The saved draft uses different aircraft seats. Prepare a new transport script draft to review the current seats.</Notice>}
                 <button type="button" disabled={!reviewedTransportSeats(transport)||!!transportCrewIssue(transport)||!!transportCameraIssue(transport)||!!transportPilotIssue(transport)||!!transportFlightIssue(transport)||!!transportRouteIssue(transport)||!!transport.createPilot&&!modules?.transportReview?.scriptCreatedPilots?.includes(transport.pilot)} onClick={()=>void prepareTransportSource()}>Prepare transport script draft</button>
               </fieldset>}
-              <p className="subtle">Use CE609 solo source. Create pilot AI and real seats with the existing AI/tag tools; routes with AI & scenario → Edit native scenario & assets → Map scenario → Existing AI command lists. Pad volumes must already exist. Read native transport source again after restarting or changing source; generated builds pin the current tag identity. Load transport configuration from draft restores its saved choices. Bind the matching craft and three dedicated boarding/recall/landing groups. The source waits for both real landing and its pad; it never treats hover or time as arrival. Optional camera/dialogue functions must already exist and end cinematics. Players disembark normally; returning craft stays closed until Forerunner wakes its crew-settlement callback. Native compilation checks references; pilot failure/recovery, clearances, repeat trips and multiplayer need actual game acceptance. Hand-edited modules are preserved and require Edit selected module.</p>
+              <p className="subtle">Use CE609 solo source or MCC13 multiplayer source with both native MegaWorld faction hubs. MegaWorld authoring uses recorded field hover and grounded return for private Forerunner tests. Bind the aircraft, pilot, seats and dedicated boarding, recall and arrival groups. Read native transport source after edits. In-game arrival, passenger clearance and banking depend on Forerunner. Use Edit selected module for handwritten source.</p>
             </details>
             {(!project.quickForge||project.quickForge.native)&&<details className="native-recovered-mission-source" open={recoveredMissionOpen} onToggle={event=>setRecoveredMissionOpen(event.currentTarget.open)}><summary>Recovered campaign mission source</summary>
               <p>Use saved Mission Director objectives with this native solo scenario. Read the current references, prepare, Save and review the draft, then Attach source &amp; compile. Native camera points own their poses; use the existing cinematic/source tools to edit them. Missing dependencies stop the build.</p>

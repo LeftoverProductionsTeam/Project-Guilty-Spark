@@ -204,6 +204,27 @@ export function nativeTransportRecordingIssue(
   return null;
 }
 
+export function nativeTransportSourceKind(target: string | undefined, scenarioType: number | undefined, volumes: readonly string[]) {
+  if (target === 'gbx-custom' && scenarioType === 0) return 'solo';
+  if (target === 'mcc-cea' && scenarioType === 1 &&
+      ['extraction_unsc_hub', 'extraction_covenant_hub'].every(name => volumes.filter(volume => volume === name).length === 1)) {
+    return 'regional';
+  }
+  return null;
+}
+
+export function nativeRegionalTransportIssue(options: NativeTransportOptions): string | null {
+  const role = options.faction === 'unsc' ? 'pelican' : 'spirit';
+  if (options.hub !== role + '_return' || options.field !== 'extraction_' + role + '_zone') {
+    return 'Select the dedicated ' + role + ' return and field volumes required by private MegaWorld Extraction.';
+  }
+  if (!options.hoverFieldTransfer || !options.returnAfterInsertion ||
+      nativeTransportLegs(options).some(leg => !nativeTransportRecording(options, leg))) {
+    return 'Private MegaWorld Extraction requires recorded field hover, a grounded return recording, and empty return before recall.';
+  }
+  return null;
+}
+
 export function nativeTransportRouteIssue(
   options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound' | 'recordings'>,
   volumes: readonly string[],

@@ -361,7 +361,16 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
     crew:[{group:faction==='unsc'?'be_marines':'be_covenant',seat:'passenger_1',releaseAtInsertion:true}]};
    const hover=exportHaloCeTransport(hoverOptions);
    assert.deepEqual(readNativeTransportSource(hover.content),hoverOptions);
+   const previousHover=hover.content.replaceAll('(recording_play extraction_', '(recording_play_and_hover extraction_');
+   assert.deepEqual(readNativeTransportSource(previousHover),hoverOptions);
    assert.ok(hover.content.includes('(script static boolean gs_'+role+'_hover_field true)'));
+   const recordCall=(command,clip)=>'('+command+' extraction_'+role+' '+clip+'_'+role+')';
+   assert.ok(hover.content.includes(recordCall('recording_play','approach')));
+   assert.equal(hover.content.split(recordCall('recording_play_and_hover','land')).length,3);
+   for(const clip of ['approach','return','empty']){
+    assert.ok(hover.content.includes(recordCall('recording_play',clip)));
+    assert.ok(!hover.content.includes(recordCall('recording_play_and_hover',clip)));
+   }
    assert.ok(hover.content.includes('(vehicle_unload extraction_'+role+' "passenger_1")'));
    assert.ok(hover.content.includes('(gs_pickup_'+role+')'));
    assert.ok(!hover.content.includes('(vehicle_unload extraction_'+role+' "rider")'));
@@ -373,10 +382,13 @@ if(process.env.SPARK_NATIVE_TRANSPORT==='1'){
   const cuesFile=path.join(data,'scripts','test_hover_cues.hsc');
   await fs.writeFile(cuesFile,'(script static void gs_pickup_pelican (sleep 1))\n(script static void gs_pickup_spirit (sleep 1))\n');
   await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
+  await run('invader-edit',['-S','type','multiplayer',scenario]);
+  await run('invader-script',['-d',data,'-g','mcc-cea','-E','transport']);
   await fs.unlink(cuesFile);
   const compiledTransport=(await run('invader-edit',['-G','scripts[*].name',scenario])).split(/\r?\n/);
   assert.ok(['gs_pelican_trip','gs_spirit_trip','gs_pelican_hover_field','gs_spirit_hover_field'].every(name=>compiledTransport.includes(name)));
   // Restore the established AI-route fixture for recovery and mission composition below.
+  await run('invader-edit',['-S','type','singleplayer',scenario]);
   await Promise.all(transportFiles.map((file,index)=>fs.writeFile(file,priorTransport[index])));
   await run('invader-script',['-d',data,'-g','gbx-custom','-E','transport']);
   console.log('PASS: installed Invader compiled both recorded transport controllers and preserved grounded pad guards');

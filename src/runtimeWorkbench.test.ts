@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canHandoff, listingExpired, nativeTransportRecordingIssue, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
+import { canHandoff, listingExpired, nativeRegionalTransportIssue, nativeTransportSourceKind, nativeTransportRecordingIssue, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
 import type { CommunityJoinAssessment, CommunityListingView } from './runtimeWorkbench';
 
 const view: CommunityListingView = {
@@ -81,6 +81,23 @@ describe('native Extraction route review', () => {
     returnAfterInsertion: true,
     emptyInbound: 'empty',
   };
+
+  it('admits only the private MCC13 faction hubs and requires recorded transfers', () => {
+    const hubs = ['extraction_unsc_hub', 'extraction_covenant_hub'];
+    expect(nativeTransportSourceKind('gbx-custom', 0, [])).toBe('solo');
+    expect(nativeTransportSourceKind('mcc-cea', 1, hubs)).toBe('regional');
+    expect(nativeTransportSourceKind('mcc-cea', 1, hubs.slice(0, 1))).toBeNull();
+    expect(nativeTransportSourceKind('mcc-cea', 1, [...hubs, hubs[0]])).toBeNull();
+    expect(nativeTransportSourceKind('mcc-cea', 0, hubs)).toBeNull();
+
+    const options = {
+      ...legacy, pilot: 'pilot', pilotSeat: 'P-driver', hub: 'pelican_return', field: 'extraction_pelican_zone', hoverFieldTransfer: true,
+      recordings: { outbound: { landing: 'field' }, inbound: { landing: 'occupied_return' }, emptyInbound: { landing: 'empty_return' } },
+    };
+    expect(nativeRegionalTransportIssue(options)).toBeNull();
+    expect(nativeRegionalTransportIssue({ ...options, faction: 'covenant' })).toContain('spirit');
+    expect(nativeRegionalTransportIssue({ ...options, recordings: { outbound: options.recordings.outbound } })).toContain('recorded');
+  });
 
   it('checks embedded recording identity and the native pad for a mixed flight', () => {
     const options = {
