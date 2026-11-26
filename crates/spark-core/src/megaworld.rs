@@ -77,6 +77,144 @@ impl Layout {
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BurialReview {
+    pub footprint_area: f64,
+    pub uncovered_area: f64,
+    pub roof_z: f64,
+    pub cover_z: Option<f64>,
+    pub suggested_translation_z: Option<f64>,
+}
+
+/// Review the whole projected roof rectangle against actual upward-facing
+/// native collision surfaces. This is cover geometry, separate from checking
+/// the doorway, interior clearances, or terrain between the two layers.
+pub fn review_burial(
+    surface: &LayoutRegion, interior: &LayoutRegion,
+    surface_cache: (&Path, &MapInspection), interior_cache: (&Path, &MapInspection),
+    clearance: f64,
+) -> Result<BurialReview> {
+    let checked_mesh = |region: &LayoutRegion, (path, map): (&Path, &MapInspection)| -> Result<_> {
+        if map.sha256 != region.cache_sha256 || map.header.version != region.cache_version {
+            return invalid("The owned source differs from the saved Atlas region. Rebind its original cache.");
+        }
+        let (mesh, faces) = maps::collision_source(path, map)?;
+        let part = mesh.parts.get(region.bsp_index).ok_or_else(||
+            crate::SparkError::Invalid("The saved Atlas BSP is unavailable in its source.".into()))?;
+        let mut low = [f64::INFINITY; 3];
+        let mut high = [f64::NEG_INFINITY; 3];
+        for &index in &mesh.indices[part.index_start..part.index_start + part.index_count] {
+            for axis in 0..3 {
+                let coordinate = f64::from(mesh.positions[index as usize * 3 + axis]);
+                low[axis] = low[axis].min(coordinate);
+                high[axis] = high[axis].max(coordinate);
+            }
+        }
+        if part.index_count == 0 || (0..3).any(|axis|
+            (low[axis]-region.minimum[axis]).abs() > 0.002 || (high[axis]-region.maximum[axis]).abs() > 0.002) {
+            return invalid("The saved Atlas bounds differ from native collision. Re-add this region from its owned source.");
+        }
+        Ok((mesh, faces))
+    };
+    checked_mesh(interior, interior_cache)?;
+    let (mesh, faces) = checked_mesh(surface, surface_cache)?;
+    review_burial_geometry(surface, interior, &mesh, &faces, clearance)
+}
+
+fn review_burial_geometry(
+    surface: &LayoutRegion, interior: &LayoutRegion, mesh: &MeshData,
+    faces: &[maps::CollisionFace], clearance: f64,
+) -> Result<BurialReview> {
+    use manifold_rust::{cross_section::CrossSection, linalg::Vec2};
+    if surface.underground || !interior.underground || surface.region_id == interior.region_id
+        || !clearance.is_finite() || !(0.1..=64.).contains(&clearance) {
+        return invalid("Choose different surface and underground regions and a roof clearance from 0.1 to 64 world units.");
+    }
+    let left = interior.minimum[0];
+    let bottom = interior.minimum[1];
+    let width = interior.maximum[0] - left;
+    let length = interior.maximum[1] - bottom;
+    if width <= 0. || length <= 0. {
+        return invalid("The underground source has no roof footprint to review.");
+    }
+
+    let rotate = |[x, y]: [f64; 2], (sin, cos): (f64, f64)| [x * cos - y * sin, x * sin + y * cos];
+    let basis = (surface.yaw_degrees - interior.yaw_degrees).to_radians().sin_cos();
+    let offset = rotate([surface.translation[0] - interior.translation[0],
+        surface.translation[1] - interior.translation[1]], (-interior.yaw_degrees).to_radians().sin_cos());
+    let geometry = &mesh.parts[surface.bsp_index];
+    let mut triangles = Vec::new();
+    let mut lowest = f64::INFINITY;
+    let mut highest = f64::NEG_INFINITY;
+
+    let range = geometry.index_start..geometry.index_start + geometry.index_count;
+    for (face, indices) in faces[range.start / 3..range.end / 3].iter().zip(mesh.indices[range].chunks_exact(3)) {
+        // Match the native entrance selector: invisible/no-material boundary
+        // planes can seal the map, but they are not a terrain roof.
+        if face.shader.is_none() || face.flags & 2 != 0 {
+            continue;
+        }
+        let triangle: [[f64; 3]; 3] = std::array::from_fn(|vertex| {
+            let index = indices[vertex] as usize * 3;
+            let [x,y,z] = [mesh.positions[index], mesh.positions[index + 1], mesh.positions[index + 2]].map(f64::from);
+            let [x,y] = rotate([x,y], basis);
+            [x + offset[0] - left, y + offset[1] - bottom, z + surface.translation[2]]
+        });
+        if triangle.iter().all(|p| p[0] < 0.) || triangle.iter().all(|p| p[0] > width)
+            || triangle.iter().all(|p| p[1] < 0.) || triangle.iter().all(|p| p[1] > length) {
+            continue;
+        }
+        let a: [f64;3] = std::array::from_fn(|axis| triangle[1][axis] - triangle[0][axis]);
+        let b: [f64;3] = std::array::from_fn(|axis| triangle[2][axis] - triangle[0][axis]);
+        let cross = [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+        if cross[2] <= 0. || cross[2] < 0.65 * cross.iter().map(|component| component * component).sum::<f64>().sqrt() {
+            continue;
+        }
+        for point in &triangle {
+            lowest = lowest.min(point[2]);
+            highest = highest.max(point[2]);
+        }
+        triangles.push(triangle);
+    }
+    let footprint = CrossSection::square_vec2(Vec2::new(width, length), false);
+    let exposed_area = |floor_z: f64| -> f64 {
+        let covers = triangles.iter().filter_map(|triangle| {
+            let mut polygon = Vec::with_capacity(4);
+            let mut previous = triangle[2];
+            for &point in triangle {
+                if (previous[2] >= floor_z) != (point[2] >= floor_z) {
+                    let mix = (floor_z - previous[2]) / (point[2] - previous[2]);
+                    polygon.push(Vec2::new(previous[0] + (point[0] - previous[0])*mix,
+                        previous[1] + (point[1] - previous[1])*mix));
+                }
+                if point[2] >= floor_z {
+                    polygon.push(Vec2::new(point[0],point[1]));
+                }
+                previous = point;
+            }
+            (polygon.len() >= 3).then_some(polygon)
+        }).collect();
+        footprint.difference(&CrossSection::new(covers)).area()
+    };
+
+    const NUMERIC_AREA: f64 = 1e-6;
+    let roof_z = interior.maximum[2] + interior.translation[2];
+    let uncovered_area = exposed_area(roof_z + clearance);
+    let cover_z = (!triangles.is_empty() && exposed_area(lowest) <= NUMERIC_AREA).then(|| {
+        while highest - lowest > 0.01 {
+            let middle = (lowest + highest) / 2.;
+            if exposed_area(middle) <= NUMERIC_AREA { lowest = middle; } else { highest = middle; }
+        }
+        lowest
+    });
+    Ok(BurialReview {
+        footprint_area: footprint.area(), uncovered_area, roof_z, cover_z,
+        suggested_translation_z: cover_z.filter(|_| uncovered_area > NUMERIC_AREA)
+            .map(|z| z - clearance - interior.maximum[2]),
+    })
+}
+
 pub fn regions(path:&Path,runtime:&str,i:&MapInspection,mesh:&MeshData)->Result<Vec<Region>>{
     let mut out=vec![];
     for (index,part) in mesh.parts.iter().enumerate(){
@@ -128,6 +266,38 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
 }
 #[cfg(test)]mod tests{
     use super::*;
+    #[test]
+    fn native_burial_measures_rotated_roof_and_refuses_to_fill_missing_ground() {
+        let region = |id: &str, bounds, translation, yaw, underground| LayoutRegion {
+            region_id: id.into(), cache_sha256: "a".repeat(64), cache_version: 609, bsp_index: 0,
+            map_name: id.into(), bsp_name: id.into(), minimum: bounds, maximum: [4., 4., 1.],
+            translation, yaw_degrees: yaw, hex_slot: None, underground,
+        };
+        let surface = region("surface", [0.; 3], [20., 10., 0.], 90., false);
+        let mut interior = region("interior", [0.; 3], [18., 11., 1.], 0., true);
+        interior.maximum = [1., 2., 1.];
+        let mut mesh = MeshData {
+            positions: vec![0., 0., 3., 4., 0., 5., 4., 4., 5., 0., 4., 3.],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            parts: vec![maps::MeshPart { name: "floor".into(), index_start: 0, index_count: 6 }],
+            ..Default::default()
+        };
+        let faces: [_; 2] = std::array::from_fn(|_| maps::CollisionFace { shader: Some(1), flags: 0, normal: [0., 0., 1.] });
+        let report = review_burial_geometry(&surface, &interior, &mesh, &faces, 2.).unwrap();
+        assert!((report.footprint_area - 2.).abs() < 1e-6);
+        assert!((report.uncovered_area - 1.).abs() < 1e-6);
+        let depth = report.suggested_translation_z.unwrap();
+        assert!((0.49..=0.50).contains(&depth), "{report:?}");
+        interior.translation[2] = depth;
+        assert!(review_burial_geometry(&surface, &interior, &mesh, &faces, 2.).unwrap().uncovered_area <= 1e-6);
+        mesh.indices.truncate(3);
+        mesh.parts[0].index_count = 3;
+        interior.translation[0] = 16.5;
+        let missing = review_burial_geometry(&surface, &interior, &mesh, &faces, 2.).unwrap();
+        assert!(missing.uncovered_area > 1.);
+        assert!(missing.suggested_translation_z.is_none());
+    }
+
     #[test]fn topology_and_source_parts_are_scoped_and_bad_indices_refused(){
         let mesh=MeshData{positions:vec![0.,0.,0.,1.,0.,0.,0.,1.,0.],indices:vec![0,1,2],parts:vec![maps::MeshPart{name:"one".into(),index_start:0,index_count:3}],..Default::default()};
         let i=MapInspection{header:maps::MapHeader{version:609,name:"fixture".into(),engine:"CE".into(),build:String::new(),scenario_type:1,file_size:4096,declared_size:4096,tag_offset:2048,tag_size:100,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false},sha256:"a".repeat(64),tag_checksum:None,tags:vec![],objects:vec![],decals:vec![],mesh:mesh.clone(),render_mesh:None,model_meshes:Default::default(),player_starting_profiles:None,encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"levels/test/fixture".into()};

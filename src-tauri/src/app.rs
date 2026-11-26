@@ -3821,6 +3821,7 @@ pub fn run() {
             workspace_history_native::inspection_cache_status,
             workspace_history_native::set_inspection_cache_budget,
             megaworld_native::megaworld_atlas,
+            megaworld_native::review_atlas_burial,
             megaworld_native::import_megaworld_region,
             workspace_windows::release_project_document,
             workspace_windows::discard_project_changes,

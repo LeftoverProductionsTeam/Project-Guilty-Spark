@@ -9,6 +9,13 @@ import {addLayoutRegions,atlasAdjacentRegions,atlasCoveringRegions,originalRegio
 import type {AtlasRegion as Region,LayoutRegion,MegaworldLayout} from '../megaworldLayout';
 type Atlas={regions:Region[];caches:{path:string;error:string|null}[];elapsedMs:number;limitations:string[]};
 type PrepareConnection=(base:LayoutRegion,donor:LayoutRegion,terrain:boolean)=>Promise<void>;
+type BurialReview={
+  footprintArea:number;
+  uncoveredArea:number;
+  roofZ:number;
+  coverZ:number|null;
+  suggestedTranslationZ:number|null;
+};
 export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [open,setOpen]=useMapState(projectId,'megaworld.atlas',false);
   const [atlas,setAtlas]=useState<Atlas|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -42,6 +49,10 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
 function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
   const [connectionOrigin,setConnectionOrigin]=useState('');
+  const [coverSurface,setCoverSurface]=useState('');
+  const [coverClearance,setCoverClearance]=useState(2);
+  const [checkingCover,setCheckingCover]=useState(false);
+  const [coverResult,setCoverResult]=useState<{key:string;result:BurialReview}|{key:string;error:string}|null>(null);
   const [view,setView]=useState<'all'|'surface'|'underground'|'elevation'>('all');
   const base=compiledRegions.find(region=>region.regionId===connectionOrigin)??compiledRegions[0]??sourceRegion;
   const regions=layout?.regions??[],selected=regions.find(r=>r.regionId===selection)??regions[0];
@@ -64,6 +75,22 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
   const low=points.length?[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1]))]:[0,0];
   const high=points.length?[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))]:[0,0];
   const cover=selected?.underground?atlasCoveringRegions(regions,selected):[];
+  const surfaces=regions.filter(region=>!region.underground);
+  const surface=surfaces.find(region=>region.regionId===coverSurface)??cover[0]??surfaces[0];
+  const coverKey=JSON.stringify([selected,surface,coverClearance]);
+  const coverResponse=coverResult?.key===coverKey?coverResult:null;
+  const reviewedCover=coverResponse&&'result' in coverResponse?coverResponse.result:null;
+  async function checkBurial(){
+    if(!layout||!selected?.underground||!surface)return;
+    setCheckingCover(true);
+    setCoverResult(null);
+    try{
+      const result=await call<BurialReview>('review_atlas_burial',{
+        layout,surfaceId:surface.regionId,interiorId:selected.regionId,clearance:coverClearance,
+      });
+      setCoverResult({key:coverKey,result});
+    }catch(e){setCoverResult({key:coverKey,error:String(e)});}finally{setCheckingCover(false);}
+  }
   const overlaps=overlappingRegions(regions),missing=atlas?regions.filter(r=>!atlas.regions.some(a=>a.id===r.regionId)):[];
   function transform(axis:number,value:number){if(!selected||readOnly)return;onLayout({schemaVersion:1,regions:regions.map(r=>r.regionId!==selected.regionId?r:axis===3?{...r,yawDegrees:value}:{...r,translation:r.translation.map((n,i)=>i===axis?value:n) as [number,number,number]})},'Move Atlas region');}
   const adjacent=base?atlasAdjacentRegions(regions,base)
@@ -101,9 +128,30 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
     {selected&&<><div className="atlas-transform">{['X','Y','Z','Yaw'].map((axis,i)=><label key={axis}>{axis}<NumberField disabled={readOnly} label={'Atlas region '+axis} value={i===3?selected.yawDegrees:selected.translation[i]} onCommit={value=>transform(i,value)} min={i===3?-360000:-1000000} max={i===3?360000:1000000}/></label>)}</div><div className="atlas-controls"><button disabled={readOnly} onClick={()=>onLayout({schemaVersion:1,regions:regions.filter(r=>r.regionId!==selected.regionId)},'Remove Atlas region')}>Remove region plan</button><small title={selected.cacheSha256}>Source {selected.cacheSha256.slice(0,10)} · v{selected.cacheVersion}</small></div></>}
     {selected&&<label><input type="checkbox" checked={selected.underground??false} disabled={readOnly} onChange={event=>
       onLayout({schemaVersion:1,regions:regions.map(region=>region.regionId===selected.regionId?{...region,underground:event.target.checked}:region)},'Set Atlas elevation role')}/> Underground region</label>}
-    {selected?.underground&&<p className="atlas-note">{cover.length
-      ? `Possible surface cover: ${cover.map(region=>region.mapName).join(', ')}. Confirm terrain depth in Construction.`
-      : 'No surface footprint above this region. Move it under a surface region or plan terrain over it.'}</p>}
+    {selected?.underground&&<details className="atlas-region"><summary>Review terrain cover</summary>
+      <div className="atlas-controls">
+        <label>Surface region <select aria-label="Atlas cover surface" value={surface?.regionId??''}
+          onChange={event=>setCoverSurface(event.target.value)}>
+          {!surfaces.length&&<option value="">Add a surface region first</option>}
+          {surfaces.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
+        </select></label>
+        <NumberField label="Roof clearance" value={coverClearance} min={0.1} max={64} step={0.1} onCommit={setCoverClearance}/>
+        <button disabled={!native||!surface||checkingCover} onClick={()=>void checkBurial()}>
+          {checkingCover?'Checking native terrain…':'Check terrain cover'}
+        </button>
+      </div>
+      {coverResponse&&'error' in coverResponse&&<p role="alert">{coverResponse.error}</p>}
+      {reviewedCover&&<>
+        <p role="status">{reviewedCover.coverZ===null
+          ? 'This surface leaves a gap over the footprint at every depth. Move the room or author terrain over it.'
+          : reviewedCover.suggestedTranslationZ===null
+            ? 'Upward-facing native collision covers the full footprint at this depth.'
+            : `The current roof margin leaves ${(100*reviewedCover.uncoveredArea/reviewedCover.footprintArea).toFixed(1)}% of the footprint uncovered.`}</p>
+        {reviewedCover.suggestedTranslationZ!==null&&<button disabled={readOnly}
+          onClick={()=>transform(2,reviewedCover.suggestedTranslationZ!)}>Apply Z {reviewedCover.suggestedTranslationZ.toFixed(2)}</button>}
+      </>}
+      <p className="atlas-note">Checks the projected roof rectangle against native collision. Review the passage, lighting and walkability in Construction.</p>
+    </details>}
     {base&&onPrepareConnection&&<div className="atlas-controls">
       {compiledRegions.length>1&&<label>Built region <select aria-label="Atlas connection origin"
         value={base.regionId} onChange={event=>setConnectionOrigin(event.target.value)}>
