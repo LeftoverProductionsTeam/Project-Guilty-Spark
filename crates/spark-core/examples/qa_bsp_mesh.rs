@@ -17,6 +17,17 @@ fn main()->Result<()>{
   println!("{}", serde_json::to_string(&receipt)?);
   return Ok(());
  }
+ if args.first().is_some_and(|arg| arg == "--scenery-bsp-mask") {
+  if args.len() != 3 {
+   return spark_core::invalid("qa_bsp_mesh --scenery-bsp-mask <owned.map> <Scenery-index>");
+  }
+  let path = Path::new(&args[1]);
+  let map = maps::inspect_map(path, path.parent())?;
+  let id = &args[2];
+  let mask = maps::compiled_scenery_bsp_mask(path, &map, id)?;
+  println!("{}", serde_json::json!({"sourceSha256":map.sha256,"objectId":id,"bspMask":mask}));
+  return Ok(());
+ }
  if args.first().is_some_and(|arg| arg == "--ground-points") {
   if args.len() < 5 || (args.len() - 2) % 3 != 0 {
    return spark_core::invalid("qa_bsp_mesh --ground-points <owned.map> <x> <y> <z> [<x> <y> <z> ...]");

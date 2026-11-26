@@ -2233,6 +2233,25 @@ fn collision_snapshot_recover(header:&MapHeader,bytes:&[u8],inspection:&MapInspe
     let sc=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;
     let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces),include_shell_faces)?;Ok((mesh,faces))
 }
+/// Read the scenery entry's authored native BSP membership bitset from the
+/// cache. Collision-derived membership of the same point is a separate check.
+pub fn compiled_scenery_bsp_mask(path: &Path, inspection: &MapInspection, id: &str) -> Result<u16> {
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    if hash != inspection.sha256 || !matches!(header.version, 13 | 609) {
+        return invalid("Scenery BSP membership needs the same compiled MCC or CE cache");
+    }
+    let object = inspection.objects.iter().find(|object| object.id == id && object.kind == "Scenery")
+        .ok_or_else(|| SparkError::Invalid(format!("Compiled scenery {id} is missing")))?;
+    let offset = object.source_offset
+        .ok_or_else(|| SparkError::Invalid("Scenery has no native placement record".into()))?;
+    let reader = Reader(&bytes);
+    if vec3(&reader, offset)? != object.position {
+        return invalid("Native scenery position differs from its inspection");
+    }
+    // The mask follows position and rotation (six floats) in scenario_object_datum.
+    reader.u16(offset + 24)
+}
+
 pub(crate) fn scenery_parameters(path: &Path, inspection: &MapInspection) -> Result<std::collections::BTreeMap<String, (u16, i16)>> {
     let (_, bytes, hash) = read_cache_snapshot(path)?;
     if hash != inspection.sha256 { return invalid("Scenery source changed after inspection"); }
