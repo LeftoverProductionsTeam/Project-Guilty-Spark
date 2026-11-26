@@ -5,11 +5,11 @@ import {useMapState} from '../mapSession';
 import {assemblyRoutes} from '../bspAssembly';
 import type {OpenProject,Project} from '../types';
 import {NumberField} from './ui';
-import {addLayoutRegions,atlasAdjacentRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
+import {addLayoutRegions,atlasAdjacentRegions,atlasCoveringRegions,originalRegions,originalMultiplayerMaps,regionFootprint,overlappingRegions,spreadLayout} from '../megaworldLayout';
 import type {AtlasRegion as Region,LayoutRegion,MegaworldLayout} from '../megaworldLayout';
 type Atlas={regions:Region[];caches:{path:string;error:string|null}[];elapsedMs:number;limitations:string[]};
 type PrepareConnection=(base:LayoutRegion,donor:LayoutRegion,terrain:boolean)=>Promise<void>;
-export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspIndex=0,layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [open,setOpen]=useMapState(projectId,'megaworld.atlas',false);
   const [atlas,setAtlas]=useState<Atlas|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [search,setSearch]=useState(''),[runtime,setRuntime]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null);
@@ -28,7 +28,7 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
   return <details className="megaworld-atlas" open={open} onToggle={e=>setOpen(e.currentTarget.open)}>
     <summary>Megaworld Atlas <small>{atlas?`${atlas.regions.length} source regions`:'owned map regions'}</small></summary>
     {open&&<><div className="atlas-controls"><button disabled={!native||busy} onClick={()=>void scan()}>{busy?'Inspecting complete source caches…':atlas?'Rescan installed maps':'Scan installed maps'}</button><input aria-label="Find Atlas region" placeholder="Map or BSP…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/><select aria-label="Atlas runtime" value={runtime} onChange={e=>{setRuntime(e.target.value);setPage(0);}}><option value="all">All installed Halos</option>{[...new Set(atlas?.regions.flatMap(r=>r.runtimes)??[])].map(r=><option key={r}>{r}</option>)}</select></div>
-    <LayoutEditor layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} base={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
+    <LayoutEditor layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
     {atlas&&<div className="atlas-controls"><button onClick={addOriginals} disabled={busy||readOnly}>Add originals to layout</button><small>Choose a runtime to keep source editions explicit.</small></div>}
     {assembly&&<div className="atlas-region"><b>Authored connection · {assembly.donorTitle}</b><p>Donor position {assembly.translation.map(n=>n.toFixed(2)).join(', ')} · yaw {assembly.yawDegrees}° · {assembly.tunnelPoints.length} route points</p>{polygons.length>0&&<svg width="100%" height="110" role="img" aria-label="Authored region bounds and physical connection in top view" viewBox={`${low[0]-8} ${low[1]-8} ${Math.max(1,high[0]-low[0])+16} ${Math.max(1,high[1]-low[1])+16}`}><polygon points={polygons[0].map(p=>p.join(',')).join(' ')} fill="#58b9b324" stroke="#58b9b3" vectorEffect="non-scaling-stroke"/><polygon points={polygons[1].map(p=>p.join(',')).join(' ')} fill="#d19a6024" stroke="#d19a60" vectorEffect="non-scaling-stroke"/>{routes.map((r,i)=><polyline key={r.id} aria-label={r.label+' draft'} points={r.points.map(p=>[p[0],-p[1]].join(',')).join(' ')} stroke={['#fff','#80cbbf','#e4be77'][i]} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke"><title>{r.label} · draft, not gameplay verified</title></polyline>)}</svg>}</div>}
     {error&&<p role="alert">{error}</p>}
@@ -39,21 +39,35 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
   </details>;
 }
 
-function LayoutEditor({layout,atlas,onLayout,base,onPrepareConnection,readOnly=false}:{layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;base?:LayoutRegion;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
+  const [connectionOrigin,setConnectionOrigin]=useState('');
+  const [view,setView]=useState<'all'|'surface'|'underground'|'elevation'>('all');
+  const base=compiledRegions.find(region=>region.regionId===connectionOrigin)??compiledRegions[0]??sourceRegion;
   const regions=layout?.regions??[],selected=regions.find(r=>r.regionId===selection)??regions[0];
   if(!regions.length)return <p className="atlas-note">Select a source region and add it to a saved layout. Plans use source bounds; they do not compile or connect maps.</p>;
-  const footprints=regions.map(regionFootprint);
-  const centers=new Map(regions.map((region,index)=>{
+  const visible=regions.filter(region=>view==='surface'?!region.underground:view==='underground'?region.underground:true);
+  const footprints=visible.map(region=>{
+    const corners=regionFootprint(region);
+    if(view!=='elevation')return corners;
+    const x=corners.map(p=>p[0]),left=Math.min(...x),right=Math.max(...x);
+    const bottom=region.minimum[2]+region.translation[2],top=region.maximum[2]+region.translation[2];
+    return [[left,bottom],[right,bottom],[right,top],[left,top]];
+  });
+  const centers=new Map(visible.map((region,index)=>{
     const [a,,b]=footprints[index];
     return [region.regionId,[(a[0]+b[0])/2,-(a[1]+b[1])/2]];
   }));
-  const edges=regions.flatMap(region=>atlasAdjacentRegions(regions,region)
+  const edges=visible.flatMap(region=>atlasAdjacentRegions(visible,region)
     .filter(neighbor=>neighbor.regionId>region.regionId).map(neighbor=>[region,neighbor] as const));
-  const points=footprints.flat(),low=[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1]))],high=[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))];
+  const points=footprints.flat();
+  const low=points.length?[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1]))]:[0,0];
+  const high=points.length?[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))]:[0,0];
+  const cover=selected?.underground?atlasCoveringRegions(regions,selected):[];
   const overlaps=overlappingRegions(regions),missing=atlas?regions.filter(r=>!atlas.regions.some(a=>a.id===r.regionId)):[];
   function transform(axis:number,value:number){if(!selected||readOnly)return;onLayout({schemaVersion:1,regions:regions.map(r=>r.regionId!==selected.regionId?r:axis===3?{...r,yawDegrees:value}:{...r,translation:r.translation.map((n,i)=>i===axis?value:n) as [number,number,number]})},'Move Atlas region');}
-  const adjacent=base?atlasAdjacentRegions(regions,base):[];
+  const adjacent=base?atlasAdjacentRegions(regions,base)
+    .filter(region=>!compiledRegions.some(built=>built.regionId===region.regionId)):[];
   const selectedNeighbor=adjacent.find(region=>region.regionId===selected?.regionId);
   async function prepare(terrain:boolean){
     if(!base||!selectedNeighbor||!onPrepareConnection)return;
@@ -62,8 +76,14 @@ function LayoutEditor({layout,atlas,onLayout,base,onPrepareConnection,readOnly=f
   }
   const originalNames=new Set(regions.filter(r=>r.bspIndex===0).map(r=>r.mapName.toLowerCase()));
   return <section className="atlas-layout" aria-label="Saved region layout">
-    <div className="atlas-controls"><b>Region layout · {regions.length}</b><small>Saved layout</small><button disabled={readOnly} onClick={()=>{try{onLayout(spreadLayout(layout!,selected?.regionId),'Arrange Atlas hex cluster');setError('');}catch(e){setError(String(e));}}}>Hex cluster draft</button></div>{error&&<p role="alert">{error}</p>}
-    <svg width="100%" height="180" role="img" aria-label="Planned source bounds in top view" viewBox={
+    <div className="atlas-controls"><button disabled={readOnly} onClick={()=>{try{onLayout(spreadLayout(layout!,selected?.regionId),'Arrange Atlas hex cluster');setError('');}catch(e){setError(String(e));}}}>Hex cluster draft</button></div>{error&&<p role="alert">{error}</p>}
+    <label>Layout view <select aria-label="Atlas layout view" value={view} onChange={event=>setView(event.target.value as typeof view)}>
+      <option value="all">Overhead · all regions</option>
+      <option value="surface">Overhead · surface</option>
+      <option value="underground">Overhead · underground</option>
+      <option value="elevation">Elevation · X/Z bounds</option>
+    </select></label>
+    {visible.length?<svg width="100%" height="180" role="img" aria-label={view==='elevation'?'Planned source bounds in elevation':'Planned source bounds in top view'} viewBox={
       [low[0]-8,-high[1]-8,Math.max(1,high[0]-low[0])+16,Math.max(1,high[1]-low[1])+16].join(' ')}>
       {edges.map(([a,b])=>{
         const [x1,y1]=centers.get(a.regionId)!,[x2,y2]=centers.get(b.regionId)!;
@@ -71,20 +91,31 @@ function LayoutEditor({layout,atlas,onLayout,base,onPrepareConnection,readOnly=f
           opacity={a.regionId===base?.regionId||b.regionId===base?.regionId?0.9:0.4}
           strokeDasharray={a.underground||b.underground?'4 3':undefined} vectorEffect="non-scaling-stroke"/>;
       })}
-      {regions.map((r,i)=><g key={r.regionId}><polygon points={footprints[i].map(p=>p[0]+','+-p[1]).join(' ')} fill={r.regionId===selected?.regionId?'#58b9b344':'#8194ad18'} stroke={overlaps.some(pair=>pair.includes(r.regionId))?'#e8b074':'#58b9b3'} vectorEffect="non-scaling-stroke" onClick={()=>setSelection(r.regionId)}><title>{r.mapName} / {r.bspName}</title></polygon></g>)}
-    </svg>
+      {visible.map((r,i)=><g key={r.regionId}><polygon points={footprints[i].map(p=>p[0]+','+-p[1]).join(' ')}
+        fill={r.regionId===selected?.regionId?'#58b9b344':r.underground?'#ad92d733':'#8194ad18'}
+        stroke={overlaps.some(pair=>pair.includes(r.regionId))?'#e8b074':r.underground?'#ad92d7':'#58b9b3'}
+        strokeDasharray={r.underground?'3 2':undefined} vectorEffect="non-scaling-stroke"
+        onClick={()=>setSelection(r.regionId)}><title>{r.mapName} / {r.bspName}</title></polygon></g>)}
+    </svg>:<p className="atlas-note">No {view} regions in this layout.</p>}
     <label>Planned region <select aria-label="Planned Atlas region" value={selected?.regionId} onChange={e=>setSelection(e.target.value)}>{regions.map(r=><option value={r.regionId} key={r.regionId}>{r.mapName} · v{r.cacheVersion} · BSP {r.bspIndex+1}</option>)}</select></label>
     {selected&&<><div className="atlas-transform">{['X','Y','Z','Yaw'].map((axis,i)=><label key={axis}>{axis}<NumberField disabled={readOnly} label={'Atlas region '+axis} value={i===3?selected.yawDegrees:selected.translation[i]} onCommit={value=>transform(i,value)} min={i===3?-360000:-1000000} max={i===3?360000:1000000}/></label>)}</div><div className="atlas-controls"><button disabled={readOnly} onClick={()=>onLayout({schemaVersion:1,regions:regions.filter(r=>r.regionId!==selected.regionId)},'Remove Atlas region')}>Remove region plan</button><small title={selected.cacheSha256}>Source {selected.cacheSha256.slice(0,10)} · v{selected.cacheVersion}</small></div></>}
     {selected&&<label><input type="checkbox" checked={selected.underground??false} disabled={readOnly} onChange={event=>
       onLayout({schemaVersion:1,regions:regions.map(region=>region.regionId===selected.regionId?{...region,underground:event.target.checked}:region)},'Set Atlas elevation role')}/> Underground region</label>}
+    {selected?.underground&&<p className="atlas-note">{cover.length
+      ? `Possible surface cover: ${cover.map(region=>region.mapName).join(', ')}. Confirm terrain depth in Construction.`
+      : 'No surface footprint above this region. Move it under a surface region or plan terrain over it.'}</p>}
     {base&&onPrepareConnection&&<div className="atlas-controls">
+      {compiledRegions.length>1&&<label>Built region <select aria-label="Atlas connection origin"
+        value={base.regionId} onChange={event=>setConnectionOrigin(event.target.value)}>
+        {compiledRegions.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
+      </select></label>}
       <label>Connection from {base.mapName} <select aria-label="Atlas connection neighbor" value={selectedNeighbor?.regionId??''} onChange={event=>setSelection(event.target.value)}>
         <option value="">Choose adjacent region</option>{adjacent.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
       </select></label>
       <button disabled={readOnly||preparing||!selectedNeighbor||base.underground||selectedNeighbor.underground} onClick={()=>void prepare(true)}>Draft terrain seam</button>
       <button disabled={readOnly||preparing||!selectedNeighbor} onClick={()=>void prepare(false)}>Draft passage</button>
     </div>}
-    <p className="atlas-note">{originalMultiplayerCount(originalNames)}/19 original multiplayer names planned. {overlaps.length} overlapping bounds; this is not a collision test or a connected-world claim.</p>
+    <p className="atlas-note">{originalMultiplayerCount(originalNames)}/19 original maps · {regions.filter(region=>region.underground).length} underground · {overlaps.length} bounding-box overlaps.</p>
     {!!overlaps.length&&<details><summary>Review overlapping bounds</summary>{overlaps.slice(0,12).map(pair=><p key={pair.join('|')}>{pair.map(id=>regions.find(r=>r.regionId===id)!.mapName).join(' / ')}</p>)}{overlaps.length>12&&<small>{overlaps.length-12} more pairs; move regions apart to review.</small>}</details>}
     {!!missing.length&&<p role="status">{missing.length} saved source identities are unavailable in this scan. Restore their originals or rescan; plans are preserved.</p>}
     <p className="atlas-note">Hex rings use source bounds, not finished terrain seams. Individual map sizes differ. Save keeps this plan with the project; Undo/Redo restores your changes. Choose a neighboring region to preview and build its native connection in Construction.</p>

@@ -55,20 +55,35 @@ export function atlasAdjacentRegions(regions: readonly LayoutRegion[], base: Lay
 
 /** Keep the solver's full precision when applying its verified boundary alignment. */
 export function alignAtlasDonor(layout:MegaworldLayout,base:LayoutRegion,donor:LayoutRegion,
-  translation:Vec3,yawDegrees:number):MegaworldLayout {
+  translation:Vec3,yawDegrees:number,origin=base):MegaworldLayout {
   if(!atlasAdjacentRegions(layout.regions,base).some(row=>row.regionId===donor.regionId))
     throw Error('Arrange both sources as neighboring Atlas regions first.');
-  const angle=base.yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+  const angle=origin.yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
   const [x,y,z]=translation;
   return {...layout,regions:layout.regions.map(region=>region.regionId!==donor.regionId?region:{...region,
-    translation:[base.translation[0]+c*x-s*y,base.translation[1]+s*x+c*y,base.translation[2]+z],
-    yawDegrees:base.yawDegrees+yawDegrees})};
+    translation:[origin.translation[0]+c*x-s*y,origin.translation[1]+s*x+c*y,origin.translation[2]+z],
+    yawDegrees:origin.yawDegrees+yawDegrees})};
 }
 
 export function regionFootprint(r:LayoutRegion):[number,number][] {
   const angle=r.yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
   return [[r.minimum[0],r.minimum[1]],[r.maximum[0],r.minimum[1]],[r.maximum[0],r.maximum[1]],[r.minimum[0],r.maximum[1]]].map(([x,y])=>[x*c-y*s+r.translation[0],x*s+y*c+r.translation[1]]);
 }
+/** Coarse cover candidates for placement review. The source bounds do not measure terrain thickness. */
+export function atlasCoveringRegions(regions:LayoutRegion[],interior:LayoutRegion):LayoutRegion[] {
+  const footprint=regionFootprint(interior);
+  const roof=interior.maximum[2]+interior.translation[2];
+  return regions.filter(surface=>{
+    if(surface.underground||surface.regionId===interior.regionId||surface.maximum[2]+surface.translation[2]<=roof)return false;
+    const angle=-surface.yawDegrees*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
+    return footprint.every(([worldX,worldY])=>{
+      const x=worldX-surface.translation[0],y=worldY-surface.translation[1];
+      const localX=x*c-y*s,localY=x*s+y*c;
+      return localX>=surface.minimum[0]&&localX<=surface.maximum[0]&&localY>=surface.minimum[1]&&localY<=surface.maximum[1];
+    });
+  });
+}
+
 /** Rotated source bounds only: overlaps are candidates, never collision/seam proof. */
 export function overlappingRegions(regions:LayoutRegion[]):[string,string][] {
   const polygons=regions.map(regionFootprint),result:[string,string][]=[];

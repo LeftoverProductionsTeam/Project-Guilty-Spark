@@ -13,6 +13,8 @@ export interface SeamEdge {sourceSha256:string;bspIndex:number;vertices:[Vec3,Ve
 export interface SeamSection {id:string;name:string;points:Vec3[];width:number;height:number;shaderPath:string;openRoad?:boolean;archSegments?:number;edges:[SeamEdge,SeamEdge];}
 export interface BspAssembly {
   schemaVersion: 1;
+  atlasOrigin?: import('./megaworldLayout').LayoutRegion;
+  atlasFromRegionId?: string;
   donorProjectId: string;
   donorTitle: string;
   donorSource: NonNullable<Project['source']>;

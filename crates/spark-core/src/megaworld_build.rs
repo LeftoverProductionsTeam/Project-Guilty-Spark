@@ -179,6 +179,7 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
         return invalid("Connected regions require the reviewed H1A authoring kit and matching editable base tags");
     }
     let plan=project.bsp_assembly.as_ref().ok_or_else(||SparkError::Invalid("Author a connected BSP plan first".into()))?;plan.validate()?;
+    crate::bsp_assembly::verify_atlas_plan(project, inspection, plan)?;
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("Import an original CE map first".into()))?;
     if source.sha256!=inspection.sha256||source.scenario_path!=inspection.scenario_path{return invalid("The base inspection belongs to another source revision");}
     let supported_base = source.cache_version == 609

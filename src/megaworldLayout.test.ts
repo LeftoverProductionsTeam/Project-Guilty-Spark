@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {alignAtlasDonor,atlasAdjacentRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
+import {alignAtlasDonor,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
 import type {AtlasRegion} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -36,6 +36,17 @@ it('places the chosen center inside two complete six-sided rings for19 equal nat
  expect(ring.filter(r=>r===0)).toHaveLength(1);expect(ring.filter(r=>r===1)).toHaveLength(6);expect(ring.filter(r=>r===2)).toHaveLength(12);expect(overlappingRegions(next.regions)).toEqual([]);
 });
 
+it('only suggests surface cover when a lower interior fits the rotated footprint',()=>{
+ const layout=addLayoutRegions(null,[region('timberland'),region('chillout',1),region('wizard',2)]);
+ const [terrain,cave,secondCave]=layout.regions;
+ const surface={...terrain,yawDegrees:90};
+ const interior={...cave,underground:true,minimum:[-2,-2,0] as [number,number,number],
+   maximum:[2,2,3] as [number,number,number],translation:[0,5,-10] as [number,number,number]};
+ const other={...secondCave,underground:true};
+ expect(atlasCoveringRegions([surface,other],interior)).toEqual([surface]);
+ expect(atlasCoveringRegions([surface],{...interior,translation:[5,0,-10]})).toEqual([]);
+ expect(atlasCoveringRegions([surface],{...interior,translation:[0,5,2]})).toEqual([]);
+});
 it('copies a native alignment into the neighboring Atlas slot at full precision',()=>{
  const arranged=spreadLayout(addLayoutRegions(null,[region('timberland'),region('sidewinder',1)]));
  const [base,donor]=arranged.regions;
@@ -44,4 +55,9 @@ it('copies a native alignment into the neighboring Atlas slot at full precision'
  expect(result.regions[0]).toBe(base);
  expect(result.regions[1].hexSlot).toEqual(donor.hexSlot);
  expect(result.regions[1].translation).toEqual(native);
+ const origin={...base,translation:[24,10,-4] as [number,number,number],yawDegrees:90};
+ const compiledBase={...base,translation:[0,-10,0] as [number,number,number],yawDegrees:-45};
+ const continued=alignAtlasDonor(arranged,compiledBase,donor,[4,8,-16],15,origin);
+ expect(continued.regions[1].translation).toEqual([16,14,-20]);
+ expect(continued.regions[1].yawDegrees).toBe(105);
 });

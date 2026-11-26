@@ -459,6 +459,8 @@ mod tests {
     fn plan() -> BspAssembly {
         BspAssembly {
             schema_version: 1,
+            atlas_origin: None,
+            atlas_from_region_id: None,
             donor_project_id: uuid::Uuid::nil().to_string(),
             donor_title: "Synthetic room".into(),
             donor_source: Source {

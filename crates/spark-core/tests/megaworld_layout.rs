@@ -13,6 +13,63 @@ fn layout()->Layout{Layout{schema_version:1,regions:vec![LayoutRegion{region_id:
 
 
 #[test]
+#[ignore = "requires the retained compiled Atlas seam and owned stock CE maps"]
+fn compiled_atlas_world_keeps_original_neighbor_frames() {
+    use spark_core::{bsp_assembly::{self, BspAssembly}, library::Library};
+    use std::path::PathBuf;
+    let stock = PathBuf::from(std::env::var_os("SPARK_ATLAS_STOCK").unwrap());
+    let compiled = PathBuf::from(std::env::var_os("SPARK_ATLAS_COMPILED").unwrap());
+    let recipe = PathBuf::from(std::env::var_os("SPARK_ATLAS_RECIPE").unwrap());
+    let value: serde_json::Value = serde_json::from_reader(std::fs::File::open(recipe).unwrap()).unwrap();
+    let mut saved: Layout = serde_json::from_value(value["layout"].clone()).unwrap();
+    let mut seam: BspAssembly = serde_json::from_value(value["recipe"]["plan"].clone()).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let library = Library::open(temp.path()).unwrap();
+    let (original, _) = library.import_map(&stock.join("timberland.map"), Some(&stock)).unwrap();
+    let (mut merged, inspection) = library.import_map(&compiled, compiled.parent()).unwrap();
+    let (interior, donor) = library.import_map(&stock.join("chillout.map"), Some(&stock)).unwrap();
+    seam.atlas_origin = bsp_assembly::legacy_atlas_origin(original.source.as_ref().unwrap(), &saved, &seam);
+    assert_eq!(seam.atlas_origin.as_ref(), Some(&saved.regions[0]));
+    merged.inherited_bsp_connections.push(seam);
+    let mut underground = saved.regions[0].clone();
+    underground.cache_sha256 = donor.sha256.clone();
+    underground.region_id = format!("{}:0", donor.sha256);
+    underground.map_name = donor.header.name.clone();
+    underground.minimum = std::array::from_fn(|axis| donor.mesh.positions.chunks_exact(3)
+        .map(|v| f64::from(v[axis])).fold(f64::INFINITY, f64::min));
+    underground.maximum = std::array::from_fn(|axis| donor.mesh.positions.chunks_exact(3)
+        .map(|v| f64::from(v[axis])).fold(f64::NEG_INFINITY, f64::max));
+    underground.underground = true;
+    underground.hex_slot = Some([-1,1]);
+    underground.translation = [-128.,0.,-44.];
+    saved.regions.push(underground);
+    merged.megaworld_layout = Some(saved);
+    let stored = temp.path().join("merged.gsproject");
+    project::save_project(&stored, &merged).unwrap();
+    let loaded = project::load_project(&stored).unwrap();
+    let regions = &loaded.megaworld_layout.as_ref().unwrap().regions;
+    let prepare = |from, to| bsp_assembly::plan_from_atlas(&loaded, &inspection, &interior, &donor,
+        from, to, PathBuf::new(), false);
+    let passage = prepare(&regions[0], &regions[2]).unwrap();
+    assert_eq!(passage.translation, [-128.,0.,-44.]);
+    assert_eq!(passage.atlas_origin.as_ref(), Some(&regions[0]));
+    assert!(passage.tunnel_points[0][0] < 0.);
+    bsp_assembly::verify_atlas_plan(&loaded, &inspection, &passage).unwrap();
+    let mut displaced = passage.clone();
+    displaced.translation[0] += 1.;
+    assert!(bsp_assembly::verify_atlas_plan(&loaded, &inspection, &displaced).is_err());
+    let mut uncovered = passage.clone();
+    uncovered.open_road = true;
+    assert!(bsp_assembly::verify_atlas_plan(&loaded, &inspection, &uncovered).is_err());
+    let mut unlinked = loaded.clone();
+    unlinked.megaworld_layout.as_mut().unwrap().regions[2].hex_slot = Some([-2,2]);
+    assert!(bsp_assembly::verify_atlas_plan(&unlinked, &inspection, &passage).is_err());
+    let mut moved = regions[0].clone();
+    moved.translation[1] += 1.;
+    assert!(prepare(&moved, &regions[2]).unwrap_err().to_string().contains("differs from the compiled map"));
+}
+
+#[test]
 #[ignore = "requires owned stock CE map files"]
 fn saved_atlas_edge_reconstructs_stock_timberland_sidewinder_terrain() {
     use spark_core::{bsp_assembly, library::Library, maps};
@@ -45,7 +102,10 @@ fn saved_atlas_edge_reconstructs_stock_timberland_sidewinder_terrain() {
     let draft = bsp_assembly::plan_from_atlas(&loaded,&a,&donor,&b,start,end,PathBuf::new(),true).unwrap();
     assert!(draft.terrain_seam.is_some() && draft.include_donor_scenery);
     for i in 0..3 { assert!((draft.translation[i]-accepted.translation[i]).abs()<1e-7); }
-    let source = &loaded.source.as_ref().unwrap().preserved_path;
+    let original = loaded.source.as_ref().unwrap();
+    assert_eq!(draft.atlas_origin.as_ref(), Some(start));
+    assert_eq!(bsp_assembly::legacy_atlas_origin(original, loaded.megaworld_layout.as_ref().unwrap(), &accepted).as_ref(), Some(start));
+    let source = &original.preserved_path;
     let mesh = bsp_assembly::generate(source,&a,&draft,&AtomicBool::new(false)).unwrap();
     assert!(mesh.report.output_triangles>0 && mesh.report.walk_samples>0);
     assert_eq!(maps::hash_file(&stock.join(Path::new("timberland.map"))).unwrap(),a.sha256);

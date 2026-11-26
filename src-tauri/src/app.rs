@@ -470,7 +470,14 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             && source.bsp_assembly.is_some();
         if inherited_routes {
             project.inherited_bsp_connections.clone_from(&source.inherited_bsp_connections);
-            project.inherited_bsp_connections.extend(source.bsp_assembly.iter().cloned());
+            if let Some(mut plan) = source.bsp_assembly.clone() {
+                if project.inherited_bsp_connections.is_empty() && plan.atlas_origin.is_none() {
+                    if let (Some(parent), Some(layout)) = (&source.source, &source.megaworld_layout) {
+                        plan.atlas_origin = core::bsp_assembly::legacy_atlas_origin(parent, layout, &plan);
+                    }
+                }
+                project.inherited_bsp_connections.push(plan);
+            }
             if project.megaworld_layout.is_none() {
                 project.megaworld_layout.clone_from(&source.megaworld_layout);
             }

@@ -2,6 +2,26 @@
 
 Current Product Completion acceptance requires the compact 3–4–5–4–3 Atlas as the native build source, natural outdoor seams, buried interiors, and normal-controls traversal of all original regions. Earlier route, cache and screenshot results below remain regression evidence. Standalone Be Native and Black Echo are fixtures. Flagship gameplay acceptance is inside the compact world.
 
+### Full overhead and burial review
+
+The Windows editor now has all-region, surface-only, underground-only and X/Z elevation views. With the 19 verified stock source identities, normal controls showed that the old Chill Out position had no cover candidate, then showed Timberland as a candidate after an underground placement edit. Normal Save and close, then a fresh start and reopen, preserved all identities and the edit. This cover preview uses source bounds. Native terrain geometry and traversal still require Construction and playtest checks.
+
+These rows reproduce the existing Hex cluster draft using the exact 19 stock CE609 sources in [the Atlas fixture](fixtures/c43-original-bsp-atlas.json), with Timberland as the center. The rows run south to north in the planner's coordinate frame.
+
+| Row | Stock regions, west to east |
+| --- | --- |
+| −2 | Death Island · Gephyrophobia · Hang ’Em High |
+| −1 | Danger Canyon · Beaver Creek · Blood Gulch · Ice Fields |
+| 0 | Wizard · Damnation · Timberland · Boarding Action · Infinity |
+| 1 | Sidewinder · Chill Out · Carousel · Longest |
+| 2 | Rat Race · Chiron TL-34 · Prisoner |
+
+The generic draft makes no burial assignments and leaves elevation offsets at zero. Twenty-four nominal neighbor pairs have more than 32 world units between their projected source bounds. The largest gap is about 1,915 units between Blood Gulch and Hang ’Em High. The projected total extends from Y −3,153 to +456 and reaches X +1,599. Both exceed the existing native BSP coordinate limit of ±1,500 in the current Timberland frame. Stock Death Island alone spans roughly 2,728 × 2,725 units with its surrounding ocean. The full ocean extent cannot drive the row spacing for the connected landscape. Review the actual shoreline and native collision coverage before choosing a build treatment for those bounds.
+
+The generic Timberland and Sidewinder slots are not adjacent and would imply (56.297, 339.844, 0) relative displacement. The actual retained native seam uses (114.02209091186523, 9.3280029296875, −17.233085022040342), yaw 0. Rebase the full design on that exact native transform and reserve named surface approaches over each buried interior. The revised plan needs explicit cover and approach surveys, multiple outdoor neighbors and actual grade and clearance checks. Review all of these before adding regions. Keep stock boarding structures and the Gephyrophobia ravine until their approach and sightline implications have been reviewed.
+
+Spark reopened exact e55c9f84 through Open compiled map, selected original Timberland as the built origin, then drafted and saved an underground Chill Out passage in the desktop editor. The native geometry preview rejected tiny triangles at the Timberland entrance. The draft also put the whole Chill Out footprint beyond Timberland's western boundary, so its lower elevation did not put it under Timberland. No new cache was compiled. The existing controller feed reached the private rendered Forerunner LAN map selector without the failing keyboard helper. Normal Windows mouse input separately reached the Multiplayer menu on the same staged cache. Physical traversal is pending. The current source makes the native build compare a new Atlas-bound connection against its saved source identities, adjacency, position and yaw, and reject uncovered outdoor approaches to buried donors. Edited placements can be copied back from Construction using the original Atlas frame.
+
 A private Windows editor run imported original CE Timberland and Sidewinder, arranged their Atlas slots, entered the exact terrain adjustment, then used Atlas Draft terrain seam, Apply and Preview. Saved relative transform matched (114.02209091186523, 9.3280029296875, −17.233085022040342). The preview reconstructed 32,217 source triangles and checked 133 clearance points. Rounded displayed coordinates failed triangle conditioning, so Construction now copies the terrain draft’s full-precision alignment into the saved Atlas through the existing Undo/Redo history. The new copy action, non-east/west terrain seams, underground mouth, and normal runtime traversal remain open. Receipt: spark-viewport-index-GwsjsV.json in the Windows temporary folder. Saved editor recipe spark-viewport-index-EPLtao.connection.json passed normal Save and clean exit. Halo Tool and Invader produced exact CE609 e55c9f84988a8438f78c5a34f23fa3d7807317d5fa3b6b927c2d61e2d10d1efb under GuiltySpark-Atlas-Seam-fe3567ffb82e495a9249fccfcb405855/library/jobs/88a17c0d-2bc0-4928-bde3-18340dc88aa6/output/timberland.map. CRC and native readback passed. The exact cache is retained for Forerunner normal-controls traversal. The older corridor map remains protected.
 
 Base: local master `5095e9b9ea0979448cd571d56659b4076e5930a2` plus the preserved uncommitted continuation. This records source authoring acceptance, not a playable 19-region world.

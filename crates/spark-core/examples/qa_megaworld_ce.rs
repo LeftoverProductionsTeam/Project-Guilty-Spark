@@ -48,6 +48,8 @@ fn reviewed_plan(path: &Path, base: &mut Project) -> Result<(BspAssembly, Vec<Bs
                 object.position = movement.to;
             }
         }
+        base.megaworld_layout = receipt.get("layout")
+            .map(|value| serde_json::from_value(value.clone())).transpose()?;
         Ok((serde_json::from_value(plan.clone())?, inherited))
     } else {
         let prior = project::load_project(path)?;
@@ -55,6 +57,7 @@ fn reviewed_plan(path: &Path, base: &mut Project) -> Result<(BspAssembly, Vec<Bs
             return spark_core::invalid("Previous connection belongs to a different base cache");
         }
         let plan = prior.bsp_assembly.ok_or_else(|| SparkError::Invalid("Previous project has no connection".into()))?;
+        base.megaworld_layout = prior.megaworld_layout;
         Ok((plan, prior.inherited_bsp_connections))
     }
 }

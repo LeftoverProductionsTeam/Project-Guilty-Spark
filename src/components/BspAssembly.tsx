@@ -326,9 +326,9 @@ export default function BspAssembly({
       if(!current()||atlasRef.current!==original||latest.current.donor!==owner.donor
         ||latest.current.index!==owner.index||latest.current.baseIndex!==owner.baseIndex)return;
       if(!opened.inspection||opened.inspection.sha256!==entry.sha256)throw Error('Imported donor no longer matches the selection.');
-      const withBase=addOpenedAtlasBsp(original,inspection,owner.baseIndex);
+      const withBase=atlasOrigin?original:addOpenedAtlasBsp(original,inspection,owner.baseIndex);
       const layout=addOpenedAtlasBsp(withBase,opened.inspection,owner.index);
-      if(layout!==original)onEdit({...projectRef.current,megaworldLayout:layout},'Add opened BSPs to Atlas');
+      if(layout!==original)onEdit({...projectRef.current,megaworldLayout:layout},atlasOrigin?'Add donor to Atlas':'Add opened BSPs to Atlas');
     });
   }
   async function prepareAtlasConnection(from:LayoutRegion,to:LayoutRegion,terrainSeam:boolean) {
@@ -362,12 +362,21 @@ export default function BspAssembly({
       const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:entry.id,
         donorBspIndex:to.bspIndex,atlasConnection:[from.regionId,to.regionId],terrainSeam});
       if(!matches())return;
-      setDonor(entry.id);setIndex(to.bspIndex);setBaseIndex(from.bspIndex);
+      setDonor(entry.id);setIndex(to.bspIndex);setBaseIndex(plan.baseBspIndex??0);
       setDraft(plan);setRouteView('primary');setReport(null);
     });
   }
   const placedLayout=project.megaworldLayout;
-  const atlasBase=placedLayout?.regions.find(region=>region.cacheSha256===sourceSha256&&region.bspIndex===baseIndex);
+  const atlasBase=placedLayout?.regions.find(region=>draft?.atlasFromRegionId
+    ? region.regionId===draft.atlasFromRegionId
+    : region.cacheSha256===sourceSha256&&region.bspIndex===baseIndex);
+  const inherited=project.inheritedBspConnections??[];
+  const atlasOrigin=inherited[0]?.atlasOrigin;
+  const atlasBuilt=atlasOrigin&&!inherited.some(plan=>plan.separateNativeBsps)
+    ? placedLayout?.regions.filter(region=>region.regionId===atlasOrigin.regionId||inherited.some(plan=>
+        plan.atlasOrigin?.regionId===atlasOrigin.regionId&&plan.donorSource.sha256===region.cacheSha256
+        &&plan.donorSource.cacheVersion===region.cacheVersion&&plan.donorBspIndex===region.bspIndex))??[]
+    : [];
   const atlasDonor=atlasBase&&draft&&placedLayout&&atlasAdjacentRegions(placedLayout.regions,atlasBase)
     .find(region=>region.cacheSha256===draft.donorSource.sha256&&region.bspIndex===draft.donorBspIndex);
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
@@ -476,7 +485,7 @@ export default function BspAssembly({
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
-          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
+          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
           {(!nativePartitioned || canExtend) && <>
           <details className="bsp-help">
@@ -577,7 +586,7 @@ export default function BspAssembly({
               </select>
             </label>
             <button disabled={!native||busy||!inspection||!options.some(option=>option.index===index)}
-              onClick={()=>void addAtlasSources()}>Add both BSPs to Atlas</button>
+              onClick={()=>void addAtlasSources()}>{atlasOrigin?'Add donor to Atlas':'Add both BSPs to Atlas'}</button>
             {canExtend ? <label>Tunnel direction (degrees)
               <NumberField label="Tunnel direction (degrees)" min={-360} max={360} step={1}
                 value={direction} onCommit={setDirection} disabled={busy}/>
@@ -610,8 +619,9 @@ export default function BspAssembly({
                 :'Plan connected tunnel'}
             </button>
             {!canExtend && <button disabled={!native||busy||!donor||!options.some(option=>option.index===index)} onClick={()=>void proposeConnection(true)}>Plan adjacent terrain</button>}
-            {placedLayout&&atlasBase&&atlasDonor&&draft?.terrainSeam&&selectionMatches&&<button disabled={busy}
-              onClick={()=>onEdit({...project,megaworldLayout:alignAtlasDonor(placedLayout,atlasBase,atlasDonor,draft.translation,draft.yawDegrees)},'Align Atlas to terrain draft')}>Use terrain alignment in Atlas</button>}
+            {placedLayout&&atlasBase&&atlasDonor&&draft&&(draft.terrainSeam||draft.atlasFromRegionId)&&selectionMatches&&<button disabled={busy}
+              onClick={()=>onEdit({...project,megaworldLayout:alignAtlasDonor(placedLayout,atlasBase,atlasDonor,draft.translation,draft.yawDegrees,draft.atlasOrigin)},'Align Atlas to construction draft')}>
+              {draft.terrainSeam?'Use terrain alignment in Atlas':'Use passage alignment in Atlas'}</button>}
           </div>
           {optionsError && (
             <p role="alert" className="bsp-error">

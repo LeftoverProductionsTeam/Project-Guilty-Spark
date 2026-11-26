@@ -55,6 +55,11 @@ pub struct InfantryTunnel {
 #[serde(rename_all = "camelCase")]
 pub struct BspAssembly {
     pub schema_version: u32,
+    /// The original Atlas frame at the start of a merged native world.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_origin: Option<crate::megaworld::LayoutRegion>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub atlas_from_region_id: Option<String>,
     pub donor_project_id: String,
     pub donor_title: String,
     pub donor_source: Source,
@@ -121,6 +126,9 @@ fn is_false(value: &bool) -> bool { !*value }
 fn is_zero_index(value: &usize) -> bool { *value == 0 }
 impl BspAssembly {
     pub fn validate(&self) -> Result<()> {
+        if let Some(origin) = &self.atlas_origin {
+            crate::megaworld::Layout { schema_version: 1, regions: vec![origin.clone()] }.validate()?;
+        }
         if self.schema_version != 1 || self.donor_bsp_index > 15 || self.base_bsp_index > 15
             || (!self.separate_native_bsps && self.base_bsp_index != 0) || self.donor_title.len() > 256
         {
@@ -2383,7 +2391,12 @@ fn verify_entrance(
     }
     invalid("A tunnel mouth is not on visible walkable source ground. Move it onto the map terrain; sky and invisible boundary floors cannot serve as entrances")
 }
+#[cfg(test)]
 fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, toward: V) -> Result<(V, usize)> {
+    anchor_in_region(mesh, faces, part, toward, &|_| true)
+}
+
+fn anchor_in_region(mesh: &MeshData, faces: &[CollisionFace], part: usize, toward: V, in_region: &dyn Fn(V) -> bool) -> Result<(V, usize)> {
     let range = mesh
         .parts
         .get(part)
@@ -2393,7 +2406,9 @@ fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, toward: V) -> R
     let mut low = [f64::INFINITY; 3];
     let mut high = [f64::NEG_INFINITY; 3];
     for id in &mesh.indices[range.index_start..range.index_start + range.index_count] {
-        let p = projected(vertex(mesh, *id));
+        let point = vertex(mesh, *id);
+        if !in_region(point) { continue; }
+        let p = projected(point);
         for k in 0..3 {
             low[k] = low[k].min(p[k]);
             high[k] = high[k].max(p[k]);
@@ -2419,6 +2434,7 @@ fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, toward: V) -> R
                 return None;
             }
             let center = mul(add(add(p[0], p[1]), p[2]), 1. / 3.);
+            if !in_region(center) { return None; }
             let d = sub(projected(center), target);
             Some((
                 center,
@@ -2519,23 +2535,117 @@ pub fn plan_from_bsp(
     regional_preset: Option<RegionalConnectionPreset>,
 ) -> Result<BspAssembly> {
     plan_from_bsp_placement(base_project, base, donor_project, donor, base_index, index, tags,
-        direction_degrees, regional_preset, None)
+        direction_degrees, regional_preset, None, &|_| true)
 }
 
-/// Prepare an actual native connection in the frame of the saved base region.
+fn atlas_transform(origin: &crate::megaworld::LayoutRegion, region: &crate::megaworld::LayoutRegion) -> (V, f64) {
+    (transform(sub(region.translation, origin.translation), [0.; 3], -origin.yaw_degrees),
+        (region.yaw_degrees - origin.yaw_degrees + 180.).rem_euclid(360.) - 180.)
+}
+
+/// Recover the original frame for an earlier verified single-BSP Atlas build.
+pub fn legacy_atlas_origin(
+    source: &Source, layout: &crate::megaworld::Layout, plan: &BspAssembly,
+) -> Option<crate::megaworld::LayoutRegion> {
+    if plan.separate_native_bsps { return None; }
+    let from_id = format!("{}:{}", source.sha256, plan.base_bsp_index);
+    let to_id = format!("{}:{}", plan.donor_source.sha256, plan.donor_bsp_index);
+    let (from, to) = layout.connection(&from_id, &to_id).ok()?;
+    let (translation, yaw) = atlas_transform(from, to);
+    (from.cache_version == source.cache_version && to.cache_version == plan.donor_source.cache_version
+        && sub(translation, plan.translation).iter().all(|axis| axis.abs() <= 1e-6)
+        && (yaw - plan.yaw_degrees).abs() <= 1e-6).then(|| from.clone())
+}
+
+fn atlas_base_frame<'a>(
+    project: &'a Project, base: &MapInspection, from: &'a crate::megaworld::LayoutRegion,
+    to: &crate::megaworld::LayoutRegion,
+) -> Result<(&'a crate::megaworld::LayoutRegion, V, f64)> {
+    if from.cache_sha256 == base.sha256 && from.cache_version == base.header.version {
+        if project.inherited_bsp_connections.first().is_some_and(|plan| plan.atlas_origin.is_some()) {
+            return invalid("Choose an original region of this compiled Atlas world as the connection origin");
+        }
+        return Ok((from, [0.; 3], 0.));
+    }
+    let routes = &project.inherited_bsp_connections;
+    let Some(origin) = routes.first().and_then(|plan| plan.atlas_origin.as_ref()) else {
+        return invalid("Open a compiled Atlas world or the original map for the selected region");
+    };
+    if base.mesh.parts.len() != 1 || routes.iter().any(|plan| plan.separate_native_bsps) {
+        return invalid("Compiled Atlas continuation currently requires one merged native BSP");
+    }
+    let matches = |plan: &BspAssembly, region: &crate::megaworld::LayoutRegion| {
+        plan.atlas_origin.as_ref().is_some_and(|frame| frame.region_id == origin.region_id
+            && frame.translation == origin.translation && frame.yaw_degrees == origin.yaw_degrees)
+            && plan.donor_source.sha256 == region.cache_sha256
+            && plan.donor_source.cache_version == region.cache_version && plan.donor_bsp_index == region.bsp_index
+    };
+    if origin.region_id == to.region_id || routes.iter().any(|plan|
+        plan.donor_source.sha256 == to.cache_sha256 && plan.donor_bsp_index == to.bsp_index)
+    {
+        return invalid("The neighboring Atlas region is already built into this map");
+    }
+    let (translation, yaw) = if origin.region_id == from.region_id {
+        ([0.; 3], 0.)
+    } else {
+        let route = routes.iter().find(|plan| matches(plan, from))
+            .ok_or_else(|| SparkError::Invalid("This Atlas region is not authored in the compiled map".into()))?;
+        (route.translation, route.yaw_degrees)
+    };
+    let (saved_translation, saved_yaw) = atlas_transform(origin, from);
+    if sub(translation, saved_translation).iter().any(|axis| axis.abs() > 1e-6)
+        || (yaw - saved_yaw).abs() > 1e-6 {
+        return invalid("The saved base placement differs from the compiled map. Restore its compiled Atlas position before adding a neighbor");
+    }
+    Ok((origin, translation, yaw))
+}
+
+/// Keep Atlas-authored builds tied to their reviewed source placement and adjacency.
+pub fn verify_atlas_plan(project: &Project, base: &MapInspection, plan: &BspAssembly) -> Result<()> {
+    let Some(from_id) = &plan.atlas_from_region_id else { return Ok(()); };
+    let layout = project.megaworld_layout.as_ref().ok_or_else(||
+        SparkError::Invalid("Restore the saved Atlas for this native connection".into()))?;
+    let to_id = format!("{}:{}", plan.donor_source.sha256, plan.donor_bsp_index);
+    let (from, to) = layout.connection(from_id, &to_id)?;
+    let (origin, _, _) = atlas_base_frame(project, base, from, to)?;
+    let (translation, yaw) = atlas_transform(origin, to);
+    let base_index = if from.cache_sha256 == base.sha256 { from.bsp_index } else { 0 };
+    let yaw_delta = (plan.yaw_degrees - yaw + 180.).rem_euclid(360.) - 180.;
+    if plan.atlas_origin.as_ref() != Some(origin) || plan.base_bsp_index != base_index
+        || to.cache_version != plan.donor_source.cache_version
+        || sub(plan.translation, translation).iter().any(|axis| axis.abs() > 1e-6)
+        || yaw_delta.abs() > 1e-6
+    {
+        return invalid("Native placement differs from the saved Atlas. Apply matching Atlas and Construction settings before building");
+    }
+    if to.underground && (plan.open_road || (!from.underground && to.maximum[2] + translation[2] >= plan.tunnel_points[0][2])) {
+        return invalid("Keep the underground neighbor covered and use an enclosed approach");
+    }
+    if from.underground && plan.open_road {
+        return invalid("Use an enclosed approach for the underground Atlas region");
+    }
+    Ok(())
+}
+
+/// Prepare an actual native connection in the original Atlas frame.
 pub fn plan_from_atlas(
     base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
     from: &crate::megaworld::LayoutRegion, to: &crate::megaworld::LayoutRegion, tags: PathBuf,
     terrain_seam: bool,
 ) -> Result<BspAssembly> {
-    if from.cache_sha256 != base.sha256 || to.cache_sha256 != donor.sha256
-        || from.cache_version != base.header.version || to.cache_version != donor.header.version {
-        return invalid("The open map and donor must match the saved Atlas source identities");
+    if to.cache_sha256 != donor.sha256 || to.cache_version != donor.header.version {
+        return invalid("The donor must match its saved Atlas source identity");
     }
-    let translation = transform(sub(to.translation, from.translation), [0.; 3], -from.yaw_degrees);
-    let yaw = (to.yaw_degrees - from.yaw_degrees + 180.).rem_euclid(360.) - 180.;
+    let (origin, base_translation, base_yaw) = atlas_base_frame(base_project, base, from, to)?;
+    let (translation, yaw) = atlas_transform(origin, to);
     let center = |region: &crate::megaworld::LayoutRegion| mul(add(region.minimum, region.maximum), 0.5);
-    let approach = sub(transform(center(to), translation, yaw), center(from));
+    let approach = sub(transform(center(to), translation, yaw), transform(center(from), base_translation, base_yaw));
+    let continuation = from.cache_sha256 != base.sha256;
+    let in_region = |point: V| {
+        if !continuation { return true; }
+        let local = transform(sub(point, base_translation), [0.; 3], -base_yaw);
+        (0..3).all(|axis| (from.minimum[axis] - 0.001..=from.maximum[axis] + 0.001).contains(&local[axis]))
+    };
     if approach[0].hypot(approach[1]) < 1. {
         return invalid("Move the neighboring Atlas region to leave a horizontal approach");
     }
@@ -2543,8 +2653,11 @@ pub fn plan_from_atlas(
         return invalid("Choose two surface regions with one base BSP for a terrain seam");
     }
     let direction = if terrain_seam { 0. } else { approach[1].atan2(approach[0]).to_degrees() };
-    let mut plan = plan_from_bsp_placement(base_project, base, donor_project, donor, from.bsp_index,
-        to.bsp_index, tags, direction, None, Some((translation, yaw)))?;
+    let base_index = if continuation { 0 } else { from.bsp_index };
+    let mut plan = plan_from_bsp_placement(base_project, base, donor_project, donor, base_index,
+        to.bsp_index, tags, direction, None, Some((translation, yaw)), &in_region)?;
+    plan.atlas_origin = Some(origin.clone());
+    plan.atlas_from_region_id = Some(from.region_id.clone());
     plan.include_donor_scenery = true;
     if to.underground && !from.underground {
         let roof = to.maximum[2] + translation[2];
@@ -2563,6 +2676,7 @@ fn plan_from_bsp_placement(
     base_project: &Project, base: &MapInspection, donor_project: &Project, donor: &MapInspection,
     base_index: usize, index: usize, tags: PathBuf, direction_degrees: f64,
     regional_preset: Option<RegionalConnectionPreset>, placement: Option<(V, f64)>,
+    in_base_region: &dyn Fn(V) -> bool,
 ) -> Result<BspAssembly> {
     if !direction_degrees.is_finite() || direction_degrees.abs() > 360. {
         return invalid("Tunnel direction must be a finite angle within 360 degrees");
@@ -2594,10 +2708,10 @@ fn plan_from_bsp_placement(
             .collect::<Vec<_>>()
     };
     let radius = if regional_preset.is_some() { 96. } else { 32. };
-    let base_anchors=playable_anchor_candidates(&base_mesh,&faces,base_index,toward,&starts(base),radius)?;
+    let base_anchors=playable_anchor_candidates(&base_mesh,&faces,base_index,toward,&starts(base),radius,in_base_region)?;
     let yaw = placement.map_or(0., |(_, yaw)| yaw);
     let donor_direction = transform(mul(toward, -1.), [0.; 3], -yaw);
-    let donor_anchors=playable_anchor_candidates(&donor_mesh,&donor_faces,index,donor_direction,&starts(donor),radius)?;
+    let donor_anchors=playable_anchor_candidates(&donor_mesh,&donor_faces,index,donor_direction,&starts(donor),radius,&|_| true)?;
     let (start,face)=base_anchors[0];
     let (end,_)=donor_anchors[0];
     let donor_part = &donor_mesh.parts[index];
@@ -2618,6 +2732,8 @@ fn plan_from_bsp_placement(
         })?;
     let mut plan = BspAssembly {
         schema_version: 1,
+        atlas_origin: None,
+        atlas_from_region_id: None,
         donor_project_id: donor_project.id.clone(),
         donor_title: donor_project.title.clone(),
         donor_source,
@@ -2870,13 +2986,14 @@ fn playable_anchor(
     toward: V,
     starts: &[V],
 ) -> Result<(V, usize)> {
-    Ok(playable_anchor_candidates(mesh,faces,part,toward,starts,32.)?.into_iter().next().unwrap())
+    Ok(playable_anchor_candidates(mesh,faces,part,toward,starts,32.,&|_| true)?.into_iter().next().unwrap())
 }
 
 fn playable_anchor_candidates(
     mesh:&MeshData, faces:&[CollisionFace], part:usize, toward:V, starts:&[V], radius:f64,
+    in_region: &dyn Fn(V) -> bool,
 ) -> Result<Vec<(V,usize)>> {
-    let fallback = anchor(mesh, faces, part, toward)?;
+    let fallback = anchor_in_region(mesh, faces, part, toward, in_region)?;
     let range = &mesh.parts[part];
     let mut candidates = vec![];
     for start in starts {
@@ -2899,7 +3016,7 @@ fn playable_anchor_candidates(
                 continue;
             }
             let point = [start[0], start[1], z];
-            if !bary(
+            if !in_region(point) || !bary(
                 point,
                 &RenderTri {
                     p,
