@@ -548,10 +548,10 @@ impl RouteChecker {
                     }
                 }
             }
-            if previous.is_some_and(|(_, old)| (z - old).abs() > 0.12) {
+            if let Some((old_point, old_floor)) = previous.filter(|(_, old)| (z - old).abs() > 0.12) {
                 return invalid(format!(
-                    "Tunnel floor has a step higher than 0.12 world units in segment {} near {:.2}, {:.2}, {:.2}; add a ramp waypoint",
-                    segment + 1, p[0], p[1], z,
+                    "Tunnel floor changes by {:.3} world units in segment {} (limit 0.12). Ramp between ({:.3}, {:.3}, {:.3}) and ({:.3}, {:.3}, {:.3}).",
+                    (z - old_floor).abs(), segment + 1, old_point[0], old_point[1], old_floor, p[0], p[1], z,
                 ));
             }
             for height in [0.20, 0.36, 0.52] {
