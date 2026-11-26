@@ -1440,20 +1440,47 @@ fn outdoor_cut(plan: &BspAssembly) -> Option<(V, V)> {
     Some((add(*start, mul(delta, fraction)), delta))
 }
 
+pub(crate) fn outdoor_sky_witnesses(plan: &BspAssembly) -> Option<[[f32; 3]; 2]> {
+    let (center, delta) = outdoor_cut(plan)?;
+    let shift = mul(delta, 0.5 / delta[0].hypot(delta[1]));
+    let eye = add(center, [0., 0., 0.65]);
+    Some([sub(eye, shift), add(eye, shift)].map(|point| point.map(|axis| axis as f32)))
+}
+
+pub(crate) fn outdoor_stock_sky(plan: &BspAssembly) -> Result<String> {
+    let source = &plan.donor_source;
+    let metadata = crate::bsp_audio::inspect_ambience_for_bsp(&source.preserved_path, &source.sha256, Some(plan.donor_bsp_index))?;
+    let slots = metadata.bsps.first().ok_or_else(|| SparkError::Invalid("Stock sky source has no selected BSP".into()))?
+        .clusters.iter().filter_map(|cluster| usize::try_from(cluster.sky).ok()).collect::<std::collections::BTreeSet<_>>();
+    if slots.len() != 1 { return invalid(format!("{} must have one original outdoor sky on the selected BSP", plan.donor_title)); }
+    metadata.skies.get(*slots.first().unwrap()).and_then(Option::as_ref).cloned()
+        .ok_or_else(|| SparkError::Invalid("Original outdoor sky dependency is missing".into()))
+}
+
 pub(crate) fn verify_compiled_outdoor_sky_splits(project: &Project, path: &Path, map: &MapInspection) -> Result<usize> {
     let cuts = project.inherited_bsp_connections.iter().chain(project.bsp_assembly.iter())
-        .filter_map(outdoor_cut).collect::<Vec<_>>();
+        .filter_map(|plan| outdoor_sky_witnesses(plan).map(|witnesses| (plan, witnesses))).collect::<Vec<_>>();
     if cuts.is_empty() { return Ok(0); }
     let ambience = crate::bsp_audio::inspect_ambience_for_bsp(path, &map.sha256, Some(0))?;
-    let tree = ambience.bsps.first().and_then(|bsp| bsp.listener_tree.as_ref())
+    let native = ambience.bsps.first().ok_or_else(|| SparkError::Invalid("Outdoor sky split output has no BSP".into()))?;
+    let tree = native.listener_tree.as_ref()
         .ok_or_else(|| SparkError::Invalid("Outdoor sky split output has no native cluster tree".into()))?;
-    for &(center, delta) in &cuts {
-        let shift = mul(delta, 0.5 / delta[0].hypot(delta[1]));
-        let eye = add(center, [0., 0., 0.65]);
-        let behind = tree.cluster_at(sub(eye, shift).map(|v| v as f32));
-        let ahead = tree.cluster_at(add(eye, shift).map(|v| v as f32));
+    for (plan, [base, donor]) in &cuts {
+        let behind = tree.cluster_at(*base);
+        let ahead = tree.cluster_at(*donor);
         if behind.is_none() || ahead.is_none() || behind == ahead {
-            return invalid(format!("Outdoor sky split at ({:.2}, {:.2}, {:.2}) did not separate native road clusters. Adjust the seam plane before accepting this build.", center[0], center[1], center[2]));
+            return invalid(format!("Outdoor sky split at ({:.2}, {:.2}, {:.2}) did not separate native road clusters. Adjust the seam plane before accepting this build.", donor[0], donor[1], donor[2]));
+        }
+        let read_sky = |cluster: usize| native.clusters.get(cluster)
+            .and_then(|cluster| usize::try_from(cluster.sky).ok())
+            .and_then(|slot| ambience.skies.get(slot))
+            .and_then(Option::as_deref);
+        let expected = outdoor_stock_sky(plan)?;
+        let equal = |first: &str, second: &str| first.replace('\\', "/").eq_ignore_ascii_case(&second.replace('\\', "/"));
+        if !read_sky(ahead.unwrap()).is_some_and(|sky| equal(sky, &expected))
+            || read_sky(behind.unwrap()).is_some_and(|sky| equal(sky, &expected))
+        {
+            return invalid(format!("Compiled {} road clusters did not retain distinct stock sky assignments", plan.donor_title));
         }
     }
     Ok(cuts.len())
@@ -1575,6 +1602,18 @@ fn inherited_sky_portals(
         }
     }
     Ok((outlines, matched))
+}
+
+pub(crate) fn verify_compiled_inherited_sky_portals(project: &Project, path: &Path, map: &MapInspection) -> Result<usize> {
+    if !project.inherited_bsp_connections.iter().any(|plan| plan.restore_donor_sky_portals) {
+        return Ok(0);
+    }
+    let native = maps::compiled_portals(path, map, 0)?;
+    let (expected, matched) = inherited_sky_portals(&project.inherited_bsp_connections, &native)?;
+    if matched.len() != expected.len() {
+        return invalid("Native BSP partition omitted a restored doorway sky portal");
+    }
+    Ok(matched.len())
 }
 
 fn retain_base_portals(project: &Project, base: &MapInspection, geometry: &mut AssemblyGeometry) -> Result<()> {

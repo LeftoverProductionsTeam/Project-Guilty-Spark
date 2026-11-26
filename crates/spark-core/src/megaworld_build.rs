@@ -342,7 +342,11 @@ fn build_partition_cache(
         }
     }
     crate::bsp_compile::verify_compiled_base(project, source, &map)?;
-    crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &path, &map)?;
+    let sky_splits = crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &path, &map)?;
+    let sky_doors = crate::bsp_assembly::verify_compiled_inherited_sky_portals(project, &path, &map)?;
+    if sky_splits > 0 || sky_doors > 0 {
+        runner.emit("partition-sky-readback", format!("{sky_splits} distinct stock sky split(s), {sky_doors} restored doorway cuts"), 92, "success");
+    }
     if !prepared.scenery.is_empty() {
         crate::bsp_scenery::verify_compiled(source, &map, &path, &prepared.scenery, &format!("gsbsp_{}_1", &runner.id[..8]), 0)?;
     }

@@ -111,6 +111,8 @@ impl ListenerTree {
 pub struct Inspection {
     pub source_sha256: String,
     pub bsps: Vec<Bsp>,
+    #[serde(skip)]
+    pub(crate) skies: Vec<Option<String>>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -304,6 +306,10 @@ fn read_with_listener(
         }
         Ok(Some(tag.1.clone()))
     };
+    let skies = if matches!(listener, ListenerReadback::Region(_)) {
+        let (start, count) = tags.block(&r, sc + 0x30, 16, if header.version == 13 { 16 } else { 8 })?;
+        (0..count).map(|slot| dependency(start + slot * 16, "sky ")).collect::<Result<Vec<_>>>()?
+    } else { Vec::new() };
     let mut bsps = vec![];
     let (mut total_clusters, mut total_subclusters) = (0, 0);
     let (mut total_nodes, mut total_planes, mut total_leaves) = (0, 0, 0);
@@ -493,6 +499,7 @@ fn read_with_listener(
     Ok(Inspection {
         source_sha256: sha,
         bsps,
+        skies,
     })
 }
 

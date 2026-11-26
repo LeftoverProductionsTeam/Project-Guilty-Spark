@@ -679,7 +679,7 @@ impl Runner<'_> {
                     compile_errors.extend(native_compile_errors(&line));
                 }
                 let display = line.trim();
-                if log_tool_line(err, display){
+                if (err || phase != "outdoor-sky-tree") && log_tool_line(err, display){
                     self.emit(phase, display, progress, if err { "tool" } else { "info" });
                 }
             }

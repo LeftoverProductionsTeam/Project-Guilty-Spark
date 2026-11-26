@@ -1103,6 +1103,165 @@ fn bind_intact_skies(
     Ok(offset as u8)
 }
 
+fn native_sky_listener(
+    mut query: impl FnMut(&str) -> Result<String>,
+    cluster_count: usize,
+) -> Result<crate::bsp_audio::ListenerTree> {
+    let integers = |text: String, max: usize| -> Result<Vec<u32>> {
+        let rows = text.lines().take(max + 1).map(|row| {
+            let row = row.trim();
+            row.parse::<u32>().or_else(|_| row.parse::<i32>().map(|value| value as u32))
+                .map_err(|_| SparkError::Invalid("Native sky BSP index is unreadable".into()))
+        }).collect::<Result<Vec<_>>>()?;
+        if rows.is_empty() || rows.len() > max { return invalid("Native sky BSP index exceeds its bounds"); }
+        Ok(rows)
+    };
+    let nodes = "collision_bsp[0].bsp3d_nodes[*]";
+    let planes_at = integers(query(&format!("{nodes}.plane"))?, 131072)?;
+    let back = integers(query(&format!("{nodes}.back_child"))?, 131072)?;
+    let front = integers(query(&format!("{nodes}.front_child"))?, 131072)?;
+    if planes_at.len() != back.len() || planes_at.len() != front.len() {
+        return invalid("Native sky BSP node fields disagree about their size");
+    }
+    let planes = query("collision_bsp[0].planes[*].plane")?.lines().take(65537).map(|line| {
+        let mut plane = [0.; 4];
+        let fields = line.split(',').collect::<Vec<_>>();
+        if fields.len() != 4 { return invalid("Native sky BSP plane has the wrong dimension"); }
+        for (value, field) in plane.iter_mut().zip(fields) {
+            *value = field.trim().parse::<f32>().ok().filter(|value| value.is_finite())
+                .ok_or_else(|| SparkError::Invalid("Native sky BSP plane is unreadable".into()))?;
+        }
+        Ok(plane)
+    }).collect::<Result<Vec<_>>>()?;
+    if planes.is_empty() || planes.len() > 65536 { return invalid("Native sky BSP plane count exceeds its bounds"); }
+    let leaf_clusters = integers(query("leaves[*].cluster")?, 65536)?.into_iter().map(|slot| {
+        if slot == u16::MAX as u32 || slot == u32::MAX { return Ok(None); }
+        if (slot as usize) < cluster_count { return Ok(Some(slot as usize)); }
+        invalid("Native sky BSP leaf references an invalid cluster")
+    }).collect::<Result<Vec<_>>>()?;
+    let node_count = planes_at.len();
+    let nodes = planes_at.into_iter().zip(back).zip(front).map(|((plane, back), front)| {
+        let valid = |child: u32| {
+            let count = if child >> 31 == 0 { node_count } else { leaf_clusters.len() };
+            child == u32::MAX || ((child & 0x7fff_ffff) as usize) < count
+        };
+        if plane as usize >= planes.len() || !valid(back) || !valid(front) {
+            return invalid("Native sky BSP node references invalid geometry");
+        }
+        Ok([plane, back, front])
+    }).collect::<Result<Vec<_>>>()?;
+    Ok(crate::bsp_audio::ListenerTree { nodes, planes, leaf_clusters })
+}
+
+#[test]
+fn native_sky_listener_keeps_unsigned_and_signed_leaf_addresses() {
+    let leaf_row = "0\n1\n";
+    let mut source = |field: &str| -> Result<String> {
+        let value = match field {
+            "collision_bsp[0].bsp3d_nodes[*].plane" => "0\n",
+            "collision_bsp[0].bsp3d_nodes[*].back_child" => "-2147483648\n",
+            "collision_bsp[0].bsp3d_nodes[*].front_child" => "2147483649\n",
+            "collision_bsp[0].planes[*].plane" => "1.0,0.0,0.0,0.0\n",
+            "leaves[*].cluster" => leaf_row,
+            _ => panic!("unexpected native field: {field}"),
+        };
+        Ok(value.into())
+    };
+    let tree = native_sky_listener(&mut source, 2).unwrap();
+    assert_eq!(tree.cluster_at([-1., 0., 0.]), Some(0));
+    assert_eq!(tree.cluster_at([1., 0., 0.]), Some(1));
+    assert!(native_sky_listener(source, 1).is_err());
+}
+
+fn apply_outdoor_stock_skies(
+    project: &Project, structure: &str, scenario: &str, edit: &Path,
+    tools: &Toolchain, runner: &Runner, workspace: &Path, tags: &Path,
+) -> Result<()> {
+    let bindings = project.inherited_bsp_connections.iter().chain(project.bsp_assembly.iter())
+        .filter_map(|plan| bsp_assembly::outdoor_sky_witnesses(plan).map(|witnesses| (plan, witnesses)))
+        .collect::<Vec<_>>();
+    if bindings.is_empty() { return Ok(()); }
+    let run = |root: &Path, tag: &str, fields: &[String]| {
+        let mut args = vec!["-t".into(), root.to_string_lossy().into_owned()];
+        args.extend_from_slice(fields);
+        args.push(tag.to_owned());
+        let phase = if fields.first().is_some_and(|field| field == "-G")
+            && fields.get(1).is_some_and(|field| field.starts_with("collision_bsp[") || field.starts_with("leaves["))
+        { "outdoor-sky-tree" } else { "outdoor-sky-source" };
+        runner.run(edit, &args, workspace, phase, 65)
+    };
+    let get = |root: &Path, tag: &str, key: &str| run(root, tag, &["-G".into(), key.into()]);
+    let structure = format!("{structure}.scenario_structure_bsp");
+    let count = run(tags, &structure, &["-C".into(), "clusters".into()])?.trim().parse::<usize>()
+        .ok().filter(|&count| (1..=8192).contains(&count))
+        .ok_or_else(|| SparkError::Invalid("Native outdoor BSP has an invalid cluster count".into()))?;
+    let listener = native_sky_listener(|key| get(tags, &structure, key), count)?;
+    let normalize = |name: &str| name.replace('/', "\\").to_ascii_lowercase();
+    let scenario = format!("{scenario}.scenario");
+    let mut slots = get(tags, &scenario, "skies[*].sky")?.lines()
+        .map(str::trim).filter(|name| !name.is_empty()).map(normalize).collect::<Vec<_>>();
+    let extract = find_tool(tools, "invader-extract")?;
+    let mut bound = BTreeSet::new();
+    for (index, (plan, [base, donor])) in bindings.into_iter().enumerate() {
+        let cluster = listener.cluster_at(donor).filter(|&cluster| {
+            listener.cluster_at(base).is_some_and(|other| other != cluster)
+        }).ok_or_else(|| SparkError::Invalid(format!("{} outdoor sky needs separate native road clusters", plan.donor_title)))?;
+        if !bound.insert(cluster) {
+            return invalid("Two regional sky assignments target the same outdoor BSP cluster");
+        }
+        let source = &plan.donor_source;
+        let resources = source.resource_directory.as_deref().or_else(|| source.preserved_path.parent())
+            .ok_or_else(|| SparkError::Invalid("Stock sky source has no resource directory".into()))?;
+        crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+        let sky = normalize(&format!("{}.sky", bsp_assembly::outdoor_stock_sky(plan)?));
+        let input = workspace.join(format!("outdoor-sky-source-{index}"));
+        let slot = match slots.iter().position(|existing| *existing == sky) {
+            Some(slot) => slot,
+            None => {
+                if slots.len() >= NATIVE_SKY_SLOTS { return invalid("Regional sky would exceed this compiler's native eight-sky budget"); }
+                let destination = tags.join(safe_relative(&sky)?);
+                if !destination.is_file() {
+                    fs::create_dir(&input)?;
+                    runner.run(&extract, &["-t".into(), input.to_string_lossy().into_owned(), "-m".into(),
+                        resources.to_string_lossy().into_owned(), "-s".into(), sky.clone(), "-r".into(),
+                        source.preserved_path.to_string_lossy().into_owned()], workspace, "extract", 65)?;
+                    let inventory = crate::native_staging::inventory(&input, runner.cancel)?;
+                    for entry in inventory.files {
+                        let relative = safe_relative(&entry.path)?;
+                        let from = input.join(&relative);
+                        let to = tags.join(relative);
+                        reject_links(&to)?;
+                        let hash = maps::hash_file(&from)?;
+                        if to.is_file() {
+                            if maps::hash_file(&to)? != hash {
+                                return invalid(format!("Original outdoor sky dependency conflicts with an authored tag: {}", entry.path));
+                            }
+                        } else {
+                            fs::create_dir_all(to.parent().unwrap())?;
+                            crate::native_staging::copy_file(&from, &to, entry.bytes, Some(&hash), runner.cancel)?;
+                        }
+                    }
+                    if !destination.is_file() { return invalid("Original outdoor sky dependency extraction did not produce its root"); }
+                }
+                let slot = slots.len();
+                run(tags, &scenario, &["-I".into(), "skies".into(), "1".into(), "end".into(),
+                    "-S".into(), format!("skies[{slot}].sky"), sky.clone()])?;
+                slots.push(sky.clone());
+                slot
+            }
+        };
+        run(tags, &structure, &["-S".into(), format!("clusters[{cluster}].sky"), slot.to_string()])?;
+        let assigned = get(tags, &structure, &format!("clusters[{cluster}].sky"))?;
+        let bound_sky = get(tags, &scenario, &format!("skies[{slot}].sky"))?;
+        if assigned.trim().parse::<usize>().ok() != Some(slot) || normalize(bound_sky.trim()) != sky {
+            return invalid("Native outdoor sky binding failed readback");
+        }
+        crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+        runner.emit("outdoor-sky-source", format!("{} stock sky bound to cluster {cluster}", plan.donor_title), 65, "success");
+    }
+    Ok(())
+}
+
 /// Stage each native structure. Only the explicit scenario probe binds the
 /// pair and appends the reviewed switches to the owned scenario copy.
 pub(crate) fn prepare_partition_structure(
@@ -1190,6 +1349,9 @@ pub(crate) fn prepare_partition_structure(
     } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
+        if base_geometry.is_some() {
+            apply_outdoor_stock_skies(project, &structure_tags[0], &inspection.scenario_path, &edit, tools, runner, workspace, tags)?;
+        }
         with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
             for (name, geometry) in &regions {
                 if plan.tunnel_bake_fill {
@@ -1383,6 +1545,7 @@ pub(crate) fn prepare_native_with_limits(
     }
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
+    apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags)?;
     with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
         bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
     })?;
