@@ -3,7 +3,7 @@
 Task: MegaWorld, original Zombie Apocalypse conversion and repeatable Black Echo Extraction
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 4ed6ae7 SHA-256 63cbf5c92e71cba7f40ba23ff7c7e01c4cd83b453e2ff9d1dd082927ed4c1f9d. Named weapon placement, native startup and embedded frontend verified. Previous b7aac35 (ebe46b64). Rotation reclaimed 61,682,176 bytes.
+Latest verified revision: Win64 072b815 SHA-256 bd7ddf5a73c78bfbb189ec6047ea1c684c2036994c46abbf25659e5d4cd5826a. Mission pickup advisory, native startup and embedded frontend verified. Previous 4ed6ae7 (63cbf5c9). Rotation reclaimed 61,682,176 bytes.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native 78ddeb48 passed Elite death, respawn, diagonal movement and jump. On Forerunner 8da3477b, owner deploy 19:22:28 announced field LANDED at 19:23:46 after scraping/circling; seat exit failed. Full Pelican 10.2 × 7.6 footprint reads .895 terrain relief at (79,-124); alternate 1.154 at (80,-122). Native side seats have exits 19/22. Forerunner reproduced circling, then exited once. HUD inherited MCC C40. Private HUD A/B be-native-hud-scale-ab: fcd8e89b vs exact 78ddeb48, fourteen scale bits plus checksums. Native visual review pending.
 Next action: Exact Black Echo 529f12e5 live pair cleared facility, spawned original technology, collected by normal E (item slot 25 owned by guest biped 17 on both peers), and cleared HUD marker. Containment spawned and guest died, dropping the weapon. Returned Spirit did not block pickup. Continue actual recovery, defense, evacuation, banking and redeployment. West comparison stays separate.
