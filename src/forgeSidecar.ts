@@ -162,6 +162,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     objectives: layout.objectiveRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
     writeMarker: layout.write,
     metadata: { details: layout.details, date: layout.date },
+    hmvCompatibility: { version: layout.version, preservedFeatures: layout.preservedFeatures },
     forerunnerLocalIssue: layout.forerunnerLocalIssue ?? unresolved,
     forerunnerHostPhysicsIssue: layout.forerunnerHostPhysicsIssue ?? unresolved,
     forerunnerLocalNeedsPhysics: layout.forerunnerLocalNeedsPhysics,
@@ -180,6 +181,7 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const devices = rows.filter(row => isHmvDeviceGroup(row.tag.class)).map(row => prefix + row.key);
   return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
     metadata: 'metadata' in parsed ? parsed.metadata : undefined,
+    hmvCompatibility: 'hmvCompatibility' in parsed ? parsed.hmvCompatibility : undefined,
     hmvConversionIssue: 'hmvConversionIssue' in parsed ? parsed.hmvConversionIssue : undefined,
     forerunnerLocalIssue: 'forerunnerLocalIssue' in parsed ? parsed.forerunnerLocalIssue : undefined,
     forerunnerHostPhysicsIssue: 'forerunnerHostPhysicsIssue' in parsed ? parsed.forerunnerHostPhysicsIssue : undefined,

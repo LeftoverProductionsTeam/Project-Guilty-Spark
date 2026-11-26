@@ -116,6 +116,85 @@ describe('Chupathingy Forge binary layouts', () => {
   const project = { id: 'owned-xbox-source', source: { sha256: hash }, scene: [] } as unknown as Project;
   const source = Uint8Array.from(Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==', 'base64'));
 
+  it('round-trips all current HMV feature versions without dropping data during edits', () => {
+    const base = new DataView(source.buffer, source.byteOffset, source.byteLength);
+    const originalRecordStart = 64 + 5 + source[68];
+    const originalMeta = source.slice(source.length - base.getUint16(54, true));
+    const originalRecords = source.slice(originalRecordStart, source.length - originalMeta.length);
+    const encoder = new TextEncoder();
+    const pathEntry = (group: string, tagPath: string) => {
+      const reversed = [...group].reverse().join('');
+      return Uint8Array.from([...encoder.encode(reversed), tagPath.length, ...encoder.encode(tagPath)]);
+    };
+    const paths = [pathEntry('sky ', 'sky\\test'), pathEntry('effe', 'effects\\test'), pathEntry('deca', 'decals\\test')];
+    const marker = (kind: number, team: number, variant: number, params: number[] = [], path = 0xffff) => {
+      const record = new Uint8Array(48), view = new DataView(record.buffer);
+      view.setUint16(0, path, true);
+      record[2] = kind;
+      view.setInt8(3, team);
+      record[33] = variant;
+      record.set(params, 39);
+      return record;
+    };
+    const route = marker(19, 3, 2);
+    const area = marker(20, 3, 4);
+    const volume = marker(21, -1, 1, [0, 8, 12, 16, 15, 0]);
+    const sky = marker(22, 0, 0, [3, 1, 2, 3, 50, 8, 10], 1);
+    const effect = marker(23, 0, 0, [5], 2);
+    const decal = marker(24, 0, 0, [10], 3);
+    const canvas = Uint8Array.from([1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 4, 0]);
+    function build(version: number, extra: Uint8Array[], extraPaths: Uint8Array[] = []) {
+      const file = Uint8Array.from([
+        ...source.slice(0, originalRecordStart), ...extraPaths.flatMap(row => Array.from(row)),
+        ...originalRecords, ...extra.flatMap(row => Array.from(row)), ...canvas, ...originalMeta,
+      ]);
+      const view = new DataView(file.buffer);
+      view.setUint16(4, version, true);
+      view.setUint32(8, 5, true);
+      view.setUint16(50, 1 + extraPaths.length, true);
+      view.setUint16(52, 2 + extra.length, true);
+      view.setUint32(56, file.length - 64, true);
+      view.setUint32(60, crc32(file.subarray(64)), true);
+      return file;
+    }
+    const rows = [route, area, volume, sky, effect, decal];
+    const fixtures = [
+      build(11, []), build(12, [route, area]),
+      build(13, Array.from({ length: 255 }, () => originalRecords.slice(0, 48))),
+      build(14, [volume]), build(15, [sky], paths.slice(0, 1)), build(16, rows, paths),
+    ];
+    for (const fixture of fixtures) {
+      const decoded = readHmv(Array.from(fixture), map);
+      expect(decoded.finish()).toEqual(fixture);
+      expect(decoded.forerunnerIssue).toContain('full layout copy');
+    }
+    const fixture = fixtures.at(-1)!;
+    const imported = importForgeSidecar(project, map, 'test.hmv', fixture).project;
+    expect(inspectForgeSidecar(imported.forgeSidecar!, map).hmvCompatibility).toMatchObject({
+      version: 16, preservedFeatures: expect.arrayContaining([{ label: 'decals', count: 1 }, { label: 'volumes', count: 1 }]),
+    });
+    imported.scene[0].position[0] = 4;
+    const exported = exportForgeSidecar(imported, map) as Uint8Array;
+    const reopened = readHmv(Array.from(exported), map);
+    expect(reopened.objectRecords[0].position[0]).toBe(4);
+    const placed = readHmv(Array.from(reopened.writeProperties(0, { team: -1, physics: 'fixed', placeAtStart: true, respawnSeconds: 0 })), map);
+    const saved = placed.append('weap', 'weapons\\test', [5, 0, 0], [0, 0, 0]);
+    const final = readHmv(Array.from(saved), map);
+    expect(final.version).toBe(16);
+    expect(final.objectRecords[0].properties.physics).toBe('fixed');
+    expect(final.recordsCount).toBe(9);
+    const advancedStart = originalRecordStart + paths.reduce((sum, row) => sum + row.length, 0) + 96;
+    expect(saved.slice(advancedStart, advancedStart + rows.length * 48))
+      .toEqual(fixture.slice(advancedStart, advancedStart + rows.length * 48));
+    expect(saved.slice(-originalMeta.length - canvas.length, -originalMeta.length)).toEqual(canvas);
+
+    const without257th = readHmv(Array.from(readHmv(Array.from(fixtures[2]), map).remove(256)), map);
+    expect(without257th.version).toBe(11);
+    expect(() => readHmv(Array.from(build(10, [])), map)).toThrow('supported .hmv version');
+    const badVolume = marker(21, 0, 1, [0, 8, 12, 16, 15, 0]);
+    expect(() => readHmv(Array.from(build(14, [badVolume])), map)).toThrow('invalid placement record');
+  });
+
   it('round-trips unchanged, then patches the reviewed transform and payload checksum only', () => {
     const imported = importForgeSidecar(project, map, 'test.hmv', source);
     expect([imported.editable, imported.retained]).toEqual([1, 1]);

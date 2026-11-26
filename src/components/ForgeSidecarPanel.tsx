@@ -311,6 +311,14 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
         </form>
       </details>}
       {summary&&<p role="status">{summary.editable + visibleMarkers - hiddenDevices.length} editable placements · {summary.retained - visibleMarkers + hiddenDevices.length} other records preserved.</p>}
+      {summary?.hmvCompatibility && summary.hmvCompatibility.version > 7 && (
+        <p className="subtle">
+          Chupathingy HMV {summary.hmvCompatibility.version}.
+          {summary.hmvCompatibility.preservedFeatures.length > 0 &&
+            <> Preserved in the full layout copy: {summary.hmvCompatibility.preservedFeatures.map(feature => `${feature.count} ${feature.label}`).join(', ')}.</>}
+          {' '}Choose Export Forge layout copy to keep the full layout.
+        </p>
+      )}
       {!!hiddenDevices.length && <button type="button" onClick={() => {
         try {
           const next = showHmvDevices(project, map);

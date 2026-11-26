@@ -395,12 +395,14 @@ impl Project {
                     })
                     && (68..=65536).contains(&bytes.len())
                     && bytes.starts_with(b"HFRG")
-                    && (1..=7).contains(&u16::from_le_bytes([bytes[4], bytes[5]]))
+                    && matches!(u16::from_le_bytes([bytes[4], bytes[5]]), 1..=7 | 11..=16)
+                    && u16::from_le_bytes([bytes[52], bytes[53]])
+                        <= if u16::from_le_bytes([bytes[4], bytes[5]]) >= 13 { 512 } else { 256 }
                     && bytes[6..8] == [64, 0]
                     && layout.record_keys.as_ref().is_none_or(|keys| {
                         let count = u16::from_le_bytes([bytes[52], bytes[53]]) as usize;
                         let unique: std::collections::HashSet<_> = keys.iter().collect();
-                        count <= 256 && keys.len() == count && unique.len() == count
+                        keys.len() == count && unique.len() == count
                             && keys.iter().all(|key| (1..=36).contains(&key.len())
                                 && key.bytes().all(|byte| byte.is_ascii_lowercase()
                                     || byte.is_ascii_digit() || byte == b'-'))
@@ -1200,6 +1202,31 @@ mod forge_sidecar_project_tests {
         reopened.forge_sidecar.as_mut().unwrap().text = None;
         reopened.source.as_mut().unwrap().cache_version = 7;
         assert!(reopened.validate().is_err());
+
+        for version in [11, 12, 13, 14, 15, 16] {
+            let mut advanced = project.clone();
+            let layout = advanced.forge_sidecar.as_mut().unwrap();
+            let contents = layout.bytes.as_mut().unwrap();
+            let count = if version >= 13 { 512_u16 } else { 256_u16 };
+            contents[4] = version;
+            contents[52..54].copy_from_slice(&count.to_le_bytes());
+            layout.record_keys = Some((0..count).map(|index| index.to_string()).collect());
+            let encoded = serde_json::to_vec(&advanced).unwrap();
+            let mut restored: Project = serde_json::from_slice(&encoded).unwrap();
+            restored.validate().unwrap();
+            let layout = restored.forge_sidecar.as_ref().unwrap();
+            assert_eq!(layout.bytes, advanced.forge_sidecar.as_ref().unwrap().bytes);
+            assert_eq!(layout.record_keys, advanced.forge_sidecar.as_ref().unwrap().record_keys);
+            if version == 16 {
+                let bytes = restored.forge_sidecar.as_mut().unwrap().bytes.as_mut().unwrap();
+                bytes[4] = 10;
+                assert!(restored.validate().is_err());
+                let bytes = restored.forge_sidecar.as_mut().unwrap().bytes.as_mut().unwrap();
+                bytes[4] = 16;
+                bytes[52..54].copy_from_slice(&513_u16.to_le_bytes());
+                assert!(restored.validate().is_err());
+            }
+        }
     }
 }
 

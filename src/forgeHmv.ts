@@ -6,8 +6,7 @@ export type HmvBaseIdentity = {
   scenarioPath?: string;
 };
 
-// Chupathingy Forge layout format, versions 1–7. See the pinned upstream
-// format reference in docs/RUNTIME_INTEGRATION_20261107.md.
+// Chupathingy Forge layout wire format, as specified in upstream forge_files.h.
 export const HMV_LIMIT = 65536;
 export type ForgeLayoutTarget = 'forerunner' | 'forerunner-local' | 'forerunner-host-physics';
 export const HMV_NAME = /^(?!(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\.hmv$)[a-z0-9_-]{1,28}\.hmv$/;
@@ -56,7 +55,16 @@ export interface HmvPlacementProperties {
 const forerunnerGroups = ['scen', 'vehi', 'weap', 'eqip'] as const;
 const deviceGroups = ['mach', 'ctrl'] as const;
 export const HMV_PLACEMENT_GROUPS = [...forerunnerGroups, ...deviceGroups] as const;
-const groups = [...HMV_PLACEMENT_GROUPS, 'bipd', 'lifi', 'actv'];
+const groups = [...HMV_PLACEMENT_GROUPS, 'bipd', 'lifi', 'actv', 'sky ', 'effe', 'deca'];
+const advancedPathVersion = new Map([['sky ', 15], ['effe', 16], ['deca', 16]]);
+const advancedKinds = [
+  { version: 12, limit: 64, label: 'AI route points' },
+  { version: 12, limit: 16, label: 'AI patrol areas' },
+  { version: 14, limit: 32, label: 'volumes' },
+  { version: 15, limit: 1, label: 'sky and fog' },
+  { version: 16, limit: 16, label: 'effects' },
+  { version: 16, limit: 32, label: 'decals' },
+];
 const basePlacementGroups: ReadonlySet<string> = new Set(forerunnerGroups);
 export function isHmvDeviceGroup(group: string) {
   return deviceGroups.some(candidate => candidate === group);
@@ -148,42 +156,66 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   const u32 = (offset: number) => view.getUint32(offset, true);
   requireLayout(ascii(bytes.subarray(0, 4)) === 'HFRG' && u16(6) === headerSize, 'invalid file header.');
   const version = u16(4);
-  requireLayout(version >= 1 && version <= 7, 'choose a supported version 1–7 .hmv file.');
+  requireLayout(version >= 1 && version <= 7 || version >= 11 && version <= 16,
+    'choose a supported .hmv version (1–7 or 11–16).');
+  const headerFlags = u32(8);
+  requireLayout(!(headerFlags & ~(version >= 11 ? 5 : 1)), 'unsupported layout flags.');
   const mapName = paddedName(bytes.subarray(12, 44), /^[a-z0-9_]{1,31}$/, true);
   requireLayout(supportsHmvMap(map) && mapName === scenarioShortName(map) && u32(44) === (map.header.crc32 >>> 0),
     'open the matching Xbox multiplayer or Halo Custom Edition base map. The scenario name and original cache checksum must match.');
   const packs = u16(48), pathsCount = u16(50), recordsCount = u16(52), metaSize = u16(54);
-  requireLayout(packs <= 8 && pathsCount <= 256 && recordsCount <= 256 && metaSize >= 4 && metaSize <= 2048
+  requireLayout(packs <= 8 && pathsCount <= 256 && recordsCount <= (version >= 13 ? 512 : 256) && metaSize >= 4 && metaSize <= 2048
     && u32(56) === bytes.length - headerSize, 'invalid section sizes or counts.');
   requireLayout(crc32(bytes.subarray(headerSize)) === u32(60), 'payload checksum failed.');
-  const recordsEnd = bytes.length - metaSize;
-  const recordsStart = recordsEnd - recordsCount * recordSize;
+  const metaStart = bytes.length - metaSize;
+  const latestPathEnd = metaStart - recordsCount * recordSize;
   let offset = headerSize + packs * 32;
-  requireLayout(offset <= recordsStart, 'overlapping sections.');
+  requireLayout(offset <= latestPathEnd, 'overlapping sections.');
   for (let at = headerSize; at < offset; at += 32) {
     paddedName(bytes.subarray(at + 8, at + 32), /^[a-z0-9_ -]{1,24}$/);
   }
   const paths = new Map<string, { group: string; path: string }>();
   for (let i = 0; i < pathsCount; i++) {
-    requireLayout(offset + 5 <= recordsStart, 'truncated tag paths.');
+    requireLayout(offset + 5 <= latestPathEnd, 'truncated tag paths.');
     const group = groupNames.get(u32(offset));
     const size = bytes[offset + 4];
     offset += 5;
-    requireLayout(group && size >= 1 && size <= 127 && offset + size <= recordsStart, 'invalid tag path group or length.');
+    requireLayout(group && size >= 1 && size <= 127 && offset + size <= latestPathEnd && version >= (advancedPathVersion.get(group) ?? 1), 'invalid tag path group or length.');
     const path = ascii(bytes.subarray(offset, offset + size));
     offset += size;
     const key = group + '|' + path;
     requireLayout(hmvPathValid(path) && !paths.has(key), 'invalid or repeated tag path.');
     paths.set(key, { group, path });
   }
-  requireLayout(offset === recordsStart, 'unexpected bytes before placement records.');
+  const recordsStart = offset;
+  const recordsEnd = recordsStart + recordsCount * recordSize;
+  const hasCanvas = !!(headerFlags & 4);
+  if (hasCanvas) {
+    requireLayout(metaStart >= recordsEnd + 8 && bytes[recordsEnd] === 1 && !bytes[recordsEnd + 1]
+      && !u16(recordsEnd + 6), 'invalid stock placement block header.');
+    const categories = u16(recordsEnd + 2), entries = u16(recordsEnd + 4);
+    requireLayout(!(categories & ~0x3ff) && entries <= 1024
+      && (categories || entries) && metaStart === recordsEnd + 8 + entries * 4, 'invalid stock placement block size.');
+    let previousKey = -1;
+    for (let at = recordsEnd + 8; at < metaStart; at += 4) {
+      const category = bytes[at], kept = bytes[at + 1], index = u16(at + 2);
+      const key = category * 8192 + index;
+      requireLayout(category < 10 && kept === (categories >>> category & 1)
+        && index < 8192 && key > previousKey, 'invalid or unordered stock placement entry.');
+      previousKey = key;
+    }
+  } else {
+    requireLayout(recordsEnd === metaStart, 'unexpected bytes after placement records.');
+  }
+  const canvas = bytes.subarray(recordsEnd, metaStart);
 
   const pathList = [...paths.values()];
   const objectRecords: { index: number; group: string; path: string; position: Vec3; rotation: Vec3; properties: HmvPlacementProperties }[] = [];
   const spawnRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvSpawnProperties }[] = [];
   const teleporterRecords: { index: number; position: Vec3; rotation: Vec3; channel: number; role: HmvTeleporterRole }[] = [];
   const recordVersions = new Uint8Array(recordsCount).fill(1);
-  let forerunnerIssue = packs ? 'Forerunner’s base layout cannot use object packs.'
+  let forerunnerIssue = version > 7 ? 'This HMV version needs Chupathingy Forge. Export a full layout copy to preserve its features.'
+    : packs ? 'Forerunner’s base layout cannot use object packs.'
     : recordsCount < 1 || recordsCount > 128 ? 'Forerunner needs 1–128 placements.' : null;
   let forerunnerLocalIssue = map.header.scenarioType === 1 ? forerunnerIssue : 'Local Forge needs a multiplayer base map.';
   let forerunnerHostPhysicsIssue = map.header.scenarioType !== 1 ? 'Hosted Forge needs a multiplayer base map.'
@@ -192,6 +224,8 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   const objectiveRecords: { index: number; position: Vec3; rotation: Vec3; properties: HmvObjectiveProperties }[] = [];
   let markers = false, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
+  const advancedCounts = new Uint16Array(advancedKinds.length);
+  let aiMovement = 0;
   for (let index = 0; index < recordsCount; index++, offset += recordSize) {
     const kind = bytes[offset + 2], team = view.getInt8(offset + 3);
     const transform = Array.from({ length: 6 }, (_, field) => view.getFloat32(offset + 4 + field * 4, true));
@@ -200,10 +234,43 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     const pathIndex = u16(offset), ref = pathList[pathIndex];
     const physics = flags & physicsMask, actor = ref?.group === 'actv';
     const invalid = 'invalid placement record ' + (index + 1) + '.';
-    requireLayout(transformsValid(transform) && bytes.subarray(offset + 36, offset + recordSize).every(value => value === 0), invalid);
+    const [behavior, route, aiOptions] = bytes.subarray(offset + 36, offset + 39);
+    const parameters = bytes.subarray(offset + 39, offset + recordSize);
+    const noParameters = parameters.every(value => value === 0);
+    const movement = behavior || route || aiOptions;
+    requireLayout(transformsValid(transform) && (!movement || version >= 12), invalid);
+    if (kind >= 19) {
+      const feature = advancedKinds[kind - 19];
+      requireLayout(feature && version >= feature.version && ++advancedCounts[kind - 19] <= feature.limit
+        && !respawn && !count && !modes && !flags && !aiTeam && !movement
+        && transform[4] === 0 && transform[5] === 0, invalid);
+      const [p0, p1, p2, p3, p4, p5, p6, p7, p8] = parameters;
+      if (kind === 19 || kind === 20) {
+        requireLayout(pathIndex === 0xffff && team >= 0 && team < 16
+          && variant < (kind === 19 ? 4 : 5) && noParameters, invalid);
+      } else if (kind === 21) {
+        const amountValid = variant === 0 ? p4 === 0 : variant === 1 ? p4 >= 1 && p4 <= 100 : p4 <= 200;
+        requireLayout(pathIndex === 0xffff && team >= -1 && team <= 1 && variant <= 2 && amountValid
+          && (p0 === 0 ? p1 && p2 && p3 : p0 === 1 && p1 && !p2 && !p3)
+          && p5 <= 1 && (team === -1 || p5 === 1) && !p6 && !p7 && !p8, invalid);
+      } else if (kind === 22) {
+        requireLayout(!team && !variant && transform.every(value => value === 0) && p0 >= 1 && p0 <= 3
+          && (p0 & 1 ? ref?.group === 'sky ' : pathIndex === 0xffff)
+          && (p0 & 2 ? p4 >= 1 && p4 <= 100 && p5 <= 254 && p5 < 2 * p6
+            : !p1 && !p2 && !p3 && !p4 && !p5 && !p6) && !p7 && !p8, invalid);
+      } else {
+        requireLayout(!team && !variant && ref?.group === (kind === 23 ? 'effe' : 'deca')
+          && (kind === 23 ? p0 <= 60 : p0 >= 1 && p0 <= 40)
+          && parameters.subarray(1).every(value => value === 0), invalid);
+      }
+      recordVersions[index] = feature.version;
+      markers = true;
+      continue;
+    }
+    requireLayout(noParameters, invalid);
     markers ||= kind !== 0;
     const group = ref?.group ?? '';
-    const ordinary = kind === 0 && count === 1 && (flags & ~physicsMask) === 1 && !respawn && !modes && !variant && !aiTeam;
+    const ordinary = kind === 0 && count === 1 && (flags & ~physicsMask) === 1 && !respawn && !modes && !variant && !aiTeam && !movement;
     const placementIssue = (target: string, physicsRule: string) => `${target} cannot import record ${index + 1}. It must be one base-map object placed at start with ${physicsRule} and no respawn timer, AI or game-mode settings.`;
     if (!forerunnerIssue && (!ordinary || physics || !basePlacementGroups.has(group))) {
       forerunnerIssue = isHmvDeviceGroup(group)
@@ -220,7 +287,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
 
     if (kind === 5 || kind === 7 || kind === 8) {
       requireLayout(pathIndex === 0xffff && team >= 0 && !respawn && !count && !modes && !flags
-        && !aiTeam && transform[4] === 0 && transform[5] === 0, invalid);
+        && !aiTeam && !movement && transform[4] === 0 && transform[5] === 0, invalid);
       if (kind === 5) {
         const definition = hmvObjectiveDefinition(variant);
         requireLayout(version >= 6 && definition && team < definition.slots, invalid);
@@ -244,7 +311,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     }
 
     const spawn = kind === 2 && version >= 4;
-    requireLayout(kind === 0 ? ref : kind === 1 ? actor : kind === 2 ? pathIndex === 0xffff
+    requireLayout(kind === 0 ? ref && !advancedPathVersion.has(ref.group) : kind === 1 ? actor : kind === 2 ? pathIndex === 0xffff
       : kind === 3 ? ref?.group === 'weap' || ref?.group === 'eqip' : kind === 4 && ref?.group === 'vehi', invalid);
     const allowedFlags = version >= 7 ? 0x3f : version >= 4 ? 0x0f : (1 << version) - 1;
     requireLayout(team >= -1 && team <= 7 && respawn <= 600 && count <= (kind === 0 ? 1 : 16) && variant <= 15
@@ -253,7 +320,12 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
       && aiTeam < 6 && (version >= 2 && actor || (!aiTeam && !(flags & 2)))
       && (!(flags & 4) || actor && respawn > 0)
       && (!physics || kind === 0 && !actor && physics !== physicsMask), invalid);
-    if (physics) recordVersions[index] = 7;
+    requireLayout(!movement || behavior <= 2 && route <= 16 && aiOptions <= 1
+      && (actor || kind === 0 && ref?.group === 'vehi' && !behavior && !aiOptions), invalid);
+    if (movement) {
+      aiMovement++;
+      recordVersions[index] = 12;
+    } else if (physics) recordVersions[index] = 7;
     else if (spawn) recordVersions[index] = 4;
     else if (flags & 4) recordVersions[index] = 3;
     else if (aiTeam || (flags & 2)) recordVersions[index] = 2;
@@ -272,10 +344,17 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
       });
     }
   }
-  requireLayout(u32(8) === Number(markers) && !(senders & ~receivers), 'marker flags or teleporter pairs are invalid.');
-  requireLayout(version < 3 || recordVersions.includes(version), 'the declared version is missing its required record type.');
+  requireLayout(Boolean(headerFlags & 1) === markers && !(senders & ~receivers), 'marker flags or teleporter pairs are invalid.');
+  requireLayout(version < 3 || version === 11 && hasCanvas || version === 13 && recordsCount > 256
+    || recordVersions.includes(version), 'the declared version is missing its required record type.');
+  const preservedFeatures = advancedKinds.flatMap(({ label }, index) => {
+    const count = advancedCounts[index];
+    return count ? [{ label, count }] : [];
+  });
+  if (hasCanvas) preservedFeatures.push({ label: 'stock placement rules', count: 1 });
+  if (aiMovement) preservedFeatures.push({ label: 'AI movement bindings', count: aiMovement });
 
-  const meta = bytes.subarray(recordsEnd);
+  const meta = bytes.subarray(metaStart);
   const fields = [];
   let start = 0;
   for (const limit of metadataSizes) {
@@ -296,19 +375,19 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
 
   function rebuild(records: Uint8Array[], newPath?: Uint8Array, nextVersion = version, nextMeta = meta) {
     const recordsLength = records.reduce((sum, record) => sum + record.length, 0);
-    const length = recordsStart + (newPath?.length ?? 0) + recordsLength + nextMeta.length;
+    const length = recordsStart + (newPath?.length ?? 0) + recordsLength + canvas.length + nextMeta.length;
     requireLayout(length <= HMV_LIMIT, 'the layout would exceed 64 KiB.');
     const output = new Uint8Array(length);
     const next = new DataView(output.buffer);
     let cursor = 0;
-    const sections = [bytes.subarray(0, recordsStart), ...(newPath ? [newPath] : []), ...records, nextMeta];
+    const sections = [bytes.subarray(0, recordsStart), ...(newPath ? [newPath] : []), ...records, canvas, nextMeta];
     for (const section of sections) {
       output.set(section, cursor);
       cursor += section.length;
     }
-    next.setUint16(4, nextVersion, true);
+    next.setUint16(4, Math.max(nextVersion, recordsLength / recordSize > 256 ? 13 : 1), true);
     const hasMarkers = records.some(section => section.some((value, byte) => byte % recordSize === 2 && value !== 0));
-    next.setUint32(8, Number(hasMarkers), true);
+    next.setUint32(8, Number(hasMarkers) | (hasCanvas ? 4 : 0), true);
     next.setUint16(50, pathsCount + (newPath ? 1 : 0), true);
     next.setUint16(52, recordsLength / recordSize, true);
     next.setUint16(54, nextMeta.length, true);
@@ -323,8 +402,8 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   }
 
   function versionWithoutFeatureAt(index: number) {
-    if (recordVersions[index] !== version) return version;
-    return Math.max(1, ...recordVersions.filter((_, record) => record !== index));
+    if (recordVersions[index] !== version && !(version === 13 && recordsCount === 257)) return version;
+    return Math.max(1, hasCanvas ? 11 : 1, ...recordVersions.filter((_, record) => record !== index));
   }
 
   function writeSpawn(view: DataView, offset: number, properties: HmvSpawnProperties) {
@@ -355,7 +434,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   }
 
   function appendRecord(record: Uint8Array, entry?: Uint8Array, nextVersion = version) {
-    requireLayout(recordsCount < 256, 'this layout has reached its 256-record limit.');
+    requireLayout(recordsCount < 512, 'this layout has reached its 512-record limit.');
     return rebuild([bytes.subarray(recordsStart, recordsEnd), record], entry, nextVersion);
   }
 
@@ -366,6 +445,8 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     objectiveRecords,
     details,
     date,
+    version,
+    preservedFeatures,
     recordsCount,
     mapName,
     forerunnerIssue,
@@ -373,6 +454,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     forerunnerHostPhysicsIssue: forerunnerHostPhysicsIssue ?? (forerunnerLocalNeedsPhysics ? null : 'Select Fixed or Phased physics for at least one placement.'),
     forerunnerLocalNeedsPhysics,
     write(index: number, position: Vec3, rotation: Vec3) {
+      requireEditablePlacement(index);
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
     },
     writeDetails(updated: HmvLayoutDetails) {
@@ -418,7 +500,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
       return appendRecord(record, undefined, Math.max(version, 4));
     },
     appendTeleporterPair(sender: Vec3, receiver: Vec3, yaw: number) {
-      requireLayout(recordsCount <= 254 && teleporterRecords.length <= teleporterLimit - 2,
+      requireLayout(recordsCount <= 510 && teleporterRecords.length <= teleporterLimit - 2,
         'the layout has no room for another two teleporter endpoints.');
       const used = senders | receivers;
       const channel = Array.from({ length: HMV_TELEPORTER_CHANNELS }, (_, index) => index)
@@ -485,7 +567,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
         && Number.isInteger(respawnSeconds) && respawnSeconds >= 0 && respawnSeconds <= 600
         && typeof placeAtStart === 'boolean' && Object.hasOwn(physicsBits, physics), 'the placement properties are out of range.');
       const at = recordsStart + index * recordSize;
-      view.setUint16(4, physics !== 'normal' ? 7 : version === 7 ? versionWithoutFeatureAt(index) : version, true);
+      view.setUint16(4, physics !== 'normal' ? Math.max(version, 7) : version === 7 ? versionWithoutFeatureAt(index) : version, true);
       view.setInt8(at + 3, team);
       view.setUint16(at + 28, respawnSeconds, true);
       bytes[at + 34] = (bytes[at + 34] & ~(1 | physicsMask)) | physicsBits[physics] | Number(placeAtStart);
