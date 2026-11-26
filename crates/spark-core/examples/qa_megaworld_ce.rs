@@ -1,5 +1,5 @@
 //! Real native CE609 or MCC13 assembly and extension acceptance. Player proof is separate.
-use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::RuntimeId,Result,SparkError};
+use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::{self, RuntimeId, RuntimeRegistration},Result,SparkError};
 use std::{fs,io::Read,path::Path,sync::{Arc,atomic::AtomicBool}};
 
 fn reviewed_plan(path: &Path, base: &Project) -> Result<(BspAssembly, Vec<BspAssembly>)> {
@@ -40,6 +40,26 @@ fn main()->Result<()>{
     let mut a=std::env::args().skip(1).collect::<Vec<_>>();
     let mcc = a.first().is_some_and(|arg| arg == "--mcc13");
     if mcc { a.remove(0); }
+    let reviewed_runtime = if a.first().is_some_and(|arg| arg == "--reviewed-forerunner") {
+        if !mcc || a.len() < 2 {
+            return spark_core::invalid("A reviewed Forerunner registration requires an MCC13 replay");
+        }
+        a.remove(0);
+        let file = a.remove(0);
+        spark_core::reject_links(Path::new(&file))?;
+        let mut bytes = Vec::new();
+        const MAX_REGISTRATION_BYTES: u64 = 128 * 1024;
+        fs::File::open(file)?.take(MAX_REGISTRATION_BYTES + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_REGISTRATION_BYTES {
+            return spark_core::invalid("Reviewed Forerunner registration exceeds 128 KiB");
+        }
+        let registration: RuntimeRegistration = serde_json::from_slice(&bytes)?;
+        runtime::inspect_registration(&registration)?;
+        let review = registration.reviewed_companion
+            .ok_or_else(|| SparkError::Invalid("The registration has no reviewed Forerunner capabilities".into()))?;
+        spark_core::megaworld_build::GameplayLimits::for_review(&review)?;
+        Some((registration.id, review))
+    } else { None };
     let partition_structure = a.first().is_some_and(|arg| arg == "--partition-structure");
     let partition_scenario = a.first().is_some_and(|arg| arg == "--partition-scenario-probe");
     let partition_lighting = a.first().is_some_and(|arg| arg == "--partition-lighting-probe");
@@ -62,7 +82,7 @@ fn main()->Result<()>{
         spark_core::reject_links(Path::new(&path))?;
         Some(fs::canonicalize(path)?)
     } else { None };
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--regional-preset <surface|underground|underground-infantry>] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13 [--reviewed-forerunner <registration.json>]] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--regional-preset <surface|underground|underground-infantry>] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
@@ -154,10 +174,14 @@ fn main()->Result<()>{
     p.title = format!("{} + {} · CE", p.title, plan.donor_title);
     while p.title.len() > 180 { p.title.pop(); }
     p.bsp_assembly=Some(plan);
+    p.megaworld_runtime_registration_id = reviewed_runtime.as_ref().map(|(id, _)| id.clone());
     let target=EngineBuildTarget{id:uuid::Uuid::new_v4().to_string(),name:if mcc { "MCC13 from reviewed CE source" } else { "Reviewed CE source for Chupathingy" }.into(),runtime_id:if mcc { RuntimeId::MccSteam } else { RuntimeId::ChupathingyCe },builder:if mcc { "h1a-tool" } else { "invader-ce" }.into(),hek_directory:Some(fs::canonicalize(&a[3])?),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:Some(fs::canonicalize(&a[4])?),ce_compatible_tagset:true,open_sauce:false};p.active_build_target=Some(target.id.clone());p.build_targets.push(target);
     project::save_project(&out.join("connection.gsproject"),&p)?;lib.save(&p,Some(&i))?;
     let id=uuid::Uuid::new_v4().to_string();let log=out.join("native-events.jsonl");
     if partition_structure || partition_scenario || partition_lighting {
+        if reviewed_runtime.is_some() {
+            return spark_core::invalid("The reviewed Forerunner target is used by full native replay builds");
+        }
         let jobs = out.join("library/jobs");
         let cancel = Arc::new(AtomicBool::new(false));
         let event = |event: spark_core::build::JobEvent| eprintln!("{}: {}", event.phase, event.message);
@@ -169,9 +193,9 @@ fn main()->Result<()>{
         project::atomic_write(&out.join("partition-structure.json"), &serde_json::to_vec_pretty(&result)?, false)?;
         return Ok(());
     }
-    let record=spark_core::megaworld_build::run(&p,&i,&out.join("library/jobs"),&id,Arc::new(AtomicBool::new(false)),|event|{
+    let record=spark_core::megaworld_build::run_with_reviewed_runtime(&p,&i,&out.join("library/jobs"),&id,Arc::new(AtomicBool::new(false)),|event|{
         use std::io::Write;if let Ok(mut file)=fs::OpenOptions::new().create(true).append(true).open(&log){let _=writeln!(file,"{}",serde_json::to_string(&event).unwrap());}eprintln!("{}: {}",event.phase,event.message);
-    })?;
+    }, reviewed_runtime.as_ref().map(|(_, review)| review))?;
     p.builds.push(record.clone());lib.save(&p,Some(&i))?;project::save_project(&out.join("compiled.gsproject"),&p)?;
     project::atomic_write(&out.join("acceptance.json"),&serde_json::to_vec_pretty(&serde_json::json!({"build":record,"projectId":p.id,"gameplayVerified":false,"streaming":false}))?,false)?;
     println!("Validated {} cache {}",record.target,record.sha256.unwrap());Ok(())
