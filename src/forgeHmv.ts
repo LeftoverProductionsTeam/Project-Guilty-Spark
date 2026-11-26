@@ -120,7 +120,11 @@ function writePose(view: DataView, offset: number, position: Vec3, rotation: Vec
   requireLayout(transformsValid(values), 'an edited placement is outside the supported coordinate or angle range.');
   requireLayout(!yawOnly || rotation[1] === 0 && rotation[2] === 0, 'layout markers only support yaw.');
   const count = yawOnly ? 4 : 6;
-  for (let index = 0; index < count; index++) view.setFloat32(offset + index * 4, values[index], true);
+  for (let index = 0; index < count; index++) {
+    const at = offset + index * 4, value = Math.fround(values[index]);
+    // Project JSON can normalize signed zero. Keep the original encoding of unchanged fields.
+    if (view.getFloat32(at, true) !== value) view.setFloat32(at, value, true);
+  }
 }
 
 export function emptyHmv(map: HmvBaseIdentity) {

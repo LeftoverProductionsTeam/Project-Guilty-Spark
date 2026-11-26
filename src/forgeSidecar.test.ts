@@ -121,6 +121,7 @@ describe('Chupathingy Forge binary layouts', () => {
     const originalRecordStart = 64 + 5 + source[68];
     const originalMeta = source.slice(source.length - base.getUint16(54, true));
     const originalRecords = source.slice(originalRecordStart, source.length - originalMeta.length);
+    new DataView(originalRecords.buffer).setFloat32(20, 0, true);
     const encoder = new TextEncoder();
     const pathEntry = (group: string, tagPath: string) => {
       const reversed = [...group].reverse().join('');
@@ -173,6 +174,8 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(inspectForgeSidecar(imported.forgeSidecar!, map).hmvCompatibility).toMatchObject({
       version: 16, preservedFeatures: expect.arrayContaining([{ label: 'decals', count: 1 }, { label: 'volumes', count: 1 }]),
     });
+    const reopenedProject = JSON.parse(JSON.stringify(imported)) as Project;
+    expect(exportForgeSidecar(reopenedProject, map)).toEqual(fixture);
     imported.scene[0].position[0] = 4;
     const exported = exportForgeSidecar(imported, map) as Uint8Array;
     const reopened = readHmv(Array.from(exported), map);
