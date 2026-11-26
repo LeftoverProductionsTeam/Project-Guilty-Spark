@@ -19,7 +19,7 @@ export interface WrlDiagnostics {
   notes: string[];
 }
 const MAX_FILE = 2 * 1024 * 1024;
-const MAX_REGIONS = 256;
+const MAX_REGIONS = 2048;
 const MAX_VERTICES = 60000;
 const MAX_PRIMITIVES = 75000;
 const MAX_FAN = 256;

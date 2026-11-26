@@ -17,6 +17,10 @@ assert.ok(Math.abs(edge.end[1]+26.55917236)<1e-8);
 for(const bad of ['#VRML V2.0 utf8\nSeparator {}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3]} IndexedLineSet {coordIndex [0,1,-1]}}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3,1 1 1]} IndexedLineSet {coordIndex [0,9,-1]}}', '#VRML 1.0 ascii\nSeparator {Coordinate3 {point [1 2 3,1 1 1]} IndexedLineSet {coordIndex [0,1]}}', '#VRML 1.0 ascii\nSeparator {'])
   assert.throws(()=>parseHaloWrl(bad));
 assert.throws(()=>parseHaloWrl(wrl+' '.repeat(2*1024*1024)));
+const toolRegion=`Separator { Coordinate3 { point [0 0 0, 100 0 0, 0 100 0] } IndexedFaceSet { coordIndex [0,1,2,-1] } }`;
+const parseRegions=count=>parseHaloWrl('#VRML V1.0 ascii\n'+(toolRegion+'\n').repeat(count));
+assert.equal(parseRegions(886).regions,886,'Native maps can report hundreds of individual error markers');
+assert.throws(()=>parseRegions(2049),/too many error regions/);
 const report=analyzeHaloToolLog('### Warning found 1 degenerate triangles.\n### ERROR edge is open (red)\n### ERROR could not build collision geometry');
 assert.deepEqual(report.diagnostics.map(d=>d.code),['DEGENERATE','OPEN_EDGE','COLLISION']);
 assert.equal(report.containsFatal,true);

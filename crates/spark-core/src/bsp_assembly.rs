@@ -1482,6 +1482,11 @@ fn add_portals(
         } else if authored.is_none() && separation_squared<0.25 {
             continue;
         }
+        // A placed terrain join opens along the Atlas boundary. An oblique
+        // road must not tilt that full-height cut back through retained terrain.
+        let cut_direction = route.terrain_seam.as_ref()
+            .filter(|seam| seam.bearing_degrees.is_some())
+            .map_or(d, TerrainSeam::axis);
         for center in [first, last] {
             let portal_height=route.tunnel_height as f64+if route.arch_segments.is_some(){route.tunnel_width as f64/2.}else{0.};
             let points = if let Some(seam)=&route.terrain_seam {
@@ -1489,13 +1494,13 @@ fn add_portals(
                 // Let Halo Tool clip this source-bounded plane against its banks.
                 let bottom=base_bounds.0[2].min(donor_bounds.0[2])-0.1;
                 let roof=base_bounds.1[2].max(donor_bounds.1[2])+0.25;
-                terrain::portal([center[0],center[1],bottom],d,route.tunnel_width as f64+2.*seam.shoulder_width,roof)?
+                terrain::portal([center[0],center[1],bottom],cut_direction,route.tunnel_width as f64+2.*seam.shoulder_width,roof)?
             }else if authored.is_some(){crate::bsp_visibility::authored_portal_quad(center,d,route.tunnel_width as f64,portal_height)?}else{crate::bsp_visibility::portal_quad(center,d,route.tunnel_width as f64,portal_height)?};
             if generated_cuts.iter().any(|(previous,was_authored)|(*was_authored||authored.is_some())&&crate::bsp_visibility::portals_intersect(previous,&points)) {
                 return invalid("Authored visibility planes cross or overlap another portal. Move the handles away from the tunnel bend or other cuts");
             }
             let surface=if let Some(space)=&source_space {
-                crate::bsp_visibility::clipped_portal(space,center,d,(route.tunnel_height as f64*0.5).min(0.8))?
+                crate::bsp_visibility::clipped_portal(space,center,cut_direction,(route.tunnel_height as f64*0.5).min(0.8))?
             }else{
                 let points=if let Some(segments)=route.arch_segments{seam_sections::arch_portal(center,d,route.tunnel_width as f64,route.tunnel_height as f64,segments)?}else{points.to_vec()};
                 let triangles=(1..points.len()-1).map(|i|[0,i,i+1]).collect();crate::bsp_visibility::SourcePortal{points,triangles}

@@ -18,7 +18,7 @@ pub struct TerrainSeam {
     pub grade_road: bool,
 }
 impl TerrainSeam {
-    fn axis(&self) -> V {
+    pub(super) fn axis(&self) -> V {
         let (y, x) = self.bearing_degrees.unwrap_or(0.).to_radians().sin_cos();
         [x, y, 0.]
     }
