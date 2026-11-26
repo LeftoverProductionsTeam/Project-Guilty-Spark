@@ -1034,6 +1034,9 @@ fn generate_end(
     }
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
     let mut route_clearance = checker.verify_details(&clearance_route)?;
+    if matches!(partition, Some((_, PartitionEnd::Donor))) {
+        checker.verify_return(&clearance_route)?;
+    }
     for previous in inherited {
         route_clearance.extend(checker.verify_details(previous).map_err(|error| SparkError::Invalid(format!("Inherited {} route: {error}", previous.donor_title)))?);
     }
@@ -1061,11 +1064,17 @@ fn generate_end(
     ).count();
     if !matches!(partition, Some((_, PartitionEnd::Donor))) {
         append_source_surface_effects(base, assembly.base_bsp_index, 0, [0.; 3], 0.,
-            &mut mesh, &mut materials, &mut triangle_materials)?;
+            &mut mesh, &mut materials, &mut triangle_materials, &[])?;
     }
     if !matches!(partition, Some((_, PartitionEnd::Base))) {
+        let water_exclusions = if matches!(partition, Some((_, PartitionEnd::Donor))) {
+            enclosed_passage_planes(&route_geometry.tunnel_points,
+                route_geometry.tunnel_width.into(), route_geometry.tunnel_height.into())?
+        } else {
+            Vec::new()
+        };
         append_source_surface_effects(&donor, assembly.donor_bsp_index, 1, assembly.translation, assembly.yaw_degrees,
-            &mut mesh, &mut materials, &mut triangle_materials)?;
+            &mut mesh, &mut materials, &mut triangle_materials, &water_exclusions)?;
     }
     mesh.parts.push(maps::MeshPart {
         name: "Connected world".into(),
@@ -1112,9 +1121,64 @@ fn is_source_surface_effect(tag: &maps::Tag) -> bool {
     ["waterfall", "water fall", "light", "glow", "gseffect"].iter().any(|part| name.contains(part))
 }
 
-// Visual water and illuminated panels can be entirely absent from the source
-// collision shell. Keep its native material, normals and UVs in the existing
-// render-only JMS layer. This adds no walkable floor or blocking collision.
+type PassagePlanes = [(V, V); 6];
+
+fn enclosed_passage_planes(path: &[V], width: f64, height: f64) -> Result<Vec<PassagePlanes>> {
+    let sides = tunnel_sides(path, width)?;
+    Ok(path.windows(2).zip(sides.windows(2)).map(|(points, sides)| {
+        let corners = passage_corners(points[0], points[1], sides[0], sides[1], height);
+        let inside = add(mul(add(points[0], points[1]), 0.5), [0., 0., height * 0.5]);
+        std::array::from_fn(|i| {
+            let [a, b, c] = LEVEL_PASSAGE_TRIANGLES[i * 2].map(|corner| corners[corner]);
+            let n = normal(a, b, c);
+            (a, if dot(n, sub(inside, a)) < 0. { mul(n, -1.) } else { n })
+        })
+    }).collect())
+}
+
+/// Remove only the part of a source water triangle inside the closed passage.
+/// Each split leaves a convex polygon, with unchanged vertices outside the cut.
+fn exclude_passage_water(triangle: [V; 3], volumes: &[PassagePlanes]) -> Vec<Vec<V>> {
+    use crate::bsp_clearance::clip_connector_face;
+
+    let mut polygons = vec![triangle.to_vec()];
+    let mut clipped = Vec::new();
+    for planes in volumes {
+        let mut outside = Vec::new();
+        for polygon in polygons {
+            let mut inside = polygon.clone();
+            let mut fragments = Vec::new();
+            for &(origin, normal) in planes {
+                let distance = |point: V| dot(normal, sub(point, origin));
+                if inside.iter().all(|&point| distance(point) >= 0.) {
+                    continue;
+                }
+                let mut fragment = inside.clone();
+                clip_connector_face(&mut fragment, &mut clipped, |point| -distance(point));
+                if fragment.len() >= 3 {
+                    fragments.push(fragment);
+                }
+                clip_connector_face(&mut inside, &mut clipped, distance);
+                if inside.len() < 3 {
+                    break;
+                }
+            }
+            let cuts_area = inside.len() >= 3 && inside[1..].windows(2).any(|pair| {
+                let area = cross(sub(pair[0], inside[0]), sub(pair[1], inside[0]));
+                dot(area, area) > 1e-16
+            });
+            if !cuts_area {
+                outside.push(polygon);
+            } else {
+                outside.extend(fragments);
+            }
+        }
+        polygons = outside;
+    }
+    polygons
+}
+
+// Preserve noncolliding water and illuminated panels with their native materials.
 fn append_source_surface_effects(
     inspection: &MapInspection,
     bsp_index: usize,
@@ -1124,6 +1188,7 @@ fn append_source_surface_effects(
     mesh: &mut MeshData,
     materials: &mut Vec<AssemblyMaterial>,
     slots: &mut Vec<usize>,
+    water_exclusions: &[PassagePlanes],
 ) -> Result<()> {
     let Some(render) = inspection.render_mesh.as_ref() else { return Ok(()); };
     let restored: BTreeSet<_> = materials.iter().filter(|m| m.source == source).filter_map(|m| m.shader_path.clone()).collect();
@@ -1158,7 +1223,10 @@ fn append_source_surface_effects(
             slot
         });
         for triangle in indices.chunks_exact(3) {
-            for &id in triangle {
+            let mut points = [[0.; 3]; 3];
+            let mut normals = [[0.; 3]; 3];
+            let mut uvs = [[0.; 2]; 3];
+            for (corner, &id) in triangle.iter().enumerate() {
                 let id = id as usize;
                 let point = render.positions.get(id*3..id*3+3);
                 let normal = render.normals.get(id*3..id*3+3);
@@ -1166,18 +1234,45 @@ fn append_source_surface_effects(
                 let (Some(point), Some(normal), Some(uv)) = (point, normal, uv) else {
                     return invalid("Source surface effect is missing its original render vertices, normals or UVs");
                 };
-                let world = transform([point[0].into(), point[1].into(), point[2].into()], translation, yaw);
-                validate_native_bsp_point(world)?;
-                let rotated = transform([normal[0].into(), normal[1].into(), normal[2].into()], [0.; 3], yaw);
-                if rotated.iter().any(|value| !value.is_finite()) || uv.iter().any(|value| !value.is_finite()) {
+                points[corner] = transform([point[0].into(), point[1].into(), point[2].into()], translation, yaw);
+                validate_native_bsp_point(points[corner])?;
+                normals[corner] = transform([normal[0].into(), normal[1].into(), normal[2].into()], [0.; 3], yaw);
+                uvs[corner] = [f64::from(uv[0]), f64::from(uv[1])];
+                if normals[corner].iter().chain(&uvs[corner]).any(|value| !value.is_finite()) {
                     return invalid("Source surface effect has non-finite native normals or UVs");
                 }
-                mesh.indices.push((mesh.positions.len()/3) as u32);
-                mesh.positions.extend(world.map(|value| value as f32));
-                mesh.normals.extend(rotated.map(|value| value as f32));
-                mesh.uvs.extend_from_slice(uv);
             }
-            slots.push(slot);
+            let volumes = if tag.class == "swat" { water_exclusions } else { &[] };
+            let source = RenderTri { p: points, n: normal(points[0], points[1], points[2]), uv: uvs };
+            for polygon in exclude_passage_water(points, volumes) {
+                for pair in polygon[1..].windows(2) {
+                    let surface = [polygon[0], pair[0], pair[1]];
+                    let exported = surface.map(|point| point.map(|axis| f64::from(axis as f32)));
+                    let edge = cross(sub(exported[1], exported[0]), sub(exported[2], exported[0]));
+                    if !volumes.is_empty() && surface != points && dot(edge, edge) <= 1e-16 {
+                        continue;
+                    }
+                    if slots.len() >= MAX_OUTPUT_TRIANGLES {
+                        return invalid("Clipping native water would exceed the BSP output triangle budget");
+                    }
+                    for point in surface {
+                        let weights = if let Some(corner) = points.iter().position(|&p| p == point) {
+                            std::array::from_fn(|i| if i == corner { 1. } else { 0. })
+                        } else {
+                            bary(point, &source).ok_or_else(|| SparkError::Invalid(
+                                "Could not preserve UV coordinates at a cut water edge".into()))?
+                        };
+                        let interpolate = |values: [f64; 3]| {
+                            (0..3).map(|i| values[i] * weights[i]).sum::<f64>() as f32
+                        };
+                        mesh.indices.push((mesh.positions.len()/3) as u32);
+                        mesh.positions.extend(point.map(|value| value as f32));
+                        mesh.normals.extend((0..3).map(|axis| interpolate(normals.map(|n| n[axis]))));
+                        mesh.uvs.extend((0..2).map(|axis| interpolate(uvs.map(|uv| uv[axis]))));
+                    }
+                    slots.push(slot);
+                }
+            }
         }
     }
     Ok(())
@@ -4156,7 +4251,7 @@ mod tests {
         ..Default::default()
     });
     let (mut mesh, mut materials, mut slots) = (MeshData::default(), vec![], vec![]);
-    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots).unwrap();
+    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots, &[]).unwrap();
     assert_eq!(mesh.positions, [2.,4.,4., 1.,4.,4., 2.,4.,5.]);
     assert!(mesh.normals.chunks_exact(3).all(|n| n[0].abs() < 1e-6 && n[1] == 1. && n[2] == 0.));
     assert_eq!(mesh.uvs, source.render_mesh.as_ref().unwrap().uvs);
@@ -4176,8 +4271,38 @@ mod tests {
     assert_eq!(saved.shader_class.as_deref(), Some("scex"));
 
     let (mut mesh, mut slots) = (MeshData::default(), vec![]);
-    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots).unwrap();
+    append_source_surface_effects(&source, 0, 1, [2.,3.,4.], 90., &mut mesh, &mut materials, &mut slots, &[]).unwrap();
     assert!(slots.is_empty());
+ }
+ #[test]
+ fn water_rebuild_clips_only_the_closed_passage_and_preserves_uvs() {
+    let volumes = enclosed_passage_planes(&[[0., 0., 0.], [4., 0., 0.]], 2., 2.).unwrap();
+    let mut source = inspected(10);
+    source.tags[0].class = "swat".into();
+    source.render_mesh = Some(MeshData {
+        positions: vec![-1., -2., 1., 5., -2., 1., 5., 2., 1., -1., 2., 1.],
+        normals: vec![0., 0., 1., 0., 0., 1., 0., 0., 1., 0., 0., 1.],
+        uvs: vec![0., 0., 1., 0., 1., 1., 0., 1.],
+        indices: vec![0, 1, 2, 0, 2, 3],
+        material_ranges: vec![maps::MeshMaterialRange {
+            shader_tag_id: 10, shader_permutation: 0, bsp_index: 0, lightmap_index: 0,
+            lightmap_page: -1, has_lightmap_uvs: false, has_incident_radiosity: false,
+            lightmap_bitmap_tag_id: None, index_start: 0, index_count: 6,
+        }],
+        ..Default::default()
+    });
+    let (mut mesh, mut materials, mut slots) = (MeshData::default(), vec![], vec![]);
+    append_source_surface_effects(&source, 0, 1, [0.; 3], 0., &mut mesh, &mut materials, &mut slots, &volumes).unwrap();
+    let area: f64 = mesh.indices.chunks_exact(3).map(|ids| {
+        let [a, b, c] = [ids[0], ids[1], ids[2]].map(|id| vertex(&mesh, id));
+        cross(sub(b, a), sub(c, a))[2] * 0.5
+    }).sum();
+    assert!((area - 16.).abs() < 1e-5);
+    assert!(slots.iter().all(|&slot| materials[slot].shader_class.as_deref() == Some("swat") && !materials[slot].collision_only));
+    for (point, uv) in mesh.positions.chunks_exact(3).zip(mesh.uvs.chunks_exact(2)) {
+        assert!((uv[0] - (point[0] + 1.) / 6.).abs() < 1e-6);
+        assert!((uv[1] - (point[1] + 2.) / 4.).abs() < 1e-6);
+    }
  }
  #[test] fn joined_preview_keeps_each_native_shader_owner_world_positions_uvs_and_unbaked_status(){
   let mesh=MeshData{positions:vec![0.,0.,0.,1.,0.,0.,0.,1.,0.],normals:vec![0.,0.,1.,0.,0.,1.,0.,0.,1.],uvs:vec![0.,0.,1.,0.,0.,1.],indices:vec![0,1,2,0,1,2,0,1,2],..Default::default()};

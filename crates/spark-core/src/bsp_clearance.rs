@@ -251,7 +251,7 @@ fn closest(p: V, t: Tri) -> V {
     }
     add(a, add(mul(ab, vb / denominator), mul(ac, vc / denominator)))
 }
-fn clip_connector_face(polygon: &mut Vec<V>, result: &mut Vec<V>, distance: impl Fn(V) -> f64) {
+pub(crate) fn clip_connector_face(polygon: &mut Vec<V>, result: &mut Vec<V>, distance: impl Fn(V) -> f64) {
     let Some(&last) = polygon.last() else { return; };
     result.clear();
     let mut previous = last;
