@@ -7,7 +7,7 @@ use std::path::Path;
 #[path="native_command_lists.rs"] mod command_lists;
 #[path="native_transport.rs"] mod transport;
 #[path="native_factions.rs"] mod factions;
-pub use factions::{faction_service_owner,NativeFactionService,NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
+pub use factions::{faction_service_owner,needs_faction_control_readback,NativeFactionService,NativeFactionBody,NativeFactionBodyBinding,NativeFactionKit,NativeFactionSnapshot,NativeSquadTerminal,NativeSquadTerminalSnapshot};
 pub fn native_squad_terminal_snapshots(fields:&str)->Result<Vec<NativeSquadTerminalSnapshot>>{factions::squad_snapshots(fields)}
 pub fn verify_native_squad_terminals(expected:&[NativeSquadTerminalSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_squad_cache(expected,cache,map)}
 pub fn verify_faction_arms_source(body:&NativeFactionBody,profile:&crate::firefight::NativePlayerProfile,read:impl FnMut(&str)->Result<String>)->Result<Vec<String>>{factions::verify_arms_source(body,profile,read)}

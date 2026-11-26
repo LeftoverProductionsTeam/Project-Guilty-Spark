@@ -755,7 +755,7 @@ fn prepare(
         if fs::metadata(&edit)?.len()>256*1024*1024{return invalid("Native squad reader exceeds its identity limit");}
         tools.insert("invaderEdit".into(),maps::hash_file(&edit)?);
     }
-    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())||!s.machine_settings.is_empty()||s.devices.iter().flatten().any(|row|crate::native_operations::faction_service_owner(&row.name).is_some())) {
+    if scenario_squad_readback.as_ref().is_some_and(|s|s.faction_kits.as_ref().is_some_and(|s|!s.is_empty())||s.extraction_squads.as_ref().is_some_and(|s|!s.is_empty())||!s.machine_settings.is_empty()||s.devices.iter().flatten().any(|row|crate::native_operations::needs_faction_control_readback(&row.name, parent_inspection.header.version == 13))) {
         let extract=checked_file(&input.invader_info.with_file_name(if cfg!(windows){"invader-extract.exe"}else{"invader-extract"}))?;
         if fs::metadata(&extract)?.len()>256*1024*1024{return invalid("Native device extractor exceeds its identity limit");}
         tools.insert("invaderExtract".into(),maps::hash_file(&extract)?);
@@ -1165,7 +1165,7 @@ fn verify_device_native_output(input:&WorkingTagsInput,prepared:&Prepared,snapsh
     invoke:&impl Fn(&Runner<'_>,&Path,&[String],&Path,&str,u8)->Result<String>)
     -> Result<(Vec<serde_json::Value>,Vec<serde_json::Value>)> {
     let kits=snapshot.faction_kits.as_deref().unwrap_or(&[]);let squads=snapshot.extraction_squads.as_deref().unwrap_or(&[]);
-    let services=snapshot.devices.iter().flatten().filter(|row|row.class=="ctrl" && crate::native_operations::faction_service_owner(&row.name).is_some());
+    let services=snapshot.devices.iter().flatten().filter(|row|row.class=="ctrl" && crate::native_operations::needs_faction_control_readback(&row.name, inspection.header.version == 13));
     let controls=kits.iter().map(|row|(row.kit.name(),row.kit.control_tag_path.clone(),row.control_index))
         .chain(squads.iter().map(|row|(row.terminal.name(),row.terminal.control_tag_path.clone(),row.control_index)))
         .chain(services.map(|row|(row.name.clone(),row.tag_path.clone(),row.index))).collect::<Vec<_>>();

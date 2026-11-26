@@ -108,16 +108,24 @@ pub struct NativeFactionService {
 }
 impl NativeFactionService {
     fn name(&self) -> String {
-        format!("extraction_{}_{}", self.faction, self.service)
+        match (self.faction.as_str(), self.service.as_str()) {
+            ("unsc", "fieldPickup") => FIELD_PICKUP_CONTROLS[0].into(),
+            ("covenant", "fieldPickup") => FIELD_PICKUP_CONTROLS[1].into(),
+            _ => format!("extraction_{}_{}", self.faction, self.service),
+        }
     }
     pub(super) fn validate(&self) -> Result<()> {
-        if faction_service_owner(&self.name()).is_none() {
-            return invalid("Choose UNSC or Covenant deployment, loadout or debrief");
+        if !["unsc", "covenant"].contains(&self.faction.as_str())
+            || !(FACTION_SERVICES.contains(&self.service.as_str()) || self.service == "fieldPickup")
+        {
+            return invalid("Choose UNSC or Covenant deployment, loadout, debrief or field pickup");
         }
         validate_hub_pose(&self.control_tag_path, self.position, self.rotation_radians)
     }
 }
 const FACTION_SERVICES: [&str; 3] = ["deploy", "loadout", "debrief"];
+const FIELD_PICKUP_CONTROLS: [&str; 2] = ["extraction_pelican_activate", "extraction_spirit_activate"];
+const FIELD_PICKUP_ZONES: [&str; 2] = ["extraction_pelican_zone", "extraction_spirit_zone"];
 pub fn faction_service_owner(name: &str) -> Option<usize> {
     let name = name.strip_prefix("extraction_")?;
     let (faction, service) = name.split_once('_')?;
@@ -125,9 +133,21 @@ pub fn faction_service_owner(name: &str) -> Option<usize> {
     ["unsc", "covenant"].iter().position(|value| *value == faction)
 }
 
+fn field_pickup_owner(name: &str) -> Option<usize> {
+    FIELD_PICKUP_CONTROLS.iter().position(|value| *value == name)
+}
+
+fn regional_service_owner(name: &str) -> Option<usize> {
+    faction_service_owner(name).or_else(|| field_pickup_owner(name))
+}
+
+pub fn needs_faction_control_readback(name: &str, regional_mcc: bool) -> bool {
+    faction_service_owner(name).is_some() || (regional_mcc && field_pickup_owner(name).is_some())
+}
+
 impl HubControl {
     fn group_name(&self, suffix: &str) -> String {
-        let suffix = match (faction_service_owner(&self.name), suffix) {
+        let suffix = match (regional_service_owner(&self.name), suffix) {
             (Some(_), "power") => "pwr",
             (Some(_), "position") => "pos",
             _ => suffix,
@@ -199,7 +219,7 @@ fn control_layout(
         }
     }
     let volumes = scenario_volume_choices(fields)?;
-    let regional = if added_profiles > 0 || kits.iter().any(|kit| faction_service_owner(&kit.name).is_some()) {
+    let regional = if added_profiles > 0 || kits.iter().any(|kit| regional_service_owner(&kit.name).is_some()) {
         regional_faction_hubs(&volumes)?
     } else { None };
     for kit in kits {
@@ -1097,7 +1117,20 @@ fn validate_terminal_point(
     position: [f32; 3],
 ) -> Result<()> {
     if let Some(hubs) = regional {
-        let faction = faction_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
+        let faction = regional_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
+        if name == FIELD_PICKUP_CONTROLS[faction] {
+            let zone_name = FIELD_PICKUP_ZONES[faction];
+            let zone = unique_volume(volumes, zone_name)?;
+            let other_zone = FIELD_PICKUP_ZONES[1 - faction];
+            let inside_other_zone = volumes.iter().any(|row| row.name.eq_ignore_ascii_case(other_zone))
+                && unique_volume(volumes, other_zone)?.contains_native_interior(position);
+            if !zone.contains_native_interior(position) || inside_other_zone
+                || hubs.iter().any(|hub| hub.contains_native_interior(position))
+            {
+                return invalid(format!("{name} needs a position inside only {zone_name}, outside both faction hubs"));
+            }
+            return Ok(());
+        }
         if !hubs[faction].contains_native_interior(position)
             || hubs[1 - faction].contains_native_interior(position)
         {
@@ -1127,6 +1160,8 @@ pub struct MegaWorldHubStarts {
     pub terminal_index: Option<usize>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub services: Vec<MegaWorldHubService>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field_pickup: Option<MegaWorldFieldPickup>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1134,6 +1169,16 @@ pub struct MegaWorldHubStarts {
 pub struct MegaWorldHubService {
     pub service: String,
     pub control_index: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MegaWorldFieldPickup {
+    pub name: String,
+    pub control_index: usize,
+    pub volume_index: usize,
+    pub bsp_index: u16,
+    pub position: [f32; 3],
 }
 
 /// Read the faction starts from the exact MCC13 cache. Stock starts outside
@@ -1202,8 +1247,10 @@ pub fn megaworld_hub_starts(
         } else { None };
 
         let mut services = Vec::new();
-        for kind in FACTION_SERVICES {
-            let service_name = format!("{terminal_name}_{kind}");
+        let mut field_pickup = None;
+        let controls = FACTION_SERVICES.into_iter().map(|kind| (Some(kind), format!("{terminal_name}_{kind}")))
+            .chain(std::iter::once((None, FIELD_PICKUP_CONTROLS[faction].to_owned())));
+        for (kind, service_name) in controls {
             let mut names = logic.names.iter().enumerate().filter(|(_, row)| row.name.eq_ignore_ascii_case(&service_name));
             let Some((name_index, row)) = names.next() else { continue; };
             if terminal_index.is_none() || row.name != service_name || row.object_type != 8
@@ -1226,15 +1273,36 @@ pub fn megaworld_hub_starts(
             {
                 return invalid(format!("Native faction service {service_name} needs independent live groups"));
             }
+            if kind.is_none() && [(power, "pwr"), (position, "pos")].into_iter().any(|(index, suffix)| {
+                !index.and_then(|index| logic.groups.get(index as usize))
+                    .is_some_and(|group| group.name == format!("{service_name}_{suffix}"))
+            }) {
+                return invalid(format!("Native field pickup {service_name} must have dedicated control groups"));
+            }
             validate_terminal_point(&volumes, Some(hubs), &service_name, service.position)?;
             let membership = crate::maps::bsp_point_locations(path, map, &[service.position], Some(1.))?;
-            if membership[0].bsps != [bsp] || !membership[0].ground.iter().any(|ground| ground.bsp == bsp) {
-                return invalid(format!("Native faction service {service_name} needs grounded BSP {bsp} placement"));
+            let [owner] = membership[0].bsps.as_slice() else {
+                return invalid(format!("Native faction service {service_name} needs exactly one owning BSP"));
+            };
+            if !membership[0].ground.iter().any(|ground| ground.bsp == *owner) {
+                return invalid(format!("Native faction service {service_name} needs a grounded placement"));
             }
-            services.push(MegaWorldHubService { service: kind.to_owned(), control_index: service.index });
+            if let Some(kind) = kind {
+                if *owner != bsp {
+                    return invalid(format!("Native faction service {service_name} needs grounded BSP {bsp} placement"));
+                }
+                services.push(MegaWorldHubService { service: kind.to_owned(), control_index: service.index });
+            } else {
+                let volume_index = volumes.iter().position(|row| row.name == FIELD_PICKUP_ZONES[faction])
+                    .ok_or_else(|| crate::SparkError::Invalid(format!("Missing field volume for {service_name}")))?;
+                field_pickup = Some(MegaWorldFieldPickup {
+                    name: service_name, control_index: service.index, volume_index,
+                    bsp_index: *owner, position: service.position,
+                });
+            }
         }
         Ok(MegaWorldHubStarts {
-            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services,
+            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services, field_pickup,
             start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
         })
     };
@@ -1273,6 +1341,34 @@ pub fn verify_control_values(trigger: &str, initially_off: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_pickup_uses_only_its_native_zone_and_mcc_readback() {
+        let volume = |name: &str, x| crate::maps::ScenarioLogicVolume {
+            name: name.into(), kind: 1,
+            geometry: Some(crate::maps::ScenarioLogicVolumeGeometry {
+                corner: [x, 0., 0.], forward: [1., 0., 0.], up: [0., 0., 1.], dimensions: [4., 4., 4.],
+            }),
+        };
+        let volumes = [volume(MEGAWORLD_HUBS[0], 0.), volume(MEGAWORLD_HUBS[1], 10.),
+            volume(FIELD_PICKUP_ZONES[0], 20.), volume(FIELD_PICKUP_ZONES[1], 30.)];
+        let hubs = regional_faction_hubs(&volumes).unwrap();
+        for (faction, x) in ["unsc", "covenant"].into_iter().zip([21., 31.]) {
+            let index = usize::from(faction == "covenant");
+            let service = NativeFactionService { faction: faction.into(), service: "fieldPickup".into(),
+                control_tag_path: "devices/terminal".into(), position: [x, 1., 1.], rotation_radians: [0.; 3] };
+            service.validate().unwrap();
+            assert_eq!(service.name(), FIELD_PICKUP_CONTROLS[index]);
+            assert!(!needs_faction_control_readback(&service.name(), false));
+            assert!(needs_faction_control_readback(&service.name(), true));
+            validate_terminal_point(&volumes, hubs, &service.name(), service.position).unwrap();
+            assert!(validate_terminal_point(&volumes, hubs, &service.name(), [1., 1., 1.]).is_err());
+            assert!(validate_terminal_point(&volumes, hubs, FIELD_PICKUP_CONTROLS[1-index], service.position).is_err());
+        }
+        let malformed = NativeFactionService { faction: "pelican".into(), service: "activate".into(),
+            control_tag_path: "devices/terminal".into(), position: [21., 1., 1.], rotation_radians: [0.; 3] };
+        assert!(malformed.validate().is_err());
+    }
     fn kit() -> NativeFactionKit {
         NativeFactionKit {
             faction: "unsc".into(),
