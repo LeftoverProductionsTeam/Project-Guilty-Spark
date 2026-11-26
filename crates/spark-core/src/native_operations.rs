@@ -2606,11 +2606,11 @@ pub struct NativeDevicePlacement {
     pub position_group: Option<i16>,
 }
 impl NativeDevicePlacement {
-    fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles",_=>"machines"}}
-    fn valid(&self)->bool{["ctrl","mach","vehi"].contains(&self.class.as_str())&&(self.class=="ctrl"||(self.usable_from_both_sides.is_none()&&self.interaction_disabled.is_none()))
+    fn array(&self)->&str{match self.class.as_str(){"ctrl"=>"controls","vehi"=>"vehicles","weap"=>"weapons",_=>"machines"}}
+    fn valid(&self)->bool{["ctrl","mach","vehi","weap"].contains(&self.class.as_str()) && (self.class!="weap" || self.name_index>=0 && !self.name.is_empty())&&(self.class=="ctrl"||(self.usable_from_both_sides.is_none()&&self.interaction_disabled.is_none()))
         && (self.class == "mach" || self.manual_activation.is_none())
-        && (self.class != "vehi" || self.initially_off.is_none() && self.initially_open.is_none())
-        && [self.power_group, self.position_group].into_iter().flatten().all(|group| self.class != "vehi" && (-1..128).contains(&group))&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
+        && (!matches!(self.class.as_str(),"vehi"|"weap") || self.initially_off.is_none() && self.initially_open.is_none())
+        && [self.power_group, self.position_group].into_iter().flatten().all(|group| matches!(self.class.as_str(),"ctrl"|"mach") && (-1..128).contains(&group))&&self.index<4096&&(-1..512).contains(&self.name_index)&&self.name.len()<=32&&!self.name.chars().any(char::is_control)&&(self.name_index>=0||self.name.is_empty())&&!self.tag_path.is_empty()&&self.tag_path.len()<=240&&crate::safe_relative(&self.tag_path.replace('\\',"/")).is_ok()&&self.position.iter().all(|v|v.is_finite()&&v.abs()<=1e6)&&self.rotation_radians.iter().all(|v|v.is_finite()&&v.abs()<=20000.)}
     fn same_identity(&self,b:&Self)->bool{self.class==b.class&&self.index==b.index&&self.name_index==b.name_index&&self.name==b.name&&self.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))}
     fn same_rotation(&self, other: &Self) -> bool {
         self.rotation_radians.iter().zip(other.rotation_radians).all(|(a, b)| facings_close(*a, b))
@@ -2795,9 +2795,11 @@ pub fn scenario_device_choices(fields:&str)->Result<Vec<NativeDevicePlacement>>{
 fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<usize>;9])>>{
     let names=array_listing(fields,"object_names")?;if names.count>512{return invalid("Native object name table exceeds512entries");}let names=array_items(&names,"object_names")?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;
     let mut result=vec![];
-    for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle")]{
+    for(array,palette,class,extension)in [("machines","machine_palette","mach","device_machine"),("controls","control_palette","ctrl","device_control"),("vehicles","vehicle_palette","vehi","vehicle"),("weapons","weapon_palette","weap","weapon")]{
+        if class=="weap"&&!fields.lines().any(|line|line.starts_with("weapons[")){continue;}
         let inventory=array_listing(fields,array)?;let pal=array_listing(fields,palette)?;let refs=array_items(&pal,palette)?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect::<Result<Vec<_>>>()?;let mut line=inventory.start+1;
         for(index,item)in array_items(&inventory,array)?.into_iter().enumerate(){let root=direct_struct_fields(item)?;let palette_index=native_index(&root,"type")?;let name_index=native_index(&root,"name")?;let name=if name_index<0{String::new()}else{names.get(name_index as usize).cloned().ok_or_else(||crate::SparkError::Invalid("Native object name index missing".into()))?};
+            if class=="weap"&&name_index<0{line+=item.len();continue;}
             let tag=usize::try_from(palette_index).ok().and_then(|i|refs.get(i)).and_then(|v|v.strip_suffix(&format!(".{extension}"))).ok_or_else(||crate::SparkError::Invalid("Native device palette reference is unavailable or has another class".into()))?;
             let (position, p) = native_vector(&root, "position")?;
             let (rotation, r) = native_vector(&root, "rotation")?;
@@ -2819,12 +2821,12 @@ fn native_device_fields(fields:&str)->Result<Vec<(NativeDevicePlacement,[Option<
             let (manual_activation, activation_line) = if class == "mach" {
                 device_flag(&root, "does_not_operate_automatically", line + 1)?
             } else { (None, None) };
-            let ((power_group, power_line), (position_group, position_line)) = if class == "vehi" {
+            let ((power_group, power_line), (position_group, position_line)) = if matches!(class,"vehi"|"weap") {
                 ((None, None), (None, None))
             } else {
                 (device_group_field(&root, "power_group", line + 1)?, device_group_field(&root, "position_group", line + 1)?)
             };
-            let ((initially_off, power_flag_line), (initially_open, position_flag_line)) = if class == "vehi" {
+            let ((initially_off, power_flag_line), (initially_open, position_flag_line)) = if matches!(class,"vehi"|"weap") {
                 ((None, None), (None, None))
             } else {
                 (device_flag(&root, "initially_off", line + 1)?, device_flag(&root, "initially_open", line + 1)?)
@@ -2876,14 +2878,53 @@ fn verify_devices_cache(expected:&[NativeDevicePlacement],path:&Path,map:&crate:
     let vehicles=expected.iter().any(|row|row.class=="vehi");
     let actual=if vehicles{crate::maps::scenario_placement_readback(path,map)?}else{crate::maps::scenario_logic_readback(path,map)?};
     let rows=actual.devices.iter().chain(actual.vehicles.iter().filter(|_|vehicles)).collect::<Vec<_>>();
-    if rows.len()!=expected.len(){return invalid("Compiled native placement inventory differs from source");}
-    for(a,b)in expected.iter().zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.interaction_disabled.is_some_and(|disabled|Some(disabled)!=b.interaction_disabled)||a.manual_activation.is_some_and(|value|Some(value)!=b.manual_activation)||a.initially_off.is_some_and(|value|Some(value)!=b.initially_off)||a.initially_open.is_some_and(|value|Some(value)!=b.initially_open)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, activation or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    let devices=expected.iter().filter(|row|row.class!="weap");
+    if rows.len()!=devices.clone().count(){return invalid("Compiled native placement inventory differs from source");}
+    for(a,b)in devices.zip(rows){if a.class!=b.class||usize::from(a.index)!=b.index||a.name_index!=b.name_index||!a.tag_path.replace('\\',"/").eq_ignore_ascii_case(&b.tag_path.replace('\\',"/"))||!positions_close(a.position,b.position)||a.rotation_radians.iter().zip(b.rotation_radians).any(|(a,b)|!facings_close(*a,b))||a.usable_from_both_sides.is_some_and(|sides|Some(sides)!=b.usable_from_both_sides)||a.interaction_disabled.is_some_and(|disabled|Some(disabled)!=b.interaction_disabled)||a.manual_activation.is_some_and(|value|Some(value)!=b.manual_activation)||a.initially_off.is_some_and(|value|Some(value)!=b.initially_off)||a.initially_open.is_some_and(|value|Some(value)!=b.initially_open)||a.power_group.is_some_and(|group|Some(group)!=b.power_group)||a.position_group.is_some_and(|group|Some(group)!=b.position_group){return invalid("Compiled device identity, reference, pose, activation or group bindings differ from native source");}if a.name_index>=0{let name=actual.names.get(a.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled device name index unavailable".into()))?;if name.name!=a.name||name.object_type!=match a.class.as_str(){"ctrl"=>8,"vehi"=>1,_=>7}||name.object_index!=a.index as i16{return invalid("Compiled device name-table binding differs from source");}}}
+    let mut weapons=expected.iter().filter(|row|row.class=="weap").peekable();
+    if weapons.peek().is_some(){
+        let (names, actual)=crate::maps::scenario_weapon_readback(path,map)?;
+        let actual=actual.iter().filter(|row|row.name_index>=0).collect::<Vec<_>>();
+        if actual.len()!=weapons.clone().count(){return invalid("Compiled named weapon placement inventory differs from source");}
+        for (source, compiled) in weapons.zip(actual){
+            let name=names.get(compiled.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled weapon name is unavailable".into()))?;
+            if compiled.index!=usize::from(source.index)||compiled.name_index!=source.name_index||name.name!=source.name||name.object_type!=2||name.object_index!=source.index as i16
+                ||!source.tag_path.replace('\\',"/").eq_ignore_ascii_case(&compiled.tag_path.replace('\\',"/"))
+                ||!positions_close(source.position,compiled.position)||source.rotation_radians.iter().zip(compiled.rotation_radians).any(|(a,b)|!facings_close(*a,b)){
+                return invalid("Compiled named weapon identity or pose differs from source");
+            }
+        }
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod device_placement_tests {
  use super::*;
+ #[test]
+ fn named_weapon_pose_keeps_its_object_binding_and_spawn_flags(){
+    let source=fields()
+        .replace("object_names[1] array", "object_names[2] array")
+        .replace("vehicles[0] array", "    object_names[1] struct\n        name (technology) string\nvehicles[0] array")
+        + concat!("weapon_palette[1] array\n",
+          "    weapon_palette[0] struct\n        name (weapons/technology.weapon) tagref\n",
+          "weapons[1] array\n    weapons[0] struct\n        type (0) index\n        name (1) index\n",
+          "        position (55,2,3) point3d (float32)\n        rotation (0,0,0) euler3d (float)\n",
+          "        not_placed bitmask\n            automatically (1) bitfield\n");
+    let mut weapon=scenario_device_choices(&source).unwrap().into_iter().find(|row|row.class=="weap").unwrap();
+    assert_eq!((weapon.index,weapon.name_index,weapon.name.as_str()),(0,1,"technology"));
+    assert!(weapon.power_group.is_none());
+    weapon.position[0]=50.;
+    let operation=Operation::DevicePlacement{device:weapon,source_sha256:"a".repeat(64)};
+    operation.validate("scnr","level.scenario").unwrap();
+    let args=operation.arguments_with_fields(Path::new("tags"),"scnr","level.scenario",&source).unwrap();
+    assert!(args.windows(3).any(|row|row[0]=="-S"&&row[1]=="weapons[0].position"&&row[2]=="50,2,3"));
+    let revised=source.replace("position (55,2,3)", "position (50,2,3)");
+    assert_eq!(reviewed_difference(&source,&revised,&operation).unwrap().len(),1);
+    let changed_flag=revised.replace("automatically (1)", "automatically (0)");
+    assert!(reviewed_difference(&source,&changed_flag,&operation).is_err());
+ }
+
  fn fields()->String{concat!("object_names[1] array\n    object_names[0] struct\n        name (terminal) string\nvehicles[0] array\nvehicle_palette[0] array\nmachines[0] array\nmachine_palette[0] array\ncontrol_palette[1] array\n    control_palette[0] struct\n        name (devices/terminal.device_control) tagref\ncontrols[1] array\n    controls[0] struct\n        type (0) index\n        name (0) index\n        position (1,2,3) point3d (float32)\n        rotation (0,0,0) euler3d (float)\n        power_group (65535) index\n        position_group (65535) index\n        device_flags bitmask\n            initially_off (0) bitfield\nscripts[0] array\n").into()}
  #[test]
  fn native_devices_preserve_complete_identity_and_reject_unrelated_or_stale_changes(){

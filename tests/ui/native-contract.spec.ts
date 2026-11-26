@@ -5271,6 +5271,30 @@ test('AI scenario workspace keeps source tasks compact and drafts accessible acr
  await testInfo.attach('ai-scenario-layouts',{body:JSON.stringify(measurements,null,2),contentType:'application/json'});
 });
 
+test('named mission weapon uses the existing native pose review and restore', async ({page}) => {
+  await mockRecoveredMissionAreas(page, 'vehicle');
+  await page.evaluate(() => {
+    (window as any).__sparkMock.nativeDevices.push({
+      class:'weap', index:0, nameIndex:12, name:'be_technology', tagPath:'forerunner/be_native/technology_grunt',
+      position:[55.84,-86.44,.078], rotationRadians:[0,0,0],
+    });
+  });
+  await chooseTool(page, 'AI & scenario');
+  const operations = page.locator('.native-tag-operations');
+  await operations.locator(':scope > summary').click();
+  const form = operations.locator('.native-device-placements');
+  await form.locator(':scope > summary').click();
+  await form.getByRole('combobox', {name:'Native source placement', exact:true}).selectOption('weap:0');
+  await form.getByRole('spinbutton', {name:'Weapon position X', exact:true}).fill('50');
+  await form.getByRole('button', {name:'Preview weapon placement', exact:true}).click();
+  const preview = page.getByRole('region', {name:'Native edit preview', exact:true});
+  await preview.getByRole('button', {name:'Accept as new source revision', exact:true}).click();
+  const weapon = () => page.evaluate(() => (window as any).__sparkMock.nativeDevices.find((row:any) => row.class==='weap'));
+  await expect.poll(weapon).toMatchObject({name:'be_technology', nameIndex:12, position:[50,-86.44,.078]});
+  await preview.getByRole('button', {name:'Restore before-edit tag', exact:true}).click();
+  await expect.poll(weapon).toMatchObject({name:'be_technology', position:[55.84,-86.44,.078]});
+});
+
 test('a single campaign co-op start gives guidance until a duplicate is accepted', async ({page}) => {
   await mockRecoveredMissionAreas(page, 'vehicle');
   await page.evaluate(() => {

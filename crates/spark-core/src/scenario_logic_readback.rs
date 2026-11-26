@@ -594,7 +594,7 @@ fn parse_volumes(r:&Reader,space:&Space,at:usize)->Result<Vec<ScenarioLogicVolum
     Ok(volumes)
 }
 #[derive(Clone,Debug)]
-pub struct ScenarioLogicWeapon {pub index:usize,pub name_index:i16,pub tag_path:String,pub not_placed:u16}
+pub struct ScenarioLogicWeapon {pub index:usize,pub name_index:i16,pub tag_path:String,pub not_placed:u16,pub position:[f32;3],pub rotation_radians:[f32;3]}
 /// Native placement blocks shared by source selection and independent cache bindings.
 pub(crate) const NAMED_OBJECT_BLOCKS:&[(&str,&str,&str,&str,i16,usize,usize,usize,&str)]=&[
  ("scenery","scenery_palette","scen","scenery",6,0x210,0x21c,72,"Scenery"),
@@ -691,7 +691,7 @@ pub fn scenario_weapon_readback(path:&Path,map:&MapInspection)->Result<(Vec<Scen
         let names=parse_names(r,space,sc)?;let mut diagnostics=vec![];let placed=placements(r,space,sc,(0x270,0x27c,92,"Weapon"),&map.tags,&mut diagnostics)?;
         if !diagnostics.is_empty(){return invalid("Compiled mission weapon placement/palette is invalid");}
         let(at,_)=space.block(r,sc+0x270,92,4096)?;let mut weapons=vec![];
-        for(index,object)in placed.iter().enumerate(){let targets=map.tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class=="weap").collect::<Vec<_>>();if targets.len()!=1||object.position.iter().any(|v|!v.is_finite()){return invalid("Compiled mission weapon identity or position is invalid");}let p=at+index*92;weapons.push(ScenarioLogicWeapon{index,name_index:r.u16(p+2)? as i16,tag_path:targets[0].path.clone(),not_placed:r.u16(p+4)?});}Ok((names,weapons))
+        for(index,object)in placed.iter().enumerate(){let targets=map.tags.iter().filter(|tag|Some(tag.id)==object.tag_id&&tag.class=="weap").collect::<Vec<_>>();if targets.len()!=1||object.position.iter().any(|v|!v.is_finite()){return invalid("Compiled mission weapon identity or position is invalid");}let p=at+index*92;weapons.push(ScenarioLogicWeapon{index,name_index:r.u16(p+2)? as i16,tag_path:targets[0].path.clone(),not_placed:r.u16(p+4)?,position:object.position,rotation_radians:object.rotation});}Ok((names,weapons))
     })
 }
 fn parse(r:&Reader,space:&Space,sc:usize,tags:&[Tag])->Result<ScenarioLogicReadback>{
