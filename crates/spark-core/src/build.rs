@@ -173,11 +173,17 @@ pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(P
     };
     let name = output.file_name().and_then(|name| name.to_str())
         .ok_or_else(|| SparkError::Invalid("Exported map filename is unavailable".into()))?;
+    let mut native_features = extraction.unwrap_or_default();
+    if project.bsp_assembly.is_some() {
+        if let Some(feature) = crate::megaworld_build::expanded_tag_memory_requirement(output, &map)? {
+            native_features.push(feature.to_owned());
+        }
+    }
     let receipt = serde_json::json!({
         "schemaVersion": 1, "fileName": name, "cacheSha256": export.sha256,
         "cacheVersion": map.header.version, "scenarioPath": map.scenario_path,
         "scenarioType": map.header.scenario_type, "mode": mode,
-        "requiredResourceBanks": resources, "requiredNativeFeatures": extraction.unwrap_or_default(),
+        "requiredResourceBanks": resources, "requiredNativeFeatures": native_features,
         "runtimeSettings": runtime_settings,
     });
     if maps::hash_file(output)? != export.sha256 {
@@ -1361,6 +1367,45 @@ fn core_check_reused_tag(file:&Path,relative:&str)->Result<()>{crate::reject_lin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "Requires retained native MCC13 MegaWorld fixtures and owned build scratch"]
+    fn megaworld_export_reports_only_required_expanded_tag_memory() {
+        let fixtures = PathBuf::from(std::env::var_os("SPARK_MCC13_MODE_FIXTURES").unwrap());
+        let scratch = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let work = tempfile::tempdir_in(scratch).unwrap();
+        let feature = "maps.mcc13_tag_space_64m.v1";
+        let cases = [
+            ("stage-8", "7b993ee0994b282fed5abb4c9498167d20d12cab9be679d4299337a98a570774", vec![]),
+            ("stage-9", "a879235d308d4f4022df57d19b1cd68f5703cb3febbd9c397ed7a6d8e8e42b17", vec![feature]),
+        ];
+        for (folder, sha256, expected) in cases {
+            let fixture = fixtures.join(folder);
+            let original = fixture.join("timberland.map");
+            let project = project::load_project(&fixture.join("compiled.gsproject")).unwrap();
+            let output = work.path().join(format!("{folder}.map"));
+            fs::copy(&original, &output).unwrap();
+            assert_eq!(maps::hash_file(&output).unwrap(), sha256);
+            let export = MapExport {
+                project_id: project.id.clone(),
+                build_id: uuid::Uuid::new_v4().to_string(),
+                project_fingerprint: project.fingerprint().unwrap(),
+                output,
+                sha256: sha256.to_owned(),
+                bytes: fs::metadata(&original).unwrap().len(),
+                cache_version: 13,
+                runtime_id: crate::runtime::RuntimeId::MccSteam,
+                reused: false,
+            };
+            let (file, mode) = write_map_export_mode(&export, &project).unwrap();
+            assert_eq!(mode, "multiplayer");
+            let receipt: serde_json::Value = serde_json::from_slice(&fs::read(file).unwrap()).unwrap();
+            assert_eq!(receipt["requiredNativeFeatures"], serde_json::json!(expected));
+            assert_eq!(receipt["cacheSha256"], sha256);
+            assert_eq!(maps::hash_file(&original).unwrap(), sha256);
+        }
+    }
+
+
     #[test]
     fn native_source_provenance_never_relabels_mcc_or_unreviewed_ce_receipts() {
         let mut receipt=serde_json::json!({"schemaVersion":1,"sourceSha256":"a".repeat(64),"compilerSha256":"b".repeat(64),"sourcePreserved":true});

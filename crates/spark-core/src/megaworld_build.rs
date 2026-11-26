@@ -23,6 +23,16 @@ const MCC: CacheTarget = CacheTarget {
     tag_capacity: 64 * 1024 * 1024, name: "MCC Halo 1 cache 13",
 };
 
+const EXPANDED_TAG_MEMORY_FEATURE: &str = "maps.mcc13_tag_space_64m.v1";
+
+pub(crate) fn expanded_tag_memory_requirement(path: &Path, map: &MapInspection) -> Result<Option<&'static str>> {
+    if map.header.version != MCC.version {
+        return Ok(None);
+    }
+    let memory = maps::verify_resident_tag_window(path, map, MCC.tag_base, MCC.tag_capacity)?;
+    Ok((memory.resident_bytes > CLASSIC.tag_capacity).then_some(EXPANDED_TAG_MEMORY_FEATURE))
+}
+
 #[derive(Clone, Copy, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameplayLimits {
@@ -46,13 +56,12 @@ impl GameplayLimits {
     }
 
     pub fn for_review(review: &crate::runtime::CompanionReview) -> Result<Self> {
-        const FEATURE: &str = "maps.mcc13_tag_space_64m.v1";
         let capabilities = &review.capabilities;
         capabilities.validate()?;
         let target = capabilities.map_targets.iter().find(|row| {
             row.cache_version == MCC.version && row.invader_engine == MCC.engine && row.tag_space_bytes == MCC.tag_capacity
-                && row.required_feature.as_deref() == Some(FEATURE)
-                && capabilities.native_features.iter().any(|name| name == FEATURE)
+                && row.required_feature.as_deref() == Some(EXPANDED_TAG_MEMORY_FEATURE)
+                && capabilities.native_features.iter().any(|name| name == EXPANDED_TAG_MEMORY_FEATURE)
         }).ok_or_else(|| SparkError::Invalid("This Forerunner profile does not advertise native 64 MiB MCC13 support".into()))?;
         let native = Self::native(MCC.version);
         let bound = |value: Option<u16>, fallback: usize, verified: usize| value.map_or(fallback, usize::from).min(verified);
