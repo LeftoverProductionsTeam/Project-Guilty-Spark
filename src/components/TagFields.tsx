@@ -1,9 +1,42 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { ArrowRight, ChevronDown, FileCode2, RotateCcw } from 'lucide-react';
 import { classNames, fieldValue, formatNumber, shortPath } from '../editor';
 import type { Project, Tag, TagField } from '../types';
 import { NumberField } from './ui';
 import { renamedTagPath } from '../tagRenames';
+
+const isVehicleRule = (field: TagField) => field.key.startsWith('vehicle-spawn-flags-');
+const vehicleModes = ['Slayer', 'Capture the Flag', 'King of the Hill', 'Oddball'];
+
+function VehicleRules({ project, tag, rules, change }: {
+  project: Project;
+  tag: Tag;
+  rules: TagField[];
+  change: (field: TagField, value: number) => void;
+}) {
+  const [selected, select] = useState('');
+  const field = rules.find(rule => rule.key === selected) ?? rules[0];
+  const value = fieldValue(project, tag, field);
+  return <fieldset className="vehicle-placement-rules">
+    <legend>Multiplayer vehicle placement</legend>
+    <label>Vehicle placement <select value={field.key} onChange={event => select(event.target.value)}>
+      {rules.map(rule => <option key={rule.key} value={rule.key}>{rule.label}</option>)}
+    </select></label>
+    <table>
+      <thead><tr><th scope="col">Mode</th><th scope="col">Default</th><th scope="col">Allowed</th></tr></thead>
+      <tbody>{vehicleModes.map((mode, bit) => <tr key={mode}>
+        <th scope="row">{mode}</th>
+        {['Default', 'Allowed'].map((rule, column) => {
+          const mask = 1 << (bit + column * 8);
+          return <td key={rule}><input type="checkbox" aria-label={mode + ' ' + rule.toLowerCase()}
+            checked={!!(value & mask)}
+            onChange={event => change(field, event.currentTarget.checked ? value | mask : value & ~mask)} /></td>;
+        })}
+      </tr>)}</tbody>
+    </table>
+    <button type="button" disabled={value === field.value} onClick={() => change(field, field.value)}>Reset this placement’s rules</button>
+  </fieldset>;
+}
 
 /** The same audited field controls serve the full Tag editor and the viewport drawer. */
 export default function TagFields({
@@ -24,12 +57,14 @@ export default function TagFields({
     const target=tags.find(candidate=>candidate.id===id);
     return target ? renamedTagPath(project,target) : 'Unresolved reference · '+id;
   };
+  const vehicleRules = tag.fields.filter(isVehicleRule);
   const usesCarrierReference = tag.fields.some(field => field.targetClass === 'actv' || field.targetClass === 'vehi');
   return tag.fields.length ? (
     <>
       {usesCarrierReference && <p className="subtle">Choose a replacement from this map. Save an edited map copy and test it in the target game.</p>}
       {tag.class === 'phys' && <p className="subtle">These coefficients apply to every object that uses this physics tag.</p>}
-      {tag.fields.map((field) => {
+      {!!vehicleRules.length && <VehicleRules project={project} tag={tag} rules={vehicleRules} change={change} />}
+      {tag.fields.filter(field => !isVehicleRule(field)).map((field) => {
         const value = fieldValue(project, tag, field),
           changed = value !== field.value;
         const detailedReference = field.kind === 'reference' && ['proj', 'actv', 'vehi'].includes(field.targetClass ?? '');

@@ -29,6 +29,15 @@
 .tag-properties-pane .field-table-title h3 {font-size:12px;margin:0;}
 .tag-properties-pane .field-table .property-row {padding:5px 0;gap:8px;grid-template-columns:var(--gs-tag-field-columns,minmax(75px,1fr) minmax(110px,160px));}
 .tag-properties-pane .property-row > div:first-child {min-width:0;overflow-wrap:anywhere;gap:3px;}
+.vehicle-placement-rules {display:grid;gap:8px;min-width:0;max-width:520px;border:1px solid var(--line);border-radius:4px;padding:8px;font-size:11px;}
+.vehicle-placement-rules legend {padding-inline:4px;font-weight:600;}
+.vehicle-placement-rules label {display:grid;gap:4px;min-width:0;}
+.vehicle-placement-rules select {width:100%;min-width:0;}
+.vehicle-placement-rules table {width:100%;border-collapse:collapse;}
+.vehicle-placement-rules th,.vehicle-placement-rules td {padding:4px;border-bottom:1px solid var(--line);}
+.vehicle-placement-rules th[scope="row"] {text-align:left;font-weight:500;}
+.vehicle-placement-rules td {text-align:center;}
+.vehicle-placement-rules button {justify-self:start;}
 .tag-properties-pane .analysis-card {padding:8px;margin-block:6px;}
 .tag-properties-pane .reference-list {margin-top:10px;}
 .tag-properties-pane .reference-list h3 {font-size:12px;margin:6px 0;}

@@ -1012,6 +1012,14 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
                     edit.field_key
                 ))
             })?;
+        use crate::maps::{VEHICLE_SPAWN_FLAGS_KEY_PREFIX, VEHICLE_SPAWN_FLAGS_MASK};
+        if field.key.starts_with(VEHICLE_SPAWN_FLAGS_KEY_PREFIX) {
+            let requested = edit.value.as_u64().and_then(|value| u16::try_from(value).ok());
+            let original = field.value.as_u64().and_then(|value| u16::try_from(value).ok());
+            if !requested.zip(original).is_some_and(|(new, old)| (new ^ old) & !VEHICLE_SPAWN_FLAGS_MASK == 0) {
+                return invalid("A vehicle placement edit may only change the reviewed multiplayer flags");
+            }
+        }
         if field.kind == "reference" {
             let id = edit
                 .value

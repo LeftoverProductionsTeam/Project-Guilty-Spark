@@ -58,7 +58,7 @@ impl PreparedVehicles {
         let membership = donor.iter().map(|row| contains(row.position)).collect();
         for (index, row) in donor.iter_mut().enumerate() {
             if row.tag.is_none() || row.not_placed & !0x1f != 0 || row.unit_flags & !1 != 0
-                || row.spawn_flags & !0x0f0f != 0
+                || row.spawn_flags & !maps::VEHICLE_SPAWN_FLAGS_MASK != 0
                 || !(0. ..=1.).contains(&row.body_vitality)
                 || (cache_version != 13 && row.appearance_player != 0)
             {

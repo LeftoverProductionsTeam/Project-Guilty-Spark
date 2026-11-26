@@ -2,7 +2,7 @@
 //! Known field offsets are deliberately a small audited subset, never guessed from tag names.
 #[path = "scenario_logic_readback.rs"]
 mod scenario_logic_readback;
-pub(crate) use scenario_logic_readback::{scenario_vehicle_bsp_mask, NAMED_OBJECT_BLOCKS};
+pub(crate) use scenario_logic_readback::{scenario_vehicle_bsp_mask, NAMED_OBJECT_BLOCKS, VEHICLE_SPAWN_FLAGS_KEY_PREFIX, VEHICLE_SPAWN_FLAGS_MASK};
 pub use scenario_logic_readback::scenario_gameplay_merge_budget;
 pub(crate) use scenario_logic_readback::{mcc13_sky_reference_count, native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
     NativeItemCollection, NativeNetgameFlag, NativeNetgamePickup, CLASSIC_NETGAME_FLAG_LIMIT, MCC13_REGIONAL_FLAG_LIMIT, NETGAME_EQUIPMENT_LIMIT};
@@ -1185,6 +1185,33 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
                 "SCENARIO_BLOCK",
                 format!("{kind}: {e}"),
             )),
+        }
+    }
+    if header.scenario_type == 1 && matches!(header.version, 6 | 7 | 13 | 609) {
+        use scenario_logic_readback::{VEHICLE_SPAWN_FLAGS_KEY_PREFIX, VEHICLE_SPAWN_FLAGS_OFFSET};
+        // These offsets come from the validated native placement rows above.
+        let vehicles: std::collections::HashMap<_, _> = tags.iter()
+            .filter(|tag| tag.class == "vehi" && !tag.external)
+            .map(|tag| (tag.id, &tag.path)).collect();
+        let fields: Vec<_> = objects.iter().filter_map(|object| {
+            let row = object.id.strip_prefix("Vehicle-")?;
+            let target = vehicles.get(&object.tag_id?)?;
+            let offset = object.source_offset? - 8 + VEHICLE_SPAWN_FLAGS_OFFSET;
+            let value = r.u16(offset).ok()?;
+            Some(TagField {
+                key: format!("{VEHICLE_SPAWN_FLAGS_KEY_PREFIX}{row}"),
+                label: format!("{} ({target})", object.name),
+                offset,
+                kind: "u16".into(),
+                value: serde_json::json!(value),
+                min: 0.,
+                max: f64::from(u16::MAX),
+                unit: String::new(),
+                target_class: None,
+            })
+        }).collect();
+        if let Some(scenario) = tags.iter_mut().find(|tag| tag.id == scenario_id) {
+            scenario.fields.extend(fields);
         }
     }
     match space.block(&r, scenario_at + 0x354, 52, 4096) {

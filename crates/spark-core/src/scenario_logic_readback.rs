@@ -387,6 +387,10 @@ pub(crate) struct NativeVehicle {
     pub spawn_flags: u16,
 }
 
+pub(crate) const VEHICLE_SPAWN_FLAGS_OFFSET: usize = 90;
+pub(crate) const VEHICLE_SPAWN_FLAGS_MASK: u16 = 0x0f0f;
+pub(crate) const VEHICLE_SPAWN_FLAGS_KEY_PREFIX: &str = "vehicle-spawn-flags-";
+
 pub(crate) fn scenario_vehicles(path: &Path, map: &MapInspection) -> Result<Vec<NativeVehicle>> {
     with_scenario(path, map, |reader, space, scenario| {
         let names = parse_names(reader, space, scenario)?;
@@ -427,7 +431,7 @@ pub(crate) fn scenario_vehicles(path: &Path, map: &MapInspection) -> Result<Vec<
                 body_vitality: reader.f32(row + 72)?,
                 unit_flags: reader.u32(row + 76)?,
                 team: reader.bytes(row + 88, 1)?[0] as i8,
-                spawn_flags: reader.u16(row + 90)?,
+                spawn_flags: reader.u16(row + VEHICLE_SPAWN_FLAGS_OFFSET)?,
             })
         }).collect()
     })
