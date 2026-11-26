@@ -393,6 +393,7 @@ export default function BspAssembly({
     if (draft) {
       const next = { ...draft, ...change };
       if (!next.preserveDonorBsp || next.openRoad) next.directionalDonorLanding = undefined;
+      if (next.separateNativeBsps || next.openRoad) next.fitPassageFloor = undefined;
       latest.current = { ...latest.current, signature: assemblySignature(next) };
       draftNow.current=next;setDraft(next);
       setReport(null);
@@ -864,6 +865,10 @@ export default function BspAssembly({
                   />
                 </label>
               </div>
+              {!secondary && !draft.openRoad && !draft.separateNativeBsps && <div className="bsp-toggles"><label>
+                <input type="checkbox" checked={draft.fitPassageFloor ?? false} disabled={busy}
+                  onChange={event=>update({fitPassageFloor:event.target.checked})}/> Fit floor through entrances
+              </label></div>}
               {draft.terrainSeam&&<div className="bsp-settings">
                 <label>Shoulders<NumberField value={draft.terrainSeam.shoulderWidth} min={2} max={24} step={0.5} label="Terrain shoulder width" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,shoulderWidth:value}})}/></label>
                 <label>Bank height<NumberField value={draft.terrainSeam.bankHeight} min={0} max={12} step={0.25} label="Terrain bank height" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,bankHeight:value}})}/></label>

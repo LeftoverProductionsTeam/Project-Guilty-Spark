@@ -516,11 +516,17 @@ impl RouteChecker {
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
+    let mut prior_lanes=[None;2];
     // Match the same mitered cross sections used by the ridge solid. A lane
     // sampled at a segment's perpendicular can cross onto the next graded
     // segment near a turn and compare the next ramp height to the old one.
-    let lane_sides = (strict_floor && assembly.tunnel_width >= 6.)
-        .then(|| crate::bsp_assembly::tunnel_sides(&assembly.tunnel_points, 3.))
+    let lane_distance = if assembly.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some())
+        || assembly.fit_passage_floor
+    {
+        Some(f64::from(assembly.tunnel_width)-0.45)
+    } else if strict_floor && assembly.tunnel_width >= 6. {Some(3.)} else {None};
+    let lane_sides = lane_distance
+        .map(|width| crate::bsp_assembly::tunnel_sides(&assembly.tunnel_points, width))
         .transpose()?;
     for (segment, pair) in assembly.tunnel_points.windows(2).enumerate() {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
@@ -538,19 +544,35 @@ impl RouteChecker {
                 let lateral = add(sides[segment], mul(sub(sides[segment + 1], sides[segment]), t));
                 // A centerline can cross a narrow triangle or hide a tear
                 // under one wheel. Review both sides at the same elevation.
-                for sign in [-1., 1.] {
+                for (lane,sign) in [-1., 1.].into_iter().enumerate() {
                     let point = add([p[0], p[1], z], mul(lateral, sign));
-                    if index.floor_in_range(point, &mut scratch, 0.30, 0.30).is_none() {
+                    let Some(height)=index.floor_in_range(point,&mut scratch,0.30,0.30) else {
                         return invalid(format!(
-                            "Canyon-top deck loses lateral floor support near {:.2}, {:.2}, {:.2}. Fill the tear or move the ridge onto a wider floor.",
-                            point[0], point[1], point[2],
+                            "The route loses lateral floor support near {:.2}, {:.2}, {:.2}. Fill the gap or move the landing onto a wider floor.",
+                            point[0],point[1],point[2],
                         ));
+                    };
+                    if !strict_floor {
+                        // Both sides of a fitted route must provide the same
+                        // standing clearance and continuous grade as its center.
+                        let position=[point[0],point[1],height];
+                        let (prior,prior_height)=prior_lanes[lane].unwrap_or((position,height));
+                        if (prior_height-height).abs()>0.12 || [0.20,0.36,0.52].into_iter().any(|capsule|{
+                            let raised=prior_height.max(height)+capsule;
+                            !index.clear_segment([prior[0],prior[1],raised],[point[0],point[1],raised],0.18,&mut scratch)
+                        }) {
+                            return invalid(format!(
+                                "A route side has a step or obstruction near {:.2}, {:.2}, {:.2}. Align the landing or widen the clear passage.",
+                                point[0],point[1],height,
+                            ));
+                        }
+                        prior_lanes[lane]=Some((position,height));
                     }
                 }
             }
             if let Some((old_point, old_floor)) = previous.filter(|(_, old)| (z - old).abs() > 0.12) {
                 return invalid(format!(
-                    "Tunnel floor changes by {:.3} world units in segment {} (limit 0.12). Ramp between ({:.3}, {:.3}, {:.3}) and ({:.3}, {:.3}, {:.3}).",
+                    "A tunnel floor step changes height by {:.3} world units in segment {} (limit 0.12). Ramp between ({:.3}, {:.3}, {:.3}) and ({:.3}, {:.3}, {:.3}).",
                     (z - old_floor).abs(), segment + 1, old_point[0], old_point[1], old_floor, p[0], p[1], z,
                 ));
             }
@@ -653,6 +675,7 @@ mod tests {
             preserve_donor_bsp: false,
             tunnel_bake_fill: false,
             directional_donor_landing: false,
+            fit_passage_floor: false,
             include_donor_scenery: false,
             translation: [0.; 3],
             yaw_degrees: 0.,
@@ -736,6 +759,7 @@ mod tests {
         road.terrain_seam = Some(crate::bsp_assembly::TerrainSeam {
             shoulder_width: 8.,
             bank_height: 0.,
+            bearing_degrees: None,
             base_shader_path: "fixture/grass".into(),
             donor_shader_path: "fixture/snow".into(),
         });

@@ -95,12 +95,12 @@ it('loads the stock compact layout and preserves built surface frames', () => {
   expect(region('sidewinder').translation).toEqual([114.02209091186523, 9.3280029296875, -17.233085022040342]);
   expect(plan.regions.filter(row => row.underground && row.surfaceAccess)).toHaveLength(9);
   expect(region('hangemhigh').surfaceAccess?.surfaceRegionId).toBe(region('bloodgulch').regionId);
-  expect(region('chillout')).toMatchObject({translation: [-12, 30, -31], surfaceAccess: {surfaceRegionId: region('timberland').regionId}});
+  expect(region('chillout')).toMatchObject({translation: [-12, 30, -31], surfaceAccess: {surfaceRegionId: region('timberland').regionId, headingDegrees: -180}});
   expect(atlasAdjacentRegions(plan.regions, region('timberland')).map(row => row.mapName)).toContain('dangercanyon');
   expect(JSON.stringify(sources)).toBe(original);
   const moved = { ...region('timberland'), translation: [40, 25, -4] as [number, number, number], yawDegrees: 90 };
   const rotated = applyCompactStockLayout(plan, sources, [moved]);
-  expect(rotated.regions.find(row => row.mapName === 'chillout')).toMatchObject({translation: [10, 13.000000000000002, -35], surfaceAccess: {headingDegrees: 0}});
+  expect(rotated.regions.find(row => row.mapName === 'chillout')).toMatchObject({translation: [10, 13.000000000000002, -35], surfaceAccess: {headingDegrees: -90}});
   expect(() => applyCompactStockLayout(null, sources.slice(1))).toThrow('Missing');
   expect(() => applyCompactStockLayout(plan, sources, [region('timberland'), {...region('sidewinder'), translation: [80, 0, 0]}])).toThrow('move compiled');
 });

@@ -28,6 +28,7 @@ export interface BspAssembly {
   outdoorSkySplit?: number;
   tunnelBakeFill?: boolean;
   directionalDonorLanding?: boolean;
+  fitPassageFloor?: boolean;
   translation: Vec3;
   yawDegrees: number;
   tunnelPoints: Vec3[];
@@ -35,7 +36,7 @@ export interface BspAssembly {
   tunnelHeight: number;
   tunnelShaderPath: string;
   openRoad?: boolean;
-  terrainSeam?: {shoulderWidth:number;bankHeight:number;baseShaderPath:string;donorShaderPath:string};
+  terrainSeam?: {shoulderWidth:number;bankHeight:number;baseShaderPath:string;donorShaderPath:string;bearingDegrees?:number};
   infantryTunnel?: {points:Vec3[];width:number;height:number;shaderPath:string};
   highGround?: {points:Vec3[];width:number;height:number;shaderPath:string};
   sections?:SeamSection[];
@@ -94,7 +95,7 @@ export function assemblySignature(plan: BspAssembly | null): string {
   // f64 world coordinates and source identities must retain full precision.
   const route=(value:BspAssembly['infantryTunnel'])=>value?{...value,width:Math.fround(value.width),height:Math.fround(value.height)}:undefined;
   return JSON.stringify(
-    ordered(plan ? { ...plan, baseBspIndex: plan.baseBspIndex || undefined, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), nativeSeals: plan.nativeSeals?.length ? plan.nativeSeals : undefined, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, separateNativeBsps: plan.separateNativeBsps || undefined, preserveDonorBsp: plan.preserveDonorBsp || undefined, restoreDonorSkyPortals: plan.restoreDonorSkyPortals || undefined, outdoorSkySplit: plan.outdoorSkySplit ?? undefined, tunnelBakeFill: plan.tunnelBakeFill || undefined, directionalDonorLanding: plan.directionalDonorLanding || undefined, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
+    ordered(plan ? { ...plan, baseBspIndex: plan.baseBspIndex || undefined, sections:plan.sections?.length?plan.sections.map(section=>({...route(section),openRoad:section.openRoad??false})):undefined, archSegments:plan.archSegments??undefined, tunnelWidth:Math.fround(plan.tunnelWidth), tunnelHeight:Math.fround(plan.tunnelHeight), nativeSeals: plan.nativeSeals?.length ? plan.nativeSeals : undefined, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false, separateNativeBsps: plan.separateNativeBsps || undefined, preserveDonorBsp: plan.preserveDonorBsp || undefined, restoreDonorSkyPortals: plan.restoreDonorSkyPortals || undefined, outdoorSkySplit: plan.outdoorSkySplit ?? undefined, tunnelBakeFill: plan.tunnelBakeFill || undefined, directionalDonorLanding: plan.directionalDonorLanding || undefined, fitPassageFloor: plan.fitPassageFloor || undefined, openRoad: plan.openRoad || undefined, infantryTunnel: route(plan.infantryTunnel), terrainSeam:plan.terrainSeam??undefined, highGround:route(plan.highGround) } : null),
   );
 }
 export function nativeSealVertices(text: string): Vec3[] {

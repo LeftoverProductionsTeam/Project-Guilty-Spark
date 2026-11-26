@@ -81,6 +81,9 @@ pub struct BspAssembly {
     /// Fit the connector floor across the two directional donor switches.
     #[serde(default, skip_serializing_if = "is_false")]
     pub directional_donor_landing: bool,
+    /// Continue the authored floor where an enclosed passage meets native air.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub fit_passage_floor: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
     pub translation: [f64; 3],
@@ -168,6 +171,9 @@ impl BspAssembly {
         }
         if self.tunnel_bake_fill && (!self.preserve_donor_bsp || self.open_road) {
             return invalid("Tunnel bake lighting requires an enclosed connector between intact BSPs");
+        }
+        if self.fit_passage_floor && (self.open_road || self.separate_native_bsps) {
+            return invalid("Fitted passage floors require a combined, enclosed tunnel");
         }
         if self.directional_donor_landing && (!self.preserve_donor_bsp || self.open_road) {
             return invalid("Directional landing requires an enclosed connector with the donor BSP intact");
@@ -266,6 +272,7 @@ impl BspAssembly {
         route.tunnel_height = tunnel.height; route.tunnel_shader_path = tunnel.shader_path.clone();
         route.visibility_zones.clear(); route.native_seals.clear();
         route.outdoor_sky_split = None;
+        route.fit_passage_floor = false;
         route
     }
     fn high_ground_plan(&self, ridge: &InfantryTunnel) -> Self {
@@ -711,16 +718,29 @@ fn passage_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize,
 // A route volume joined into existing outdoor sky cannot raise its floor:
 // it is already inside free space. Remove only the explicitly authored strip
 // beneath the ridge, leaving a real supported surface and the lower routes.
-fn support_high_ground(mut space:Manifold,route:&BspAssembly,material:usize,minimum:f64,token:Option<&CancelToken>)->Result<Manifold>{
+fn support_route_floor(
+    mut space:Manifold, route:&BspAssembly, material:usize,
+    depth_for:impl Fn([V;2])->f64, token:Option<&CancelToken>, label:&str,
+)->Result<Manifold>{
     let sides=tunnel_sides(&route.tunnel_points,route.tunnel_width as f64)?;
     for (index,pair) in route.tunnel_points.windows(2).enumerate(){
-        let depth=pair[0][2].max(pair[1][2])-minimum;
-        if !depth.is_finite()||depth<=0. {return invalid("High-ground support requires a verified lower source boundary");}
+        let depth=depth_for([pair[0],pair[1]]);
+        if !depth.is_finite()||depth<=0. {return invalid("Terrain support requires a verified lower source boundary");}
         let down=[0.,0.,-depth];
         let support=passage_solid(add(pair[0],down),add(pair[1],down),sides[index],sides[index+1],depth,material,None)?;
-        space=checked(space.boolean_with_engine_and_token(&support,OpType::Subtract,BooleanEngine::Auto,token),"Canyon-top terrain support")?;
+        space=checked(space.boolean_with_engine_and_token(&support,OpType::Subtract,BooleanEngine::Auto,token),label)?;
     }
     Ok(space)
+}
+
+fn support_high_ground(space:Manifold,route:&BspAssembly,material:usize,minimum:f64,token:Option<&CancelToken>)->Result<Manifold>{
+    support_route_floor(space,route,material,|pair|pair[0][2].max(pair[1][2])-minimum,token,"Canyon-top terrain support")
+}
+
+// The tunnel is an air union. In a stock landing that air is already present,
+// so cutting the route alone can leave a step down to the original lower floor.
+fn fit_passage_floor(space:Manifold,route:&BspAssembly,material:usize,token:Option<&CancelToken>)->Result<Manifold>{
+    support_route_floor(space,route,material,|_|0.75,token,"Continuous enclosed passage floor")
 }
 #[derive(Clone, Copy)]
 enum PartitionEnd { Base, Donor }
@@ -924,10 +944,10 @@ fn generate_end(
             if let (Some(ribbon),Some(slots))=(&terrain_ribbon,terrain_materials){
                 let generated = ribbon.solid(assembly, slots, sky_material.unwrap())?;
                 let generated = ribbon.preserve_teleporter_floors(generated, &combined, base_path, base,
-                    &base_mesh, assembly.base_bsp_index, [0.; 3], slots[0], lowest_source - 1., &token)?;
+                    &base_mesh, assembly.base_bsp_index, ([0.; 3],0.), slots[0], lowest_source - 1., &token)?;
                 let donor_space = right.as_ref().ok_or_else(|| SparkError::Invalid("The terrain seam needs its stock donor".into()))?;
                 let generated = ribbon.preserve_teleporter_floors(generated, donor_space, &assembly.donor_source.preserved_path, &donor,
-                    &donor_mesh, assembly.donor_bsp_index, assembly.translation, slots[1], lowest_source - 1., &token)?;
+                    &donor_mesh, assembly.donor_bsp_index, (assembly.translation,assembly.yaw_degrees), slots[1], lowest_source - 1., &token)?;
                 combined=checked(combined.boolean_with_engine_and_token(&generated,OpType::Add,BooleanEngine::Auto,Some(&token)),"Terrain seam join")?;
             }
             for (route_index,(route, material)) in routes.iter().zip(&passage_materials).enumerate() {
@@ -968,6 +988,9 @@ fn generate_end(
                     united, &routes[0], passage_materials[0], lowest_source - 0.25, Some(&token),
                 )?;
             }
+            if assembly.fit_passage_floor {
+                united=fit_passage_floor(united,&routes[0],passage_materials[0],Some(&token))?;
+            }
             if let Some(ridge)=&assembly.high_ground {
                 united=support_high_ground(united,&assembly.high_ground_plan(ridge),passage_materials[1+usize::from(assembly.infantry_tunnel.is_some())],lowest_source-0.25,Some(&token))?;
             }
@@ -999,7 +1022,7 @@ fn generate_end(
         if assembly.high_ground.is_some() {
             weld_materials.push(passage_materials[1 + usize::from(assembly.infantry_tunnel.is_some())]);
         }
-    } else if matches!(partition, Some((_, PartitionEnd::Donor))) {
+    } else if matches!(partition, Some((_, PartitionEnd::Donor))) || assembly.fit_passage_floor {
         // A tunnel breaking into a retained floor can leave short Boolean
         // edges at the join. Restore those edges before needle refinement.
         weld_materials.extend(passage_materials.iter().copied());
@@ -1034,7 +1057,8 @@ fn generate_end(
     }
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
     let mut route_clearance = checker.verify_details(&clearance_route)?;
-    if matches!(partition, Some((_, PartitionEnd::Donor))) {
+    if matches!(partition, Some((_, PartitionEnd::Donor))) || assembly.fit_passage_floor
+        || assembly.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some()) {
         checker.verify_return(&clearance_route)?;
     }
     for previous in inherited {
@@ -1088,7 +1112,7 @@ fn generate_end(
         &route_geometry,
         &base_mesh,
         &donor_mesh,
-        assembly.terrain_seam.as_ref().map(|_|terrain::render_edge(&donor,assembly.donor_bsp_index,false).map(|edge|edge-0.25+assembly.translation[0])).transpose()?,
+        terrain_ribbon.as_ref().map(|ribbon|ribbon.boundary),
         partition.map(|(seam, end)| (end, seam.separation_axis)),
     )?;
     let exact_sky_portals = if assembly.restore_donor_sky_portals {
@@ -1368,7 +1392,7 @@ fn add_portals(
     assembly: &BspAssembly,
     base: &MeshData,
     donor: &MeshData,
-    trimmed_donor_min: Option<f64>,
+    terrain_boundary: Option<terrain::Boundary>,
     partition: Option<(PartitionEnd, V)>,
 ) -> Result<usize> {
     fn bounds(mesh: &MeshData, part: usize, translation: V, yaw: f64) -> (V, V) {
@@ -1391,7 +1415,9 @@ fn add_portals(
         assembly.translation.map(f64::from),
         assembly.yaw_degrees as f64,
     );
-    if let Some(boundary)=trimmed_donor_min{donor_bounds.0[0]=boundary;}
+    if assembly.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_none()) {
+        if let Some(boundary)=terrain_boundary {donor_bounds.0[0]=boundary.donor_min;}
+    }
     let inside = |p: V, b: (V, V)| (0..3).all(|k| p[k] >= b.0[k] - 0.1 && p[k] <= b.1[k] + 0.1);
     // Diagonal corridors can be outside the region along their heading
     // even while they are inside its world-aligned bounding rectangle.
@@ -1416,6 +1442,12 @@ fn add_portals(
     let mut native_cuts:Vec<Vec<[u32;3]>>=vec![];
     let mut generated_cuts:Vec<([[f64;3];4],bool)>=vec![];
     for (route_index, route) in assembly.connection_routes().into_iter().enumerate() {
+    let inside_route_source=|p|{
+        if let Some(boundary)=terrain_boundary.filter(|_|route.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some())){
+            let along=dot(p,boundary.axis);
+            along<=boundary.base_max+0.1||along>=boundary.donor_min-0.1
+        }else{inside_retained_source(p)}
+    };
     let before = count;let mut covered_by_shared_cut=false;
     for (segment,end) in portal_spans(&route) {
         let (a,b)=(route.tunnel_points[segment],route.tunnel_points[end]);
@@ -1423,13 +1455,13 @@ fn add_portals(
         let candidates: Vec<_> = route.tunnel_points[segment..=end].windows(2).flat_map(|pair|{
             let delta=sub(pair[1],pair[0]);let steps=(delta[0].hypot(delta[1])/0.4).ceil() as usize;
             (1..steps).map(move|n|add(pair[0],mul(delta,n as f64/steps as f64)))
-        }).filter(|p| !inside_retained_source(*p)).collect();
+        }).filter(|p| !inside_route_source(*p)).collect();
         let authored = crate::bsp_visibility::authored_centers(&route.visibility_zones, &route.tunnel_points, segment)?;
         if authored.is_none() && candidates.len() < 4 {
             continue;
         }
         let [first, last] = authored.unwrap_or_else(||if route.terrain_seam.is_some(){[candidates[0],*candidates.last().unwrap()]}else{[candidates[candidates.len() / 3],candidates[candidates.len() * 2 / 3]]});
-        if [first,last].iter().any(|p|inside_retained_source(*p)) {
+        if [first,last].iter().any(|p|inside_route_source(*p)) {
             return invalid("Authored visibility cuts must lie in an isolated tunnel segment outside both source BSP bounds; move the portal handles or choose a longer segment");
         }
         let separation_squared=dot(sub(first,last),sub(first,last));
@@ -2877,26 +2909,77 @@ pub fn plan_from_atlas(
     if terrain_seam && (from.underground || to.underground || from.bsp_index != 0 || base.mesh.parts.len() != 1) {
         return invalid("Choose two surface regions with one base BSP for a terrain seam");
     }
-    let direction = if terrain_seam { 0. } else {
-        surface_heading.unwrap_or_else(|| approach[1].atan2(approach[0]).to_degrees())
-    };
+    let direction = surface_heading.unwrap_or_else(|| approach[1].atan2(approach[0]).to_degrees());
     let base_index = if continuation { 0 } else { from.bsp_index };
     let mut plan = plan_from_bsp_placement(base_project, base, donor_project, donor, base_index,
         to.bsp_index, tags, direction, None, Some((translation, yaw)), &in_region)?;
     plan.atlas_origin = Some(origin.clone());
     plan.atlas_from_region_id = Some(from.region_id.clone());
     plan.include_donor_scenery = true;
+    plan.fit_passage_floor = surface_heading.is_some() && !plan.separate_native_bsps;
     if to.underground && !from.underground {
         let roof = to.maximum[2] + translation[2];
+        if plan.fit_passage_floor {
+            plan_buried_approach(base_project,base,donor,&mut plan,direction,roof,&in_region)?;
+        }
         if roof >= plan.tunnel_points[0][2] {
             return invalid("Lower the underground Atlas region below the surface entrance before building");
         }
     }
     if terrain_seam {
         let source=base_project.source.as_ref().ok_or_else(|| SparkError::Invalid("Destination source is missing".into()))?;
-        return terrain::plan_placed(&source.preserved_path, base, donor, plan);
+        return terrain::plan_placed(&source.preserved_path, base, donor, plan, direction);
     }
+    plan.validate()?;
     Ok(plan)
+}
+
+/// Select the actual surface landing behind the buried entry along the Atlas
+/// heading. The whole-map edge is not an entrance when the room lies below it.
+fn plan_buried_approach(
+    base_project:&Project,base:&MapInspection,donor:&MapInspection,plan:&mut BspAssembly,
+    heading:f64,roof:f64,in_region:&dyn Fn(V)->bool,
+)->Result<()>{
+    let source=base_project.source.as_ref().ok_or_else(||SparkError::Invalid("Destination source is missing".into()))?;
+    let (base_mesh,base_faces)=maps::collision_source(&source.preserved_path,base)?;
+    let (donor_mesh,donor_faces)=maps::collision_source(&plan.donor_source.preserved_path,donor)?;
+    let (y,x)=heading.to_radians().sin_cos();
+    let donor_heading=transform([-x,-y,0.],[0.;3],-plan.yaw_degrees);
+    let starts=donor.objects.iter().filter(|row|row.kind=="Player spawn").map(|row|row.position.map(f64::from)).collect::<Vec<_>>();
+    let mouths=playable_anchor_candidates(&donor_mesh,&donor_faces,plan.donor_bsp_index,donor_heading,&starts,32.,&|_|true)?;
+    let base_checker=crate::bsp_clearance::RouteChecker::for_part(&base_mesh,plan.base_bsp_index)?;
+    let donor_checker=crate::bsp_clearance::RouteChecker::for_part(&donor_mesh,plan.donor_bsp_index)?;
+    let lane=f64::from(plan.tunnel_width)*0.5-0.2;
+    let clear=|checker:&crate::bsp_clearance::RouteChecker,point:V,axis:V|{
+        [-lane,0.,lane].into_iter().all(|offset|{
+            let mut step=add(point,mul(axis,offset));
+            step[2]+=0.08;
+            checker.verify_start(step).is_ok()
+        })
+    };
+    for angle in [0.,-15.,15.,-30.,30.,-45.,45.] {
+        let (y,x)=(heading+angle).to_radians().sin_cos();
+        let toward=[x,y,0.];
+        let side=[-y,x,0.];
+        let local_side=transform(side,[0.;3],-plan.yaw_degrees);
+        let clear_mouths=mouths.iter().map(|&(point,_)|point)
+            .filter(|&point|clear(&donor_checker,point,local_side)).take(24).collect::<Vec<_>>();
+        for run in [20.,24.,32.,40.,48.,56.,64.,72.,84.] {
+            for &mouth in &clear_mouths {
+                let end=transform(mouth,plan.translation,plan.yaw_degrees);
+                let sample=sub(end,mul(toward,run));
+                let Ok((start,face))=terrain::source_floor(&base_mesh,&base_faces,plan.base_bsp_index,sample,0.65) else{continue;};
+                if !in_region(start)||start[2]<=roof||(start[2]-end[2]).abs()>0.30*run
+                    || !clear(&base_checker,start,side) {continue;}
+                if let Some(shader)=connection_shader(&base.tags,base_faces[face].shader,&base.header.name) {
+                    plan.tunnel_shader_path=shader.path.clone();
+                }
+                plan.tunnel_points=vec![start,end];
+                return plan.validate();
+            }
+        }
+    }
+    invalid("No clear surface approach fits the saved underground heading and depth. Rotate the entrance or move it nearer a walkable surface landing.")
 }
 
 fn plan_from_bsp_placement(
@@ -2971,6 +3054,7 @@ fn plan_from_bsp_placement(
         preserve_donor_bsp: false,
         tunnel_bake_fill: false,
         directional_donor_landing: false,
+        fit_passage_floor: false,
         include_donor_scenery: false,
         translation,
         yaw_degrees: yaw,
@@ -3063,7 +3147,8 @@ fn plan_from_bsp_placement(
         }
         return Err(first_problem.unwrap());
     }
-    plan.validate()?;
+    // Atlas fitting replaces these preliminary mouth points before validation.
+    if placement.is_none() { plan.validate()?; }
     Ok(plan)
 }
 #[derive(Clone, Copy, Debug, serde::Deserialize)]
@@ -3195,6 +3280,11 @@ pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<Com
         let details = checker.verify_details(route).map_err(|error| {
             SparkError::Invalid(format!("Connection {} ({}): {error}", index + 1, route.donor_title))
         })?;
+        if route.fit_passage_floor || route.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some()) {
+            checker.verify_return(route).map_err(|error| SparkError::Invalid(format!(
+                "Return through connection {} ({}): {error}",index+1,route.donor_title,
+            )))?;
+        }
         walk_samples.push(details.iter().map(|detail| detail.walk_samples).sum());
         route_clearance.push(details);
     }
@@ -3986,6 +4076,7 @@ mod tests {
         plan.terrain_seam = Some(TerrainSeam {
             shoulder_width: 8.,
             bank_height: 0.,
+            bearing_degrees: None,
             base_shader_path: "fixture/base".into(),
             donor_shader_path: "fixture/donor".into(),
         });
@@ -4072,6 +4163,48 @@ mod tests {
         plan.infantry_tunnel.as_mut().unwrap().points=vec![[0.,0.,0.],[25.,25.,0.],[75.,25.,0.],[100.,0.,0.]];
         assert!(verify_route(&mesh,&plan).unwrap_err().to_string().contains("Infantry tunnel"));
     }
+    #[test]
+    fn placed_terrain_validates_a_south_facing_rotated_donor_without_changing_legacy_plans() {
+        let mut road=dual_route_plan();
+        road.open_road=true;
+        road.tunnel_points=vec![[0.,0.,0.],[0.,-18.,0.]];
+        road.yaw_degrees=90.;
+        road.terrain_seam=Some(TerrainSeam{
+            shoulder_width:8.,bank_height:4.,bearing_degrees:None,
+            base_shader_path:"fixture/grass".into(),donor_shader_path:"fixture/snow".into(),
+        });
+        assert!(road.validate().is_err());
+        road.terrain_seam.as_mut().unwrap().bearing_degrees=Some(-90.);
+        assert!(road.validate().is_ok());
+        road.tunnel_points.reverse();
+        assert!(road.validate().is_err());
+        road.terrain_seam.as_mut().unwrap().bearing_degrees=Some(90.);
+        assert!(road.validate().is_ok());
+    }
+
+    #[test]
+    fn fitted_passage_eliminates_a_drop_in_a_stock_landing_without_raising_the_adjacent_floor() {
+        let mut route=dual_route_plan();
+        route.terrain_seam=None;
+        route.outdoor_sky_split=None;
+        route.tunnel_width=2.;
+        route.tunnel_height=1.6;
+        route.fit_passage_floor=true;
+        route.tunnel_points=vec![[-2.,0.,0.],[2.,0.,0.],[5.,0.,-0.5]];
+        let span=[0.,3.,0.];
+        let near=passage_solid([-3.,0.,0.],[0.1,0.,0.],span,span,2.,0,None).unwrap();
+        let far=passage_solid([0.,0.,-0.5],[6.,0.,-0.5],span,span,2.5,0,None).unwrap();
+        let space=checked(near.boolean_with_engine_and_token(&far,OpType::Add,BooleanEngine::Auto,None),"Test rooms").unwrap();
+        let mut slots=vec![material(),material()];
+        let (before,_)=collision_layer(&space.get_mesh_gl64(-1),&mut slots).unwrap();
+        assert!(verify_route(&before,&route).is_err());
+        let fitted=fit_passage_floor(space,&route,1,None).unwrap();
+        let (after,_)=collision_layer(&fitted.get_mesh_gl64(-1),&mut slots).unwrap();
+        let checker=crate::bsp_clearance::RouteChecker::new(&after).unwrap();
+        assert_eq!(checker.verify(&route).unwrap(),checker.verify_return(&route).unwrap());
+        assert_eq!(checker.native_ground_z([1.,1.5,1.],2.),Some(-0.5));
+    }
+
     #[test]
     fn restored_sky_portal_matches_only_its_native_perimeter() {
         let trapezoid = [[4., 0., 0.], [4., 0.2, 1.], [4., 1.1, 1.], [4., 1.3, 0.]];
