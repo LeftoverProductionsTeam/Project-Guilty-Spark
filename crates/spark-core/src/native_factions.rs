@@ -1098,12 +1098,14 @@ fn validate_terminal_point(
 ) -> Result<()> {
     if let Some(hubs) = regional {
         let faction = faction_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
-        if !hubs[faction].contains(position) || hubs[1 - faction].contains(position) {
+        if !hubs[faction].contains_native_interior(position)
+            || hubs[1 - faction].contains_native_interior(position)
+        {
             return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
         }
         for field in ["extraction_pelican_zone", "extraction_spirit_zone"] {
             if volumes.iter().any(|v| v.name.eq_ignore_ascii_case(field))
-                && unique_volume(volumes, field)?.contains(position) {
+                && unique_volume(volumes, field)?.contains_native_interior(position) {
                 return invalid(format!("{name} overlaps the field transfer volume {field}"));
             }
         }
@@ -1147,7 +1149,7 @@ pub fn megaworld_hub_starts(
     let mut starts = [vec![], vec![]];
     let mut points = Vec::new();
     for (index, start) in crate::maps::scenario_region_starts(path, map)?.into_iter().enumerate() {
-        if let Some(faction) = hubs.iter().position(|geometry| geometry.contains(start.position)) {
+        if let Some(faction) = hubs.iter().position(|geometry| geometry.contains_native_interior(start.position)) {
             starts[faction].push((index, start.bsp_index, points.len()));
             let mut standing = start.position;
             standing[2] += 0.05;
@@ -1894,6 +1896,19 @@ mod tests {
             "extractionPlayable": false, "hubs": hubs, "factions": bindings, "transferSites": pads,
         })).unwrap(), false).unwrap();
         eprintln!("Nineteen-region native faction controls and bodies: {}", built.sha256);
+    }
+
+    #[test]
+    #[ignore = "Read-only regression against the retained MegaWorld Win64 faction fixture"]
+    fn native_trigger_membership_matches_megaworld_win64_readback() {
+        let path = std::path::PathBuf::from(std::env::var_os("SPARK_NATIVE_MEGAWORLD_CACHE").unwrap());
+        let map = crate::maps::inspect_map(&path, None).unwrap();
+        assert_eq!(map.sha256, "84c955d34ad5869d4119c571aac87ce73a6d244e0ced1c1f5b5f97bd1d930067");
+        let [unsc, covenant] = megaworld_hub_starts(&path, &map).unwrap().unwrap();
+        assert_eq!(unsc.bsp_index, 0);
+        assert_eq!(unsc.start_indices, [0, 2, 18, 20, 36, 38]);
+        assert_eq!(covenant.bsp_index, 10);
+        assert_eq!(covenant.start_indices, [426, 427, 450, 563, 564, 565, 566, 567]);
     }
 
     #[test]

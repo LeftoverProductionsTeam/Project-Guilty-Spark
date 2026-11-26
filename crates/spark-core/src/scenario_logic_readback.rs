@@ -51,13 +51,30 @@ impl ScenarioLogicVolumeGeometry {
         })
     }
 
-    pub(crate) fn contains(&self,point:[f32;3])->bool {
+    pub(crate) fn contains(&self, point: [f32; 3]) -> bool {
+        self.local_coordinates(point).is_some_and(|local| {
+            local.into_iter().zip(self.dimensions).all(|(value, extent)| {
+                value >= -1e-5 && value <= extent + 1e-5
+            })
+        })
+    }
+
+    /// The native trigger excludes points on its faces.
+    pub(crate) fn contains_native_interior(&self, point: [f32; 3]) -> bool {
+        self.local_coordinates(point).is_some_and(|local| {
+            local.into_iter().zip(self.dimensions).all(|(value, extent)| {
+                value > 0.0 && value < extent
+            })
+        })
+    }
+
+    fn local_coordinates(&self, point: [f32; 3]) -> Option<[f32; 3]> {
         let dot=|a:[f32;3],b:[f32;3]|a.iter().zip(b).map(|(x,y)|x*y).sum::<f32>();
         if point.iter().chain(self.forward.iter()).chain(self.up.iter()).chain(self.corner.iter()).chain(self.dimensions.iter()).any(|v|!v.is_finite())
-            ||self.dimensions.iter().any(|d|*d<=0.)||(dot(self.forward,self.forward)-1.).abs()>1e-4||(dot(self.up,self.up)-1.).abs()>1e-4||dot(self.forward,self.up).abs()>1e-4{return false;}
+            ||self.dimensions.iter().any(|d|*d<=0.)||(dot(self.forward,self.forward)-1.).abs()>1e-4||(dot(self.up,self.up)-1.).abs()>1e-4||dot(self.forward,self.up).abs()>1e-4{return None;}
         let [ux,uy,uz]=self.up;let [fx,fy,fz]=self.forward;let side=[uy*fz-uz*fy,uz*fx-ux*fz,ux*fy-uy*fx];
         let delta=std::array::from_fn(|i|point[i]-self.corner[i]);
-        [self.forward,side,self.up].into_iter().zip(self.dimensions).all(|(axis,extent)|{let value=dot(delta,axis);value>=-1e-5&&value<=extent+1e-5})
+        Some([self.forward, side, self.up].map(|axis| dot(delta, axis)))
     }
 }
 #[derive(Clone,Debug,Serialize)]
@@ -707,6 +724,24 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn native_trigger_membership_excludes_faces_of_rotated_volume() {
+        let volume = super::ScenarioLogicVolumeGeometry {
+            forward: [0., 1., 0.],
+            up: [0., 0., 1.],
+            corner: [3., 5., 7.],
+            dimensions: [4., 6., 8.],
+        };
+        assert!(volume.contains_native_interior([0., 7., 11.]));
+        for boundary in [
+            [3., 7., 11.], [-3., 7., 11.], [0., 5., 11.],
+            [0., 9., 11.], [0., 7., 7.], [0., 7., 15.],
+        ] {
+            assert!(volume.contains(boundary));
+            assert!(!volume.contains_native_interior(boundary));
+        }
+    }
+
     use super::*;
     #[test]
     #[ignore = "Requires two explicitly selected legitimate multiplayer caches"]
