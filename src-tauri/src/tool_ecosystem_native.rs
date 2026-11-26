@@ -25,13 +25,21 @@ struct Row {
     installed_version: Option<String>,
 }
 #[cfg(windows)]
-fn file_version(path:&Path)->Option<String>{
+fn file_version_resource(path:&Path)->Option<Vec<u8>>{
     use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW,GetFileVersionInfoW,VerQueryValueW,VS_FIXEDFILEINFO};
+    use windows_sys::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW,GetFileVersionInfoW};
     let file:Vec<u16>=path.as_os_str().encode_wide().chain(Some(0)).collect();
     unsafe {
         let size=GetFileVersionInfoSizeW(file.as_ptr(),std::ptr::null_mut());if size==0||size>1024*1024{return None;}
         let mut bytes=vec![0u8;size as usize];if GetFileVersionInfoW(file.as_ptr(),0,size,bytes.as_mut_ptr().cast())==0{return None;}
+        Some(bytes)
+    }
+}
+#[cfg(windows)]
+fn file_version(path:&Path)->Option<String>{
+    use windows_sys::Win32::Storage::FileSystem::{VerQueryValueW,VS_FIXEDFILEINFO};
+    let bytes=file_version_resource(path)?;
+    unsafe {
         let mut value=std::ptr::null_mut();let mut length=0;let root=[b'\\' as u16,0];
         if VerQueryValueW(bytes.as_ptr().cast(),root.as_ptr(),&mut value,&mut length)==0||value.is_null()||length<std::mem::size_of::<VS_FIXEDFILEINFO>() as u32{return None;}
         let info=std::ptr::read_unaligned(value.cast::<VS_FIXEDFILEINFO>());
@@ -40,6 +48,29 @@ fn file_version(path:&Path)->Option<String>{
     }
 }
 #[cfg(not(windows))]fn file_version(_path:&Path)->Option<String>{None}
+
+// Product metadata is a discovery hint. It never authorizes running a client
+// or stands in for the exact binary/SDL companion review.
+#[cfg(windows)]
+pub(super) fn declares_windows_product(path:&Path, product:&str)->bool{
+    use windows_sys::Win32::Storage::FileSystem::VerQueryValueW;
+    let Some(bytes)=file_version_resource(path) else{return false;};
+    let query:Vec<u16>=r"\StringFileInfo\040904B0\ProductName".encode_utf16().chain(Some(0)).collect();
+    let mut value=std::ptr::null_mut();
+    let mut length=0;
+    unsafe {
+        if VerQueryValueW(bytes.as_ptr().cast(),query.as_ptr(),&mut value,&mut length)==0 ||
+            value.is_null() || !(1..=128).contains(&length) {return false;}
+        let start=bytes.as_ptr() as usize;
+        let pointer=value as usize;
+        let end=pointer.checked_add(length as usize*2);
+        if pointer<start || !end.is_some_and(|end|end<=start+bytes.len()){return false;}
+        let actual=(0..length as usize).map(|index|std::ptr::read_unaligned(value.cast::<u16>().add(index)));
+        actual.eq(product.encode_utf16().chain(Some(0)))
+    }
+}
+#[cfg(not(windows))]
+pub(super) fn declares_windows_product(_path:&Path,_product:&str)->bool{false}
 fn installed_blender()->Option<PathBuf>{
     let root=PathBuf::from(std::env::var_os("ProgramFiles")?).join("Blender Foundation");core::reject_links(&root).ok()?;
     let mut folders=fs::read_dir(root).ok()?.take(32).filter_map(|item|item.ok()).filter(|e|e.file_name().to_string_lossy().starts_with("Blender ")).map(|e|e.path()).collect::<Vec<_>>();folders.sort();

@@ -67,19 +67,22 @@ export default function GamesTools({
   const [setupPackage]=useMapState('global','tools.enginePackage','chupathingy');
   const settingUpForerunner = section === 'setup' && setupPackage === 'forerunner';
   const [showCompatibility,setShowCompatibility]=useMapState('global','tools.compatibilityOpen',false);
+  function openForerunnerSetup() {
+    writeMapSession('global','tools.enginePackage','forerunner');
+    writeMapSession('global','tools.downloadOpen',false);
+    setFoldersFor('openCe');
+    chooseSection('setup');
+  }
   function openForerunner() {
     setRuntime('openCe');
     setShowForerunner(true);
     if (forerunner) {
       void call('activate_runtime_registration',{registrationId:forerunner.id})
         .then(()=>window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed')))
-        .catch(error=>setFlavorError(String(error)));
+        .catch(error=>{setFlavorError(String(error));openForerunnerSetup();});
     } else {
       if (detectedForerunner?.contentReady) void connect(detectedForerunner);
-      writeMapSession('global','tools.enginePackage','forerunner');
-      writeMapSession('global','tools.downloadOpen',false);
-      setFoldersFor('openCe');
-      chooseSection('setup');
+      openForerunnerSetup();
     }
   }
   const selectedForerunner = runtime === 'openCe' && (forerunnerActive || showForerunner || settingUpForerunner);

@@ -1,4 +1,4 @@
-//! Read-only, bounded detection of the reviewed portable Halo clients. Detection
+//! Read-only, bounded detection of portable Halo client installations. Detection
 //! does not register or launch them. Separate user actions register exact
 //! executable identities and optionally query the advertised companion contract.
 use super::*;
@@ -34,22 +34,31 @@ fn community_identity(hash: &str) -> Option<(runtime::RuntimeId, &'static str)> 
         _ => None,
     }
 }
+fn forerunner_latest_root(root:&Path)->bool{
+    let named=|name:Option<&std::ffi::OsStr>, expected:&str|name.is_some_and(|name|name.eq_ignore_ascii_case(expected));
+    named(root.file_name(),"Latest") && root.parent().is_some_and(|parent|
+        named(parent.file_name(),"Project Forerunner") || named(parent.file_name(),"Forerunner"))
+}
 fn community(root: &Path) -> Reply<Detected> {
     core::reject_links(root).map_err(error)?;
     let root = fs::canonicalize(root).map_err(error)?;
     // New Chupathingy packages keep halo.exe as a setup launcher. Identify
     // the actual engine independently; a familiar filename is never evidence.
-    let (executable, hash, runtime_id, version) = ["halo.exe","chupathingy.exe"].into_iter().find_map(|name|{
+    let (executable, hash, runtime_id, version, declared_forerunner) = ["halo.exe","chupathingy.exe"].into_iter().find_map(|name|{
         let (executable,hash,_)=dependency_install::pe_identity(&root.join(name)).ok()?;
-        let (runtime_id,version)=community_identity(&hash)?;
-        Some((executable,hash,runtime_id,version))
+        if let Some((runtime_id,version))=community_identity(&hash){
+            return Some((executable,hash,runtime_id,version,false));
+        }
+        (name=="halo.exe" && forerunner_latest_root(&root) &&
+            tool_ecosystem_native::declares_windows_product(&executable,"Forerunner"))
+            .then_some((executable,hash,runtime::RuntimeId::OpenCe,"Forerunner",true))
     }).ok_or("Portable client is not a reviewed OpenCE/Chupathingy executable")?;
     let data_root = if root.join("data/maps").is_dir() { root.join("data") } else { root.clone() };
     core::reject_links(&data_root).map_err(error)?;
     let ui = data_root.join("maps/ui.map");
     let content_ready = core::reject_links(&ui).is_ok() && maps::inspect_header(&ui).is_ok_and(|header| header.version == 5);
     Ok(Detected { runtime_id, root, executable, data_root, executable_sha256: hash, version: Some(version.into()), content_ready,
-        detail: if content_ready { "Reviewed client and Xbox UI cache found. Connection records paths only; game compatibility and live-link remain separate checks." } else { "Reviewed client found. Its original Xbox maps/ui.map is missing or incompatible; complete the owned-content setup first." }.into() })
+        detail: if declared_forerunner && content_ready { "Forerunner Latest and its Xbox UI cache were detected. Connect to record the paths, then review this build in Runtime setup to enable companion features." } else if content_ready { "Reviewed client and Xbox UI cache found. Connection records paths only; game compatibility and live-link remain separate checks." } else { "Reviewed client found. Its original Xbox maps/ui.map is missing or incompatible; complete the owned-content setup first." }.into() })
 }
 /// Expand only known client folder names near explicitly linked/provenance roots.
 /// No recursive drive crawl; an installed app need not share the games' cwd.
@@ -219,6 +228,9 @@ mod tests {
         for child in ["Halo Custom Edition","OpenCE","ChupathingyCE","opencehalo-windows-release","chupathingyce-windows64-release"] {assert!(roots.contains(&PathBuf::from("owned").join(child)));}
         for child in ["Halo Custom Edition","OpenCE","Chupathingy","OpenH1-Windows","OpenCEFaber"] {assert!(roots.contains(&PathBuf::from("owned/Runtimes").join(child)));}
         assert!(roots.contains(&PathBuf::from("owned/Project Forerunner/Latest")));
+        assert!(forerunner_latest_root(Path::new("owned/PROJECT FORERUNNER/Latest")));
+        assert!(!forerunner_latest_root(Path::new("owned/Project Forerunner/Previous")));
+        assert!(!forerunner_latest_root(Path::new("owned/OpenCE/Latest")));
         assert_eq!(roots.iter().collect::<std::collections::HashSet<_>>().len(),roots.len());
         assert!(nearby_roots((0..100).map(|n|PathBuf::from(format!("owned-{n}/maps")))).len()<=256);
     }

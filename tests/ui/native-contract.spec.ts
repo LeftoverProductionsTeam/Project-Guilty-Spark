@@ -3466,6 +3466,7 @@ test('runtime folders can be moved independently, including Custom Edition, with
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
    if(command==='runtime_report')return structuredClone(w.__folderReports);
    if(command==='choose_runtime_path')return 'D:/Runtimes/'+w.__folderRuntime;
+   if(command==='list_runtime_registrations')return structuredClone(w.__folderSaves);
    if(command==='inspect_runtime_registration'){w.__folderChecks.push(structuredClone(args.registration));return{...args.registration,registrationId:args.registration.id,validation:'pass',identity:'userDeclared',executableSha256:'a'.repeat(64),diagnostics:[]};}
    if(command==='register_runtime'){w.__folderSaves.push(structuredClone(args.registration));w.__folderReports=w.__folderReports.map((r:any)=>r.id===args.registration.runtimeId?{...r,installation:{...args.registration,registrationId:args.registration.id,validation:'pass',identity:'userDeclared',executableSha256:'a'.repeat(64),diagnostics:[]}}:r);return structuredClone(w.__folderReports);}
    return original(command,args);
