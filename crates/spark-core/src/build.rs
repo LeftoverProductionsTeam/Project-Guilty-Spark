@@ -174,6 +174,9 @@ pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(P
     let name = output.file_name().and_then(|name| name.to_str())
         .ok_or_else(|| SparkError::Invalid("Exported map filename is unavailable".into()))?;
     let mut native_features = extraction.unwrap_or_default();
+    if map.header.version == 13 && maps::mcc13_sky_reference_count(output, &map)? > 8 {
+        native_features.push(crate::runtime::MCC13_EXPANDED_SKY_FEATURE.to_owned());
+    }
     if project.bsp_assembly.is_some() {
         if let Some(feature) = crate::megaworld_build::expanded_tag_memory_requirement(output, &map)? {
             native_features.push(feature.to_owned());
@@ -1405,6 +1408,41 @@ mod tests {
         }
     }
 
+
+    #[test]
+    #[ignore = "Requires the exact native distinct-sky and control fixtures"]
+    fn native_map_export_advertises_expanded_skies_from_the_exact_cache() {
+        let fixtures = PathBuf::from(std::env::var_os("SPARK_MCC13_SKY_FIXTURES").unwrap());
+        let scratch = PathBuf::from(std::env::var_os("SPARK_BUILD_WORKSPACE").unwrap());
+        let work = tempfile::tempdir_in(scratch).unwrap();
+        let project = Project::new("Native sky export check");
+        let cases = [
+            ("distinct-mcc13", "60020bebce979aabcf2ae98a833293967caed5c77913ae36343bb3baf824c29f", 13, vec![crate::runtime::MCC13_EXPANDED_SKY_FEATURE]),
+            ("standard-mcc13", "99733d06d0ca3b3c0075bb7c4d2de9108fbfaca4297a23bcaa3c03ef09f35b07", 13, vec![]),
+            ("standard-ce609", "6f20356a21e61700d9b204efc101b9b4acd4dc7d6db2f6ecff4f4418c27dfca1", 609, vec![]),
+        ];
+        for (folder, sha256, version, features) in cases {
+            let source = fixtures.join(folder).join("gs_sky_probe.map");
+            let output = work.path().join(format!("{folder}.map"));
+            fs::copy(&source, &output).unwrap();
+            let export = MapExport {
+                project_id: project.id.clone(),
+                build_id: uuid::Uuid::new_v4().to_string(),
+                project_fingerprint: project.fingerprint().unwrap(),
+                output,
+                sha256: sha256.to_owned(),
+                bytes: fs::metadata(&source).unwrap().len(),
+                cache_version: version,
+                runtime_id: crate::runtime::RuntimeId::OpenCe,
+                reused: false,
+            };
+            let (file, mode) = write_map_export_mode(&export, &project).unwrap();
+            assert_eq!(mode, "multiplayer");
+            let receipt: serde_json::Value = serde_json::from_slice(&fs::read(file).unwrap()).unwrap();
+            assert_eq!(receipt["cacheSha256"], sha256);
+            assert_eq!(receipt["requiredNativeFeatures"], serde_json::json!(features));
+        }
+    }
 
     #[test]
     fn native_source_provenance_never_relabels_mcc_or_unreviewed_ce_receipts() {

@@ -5,7 +5,9 @@ use serde::{Deserialize,Serialize};
 use std::{fs,path::{Path,PathBuf},sync::{Arc,atomic::AtomicBool}};
 
 const MAX_FILES: usize = 4096;
-const MAX_MCC_SCENARIO_FILES: usize = 8192;
+const MAX_MCC_SCENARIO_FILES: usize = 16_384;
+const MAX_ASSET_RECEIPT_BYTES: u64 = 2 * 1024 * 1024;
+const MAX_MCC_SCENARIO_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_TAG_BYTES: u64 = 64*1024*1024;
 const MAX_TOTAL: u64 = 512*1024*1024;
 #[derive(Serialize,Deserialize)]
@@ -98,6 +100,13 @@ fn extraction_file_limit(source_version: u32, requested_tag: &str) -> usize {
         MAX_MCC_SCENARIO_FILES
     } else {
         MAX_FILES
+    }
+}
+fn extraction_receipt_byte_limit(source_version: u32, requested_tag: &str) -> u64 {
+    if extraction_file_limit(source_version, requested_tag) == MAX_MCC_SCENARIO_FILES {
+        MAX_MCC_SCENARIO_RECEIPT_BYTES
+    } else {
+        MAX_ASSET_RECEIPT_BYTES
     }
 }
 fn tag_query(path:&str,class:&str)->Result<(String,PathBuf)>{
@@ -299,7 +308,11 @@ pub fn extract_selected_tag(
             files,total_bytes,
             notice:format!("Actual tags extracted into a new isolated folder by installed Invader. {}Dependencies require inspection before copy/import into a separate tags tree. No map rebuild, Halo run, tag merge, or rights verification has occurred.",if prepared_legacy.is_some(){"Known legacy extraction metadata was normalized only in a temporary tool input; source/input hashes and exact repairs are retained, and that temporary cache was removed. Audio, placements and gameplay were not repaired. "}else{""}),
         };
-        project::atomic_write(&staging.join("extraction-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
+        let receipt_json = serde_json::to_vec_pretty(&receipt)?;
+        if receipt_json.len() as u64 > extraction_receipt_byte_limit(receipt.source_version, &receipt.requested_tag) {
+            return invalid("Extraction receipt exceeds the bound for this source type");
+        }
+        project::atomic_write(&staging.join("extraction-receipt.json"), &receipt_json, false)?;
         project::atomic_write(&staging.join("extraction-inputs.json"),&serde_json::to_vec_pretty(&inputs)?,false)?;
         lease.adopt(&final_dir)?;
         Ok(receipt)
@@ -352,12 +365,13 @@ pub(crate) fn load_receipt(root:&Path,job_id:&str)->Result<TagExtractReceipt>{
     let path=folder.join("extraction-receipt.json");
     reject_links(&path)?;
     let metadata=fs::metadata(&path)?;
-    if !metadata.is_file() || metadata.len()>2*1024*1024 {
-        return invalid("Extraction receipt is missing or exceeds its 2 MiB limit");
+    if !metadata.is_file() || metadata.len()>MAX_MCC_SCENARIO_RECEIPT_BYTES {
+        return invalid("Extraction receipt is missing or exceeds its maximum size");
     }
     let r:TagExtractReceipt=serde_json::from_slice(&fs::read(&path)?)?;
     if r.job_id!=job_id || r.source_project_id.is_empty() || r.source_engine.is_empty() ||
         r.status!="extracted-unverified-import" || r.files.is_empty() || r.files.len()>extraction_file_limit(r.source_version, &r.requested_tag) ||
+        metadata.len() > extraction_receipt_byte_limit(r.source_version, &r.requested_tag) ||
         r.total_bytes>MAX_TOTAL || r.receipt_path!=path || r.tag_root!=folder.join("tags") {
         return invalid("Extraction receipt fails identity or path validation");
     }
@@ -504,6 +518,16 @@ mod tests {
         fs::write(&receipt.receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();
         assert!(load_receipt(root.path(),&job_id).is_err());
     }
+    #[test]
+    fn large_mcc_scenario_receipts_keep_asset_and_classic_limits() {
+        assert!(extraction_file_limit(13, "world.scenario") >= 8_330);
+        assert_eq!(extraction_file_limit(609, "world.scenario"), 4_096);
+        assert_eq!(extraction_file_limit(13, "prop.scenery"), 4_096);
+        assert_eq!(extraction_receipt_byte_limit(13, "world.scenario"), 4 * 1024 * 1024);
+        assert_eq!(extraction_receipt_byte_limit(609, "world.scenario"), 2 * 1024 * 1024);
+        assert_eq!(extraction_receipt_byte_limit(13, "prop.scenery"), 2 * 1024 * 1024);
+    }
+
     #[test]
     fn inventories_bounded_source(){
         let dir=tempfile::tempdir().unwrap();

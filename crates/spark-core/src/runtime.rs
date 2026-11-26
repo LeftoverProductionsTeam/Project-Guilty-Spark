@@ -340,7 +340,7 @@ pub struct CapabilityEvidence {
         current.map_targets[0].max_sky_references = Some(8);
         current.map_targets[1].max_sky_references = Some(16);
         assert!(current.validate().is_err());
-        current.native_features.push("maps.mcc13_sky_slots_16.v1".into());
+        current.native_features.push(MCC13_EXPANDED_SKY_FEATURE.into());
         current.validate().unwrap();
         let reviewed = current.clone();
         assert_eq!(serde_json::to_value(&reviewed).unwrap()["map_targets"][1]["max_sky_references"], 16);
@@ -449,6 +449,8 @@ pub struct CompanionMapTarget {
     #[serde(rename = "default")]
     pub is_default: bool,
 }
+pub(crate) const MCC13_EXPANDED_SKY_FEATURE: &str = "maps.mcc13_sky_slots_16.v1";
+
 // Advertised metadata is retained for inspection, never used as launch permission.
 // Old admitted binaries omit it; unknown additive JSON fields stay ignorable.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -484,7 +486,7 @@ impl CompanionCapabilities {
                     .flatten().any(|limit| !(1..=32767).contains(&limit)) ||
                 row.max_sky_references.is_some_and(|limit| {
                     !(1..=16).contains(&limit) || (limit > 8 && (row.cache_version != 13 ||
-                        !self.native_features.iter().any(|feature| feature == "maps.mcc13_sky_slots_16.v1")))
+                        !self.native_features.iter().any(|feature| feature == MCC13_EXPANDED_SKY_FEATURE)))
                 }) ||
                 !targets.insert((row.cache_version, row.invader_engine.as_str()))
             });

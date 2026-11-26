@@ -4,7 +4,7 @@
 mod scenario_logic_readback;
 pub(crate) use scenario_logic_readback::NAMED_OBJECT_BLOCKS;
 pub use scenario_logic_readback::scenario_gameplay_merge_budget;
-pub(crate) use scenario_logic_readback::{native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
+pub(crate) use scenario_logic_readback::{mcc13_sky_reference_count, native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
     NativeItemCollection, NativeNetgameFlag, NativeNetgamePickup, CLASSIC_NETGAME_FLAG_LIMIT, MCC13_REGIONAL_FLAG_LIMIT, NETGAME_EQUIPMENT_LIMIT};
 pub(crate) use scenario_logic_readback::{scenario_vehicles, NativeVehicle, player_start_limit, player_start_read_limit, scenario_region_starts, NativeRegionStart, NATIVE_SPAWN_TYPES, PLAYER_START_LIMIT};
 pub use scenario_logic_readback::{native_bsp_switch_name, scenario_bsp_tag_paths, scenario_bsp_transitions, NativeBspTransition, NativeBspTransitions, scenario_recording_readback, NativeScenarioRecording};
