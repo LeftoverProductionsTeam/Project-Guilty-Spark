@@ -135,7 +135,7 @@ function matchesClassicBitmapRuntime(version: number) { return [6,7,609].include
 type ExtraTask={kind:'detail';shaderTagId:number;bitmapTagId:number;imageIndex:0;role:string;key:string};
 type DecalTask=ReturnType<typeof decalTextureRequests>[number];
 type MaterialTask=OwnedMaterialPreviewTask|ExtraTask|DecalTask;
-interface SourceAppearance {sourceSha256:string;skyTagId:number|null;skyPath:string|null;environment:EditorEnvironment|null;fogMaximumDensity:number;skyMesh:MeshData|null;warnings:string[]}
+interface SourceAppearance {sourceSha256:string;skyTagId:number|null;skyPath:string|null;skyReferenceCount:number;environment:EditorEnvironment|null;fogMaximumDensity:number;skyMesh:MeshData|null;warnings:string[]}
 function planWorldMaterialPreviews(inspection:MapInspection,models:readonly MeshData[],shaders:ReadonlySet<number>,lightmaps:ReadonlySet<string>,sky?:MeshData|null,extras:ReadonlySet<string>=new Set(),features?:Project['renderFeatures']) {
   const plan=planOwnedMaterialPreviews(inspection,inspection.renderMesh,shaders,lightmaps);
   const seen=new Set(plan.shaderTasks.map(t=>t.shaderTagId));
@@ -848,7 +848,21 @@ export default function World({
   const [sourceAppearance,setSourceAppearance]=useState<SourceAppearance|null>(null);
   const overrideRef=useRef(project.worldEnvironment);
   overrideRef.current=project.worldEnvironment;
-  useEffect(()=>{let live=true;setSourceAppearance(null);if(native&&inspection)void call<SourceAppearance>('inspect_source_appearance',{projectId:project.id}).then(value=>{if(live&&value.sourceSha256===inspection.sha256){setSourceAppearance(value);setEnvironment(overrideRef.current??value.environment??structuredClone(DEFAULT_ENVIRONMENT));}}).catch(()=>{});return()=>{live=false;};},[project.id,inspection?.sha256]);
+  const skyBsp = regionView ? bsp : inspection?.header.version === 13 && bspCount === 1 ? 0 : undefined;
+  useEffect(() => {
+    let live = true;
+    setSourceAppearance(null);
+    setEnvironment(overrideRef.current ?? structuredClone(DEFAULT_ENVIRONMENT));
+    if (native && sourceSha) {
+      void call<SourceAppearance>('inspect_source_appearance', {projectId: project.id, bspIndex: skyBsp}).then(value => {
+        if (live && value.sourceSha256 === sourceSha) {
+          setSourceAppearance(value);
+          setEnvironment(overrideRef.current ?? value.environment ?? structuredClone(DEFAULT_ENVIRONMENT));
+        }
+      }).catch(() => {});
+    }
+    return () => {live = false;};
+  }, [native, project.id, sourceSha, skyBsp]);
   const [shaderTextures, setShaderTextures] = useState<Record<number, THREE.Texture>>({});
   const [loadingOwnedBitmap, setLoadingOwnedBitmap] = useState<Record<number, boolean>>({});
   const [resourceAudit, setResourceAudit] = useState<ResourceMapAudit | null>(null);
@@ -2165,16 +2179,19 @@ export default function World({
                 ? 'Saved editor override'
                 : sourceAppearance?.skyPath
                   ? `Map sky: ${sourceAppearance.skyPath}`
-                  : 'Reading the map’s authored environment…'}
+                  : sourceAppearance && skyBsp !== undefined
+                    ? 'No sky assigned to this BSP'
+                    : 'Reading the map’s authored environment…'}
             </p>
+            {sourceAppearance?.warnings[0] && <p className="subtle">{sourceAppearance.warnings[0]}</p>}
             <EnvironmentControls
               value={environment}
               persisted
               skyPath={sourceAppearance?.skyPath}
               bakedQuality={project.nativeLighting?.quality}
-              bakeDisabled={!native?'Native baking requires the desktop application.':!project.bspAssembly?'Native baking here requires editable BSP source and a configured build target. Use BSP Workshop or connect a BSP assembly first.':!sourceAppearance?.skyPath?'This source has no supported single sky tag.':undefined}
+              bakeDisabled={!native?'Native baking requires the desktop application.':!project.bspAssembly?'Native baking here requires editable BSP source and a configured build target. Use BSP Workshop or connect a BSP assembly first.':!sourceAppearance?.skyPath?'This source has no supported single sky tag.':sourceAppearance.skyReferenceCount>1?'Native baking currently requires one scenario sky.':undefined}
               onBake={onBakeBuild?async quality=>{
-                if(!project.bspAssembly||!sourceAppearance?.skyPath)throw Error('Connect editable native BSP source and its sky before baking.');
+                if(!project.bspAssembly||!sourceAppearance?.skyPath||sourceAppearance.skyReferenceCount!==1)throw Error('Connect editable native BSP source with one scenario sky before baking.');
                 edit({...project,nativeLighting:{skyPath:sourceAppearance.skyPath,environment:structuredClone(environment),quality}},'Apply native sky lighting and bake');
                 await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
                 await onBeforeResources?.(true);await onBakeBuild();

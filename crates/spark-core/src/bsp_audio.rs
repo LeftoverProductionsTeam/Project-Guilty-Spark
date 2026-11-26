@@ -146,7 +146,7 @@ pub fn inspect(path: &Path, expected: &str) -> Result<Inspection> {
     }
     read(&header, &bytes, sha)
 }
-fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspection> {
+pub(crate) fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspection> {
     read_with_listener(header, bytes, sha, ListenerReadback::None)
 }
 pub fn inspect_ambience(path: &Path, expected: &str) -> Result<Inspection> {

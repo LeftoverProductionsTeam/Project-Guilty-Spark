@@ -5,15 +5,19 @@ use std::path::Path;
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct SourceAppearance {
-    pub source_sha256:String,pub sky_tag_id:Option<u32>,pub sky_path:Option<String>,
+    pub source_sha256:String,pub sky_tag_id:Option<u32>,pub sky_path:Option<String>,pub sky_reference_count:usize,
     pub environment:Option<EditorEnvironment>,pub fog_maximum_density:f32,
     pub fog_start_distance:f32,pub fog_opaque_distance:f32,
     pub sky_mesh:Option<MeshData>,pub warnings:Vec<String>,
 }
 pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceAppearance>{
+    inspect_bsp(path, hash, inspection, None)
+}
+
+pub fn inspect_bsp(path: &Path, hash: &str, inspection: &MapInspection, bsp_index: Option<usize>) -> Result<SourceAppearance> {
     let (header,bytes,actual)=maps::read_cache_snapshot_shared(path)?;
     if actual!=hash||actual!=inspection.sha256{return invalid("Source changed during appearance inspection");}
-    let mut result=SourceAppearance{source_sha256:actual,sky_tag_id:None,sky_path:None,environment:None,
+    let mut result=SourceAppearance{source_sha256:actual,sky_tag_id:None,sky_path:None,sky_reference_count:0,environment:None,
         fog_maximum_density:0.,fog_start_distance:0.,fog_opaque_distance:0.,sky_mesh:None,warnings:vec![]};
     if !matches!(header.version,5|6|7|13|609){result.warnings.push("This engine's authored sky/appearance reader is not implemented".into());return Ok(result);}
     let start=header.tag_offset as usize;let end=start.checked_add(header.tag_size as usize).ok_or_else(||SparkError::Invalid("Sky tag region overflow".into()))?;
@@ -26,8 +30,28 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
     let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path)
         .and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("Source scenario unavailable".into()))?;
     bounded(scenario,0x3c)?;let count=r.u32(scenario+0x30)? as usize;
-    if count==0{return Ok(result)}if count>8{return invalid("Sky dependency count exceeds the classic limit");}
-    let sky_refs=pointer(r.u32(scenario+0x34)?,count*16)?;
+    if count == 0 { return Ok(result); }
+    let limit = if header.version == 13 && !header.extended { 16 } else { 8 };
+    if count > limit { return invalid("Sky dependency count exceeds the source format's supported limit"); }
+    result.sky_reference_count = count;
+    let slot = if let Some(index) = bsp_index.filter(|_| matches!(header.version, 13 | 609) && !header.extended) {
+        let regions = crate::bsp_audio::read(&header, &bytes, result.source_sha256.clone())?;
+        let bsp = regions.bsps.get(index).ok_or_else(|| SparkError::Invalid("Source sky BSP is unavailable".into()))?;
+        let slots = bsp.clusters.iter().filter_map(|cluster| usize::try_from(cluster.sky).ok())
+            .collect::<std::collections::BTreeSet<_>>();
+        if bsp.clusters.iter().any(|cluster| cluster.sky < -1) || slots.iter().any(|&slot| slot >= count) {
+            return invalid("Source BSP uses a sky outside the native scenario block");
+        }
+        let Some(&slot) = slots.first() else { return Ok(result); };
+        if slots.len() > 1 {
+            result.warnings.push(format!("This BSP uses multiple skies. Previewing sky slot {slot}."));
+        }
+        slot
+    } else {
+        if count > 1 { result.warnings.push("Previewing scenario sky slot 0".into()); }
+        0
+    };
+    let sky_refs = pointer(r.u32(scenario + 0x34)?, count * 16)? + slot * 16;
     if r.fourcc(sky_refs)?!="sky "{return invalid("Scenario sky reference has the wrong class");}
     let id=r.u32(sky_refs+12)?;
     let sky=inspection.tags.iter().find(|t|t.id==id&&t.class=="sky "&&!t.external)
@@ -51,7 +75,6 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
     }else{env.sun_intensity=0.;}
     result.sky_tag_id=Some(id);result.sky_path=Some(sky.path.clone());result.environment=Some(env);result.fog_maximum_density=density;result.fog_start_distance=near;result.fog_opaque_distance=far;
     if density>0.&&far==near{result.warnings.push("Atmospheric fog has no positive native distance range; the preview does not invent one".into());}
-    if count>1{result.warnings.push("Multiple skies require BSP cluster/portal sky selection; this view currently uses scenario sky 0".into());}
     if matches!(r.fourcc(at)?.as_str(),"mod2"|"mode") {
         match crate::render::cached_model_mesh(&bytes,&header,&inspection.tags,r.u32(at+12)?){Ok(mesh)=>result.sky_mesh=Some(mesh),Err(e)=>result.warnings.push(e.to_string())}
     }
