@@ -111,14 +111,16 @@ impl NativeFactionService {
         match (self.faction.as_str(), self.service.as_str()) {
             ("unsc", "fieldPickup") => FIELD_PICKUP_CONTROLS[0].into(),
             ("covenant", "fieldPickup") => FIELD_PICKUP_CONTROLS[1].into(),
+            ("unsc", "groundCall") => GROUND_CALL_CONTROLS[0].into(),
+            ("covenant", "groundCall") => GROUND_CALL_CONTROLS[1].into(),
             _ => format!("extraction_{}_{}", self.faction, self.service),
         }
     }
     pub(super) fn validate(&self) -> Result<()> {
         if !["unsc", "covenant"].contains(&self.faction.as_str())
-            || !(FACTION_SERVICES.contains(&self.service.as_str()) || self.service == "fieldPickup")
+            || !(FACTION_SERVICES.contains(&self.service.as_str()) || matches!(self.service.as_str(), "fieldPickup" | "groundCall"))
         {
-            return invalid("Choose UNSC or Covenant deployment, loadout, debrief or field pickup");
+            return invalid("Choose UNSC or Covenant deployment, loadout, debrief, aircraft pickup or ground evacuation");
         }
         validate_hub_pose(&self.control_tag_path, self.position, self.rotation_radians)
     }
@@ -126,6 +128,8 @@ impl NativeFactionService {
 const FACTION_SERVICES: [&str; 3] = ["deploy", "loadout", "debrief"];
 const FIELD_PICKUP_CONTROLS: [&str; 2] = ["extraction_pelican_activate", "extraction_spirit_activate"];
 const FIELD_PICKUP_ZONES: [&str; 2] = ["extraction_pelican_zone", "extraction_spirit_zone"];
+pub(crate) const GROUND_CALL_CONTROLS: [&str; 2] = ["extraction_unsc_ground_call", "extraction_cov_ground_call"];
+pub(crate) const GROUND_CALL_ZONES: [&str; 2] = ["extraction_unsc_ground_zone", "extraction_cov_ground_zone"];
 const RETURN_PADS: [&str; 2] = ["pelican_return", "spirit_return"];
 pub fn faction_service_owner(name: &str) -> Option<usize> {
     let name = name.strip_prefix("extraction_")?;
@@ -134,16 +138,18 @@ pub fn faction_service_owner(name: &str) -> Option<usize> {
     ["unsc", "covenant"].iter().position(|value| *value == faction)
 }
 
-fn field_pickup_owner(name: &str) -> Option<usize> {
-    FIELD_PICKUP_CONTROLS.iter().position(|value| *value == name)
+fn faction_field_binding(name: &str) -> Option<(usize, &'static [&'static str; 2])> {
+    [(&FIELD_PICKUP_CONTROLS, &FIELD_PICKUP_ZONES), (&GROUND_CALL_CONTROLS, &GROUND_CALL_ZONES)]
+        .into_iter().find_map(|(controls, zones)| controls.iter().position(|control| *control == name)
+            .map(|faction| (faction, zones)))
 }
 
 fn regional_service_owner(name: &str) -> Option<usize> {
-    faction_service_owner(name).or_else(|| field_pickup_owner(name))
+    faction_service_owner(name).or_else(|| faction_field_binding(name).map(|(faction, _)| faction))
 }
 
 pub fn needs_faction_control_readback(name: &str, regional_mcc: bool) -> bool {
-    faction_service_owner(name).is_some() || (regional_mcc && field_pickup_owner(name).is_some())
+    faction_service_owner(name).is_some() || (regional_mcc && faction_field_binding(name).is_some())
 }
 
 impl HubControl {
@@ -1119,10 +1125,10 @@ fn validate_terminal_point(
 ) -> Result<()> {
     if let Some(hubs) = regional {
         let faction = regional_service_owner(name).map_or_else(|| faction_index(name), Ok)?;
-        if name == FIELD_PICKUP_CONTROLS[faction] {
-            let zone_name = FIELD_PICKUP_ZONES[faction];
+        if let Some((faction, zones)) = faction_field_binding(name) {
+            let zone_name = zones[faction];
             let zone = unique_volume(volumes, zone_name)?;
-            let other_zone = FIELD_PICKUP_ZONES[1 - faction];
+            let other_zone = zones[1 - faction];
             let inside_other_zone = volumes.iter().any(|row| row.name.eq_ignore_ascii_case(other_zone))
                 && unique_volume(volumes, other_zone)?.contains_native_interior(position);
             if !zone.contains_native_interior(position) || inside_other_zone
@@ -1137,7 +1143,7 @@ fn validate_terminal_point(
         {
             return invalid(format!("{name} needs a position inside {}", MEGAWORLD_HUBS[faction]));
         }
-        for field in ["extraction_pelican_zone", "extraction_spirit_zone"] {
+        for field in FIELD_PICKUP_ZONES.into_iter().chain(GROUND_CALL_ZONES) {
             if volumes.iter().any(|v| v.name.eq_ignore_ascii_case(field))
                 && unique_volume(volumes, field)?.contains_native_interior(position) {
                 return invalid(format!("{name} overlaps the field transfer volume {field}"));
@@ -1163,6 +1169,8 @@ pub struct MegaWorldHubStarts {
     pub services: Vec<MegaWorldHubService>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field_pickup: Option<MegaWorldFieldPickup>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ground_call: Option<MegaWorldFieldPickup>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub return_pad: Option<MegaWorldReturnPad>,
 }
@@ -1302,8 +1310,9 @@ pub fn megaworld_hub_starts(
 
         let mut services = Vec::new();
         let mut field_pickup = None;
+        let mut ground_call = None;
         let controls = FACTION_SERVICES.into_iter().map(|kind| (Some(kind), format!("{terminal_name}_{kind}")))
-            .chain(std::iter::once((None, FIELD_PICKUP_CONTROLS[faction].to_owned())));
+            .chain([FIELD_PICKUP_CONTROLS[faction], GROUND_CALL_CONTROLS[faction]].map(|name| (None, name.to_owned())));
         for (kind, service_name) in controls {
             let mut names = logic.names.iter().enumerate().filter(|(_, row)| row.name.eq_ignore_ascii_case(&service_name));
             let Some((name_index, row)) = names.next() else { continue; };
@@ -1347,16 +1356,19 @@ pub fn megaworld_hub_starts(
                 }
                 services.push(MegaWorldHubService { service: kind.to_owned(), control_index: service.index });
             } else {
-                let volume_index = volumes.iter().position(|row| row.name == FIELD_PICKUP_ZONES[faction])
+                let (_, zones) = faction_field_binding(&service_name)
+                    .ok_or_else(|| crate::SparkError::Invalid(format!("Missing field role for {service_name}")))?;
+                let volume_index = volumes.iter().position(|row| row.name == zones[faction])
                     .ok_or_else(|| crate::SparkError::Invalid(format!("Missing field volume for {service_name}")))?;
-                field_pickup = Some(MegaWorldFieldPickup {
+                let target = if service_name == GROUND_CALL_CONTROLS[faction] { &mut ground_call } else { &mut field_pickup };
+                *target = Some(MegaWorldFieldPickup {
                     name: service_name, control_index: service.index, volume_index,
                     bsp_index: *owner, position: service.position,
                 });
             }
         }
         Ok(MegaWorldHubStarts {
-            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services, field_pickup,
+            name: name.to_owned(), volume_index, bsp_index: bsp, terminal_index, services, field_pickup, ground_call,
             return_pad: regional_return_pad(path, map, &volumes, faction)?,
             start_indices: starts[faction].iter().map(|(index, _, _)| *index).collect(),
         })
@@ -1396,6 +1408,53 @@ pub fn verify_control_values(trigger: &str, initially_off: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires the retained native ground-first MCC13 candidate and its source cache"]
+    fn ground_extraction_keeps_world_and_exports_verified_receipt() {
+        use crate::{build, creative, maps, project::Project, runtime::RuntimeId};
+        let before = std::path::PathBuf::from(std::env::var_os("SPARK_GROUND_SOURCE").unwrap());
+        let output = std::path::PathBuf::from(std::env::var_os("SPARK_GROUND_CANDIDATE").unwrap());
+        let original = maps::inspect_map(&before, None).unwrap();
+        let candidate = maps::inspect_map(&output, None).unwrap();
+        let hubs = megaworld_hub_starts(&output, &candidate).unwrap().unwrap();
+        assert_eq!(hubs[0].ground_call.as_ref().unwrap().bsp_index, hubs[0].bsp_index);
+        assert_eq!(hubs[1].ground_call.as_ref().unwrap().bsp_index, hubs[1].bsp_index);
+        assert!(hubs.iter().all(|hub| hub.field_pickup.is_none() && hub.return_pad.is_none()));
+        assert_eq!(maps::mcc13_sky_reference_count(&before, &original).unwrap(),
+            maps::mcc13_sky_reference_count(&output, &candidate).unwrap());
+        let (original_collision, _) = maps::collision_source(&before, &original).unwrap();
+        let (candidate_collision, _) = maps::collision_source(&output, &candidate).unwrap();
+        assert_eq!(original_collision.parts.len(), candidate_collision.parts.len());
+        assert!(original_collision.positions == candidate_collision.positions);
+        assert!(original_collision.indices == candidate_collision.indices);
+        assert_eq!(serde_json::to_value(maps::scenario_region_starts(&before, &original).unwrap()).unwrap(),
+            serde_json::to_value(maps::scenario_region_starts(&output, &candidate).unwrap()).unwrap());
+        assert_eq!(serde_json::to_value(maps::scenario_netgame_pickups(&before, &original).unwrap()).unwrap(),
+            serde_json::to_value(maps::scenario_netgame_pickups(&output, &candidate).unwrap()).unwrap());
+        let mut vehicles = maps::scenario_vehicles(&before, &original).unwrap();
+        for vehicle in &mut vehicles {
+            vehicle.name = match vehicle.name.as_deref() {
+                Some("extraction_pelican") => Some("gs_deferred_pelican".into()),
+                Some("extraction_spirit") => Some("gs_deferred_spirit".into()),
+                _ => vehicle.name.take(),
+            };
+        }
+        assert_eq!(serde_json::to_value(vehicles).unwrap(),
+            serde_json::to_value(maps::scenario_vehicles(&output, &candidate).unwrap()).unwrap());
+        assert_eq!(creative::compiled_extraction_requirements(&output, &candidate).unwrap().unwrap(),
+            [creative::MEGAWORLD_EXTRACTION_FEATURE]);
+        let project = Project::new("Ground Extraction native acceptance candidate");
+        let export = build::MapExport {
+            project_id: project.id.clone(), build_id: "ground-native-review".into(),
+            project_fingerprint: project.fingerprint().unwrap(), sha256: candidate.sha256.clone(),
+            bytes: std::fs::metadata(&output).unwrap().len(), output, cache_version: 13,
+            runtime_id: RuntimeId::MccSteam, reused: true,
+        };
+        let (receipt, mode) = build::write_map_export_mode(&export, &project).unwrap();
+        assert_eq!(mode, "extraction");
+        println!("Reviewed private ground Extraction: {} {}", candidate.sha256, receipt.display());
+    }
 
     #[test]
     fn field_pickup_uses_only_its_native_zone_and_mcc_readback() {

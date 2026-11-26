@@ -16,6 +16,10 @@ const extractionTerminalRoles = new Map<string, {purpose:string; effect:string}>
   ['extraction_unsc', {purpose:'Join UNSC', effect:'Selects the UNSC body and kit. Incompatible carried weapons may drop next to the player.'}],
   ['extraction_covenant', {purpose:'Join Covenant', effect:'Selects the Covenant body and kit. Incompatible carried weapons may drop next to the player.'}],
   ['extraction_activate', {purpose:'Request evacuation', effect:'Calls the shared evacuation when the mission allows it.'}],
+  ['extraction_unsc_ground_call', {purpose:'Request UNSC ground evacuation', effect:'Arms the return to the UNSC hub to bank gear.'}],
+  ['extraction_cov_ground_call', {purpose:'Request Covenant ground evacuation', effect:'Arms the return to the Covenant hub to bank gear.'}],
+  ['extraction_unsc_deploy', {purpose:'Deploy UNSC', effect:'Issues the UNSC kit and starts deployment.'}],
+  ['extraction_covenant_deploy', {purpose:'Deploy Covenant', effect:'Issues the Covenant kit and starts deployment.'}],
   ['extraction_pelican_activate', {purpose:'Call Pelican', effect:'Requests Pelican evacuation when the UNSC route is ready.'}],
   ['extraction_spirit_activate', {purpose:'Call Spirit', effect:'Requests Spirit evacuation when the Covenant route is ready.'}],
 ]);
@@ -48,8 +52,11 @@ export function extractionTerminalReview(devices: NonNullable<NativeTagContext['
       canLocate: tagClass === 'ctrl' && !!name && !duplicate,
     }];
   });
-  const missing = ['extraction_deploy'].filter(name => !seen.has(name));
-  if(!missionExtractionFields.some(field=>seen.has(field.control)))missing.push('evacuation control');
+  const regionalGround = ['extraction_unsc_ground_call','extraction_cov_ground_call'];
+  const deploy = regionalGround.some(name=>seen.has(name)) ? ['extraction_unsc_deploy','extraction_covenant_deploy'] : ['extraction_deploy'];
+  const missing = deploy.filter(name=>!seen.has(name));
+  if(regionalGround.some(name=>seen.has(name)))missing.push(...regionalGround.filter(name=>!seen.has(name)));
+  else if(!missionExtractionFields.some(field=>seen.has(field.control)))missing.push('evacuation control');
   return {terminals, missing};
 }
 

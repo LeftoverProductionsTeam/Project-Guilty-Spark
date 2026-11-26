@@ -177,7 +177,7 @@ pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(P
     if map.header.version == 13 && maps::mcc13_sky_reference_count(output, &map)? > 8 {
         native_features.push(crate::runtime::MCC13_EXPANDED_SKY_FEATURE.to_owned());
     }
-    if project.bsp_assembly.is_some() {
+    if project.bsp_assembly.is_some() || native_features.iter().any(|feature| feature == crate::creative::MEGAWORLD_EXTRACTION_FEATURE) {
         if let Some(feature) = crate::megaworld_build::expanded_tag_memory_requirement(output, &map)? {
             native_features.push(feature.to_owned());
         }

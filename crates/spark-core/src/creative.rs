@@ -444,6 +444,7 @@ pub const SQUAD_BEGIN_FEATURE:&str="extraction.squad_begin.v1";
 pub const FACTION_LANDING_ZONES_FEATURE: &str = "extraction.faction_landing_zones.v1";
 pub const PELICAN_RETURN_PAD_FEATURE: &str = "extraction.pelican_return_pad.v1";
 pub const HOVER_TRANSFER_FEATURE: &str = "extraction.hover_transfer.v1";
+pub const MEGAWORLD_EXTRACTION_FEATURE: &str = "extraction.megaworld.v1";
 /// Native interface names from the reviewed Forerunner contract. This detects
 /// required engine behavior, not mission completion, membership or gameplay.
 fn squad_interface_number(name:&str,prefix:&str,suffix:&str)->Result<Option<u8>> {
@@ -485,6 +486,31 @@ pub fn compiled_extraction_requirements(cache:&std::path::Path,map:&crate::maps:
         }
     }
     let has_squad_scripts=![&queries,&begins,&settled,&aborted].iter().all(|rows|rows.is_empty());
+    if map.header.version == 13 && map.header.scenario_type == 1 && !map.header.extended {
+        use crate::native_operations::{GROUND_CALL_CONTROLS, GROUND_CALL_ZONES};
+        let markers = crate::maps::scenario_logic_readback(cache, map)?;
+        let has_ground = markers.names.iter().any(|name| GROUND_CALL_CONTROLS.contains(&name.name.as_str()))
+            || markers.volumes.iter().any(|zone| GROUND_CALL_ZONES.contains(&zone.name.as_str()));
+        if has_ground {
+            let hubs = crate::native_operations::megaworld_hub_starts(cache, map)?
+                .ok_or_else(|| crate::SparkError::Invalid("Ground Extraction requires two compiled faction hubs".into()))?;
+            for hub in hubs {
+                let body = format!("{}_body", hub.name.strip_suffix("_hub").unwrap());
+                let mut bodies = markers.names.iter().filter(|name| name.name == body);
+                let bound = bodies.next().is_some_and(|name| name.object_type == 0 && name.object_index >= 0)
+                    && bodies.next().is_none();
+                if !bound || hub.terminal_index.is_none() || hub.ground_call.is_none()
+                    || !hub.services.iter().any(|service| service.service == "deploy") {
+                    return invalid("Ground Extraction requires a faction body, hub terminal, deploy control and grounded field call for both factions");
+                }
+            }
+            let mut features = vec![MEGAWORLD_EXTRACTION_FEATURE.into()];
+            if hover_transfer { features.push(HOVER_TRANSFER_FEATURE.into()); }
+            if has_squad_scripts { features.push(SQUAD_OBJECTIVES_FEATURE.into()); }
+            if !begins.is_empty() { features.push(SQUAD_BEGIN_FEATURE.into()); }
+            return Ok(Some(features));
+        }
+    }
     if map.header.version!=609||map.header.scenario_type!=0||map.header.extended{
         if callbacks.is_empty()&&!has_squad_scripts&&!hover_transfer{return Ok(None);}
         return invalid("Forerunner Extraction requires a standard native CE609 solo map");

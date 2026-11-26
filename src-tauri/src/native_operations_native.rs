@@ -612,7 +612,7 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         let hubs=recipes::megaworld_hub_starts(output,&map).map_err(error)?.ok_or("Verified MegaWorld hubs required")?;
         let hub=&hubs[usize::from(service.faction=="covenant")];
         let points=maps::bsp_point_locations(output,&map,&[service.position],Some(1.)).map_err(error)?;
-        if service.service=="fieldPickup" {
+        if matches!(service.service.as_str(),"fieldPickup"|"groundCall") {
             let [bsp]=points[0].bsps.as_slice() else {return Err("Place the field control inside one owning BSP.".into());};
             if !points[0].ground.iter().any(|ground|ground.bsp==*bsp){return Err("Place the field control on a supported surface.".into());}
         } else if points[0].bsps != [hub.bsp_index] || !points[0].ground.iter().any(|ground| ground.bsp==hub.bsp_index) {

@@ -42,7 +42,9 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
  const hasSourceHash=/^[a-f0-9]{64}$/i.test(sourceSha256);
  const selectedKit=kits.find(row=>row.kit.faction===body.faction)??kits[0];
  const craft=service.faction==="unsc"?"pelican":"spirit";
- const serviceName=service.service==="fieldPickup"?"extraction_"+craft+"_activate":"extraction_"+service.faction+"_"+service.service;
+ const groundPrefix=service.faction==="unsc"?"extraction_unsc_ground":"extraction_cov_ground";
+ const serviceName=service.service==="fieldPickup"?"extraction_"+craft+"_activate"
+  :service.service==="groundCall"?groundPrefix+"_call":"extraction_"+service.faction+"_"+service.service;
  const installedService=context.scenarioDevices?.find(row=>row.name.toLowerCase()===serviceName);
  const servicesBlocked=blocked||kits.filter(row=>row.body).length!==2;
  const bipedSources=context.bipedSources??[];
@@ -116,7 +118,8 @@ export default function NativeFactionKits({context,busy,dirty,onPreview,onDraftC
    <p className="subtle">Place deployment, loadout and debrief controls inside the faction hub. Place field pickup controls inside their aircraft’s field volume. Multiplayer use requires a compatible Forerunner build.</p>
    <fieldset disabled={servicesBlocked}>
     <label>Service faction<select value={service.faction} onChange={event=>setService({...service,faction:event.target.value as Role})}><option value="unsc">UNSC</option><option value="covenant">Covenant</option></select></label>
-    <label>Service action<select value={service.service} onChange={event=>setService({...service,service:event.target.value as Service})}><option value="deploy">Deploy</option><option value="loadout">Choose loadout</option><option value="debrief">Review debrief</option><option value="fieldPickup">Request aircraft pickup</option></select></label>
+    <label>Service action<select value={service.service} onChange={event=>setService({...service,service:event.target.value as Service})}><option value="deploy">Deploy</option><option value="loadout">Choose loadout</option><option value="debrief">Review debrief</option><option value="groundCall">Request ground evacuation</option><option value="fieldPickup">Request aircraft pickup</option></select></label>
+    {service.service==="groundCall"&&<p className="subtle">Author <code>{groundPrefix+"_zone"}</code> outside both hubs. Place this control within it and provide a continuous ground route back to the faction hub.</p>}
     {service.service==="fieldPickup"&&<p className="subtle">Author the native <code>{"extraction_"+craft+"_zone"}</code> trigger first. Place the control where players can approach it without crossing the aircraft’s transfer path.</p>}
     {installedService?<p className="subtle">{serviceName} is already placed (native control {installedService.index}). Select it under existing controls to review its pose.</p>:<>
      <label>Touched control tag<input aria-label="Service control tag" list={id+'-controls'} value={service.control} onChange={event=>setService({...service,control:event.target.value})}/></label>
