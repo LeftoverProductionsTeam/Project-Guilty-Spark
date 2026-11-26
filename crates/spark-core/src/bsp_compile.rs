@@ -749,12 +749,14 @@ pub(crate) enum PartitionStage {
 }
 
 // H1A's lighting tool reads classic scenario block bounds, even when the
-// final MCC cache supports more placements. Only the disposable bake input is trimmed.
-fn with_native_bake_scenario(
+// final MCC cache supports more skies and placements. Only the bake copy is trimmed.
+fn with_native_bake_scenario<'a>(
     scenario_path: &str, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
-    bake: impl FnOnce(&str) -> Result<()>,
+    bake_bsps: impl IntoIterator<Item = &'a str>, bake: impl FnOnce(&str) -> Result<()>,
 ) -> Result<()> {
+    let sky_limit = crate::megaworld_build::STANDARD_SKY_SLOTS;
     let blocks = [
+        ("skies", sky_limit),
         ("netgame_flags", maps::CLASSIC_NETGAME_FLAG_LIMIT),
         ("player_starting_locations", maps::PLAYER_START_LIMIT),
         ("netgame_equipment", maps::NETGAME_EQUIPMENT_LIMIT),
@@ -777,6 +779,21 @@ fn with_native_bake_scenario(
     };
     let scenario_tag = format!("{scenario_path}.scenario");
     let counts = query_counts(&scenario_tag)?;
+    if counts[0] > sky_limit {
+        for bsp in bake_bsps {
+            let slots = runner.run(edit, &[
+                "-t".into(), tags_arg.clone(), "-G".into(), "clusters[*].sky".into(),
+                format!("{bsp}.scenario_structure_bsp"),
+            ], workspace, "bsp-bake-scenario", 64)?;
+            if slots.trim().is_empty() || !slots.lines().all(|slot| {
+                slot.trim().parse::<i32>().is_ok_and(|slot| {
+                    matches!(slot, -1 | 65535) || (0..sky_limit as i32).contains(&slot)
+                })
+            }) {
+                return invalid(format!("The lighting tool cannot bake {bsp} with its expanded or unreadable sky assignments"));
+            }
+        }
+    }
     if blocks.iter().zip(&counts).all(|((_, limit), count)| count <= limit) {
         return bake(scenario_path);
     }
@@ -1353,7 +1370,8 @@ pub(crate) fn prepare_partition_structure(
         if base_geometry.is_some() {
             apply_outdoor_stock_skies(project, &structure_tags[0], &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
         }
-        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
+        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags,
+            built.iter().map(|(bsp, _, _)| bsp.as_str()), |scenario| {
             for (name, geometry) in &regions {
                 if plan.tunnel_bake_fill {
                     bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)?;
@@ -1547,7 +1565,7 @@ pub(crate) fn prepare_native_with_limits(
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
     apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
-    with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
+    with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, [bsp.as_str()], |scenario| {
         bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
     })?;
     if let Some(starts) = &restored_starts {
