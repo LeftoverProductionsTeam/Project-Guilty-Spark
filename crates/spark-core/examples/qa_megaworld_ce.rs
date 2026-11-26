@@ -2,10 +2,17 @@
 use spark_core::{bsp_assembly::{self, BspAssembly},library::Library,project::{self,EngineBuildTarget,Project},runtime::{self, RuntimeId, RuntimeRegistration},Result,SparkError};
 use std::{fs,io::Read,path::Path,sync::{Arc,atomic::AtomicBool}};
 
-fn reviewed_plan(path: &Path, base: &Project) -> Result<(BspAssembly, Vec<BspAssembly>)> {
+#[derive(serde::Deserialize)]
+struct PlacementMove {
+    id: String,
+    from: [f32; 3],
+    to: [f32; 3],
+}
+
+fn reviewed_plan(path: &Path, base: &mut Project) -> Result<(BspAssembly, Vec<BspAssembly>)> {
     let source = base.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
+    spark_core::reject_links(path)?;
     if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
-        spark_core::reject_links(path)?;
         let mut bytes = Vec::new();
         const MAX_REVIEW_BYTES: u64 = 4 * 1024 * 1024;
         fs::File::open(path)?.take(MAX_REVIEW_BYTES + 1).read_to_end(&mut bytes)?;
@@ -25,6 +32,22 @@ fn reviewed_plan(path: &Path, base: &Project) -> Result<(BspAssembly, Vec<BspAss
         let inherited = receipt.pointer("/recipe/inheritedConnections")
             .map(|value| serde_json::from_value(value.clone()))
             .transpose()?.unwrap_or_default();
+        if let Some(transforms) = receipt.pointer("/recipe/basePlacementMoves") {
+            let moves: Vec<PlacementMove> = serde_json::from_value(transforms.clone())?;
+            let mut seen = std::collections::BTreeSet::new();
+            for movement in moves {
+                let id = movement.id;
+                if !seen.insert(id.clone()) {
+                    return spark_core::invalid("Reviewed placement move has a duplicate object ID");
+                }
+                let object = base.scene.iter_mut().find(|object| object.id == id)
+                    .ok_or_else(|| SparkError::Invalid(format!("Reviewed placement {id} is missing")))?;
+                if object.position != movement.from || !movement.to.iter().all(|value| value.is_finite()) {
+                    return spark_core::invalid(format!("Reviewed placement {id} has an unexpected pose"));
+                }
+                object.position = movement.to;
+            }
+        }
         Ok((serde_json::from_value(plan.clone())?, inherited))
     } else {
         let prior = project::load_project(path)?;
@@ -91,7 +114,7 @@ fn main()->Result<()>{
     let reviewed = if matches!(a[6].as_str(), "auto" | "terrain") {
         None
     } else {
-        let (plan, inherited_connections) = reviewed_plan(recipe_path, &p)?;
+        let (plan, inherited_connections) = reviewed_plan(recipe_path, &mut p)?;
         p.inherited_bsp_connections = inherited_connections;
         let source = donor.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing donor source".into()))?;
         if plan.donor_source.sha256 != source.sha256 || plan.donor_bsp_index != 0
