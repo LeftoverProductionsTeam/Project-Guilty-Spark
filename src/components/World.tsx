@@ -1,3 +1,5 @@
+import {ambienceCluster} from '../editorAudio';
+import type {AmbienceBsp} from '../editorAudio';
 import {NATIVE_DEVICE_VIEW,deviceMatches,deviceIdentity,deviceScope,deviceTransform,deviceSceneObject,deviceObjectId,deviceDraft} from '../nativeDevicePlacement';
 import type {NativeDeviceView} from '../nativeDevicePlacement';
 import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
@@ -316,6 +318,38 @@ function SkyGeometry({data,shaderTextures,shaderMetadata,extraTextures}:{data:Me
   const group=useRef<THREE.Group>(null);const {camera}=useThree();useFrame(()=>{group.current?.position.copy(camera.position);});
   return <group ref={group}><Mesh data={data} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures} sky/></group>;
 }
+type CameraSkyRegion = {key:string; projectId:string; hash:string; bspIndex:number};
+type CameraSkySelection = {key:string; clusterIndex?:number};
+
+function CameraSky({region,onChange}:{region:CameraSkyRegion;onChange:(selection:CameraSkySelection)=>void}) {
+  const {camera} = useThree();
+  const [partition,setPartition] = useState<AmbienceBsp>();
+  const last = useRef<number|null>(null);
+  const elapsed = useRef(0);
+  const position = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => {
+    let live = true;
+    void call<{sourceSha256:string;bsps:AmbienceBsp[]}>('inspect_map_ambience', {
+      projectId:region.projectId, bspIndex:region.bspIndex,
+    }).then(result => {
+      const bsp = result.bsps.find(candidate => candidate.index === region.bspIndex);
+      if (live && result.sourceSha256 === region.hash && bsp?.listenerTree) setPartition(bsp);
+    }).catch(() => {});
+    return () => {live = false;};
+  }, [region]);
+  useFrame((_,delta) => {
+    if (!partition || (elapsed.current += delta) < .15) return;
+    elapsed.current = 0;
+    camera.getWorldPosition(position);
+    const clusterIndex = ambienceCluster(partition,[position.x,position.y,position.z]) ?? undefined;
+    const slot = clusterIndex === undefined ? null : partition.clusters[clusterIndex]?.sky ?? null;
+    if (last.current === slot) return;
+    last.current = slot;
+    onChange({key:region.key,clusterIndex});
+  });
+  return null;
+}
+
 function Scene({
   project,
   inspection,
@@ -338,7 +372,7 @@ function Scene({
   frame,
   playerView,startId,
   environment,
-  sourceAppearance,extraTextures,
+  sourceAppearance,extraTextures,cameraSkyRegion,onCameraSky,
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
@@ -366,6 +400,7 @@ function Scene({
   playerView:boolean;startId:string;
   environment: EditorEnvironment;
   sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
+  cameraSkyRegion:CameraSkyRegion|null;onCameraSky:(selection:CameraSkySelection)=>void;
   onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
   onSnapError:(message:string)=>void;
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;greenScreen?:boolean;
@@ -462,6 +497,7 @@ function Scene({
           fov={55}
         />
       )}
+      {cameraSkyRegion&&<CameraSky key={cameraSkyRegion.key} region={cameraSkyRegion} onChange={onCameraSky}/>}
       <SceneEnvironment greenScreen={greenScreen} value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment} sourceObjectLighting={!!sourceAppearance?.environment}/>
       {!greenScreen&&sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
       {grid && !cinematic && (
@@ -849,12 +885,20 @@ export default function World({
   const overrideRef=useRef(project.worldEnvironment);
   overrideRef.current=project.worldEnvironment;
   const skyBsp = regionView ? bsp : inspection?.header.version === 13 && bspCount === 1 ? 0 : undefined;
+  const cameraSkyRegion = useMemo<CameraSkyRegion|null>(() =>
+    native && !cinematic && !xrActive && sourceSha && skyBsp !== undefined
+      ? {key: project.id+'@'+sourceSha+':'+skyBsp, projectId:project.id,hash:sourceSha,bspIndex:skyBsp}
+      : null, [cinematic,project.id,sourceSha,skyBsp,xrActive]);
+  const [cameraSky,setCameraSky] = useState<CameraSkySelection>();
+  const clusterIndex = cameraSky && cameraSky.key === cameraSkyRegion?.key ? cameraSky.clusterIndex : undefined;
   useEffect(() => {
-    let live = true;
     setSourceAppearance(null);
     setEnvironment(overrideRef.current ?? structuredClone(DEFAULT_ENVIRONMENT));
+  }, [project.id,sourceSha,skyBsp]);
+  useEffect(() => {
+    let live = true;
     if (native && sourceSha) {
-      void call<SourceAppearance>('inspect_source_appearance', {projectId: project.id, bspIndex: skyBsp}).then(value => {
+      void call<SourceAppearance>('inspect_source_appearance', {projectId: project.id, bspIndex: skyBsp, clusterIndex}).then(value => {
         if (live && value.sourceSha256 === sourceSha) {
           setSourceAppearance(value);
           setEnvironment(overrideRef.current ?? value.environment ?? structuredClone(DEFAULT_ENVIRONMENT));
@@ -862,7 +906,7 @@ export default function World({
       }).catch(() => {});
     }
     return () => {live = false;};
-  }, [native, project.id, sourceSha, skyBsp]);
+  }, [native, project.id, sourceSha, skyBsp, clusterIndex]);
   const [shaderTextures, setShaderTextures] = useState<Record<number, THREE.Texture>>({});
   const [loadingOwnedBitmap, setLoadingOwnedBitmap] = useState<Record<number, boolean>>({});
   const [resourceAudit, setResourceAudit] = useState<ResourceMapAudit | null>(null);
@@ -1768,6 +1812,7 @@ export default function World({
                     startId,
                     environment,
                     sourceAppearance,
+                    cameraSkyRegion,onCameraSky:setCameraSky,
                     extraTextures,
                     onSceneDragStart,
                     onSceneDragEnd,
@@ -2180,7 +2225,7 @@ export default function World({
                 : sourceAppearance?.skyPath
                   ? `Map sky: ${sourceAppearance.skyPath}`
                   : sourceAppearance && skyBsp !== undefined
-                    ? 'No sky assigned to this BSP'
+                    ? clusterIndex === undefined ? 'No sky assigned to this BSP' : 'No sky assigned at the camera position'
                     : 'Reading the map’s authored environment…'}
             </p>
             {sourceAppearance?.warnings[0] && <p className="subtle">{sourceAppearance.warnings[0]}</p>}

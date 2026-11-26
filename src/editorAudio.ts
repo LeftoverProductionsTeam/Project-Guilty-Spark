@@ -16,7 +16,7 @@ export interface AmbienceBsp {
   index: number;
   tagPath: string;
   backgroundPalette: { tagPath: string | null }[];
-  clusters: { index: number; background: number | null }[];
+  clusters: { index: number; background: number | null; sky?: number }[];
   listenerTree?: {
     nodes: [number, number, number][];
     planes: [number, number, number, number][];

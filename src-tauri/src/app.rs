@@ -550,10 +550,10 @@ fn inspect(state: &AppState, p: &Project) -> Reply<Arc<MapInspection>> {
 /// The source SHA is checked against the inspection and a fresh read; source
 /// maps and resource maps are never written to or silently read elsewhere.
 #[tauri::command]
-async fn inspect_source_appearance(app:tauri::AppHandle,project_id:String,bsp_index:Option<usize>)->Reply<core::appearance::SourceAppearance>{
+async fn inspect_source_appearance(app:tauri::AppHandle,project_id:String,bsp_index:Option<usize>,cluster_index:Option<usize>)->Reply<core::appearance::SourceAppearance>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;
         let source=p.source.as_ref().ok_or("Project has no preserved Halo source")?;let inspection=inspect(&state,&p)?;
-        core::appearance::inspect_bsp(&source.preserved_path,&source.sha256,&inspection,bsp_index).map_err(error)
+        core::appearance::inspect_bsp_cluster(&source.preserved_path,&source.sha256,&inspection,bsp_index,cluster_index).map_err(error)
     }).await.map_err(error)?
 }
 

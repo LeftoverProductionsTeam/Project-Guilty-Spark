@@ -15,6 +15,13 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
 }
 
 pub fn inspect_bsp(path: &Path, hash: &str, inspection: &MapInspection, bsp_index: Option<usize>) -> Result<SourceAppearance> {
+    inspect_bsp_cluster(path, hash, inspection, bsp_index, None)
+}
+
+pub fn inspect_bsp_cluster(path: &Path, hash: &str, inspection: &MapInspection, bsp_index: Option<usize>, cluster_index: Option<usize>) -> Result<SourceAppearance> {
+    if cluster_index.is_some() && bsp_index.is_none() {
+        return invalid("A source sky cluster requires a BSP index");
+    }
     let (header,bytes,actual)=maps::read_cache_snapshot_shared(path)?;
     if actual!=hash||actual!=inspection.sha256{return invalid("Source changed during appearance inspection");}
     let mut result=SourceAppearance{source_sha256:actual,sky_tag_id:None,sky_path:None,sky_reference_count:0,environment:None,
@@ -42,11 +49,19 @@ pub fn inspect_bsp(path: &Path, hash: &str, inspection: &MapInspection, bsp_inde
         if bsp.clusters.iter().any(|cluster| cluster.sky < -1) || slots.iter().any(|&slot| slot >= count) {
             return invalid("Source BSP uses a sky outside the native scenario block");
         }
-        let Some(&slot) = slots.first() else { return Ok(result); };
-        if slots.len() > 1 {
-            result.warnings.push(format!("This BSP uses multiple skies. Previewing sky slot {slot}."));
+        if let Some(cluster_index) = cluster_index {
+            let cluster = bsp.clusters.get(cluster_index)
+                .filter(|cluster| cluster.index == cluster_index)
+                .ok_or_else(|| SparkError::Invalid("Source sky cluster is unavailable".into()))?;
+            let Ok(slot) = usize::try_from(cluster.sky) else { return Ok(result); };
+            slot
+        } else {
+            let Some(&slot) = slots.first() else { return Ok(result); };
+            if slots.len() > 1 {
+                result.warnings.push(format!("This BSP uses multiple skies. Previewing sky slot {slot}."));
+            }
+            slot
         }
-        slot
     } else {
         if count > 1 { result.warnings.push("Previewing scenario sky slot 0".into()); }
         0
