@@ -20,7 +20,6 @@ pub(crate) struct PreparedStarts {
 }
 
 impl PreparedStarts {
-    pub(crate) fn base_count(&self) -> usize { self.base.len() }
 
     pub(crate) fn from_sources(
         project: &Project,

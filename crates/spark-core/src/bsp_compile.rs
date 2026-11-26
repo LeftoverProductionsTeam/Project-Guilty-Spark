@@ -748,6 +748,72 @@ pub(crate) enum PartitionStage {
     Lighting,
 }
 
+// H1A's lighting tool reads classic scenario block bounds, even when the
+// final MCC cache supports more placements. Only the disposable bake input is trimmed.
+fn with_native_bake_scenario(
+    scenario_path: &str, edit: &Path, runner: &Runner, workspace: &Path, tags: &Path,
+    bake: impl FnOnce(&str) -> Result<()>,
+) -> Result<()> {
+    let blocks = [
+        ("netgame_flags", maps::CLASSIC_NETGAME_FLAG_LIMIT),
+        ("player_starting_locations", maps::PLAYER_START_LIMIT),
+        ("netgame_equipment", maps::NETGAME_EQUIPMENT_LIMIT),
+    ];
+    let tags_arg = tags.to_string_lossy().into_owned();
+    let query_counts = |tag: &str| -> Result<Vec<usize>> {
+        let mut args = vec!["-t".into(), tags_arg.clone()];
+        for (key, _) in blocks {
+            args.extend(["-C".into(), key.into()]);
+        }
+        args.push(tag.into());
+        let readback = runner.run(edit, &args, workspace, "bsp-bake-scenario", 64)?;
+        let counts = readback.lines().map(|line| line.trim().parse::<usize>())
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|_| SparkError::Invalid("Unreadable native lighting scenario counts".into()))?;
+        if counts.len() != blocks.len() {
+            return invalid("Native lighting scenario counts are incomplete");
+        }
+        Ok(counts)
+    };
+    let scenario_tag = format!("{scenario_path}.scenario");
+    let counts = query_counts(&scenario_tag)?;
+    if blocks.iter().zip(&counts).all(|((_, limit), count)| count <= limit) {
+        return bake(scenario_path);
+    }
+
+    let source = tags.join(safe_relative(&scenario_tag)?);
+    let original_hash = maps::hash_file(&source)?;
+    let copy = safe_relative(scenario_path)?.with_file_name(format!("gsbake_{}", &runner.id[..8]));
+    let copy = copy.to_string_lossy().replace('/', "\\");
+    let copy_tag = format!("{copy}.scenario");
+    let file = tags.join(safe_relative(&copy_tag)?);
+    reject_links(&file)?;
+    if file.try_exists()? {
+        return invalid("The bake-only scenario path already exists");
+    }
+    let mut args = vec!["-t".into(), tags_arg.clone()];
+    for ((key, limit), &count) in blocks.iter().zip(&counts) {
+        if count > *limit {
+            args.extend(["-E".into(), format!("{key}[{limit}-{}]", count - 1)]);
+        }
+    }
+    args.extend(["-O".into(), copy_tag.clone(), scenario_tag]);
+    runner.run(edit, &args, workspace, "bsp-bake-scenario", 64)?;
+    let operation = (|| {
+        let expected = blocks.iter().zip(&counts).map(|((_, limit), count)| (*count).min(*limit));
+        if !query_counts(&copy_tag)?.into_iter().eq(expected) || maps::hash_file(&source)? != original_hash {
+            return invalid("The bake-only scenario differs from the reviewed scenario copy");
+        }
+        bake(&copy)
+    })();
+    if maps::hash_file(&source)? != original_hash {
+        return invalid("Native lighting changed the original gameplay scenario");
+    }
+    reject_links(&file)?;
+    fs::remove_file(&file)?;
+    operation
+}
+
 fn bake_structure_lightmaps(
     project: &Project, tool: &Path, runner: &Runner, workspace: &Path, scenario: &str, bsp: &str,
 ) -> Result<()> {
@@ -1124,59 +1190,16 @@ pub(crate) fn prepare_partition_structure(
     } else { None };
     if stage == PartitionStage::Lighting {
         crate::native_lighting::apply(project, tags, &inspection.scenario_path, &edit, runner, workspace)?;
-        let mut bake_only = None;
-        let gameplay_blocks = [
-            ("netgame_flags", netgame_flags.as_ref().map_or(0, |flags| flags.base_count()), maps::CLASSIC_NETGAME_FLAG_LIMIT),
-            ("player_starting_locations", player_starts.as_ref().map_or(0, |starts| starts.base_count()), maps::PLAYER_START_LIMIT),
-            ("netgame_equipment", pickups.as_ref().map_or(0, |items| items.total_count()), maps::NETGAME_EQUIPMENT_LIMIT),
-        ];
-        if gameplay_blocks.iter().any(|(_, count, limit)| count > limit) {
-            // Keep extended gameplay in the original scenario and give the
-            // native baker a separate tag with the same geometry and lighting inputs.
-            let scenario = format!("{}.scenario", inspection.scenario_path);
-            let source = tags.join(safe_relative(&scenario)?);
-            let before = maps::hash_file(&source)?;
-            let path = safe_relative(&inspection.scenario_path)?;
-            let copy = path.with_file_name(format!("gsbake_{}", &runner.id[..8]));
-            let copy = copy.to_string_lossy().replace('/', "\\");
-            let tag = format!("{copy}.scenario");
-            let file = tags.join(safe_relative(&tag)?);
-            reject_links(&file)?;
-            if file.try_exists()? { return invalid("The bake-only scenario path already exists"); }
-            let tags_arg = tags.to_string_lossy().into_owned();
-            let mut args = vec!["-t".into(), tags_arg.clone()];
-            for (key, count, limit) in gameplay_blocks {
-                if count > limit {
-                    args.extend(["-E".into(), format!("{key}[{limit}-{}]", count - 1)]);
+        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
+            for (name, geometry) in &regions {
+                if plan.tunnel_bake_fill {
+                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)?;
+                } else {
+                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
                 }
             }
-            args.extend(["-O".into(), tag.clone(), scenario]);
-            runner.run(&edit, &args, workspace, "partition-bake-scenario", 64)?;
-            for (key, count, limit) in gameplay_blocks {
-                let result = runner.run(&edit, &["-t".into(), tags_arg.clone(), "-C".into(), key.into(), tag.clone()],
-                    workspace, "partition-bake-scenario", 64)?;
-                if result.trim().parse::<usize>().ok() != Some(count.min(limit)) {
-                    return invalid(format!("The bake-only {key} count differs from the reviewed source"));
-                }
-            }
-            if maps::hash_file(&source)? != before {
-                return invalid("The bake-only scenario changed the original regional scenario");
-            }
-            bake_only = Some((copy, file, source, before));
-        }
-        let scenario = bake_only.as_ref().map_or(inspection.scenario_path.as_str(), |entry| entry.0.as_str());
-        for (name, geometry) in &regions {
-            if plan.tunnel_bake_fill {
-                bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)?;
-            } else {
-                bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
-            }
-        }
-        if let Some((_, file, source, before)) = bake_only {
-            if maps::hash_file(&source)? != before { return invalid("Native lighting changed the regional gameplay scenario"); }
-            reject_links(&file)?;
-            fs::remove_file(file)?;
-        }
+            Ok(())
+        })?;
     }
     let donor_tag = format!("{}.scenario_structure_bsp", structure_tags.last().unwrap());
     let donor_environment = if bind && !plan.preserve_donor_bsp {
@@ -1360,7 +1383,9 @@ pub(crate) fn prepare_native_with_limits(
     }
     append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
-    bake_structure_lightmaps(project, &tool, runner, workspace, &inspection.scenario_path, name)?;
+    with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, |scenario| {
+        bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
+    })?;
     if let Some(starts) = &restored_starts {
         starts.append(&inspection.scenario_path, tools, runner, workspace)?;
     }

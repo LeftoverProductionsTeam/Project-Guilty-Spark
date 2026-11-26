@@ -86,7 +86,6 @@ pub(crate) struct MergedTeleporterDonor<'a> {
 }
 
 impl PreparedFlags {
-    pub(crate) fn base_count(&self) -> usize { self.base.len() }
 
     pub(crate) fn from_sources(
         base_source: &Source,
