@@ -226,7 +226,7 @@ export function nativeRegionalTransportIssue(options: NativeTransportOptions): s
 }
 
 export function nativeTransportRouteIssue(
-  options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound' | 'recordings'>,
+  options: Pick<NativeTransportOptions, 'faction' | 'outbound' | 'inbound' | 'hub' | 'field' | 'returnAfterInsertion' | 'emptyInbound' | 'recall' | 'recordings'>,
   volumes: readonly string[],
   routes: NonNullable<WorkingScriptSources['transportReview']>['flightRoutes'],
 ): string | null {
@@ -242,10 +242,10 @@ export function nativeTransportRouteIssue(
   const hubZones = ['extraction_return', 'pelican_return', 'spirit_return'];
   const fieldZones = ['extraction_zone', 'extraction_pelican_zone', 'extraction_spirit_zone'];
   for (const leg of nativeTransportLegs(options)) {
-    const insertion = leg === 'outbound';
-    const pad = insertion ? options.field : options.hub;
-    const required = insertion ? field : hub;
-    const opposite = insertion ? hubZones : fieldZones;
+    const toField = leg === 'outbound' || leg === 'recall';
+    const pad = toField ? options.field : options.hub;
+    const required = toField ? field : hub;
+    const opposite = toField ? hubZones : fieldZones;
     if (nativeTransportRecording(options, leg)) {
       if (pad !== required || volumes.filter(volume => volume === pad).length !== 1) {
         return 'Select ' + required + ' for the recorded flight so the controller and Forerunner use the same pad.';

@@ -120,6 +120,14 @@ describe('native Extraction route review', () => {
     expect(nativeTransportRouteIssue(legacy, volumes, routes)).toBeNull();
   });
 
+  it('validates a separate recall against the field pad', () => {
+    const opts = {...legacy, recall: 'pickup'};
+    const volumes = ['extraction_return', 'extraction_zone'];
+    const routes = [route('field', 'extraction_zone'), route('loaded', 'extraction_return'), route('empty', 'extraction_return')];
+    expect(nativeTransportRouteIssue(opts, volumes, routes)).toContain('extraction_zone');
+    expect(nativeTransportRouteIssue(opts, volumes, [...routes, route('pickup', 'extraction_return')])).toContain('not verified inside pad extraction_zone');
+    expect(nativeTransportRouteIssue(opts, volumes, [...routes, route('pickup', 'extraction_zone')])).toBeNull();
+  });
   it.each([
     ['unsc', 'pelican'],
     ['covenant', 'spirit'],

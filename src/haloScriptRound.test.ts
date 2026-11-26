@@ -159,6 +159,22 @@ describe('Forerunner native transport source',()=>{
   expect(script.content).not.toMatch(/player_add_equipment|object_teleport|vehicle_unload|ai_place/);
   expect(script.dependencies).toContain('device_group:extraction_pelican_landed');
  });
+ it('runs a dedicated recall only after the empty return and retains the insertion default',()=>{
+  const config={...options,returnAfterInsertion:true};
+  const original=exportHaloCeTransport(config);
+  expect(original.content.match(/\(ai_command_list pilot field_route\)/g)).toHaveLength(2);
+  const authored={...config,recall:'recall_route'};
+  const generated=exportHaloCeTransport(authored);
+  expect(readNativeTransportSource(generated.content)).toEqual(authored);
+  expect(generated.content.match(/\(ai_command_list pilot field_route\)/g)).toHaveLength(1);
+  expect(generated.content.indexOf('(ai_command_list pilot recall_route)')).toBeGreaterThan(generated.content.indexOf('(ai_command_list pilot hub_route)'));
+  expect(generated.dependencies).toContain('command_list:recall_route');
+  expect(()=>exportHaloCeTransport({...options,recall:'recall_route'})).toThrow(/empty after insertion/);
+  const clips=exportHaloCeTransport({...config,createPilot:true,holdParkedPilot:true,hoverFieldTransfer:true,
+    occupancySeats:['P-driver','P-riderLF'],recordings:{outbound:{landing:'insert_clip'},recall:{landing:'recall_clip'}}});
+  expect(clips.content).toContain('(recording_play_and_hover extraction_pelican recall_clip)');
+  expect(clips.dependencies).toContain('cutscene_recording:recall_clip');
+ });
  it('keeps pilot and crew seat checks vehicle-typed and upgrades only exact legacy generated source',()=>{
   for(const faction of ['unsc','covenant'] as const){
    const settings={...options,faction,crew:[{group:'aircrew',seat:'passenger',create:true}]};

@@ -1024,7 +1024,7 @@ export interface NativeTransportCrew {
   /** Suspend this controller’s deferred troop until its captured actor leaves the craft. */
   holdUntilInsertion?:boolean;
 }
-export type NativeTransportLeg = 'outbound' | 'inbound' | 'emptyInbound';
+export type NativeTransportLeg = 'outbound' | 'inbound' | 'emptyInbound' | 'recall';
 export interface NativeTransportRecording { landing: string; hover?: string }
 
 export interface NativeTransportOptions {
@@ -1038,10 +1038,12 @@ export interface NativeTransportOptions {
   departureCamera?:{marker:string;durationMs:number};
   /** Complete seat labels from the reviewed vehicle for player occupancy checks. */
   occupancySeats?:string[];
-  /** Return to the hub after insertion, then reuse the insertion route for recall. */
+  /** Return to the hub after insertion and wait there for recall. */
   returnAfterInsertion?:boolean;
   /** Optional native hub route used only when returning without player passengers. */
   emptyInbound?:string;
+  /** Optional dedicated native route from the returned aircraft pose to the field. */
+  recall?:string;
   recordings?: Partial<Record<NativeTransportLeg, NativeTransportRecording>>;
   /** Record an actual surviving rider leaving the first grounded insertion. */
   trackPlayerInsertion?:boolean;
@@ -1050,15 +1052,20 @@ export interface NativeTransportOptions {
   /** Suspend autonomous pilot AI on a verified pad until the next authored flight. */
   holdParkedPilot?:boolean;
 }
-export function nativeTransportLegs(options: Pick<NativeTransportOptions, 'returnAfterInsertion'>): NativeTransportLeg[] {
-  return options.returnAfterInsertion ? ['outbound', 'inbound', 'emptyInbound'] : ['outbound', 'inbound'];
+export function nativeTransportLegs(options: Pick<NativeTransportOptions, 'returnAfterInsertion' | 'recall' | 'recordings'>): NativeTransportLeg[] {
+  const legs: NativeTransportLeg[] = ['outbound', 'inbound'];
+  if (options.returnAfterInsertion) {
+    legs.push('emptyInbound');
+    if (options.recall !== undefined || options.recordings?.recall) legs.push('recall');
+  }
+  return legs;
 }
 
 export function nativeTransportRecording(options: Pick<NativeTransportOptions, 'recordings' | 'emptyInbound'>, leg: NativeTransportLeg): NativeTransportRecording | undefined {
   return options.recordings?.[leg] ?? (leg === 'emptyInbound' && !options.emptyInbound ? options.recordings?.inbound : undefined);
 }
 
-export function nativeTransportAiRoute(options: Pick<NativeTransportOptions, 'outbound' | 'inbound' | 'emptyInbound' | 'recordings'>, leg: NativeTransportLeg): string | undefined {
+export function nativeTransportAiRoute(options: Pick<NativeTransportOptions, 'outbound' | 'inbound' | 'emptyInbound' | 'recall' | 'recordings'>, leg: NativeTransportLeg): string | undefined {
   return nativeTransportRecording(options, leg) ? undefined : leg === 'emptyInbound' ? options.emptyInbound ?? options.inbound : options[leg];
 }
 
@@ -1074,7 +1081,7 @@ export function exportHaloCeTransport(options:NativeTransportOptions):ScriptExpo
   return generateNativeTransport(options);
 }
 function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHold=false,legacyFlightHold=false):ScriptExport {
-  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','pickupCue','hoverFieldTransfer','returnAfterInsertion','emptyInbound','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats','recordings'].includes(key)))throw Error('Invalid transport configuration.');
+  if(!options||Object.keys(options).some(key=>!['faction','pilot','pilotSeat','outbound','inbound','hub','field','departureCue','arrivalCue','pickupCue','hoverFieldTransfer','returnAfterInsertion','emptyInbound','recall','trackPlayerInsertion','createPilot','holdParkedPilot','insertionCamera','departureCamera','crew','occupancySeats','recordings'].includes(key)))throw Error('Invalid transport configuration.');
   if(options.returnAfterInsertion!==undefined&&typeof options.returnAfterInsertion!=='boolean')throw Error('Choose whether the aircraft returns empty after insertion.');
   if(options.trackPlayerInsertion!==undefined&&(typeof options.trackPlayerInsertion!=='boolean'||options.trackPlayerInsertion&&!options.returnAfterInsertion))throw Error('Confirming passenger insertion requires the empty-return workflow.');
   if(options.hoverFieldTransfer!==undefined&&typeof options.hoverFieldTransfer!=='boolean')throw Error('Choose the field transfer mode explicitly.');
@@ -1084,6 +1091,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
   if(!['unsc','covenant'].includes(options.faction))throw Error('Choose UNSC Pelican or Covenant Spirit.');
   const pilot=ensureName(options.pilot,'Pilot encounter / squad',true);
   const legs = nativeTransportLegs(options);
+  const recallLeg = legs.includes('recall') ? 'recall' : 'outbound';
   if (options.recordings !== undefined) {
     if (!options.recordings || typeof options.recordings !== 'object' || Array.isArray(options.recordings)) throw Error('Choose embedded native flight recordings.');
     for (const [key, recording] of Object.entries(options.recordings)) {
@@ -1094,9 +1102,10 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
     }
     if (Object.keys(options.recordings).length && !options.holdParkedPilot) throw Error('Recorded flights require a dedicated held pilot.');
   }
-  if(options.hoverFieldTransfer&&(!options.recordings?.outbound||!options.returnAfterInsertion||!validNativeTransportSeats(options.occupancySeats)))
+  if(options.hoverFieldTransfer&&(!options.recordings?.outbound||!nativeTransportRecording(options,recallLeg)||!options.returnAfterInsertion||!validNativeTransportSeats(options.occupancySeats)))
     throw Error('Field hover requires a final field recording, empty return, and reviewed native seat labels.');
   if(options.emptyInbound!==undefined&&!options.returnAfterInsertion)throw Error('An empty return route requires Return empty after insertion.');
+  if(options.recall!==undefined&&!options.returnAfterInsertion)throw Error('A dedicated recall route requires Return empty after insertion.');
   const routeFor = (leg: NativeTransportLeg) => nativeTransportAiRoute(options, leg);
   for (const leg of legs) if (!nativeTransportRecording(options, leg)) ensureName(routeFor(leg), 'Native flight command list');
   const outbound = routeFor('outbound'), inbound = routeFor('inbound'), emptyInbound = routeFor('emptyInbound');
@@ -1204,7 +1213,7 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
     return '  (if (not ('+command+' '+craft+' '+name+')) (sleep -1))';
   };
   const holdEveryClip = !options.hoverFieldTransfer || legacyFlightHold;
-  const holdAtArrival = (leg: NativeTransportLeg) => holdEveryClip || leg === 'outbound';
+  const holdAtArrival = (leg: NativeTransportLeg) => holdEveryClip || leg === 'outbound' || leg === 'recall';
   const arriveAt=(volume:string,leg:NativeTransportLeg)=>{
     const recording = nativeTransportRecording(options, leg);
     const finish = recording ? [...awaitPlayback, ...(recording.hover ? [clearHover, playRecording(recording.landing, holdAtArrival(leg)), ...awaitPlayback] : [])] : [];
@@ -1274,8 +1283,8 @@ function generateNativeTransport(options:NativeTransportOptions,legacyPreSeatHol
       ...arriveAt(hub,'emptyInbound'),
       '  ; Keep the empty ship closed while the deployed field crew requests pickup.',
       waitFor(recall),
-      ...depart('outbound',recall,false),
-      ...arriveAt(field,'outbound'),
+      ...depart(recallLeg,recall,false),
+      ...arriveAt(field,recallLeg),
       ...((cues[2]??cues[1])?['  ('+(cues[2]??cues[1])+')']:[]),
       enter(true),
     ]:[]),
