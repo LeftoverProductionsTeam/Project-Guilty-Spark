@@ -68,22 +68,31 @@ impl TransportSnapshot {
 }
 struct Layout {vehicle:usize,name:usize,palette:usize,new_palette:bool,group:usize}
 fn names(fields:&str,array:&str)->Result<Vec<String>>{let table=array_listing(fields,array)?;array_items(&table,array)?.iter().map(|row|native_name(&direct_struct_fields(row)?)).collect()}
-fn layout(fields:&str,value:&TransportAppend)->Result<Layout>{
+fn layout(fields:&str,value:&TransportAppend,regional_mcc:bool)->Result<Layout>{
  value.validate()?;
  let objects=names(fields,"object_names")?;let vehicles=array_listing(fields,"vehicles")?;let palette=names(fields,"vehicle_palette")?;let groups=names(fields,"device_groups")?;
- // Legacy CE limits from the pinned native schema:80vehicles/100palette,
- //512names/128groups. Do not make a formerly valid classic map require extensions.
- if objects.len()>=512||vehicles.count>=80||palette.len()>100||groups.len()>125{return invalid("CE-compatible append capacity reached (80vehicles,100palette,512names,128groups)");}
+ let vehicle_limit=crate::bsp_vehicles::limit(if regional_mcc{13}else{609});
+ if objects.len()>=512||vehicles.count>=vehicle_limit||palette.len()>100||groups.len()>125{
+  return invalid(format!("Native append capacity reached ({vehicle_limit} vehicles, 100 palette entries, 512 names, 128 groups)"));
+ }
+ if regional_mcc {
+  let volumes=super::scenario_volume_choices(fields)?;
+  for hub in ["extraction_unsc_hub","extraction_covenant_hub"] {
+   if volumes.iter().filter(|row|row.name==hub&&row.geometry.as_ref().is_some_and(|geometry|geometry.valid())).count()!=1 {
+    return invalid("Regional transport append needs both native MegaWorld faction hubs");
+   }
+  }
+ }
  if objects.iter().any(|name|name.eq_ignore_ascii_case(&value.name))||groups.iter().any(|name|value.group_names().iter().any(|expected|name.eq_ignore_ascii_case(expected))){return invalid("Transport name or signal already exists; preserve it and use the existing source workflow instead of replacing it");}
  let reference=format!("{}.vehicle",value.tag_path.replace('\\',"/"));
  let found=palette.iter().position(|path|path.replace('\\',"/").eq_ignore_ascii_case(&reference));
- if found.is_none()&&palette.len()>=100{return invalid("CE vehicle palette capacity reached");}
+ if found.is_none()&&palette.len()>=100{return invalid("Native vehicle palette capacity reached");}
  // A formerly dangling device-group index must not silently gain a new binding.
  for array in ["machines","controls"]{let table=array_listing(fields,array)?;for row in array_items(&table,array)?{let root=direct_struct_fields(row)?;for key in ["power_group","position_group"]{let i=native_index(&root,key)?;if i>=0&&(i as usize)>=groups.len(){return invalid("Existing device references a missing group; resolve it before appending transport signals");}}}}
  Ok(Layout{vehicle:vehicles.count,name:objects.len(),palette:found.unwrap_or(palette.len()),new_palette:found.is_none(),group:groups.len()})
 }
-pub fn arguments(tags:&Path,tag:&str,before:&str,value:&TransportAppend)->Result<Vec<String>>{
- let p=layout(before,value)?;let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-n".into()];
+pub fn arguments(tags:&Path,tag:&str,before:&str,value:&TransportAppend,regional_mcc:bool)->Result<Vec<String>>{
+ let p=layout(before,value,regional_mcc)?;let mut args=vec!["-t".into(),tags.to_string_lossy().into_owned(),"-n".into()];
  let insert=|args:&mut Vec<String>,array:String,count:usize|args.extend(["-I".into(),array,count.to_string(),"end".into()]);
  let set=|args:&mut Vec<String>,key:String,value:String|args.extend(["-S".into(),key,value]);
  if p.new_palette{insert(&mut args,"vehicle_palette".into(),1);set(&mut args,format!("vehicle_palette[{}].name",p.palette),format!("{}.vehicle",value.tag_path));}
@@ -100,8 +109,8 @@ pub(super) fn preserved_arrays(before:&str,after:&str,changes:&[(&str,usize)])->
  for(array,extra)in changes{let a=array_listing(before,array)?;let b=array_listing(after,array)?;let old=array_items(&a,array)?;let new=array_items(&b,array)?;if b.count!=a.count+extra||old.iter().zip(&new).any(|(a,b)|a!=b){return invalid("Transport append changed original array bodies or indices");}}
  Ok(())
 }
-pub fn reviewed(before:&str,after:&str,value:&TransportAppend)->Result<Vec<FieldDifference>>{
- let p=layout(before,value)?;preserved_arrays(before,after,&[("vehicles",1),("vehicle_palette",usize::from(p.new_palette)),("object_names",1),("device_groups",3)])?;
+pub fn reviewed(before:&str,after:&str,value:&TransportAppend,regional_mcc:bool)->Result<Vec<FieldDifference>>{
+ let p=layout(before,value,regional_mcc)?;preserved_arrays(before,after,&[("vehicles",1),("vehicle_palette",usize::from(p.new_palette)),("object_names",1),("device_groups",3)])?;
  let snapshot=snapshots(after,&[value.name.clone()])?.pop().ok_or_else(||crate::SparkError::Invalid("Appended transport is missing".into()))?;
  if snapshot.vehicle_index as usize!=p.vehicle||snapshot.name_index as usize!=p.name||snapshot.groups!=[p.group as u16,p.group as u16+1,p.group as u16+2]||snapshot.transport.tag_path.replace('\\',"/").to_ascii_lowercase()!=value.tag_path.replace('\\',"/").to_ascii_lowercase()||!positions_close(snapshot.transport.position,value.position)||!snapshot.transport.rotation_radians.iter().zip(value.rotation_radians).all(|(a,b)|facings_close(*a,b)){return invalid("Appended transport pose/reference/binding differs from review");}
  let table=array_listing(after,"vehicles")?;let rows=array_items(&table,"vehicles")?;let root=direct_struct_fields(rows[p.vehicle])?;
@@ -121,6 +130,10 @@ pub fn snapshots(fields:&str,selected:&[String])->Result<Vec<TransportSnapshot>>
  }Ok(result)
 }
 pub fn verify_cache(expected:&[TransportSnapshot],path:&Path,map:&crate::maps::MapInspection)->Result<()>{
+ if expected.iter().any(|row|row.vehicle_index as usize>=crate::bsp_vehicles::limit(609))
+  && ((map.header.version,map.header.scenario_type)!=(13,1)||map.header.extended||super::megaworld_hub_starts(path,map)?.is_none()) {
+  return invalid("Expanded transport rows require a compiled MCC13 MegaWorld with verified faction hubs");
+ }
  let read=crate::maps::scenario_logic_readback(path,map)?;let mut signal_indices=std::collections::BTreeSet::new();
  for row in expected{row.validate()?;let value=&row.transport;if let Some(flight)=&row.flight{flight.verify_map(map,&value.tag_path)?;}let name=read.names.get(row.name_index as usize).ok_or_else(||crate::SparkError::Invalid("Compiled transport name is missing".into()))?;
   let vehicles=read.vehicles.iter().filter(|v|v.index==row.vehicle_index as usize).collect::<Vec<_>>();
@@ -232,10 +245,10 @@ mod tests{
   let missing=pilot_bindings(&pilot_scene(),&choices,|_|invalid("Missing source graph"),|_|invalid("Missing source graph")).unwrap();assert!(missing.iter().all(|row|row.issue.as_deref()==Some("Missing source graph")));assert!(native_dependency_path("unit (../original.biped) dependency","unit","biped").is_err());assert!(native_dependency_path("unit (actors/pilot.vehicle) dependency","unit","biped").is_err());assert!(native_dependency_path("unit (actors/pilot.biped) int16","unit","biped").is_err());assert!(native_dependency_path("unit (a.biped) dependency\nunit (b.biped) dependency","unit","biped").is_err());
  }
  #[test]fn append_preserves_original_arrays_fields_and_refuses_native_corruption(){
-  let value=value();let before=before();let after=after();let args=arguments(Path::new("tags"),"level.scenario",&before,&value).unwrap();assert!(args.contains(&"-n".into()));assert_eq!(reviewed(&before,&after,&value).unwrap().len(),1);let snapshot=snapshots(&after,&[value.name.clone()]).unwrap();assert_eq!(snapshot[0].groups,[1,2,3]);assert_eq!(snapshot[0].name_index,1);
-  for wrong in [after.replace("name (original)","name (changed)"),after.replace("initial_value (1)","initial_value (0)"),after.replace("source_metadata (retained)","source_metadata (lost)"),after.replace("position (1,2,3)","position (2,2,3)"),after.replace("can_change_only_once (0)","can_change_only_once (1)"),after.replace("body_vitality (1)","body_vitality (0)")]{assert!(reviewed(&before,&wrong,&value).is_err());}
-  assert!(arguments(Path::new("tags"),"level.scenario",&after,&value).is_err());
-  let partial=before.replace("name (original_power)","name (extraction_pelican_landed)");assert!(arguments(Path::new("tags"),"level.scenario",&partial,&value).is_err());
+  let value=value();let before=before();let after=after();let args=arguments(Path::new("tags"),"level.scenario",&before,&value,false).unwrap();assert!(args.contains(&"-n".into()));assert_eq!(reviewed(&before,&after,&value,false).unwrap().len(),1);let snapshot=snapshots(&after,&[value.name.clone()]).unwrap();assert_eq!(snapshot[0].groups,[1,2,3]);assert_eq!(snapshot[0].name_index,1);
+  for wrong in [after.replace("name (original)","name (changed)"),after.replace("initial_value (1)","initial_value (0)"),after.replace("source_metadata (retained)","source_metadata (lost)"),after.replace("position (1,2,3)","position (2,2,3)"),after.replace("can_change_only_once (0)","can_change_only_once (1)"),after.replace("body_vitality (1)","body_vitality (0)")]{assert!(reviewed(&before,&wrong,&value,false).is_err());}
+  assert!(arguments(Path::new("tags"),"level.scenario",&after,&value,false).is_err());
+  let partial=before.replace("name (original_power)","name (extraction_pelican_landed)");assert!(arguments(Path::new("tags"),"level.scenario",&partial,&value,false).is_err());
  }
  #[test]fn flight_route_profile_checks_physical_commands_and_rotated_pad_bounds(){
   let flight_route=|route:&NativeCommandList,volumes:&[crate::maps::ScenarioLogicVolume]|movement_route(route,volumes,true);
@@ -297,7 +310,7 @@ mod installed {
    let vehicle=if index==0{"forerunner/transport/pelican"}else{"forerunner/transport/spirit"};let source=shared.join(format!("{vehicle}.vehicle"));protected.push(source.clone());
    let listing=run(&editor,vec!["-t".into(),shared.to_string_lossy().into_owned(),"-L".into(),format!("{vehicle}.vehicle")]);validate_vehicle_source(&listing).unwrap();
    let value=TransportAppend{name:name.into(),tag_path:vehicle.into(),position:[if index==active{49.}else{65.},-87.472,0.078429],rotation_radians:[0.25,0.,0.]};let previous=fields();
-   let operation=Operation::AppendTransport{transport:value.clone(),source_sha256:crate::maps::hash_file(&file).unwrap()};let args=operation.arguments_with_fields(&tags,"scnr",tag,&previous).unwrap();run(&editor,args);let after=fields();reviewed_difference(&previous,&after,&operation).unwrap();selected.push(name.into());
+   let operation=Operation::AppendTransport{transport:value.clone(),source_sha256:crate::maps::hash_file(&file).unwrap(),regional_mcc:false};let args=operation.arguments_with_fields(&tags,"scnr",tag,&previous).unwrap();run(&editor,args);let after=fields();reviewed_difference(&previous,&after,&operation).unwrap();selected.push(name.into());
    assert_eq!(original_scripts,scenario_script_names(&after).unwrap());assert_eq!(serde_json::to_value(&original_squads).unwrap(),serde_json::to_value(scenario_squad_start_choices(&after).unwrap()).unwrap());
   }
   let faction_request=std::env::var_os("SPARK_NATIVE_FACTION_KITS").map(|request|{

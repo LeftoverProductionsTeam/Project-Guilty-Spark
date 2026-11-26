@@ -213,7 +213,7 @@ pub enum Operation {
     FactionService {service:NativeFactionService,#[serde(rename="sourceSha256")] source_sha256:String},
     FactionBody {body:NativeFactionBody,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(rename="replaceExisting",default,skip_serializing_if="command_append_is_false")] replace_existing:bool},
     FactionKits {kits:Vec<NativeFactionKit>,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(rename="replaceExistingProfiles",default,skip_serializing_if="command_append_is_false")] replace_existing_profiles:bool},
-    AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String},
+    AppendTransport {transport:TransportAppend,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,rename="regionalMcc",skip_serializing_if="command_append_is_false")] regional_mcc:bool},
     CommandList {list:NativeCommandList,#[serde(rename="sourceSha256")] source_sha256:String,#[serde(default,skip_serializing_if="command_append_is_false")] append:bool},
     MachineSettings {settings:NativeMachineSettings,#[serde(rename="sourceSha256")] source_sha256:String},
     ControlSettings {settings:NativeControlSettings,#[serde(rename="sourceSha256")] source_sha256:String},
@@ -459,7 +459,7 @@ impl Operation {
             },
             Self::FactionBody{body,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction body requires its exact reviewed scenario");}body.validate()?;},
             Self::FactionKits{kits,source_sha256,..}=>{if class!="scnr"||kits.is_empty()||kits.len()>2||source_sha256.len()!=64||!source_sha256.bytes().all(|b|b.is_ascii_hexdigit()){return invalid("Faction kits require a reviewed scenario source hash and one or two kits");}factions::validate_batch(kits)?;},
-            Self::AppendTransport{transport,source_sha256}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
+            Self::AppendTransport{transport,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Transport append requires an exact scenario source hash");}transport.validate()?;}
             Self::CommandList{list,source_sha256,..}=>{if class!="scnr"||source_sha256.len()!=64||!source_sha256.bytes().all(|c|c.is_ascii_hexdigit()){return invalid("Command source needs an exact native scenario hash");}list.validate()?;}
             Self::MachineSettings { settings, source_sha256 } => {
                 if class != "mach" || !tag.ends_with(".device_machine") || source_sha256.len() != 64
@@ -743,7 +743,7 @@ impl Operation {
             return if *replace_existing_profiles { factions::replace_profile_arguments(tags,tag,before,kits) }
                 else { factions::arguments(tags,tag,before,kits) };
         }
-        if let Self::AppendTransport{transport,..}=self{return transport::arguments(tags,tag,before,transport);}
+        if let Self::AppendTransport{transport,regional_mcc,..}=self{return transport::arguments(tags,tag,before,transport,*regional_mcc);}
         if let Self::CommandList{list,append,..}=self{return if *append{command_lists::append_arguments(tags,tag,before,list)}else{command_lists::arguments(tags,tag,before,list)};}
         if let Self::DeviceGroupAppend { name, initial_value, change_once, .. } = self {
             let index = device_group_append_index(before, name)?;
@@ -1160,7 +1160,7 @@ pub fn reviewed_difference(
         return if *replace_existing_profiles { factions::review_profile_replacements(before,after,kits) }
             else { factions::reviewed(before,after,kits) };
     }
-    if let Operation::AppendTransport{transport,..}=operation{return transport::reviewed(before,after,transport);}
+    if let Operation::AppendTransport{transport,regional_mcc,..}=operation{return transport::reviewed(before,after,transport,*regional_mcc);}
     if let Operation::CommandList{list,append,..}=operation{return if *append{command_lists::reviewed_append(before,after,list)}else{command_lists::reviewed(before,after,list)};}
     if let Operation::MachineSettings { settings, .. } = operation { return reviewed_machine_settings(before, after, settings); }
     if let Operation::ControlSettings{settings,..}=operation{return reviewed_control_settings(before,after,settings);}

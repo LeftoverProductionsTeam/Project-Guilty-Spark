@@ -579,8 +579,9 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
     let regional = matches!(operation, recipes::Operation::FactionBody { .. } | recipes::Operation::FactionKits { .. } | recipes::Operation::FactionService { .. })
         && regional_faction_source(source)?;
     let mut reviewed_arms = BTreeMap::new();
-    let roots=if let recipes::Operation::AppendTransport{transport,..}=operation{
-        if source.build.target!="gbx-custom"{return Err("Native transport append currently requires reviewed CE609 solo source".into());}
+    let roots=if let recipes::Operation::AppendTransport{transport,regional_mcc,..}=operation{
+        let admitted=if *regional_mcc { regional_faction_source(source)? } else { source.build.target=="gbx-custom" };
+        if !admitted { return Err("Native transport append needs CE609 solo or reviewed MCC13 MegaWorld working source".into()); }
         let tag=format!("{}.vehicle",transport.tag_path);let listing=fields(state,&source.project,&source.tags,&tag)?;recipes::validate_transport_vehicle_source(&listing).map_err(error)?;
         vec![(tag,"vehi")]
     }else if let recipes::Operation::SquadTerminals{terminals,..}=operation{
@@ -594,7 +595,10 @@ fn operation_dependencies(state:&AppState,source:&Source,operation:&recipes::Ope
         let hubs=recipes::megaworld_hub_starts(output,&map).map_err(error)?.ok_or("Verified MegaWorld hubs required")?;
         let hub=&hubs[usize::from(service.faction=="covenant")];
         let points=maps::bsp_point_locations(output,&map,&[service.position],Some(1.)).map_err(error)?;
-        if points[0].bsps != [hub.bsp_index] || !points[0].ground.iter().any(|ground| ground.bsp==hub.bsp_index) {
+        if service.service=="fieldPickup" {
+            let [bsp]=points[0].bsps.as_slice() else {return Err("Place the field control inside one owning BSP.".into());};
+            if !points[0].ground.iter().any(|ground|ground.bsp==*bsp){return Err("Place the field control on a supported surface.".into());}
+        } else if points[0].bsps != [hub.bsp_index] || !points[0].ground.iter().any(|ground| ground.bsp==hub.bsp_index) {
             return Err(format!("Place the service on a supported surface within {} (BSP {}).",hub.name,hub.bsp_index));
         }
         vec![(tag,"ctrl")]
@@ -953,7 +957,7 @@ pub(super) async fn native_tag_context(
             tags_directory: source.tags,
             tag_sha256:hash,
             actor_variants,
-            can_append_faction_kits,can_append_squad_terminals,regional_faction_source,control_sources,weapon_sources,biped_sources,faction_kits,faction_body_issue,can_append_transport:can_append_encounter&&source.build.target=="gbx-custom",vehicle_sources,can_append_encounter,
+            can_append_faction_kits,can_append_squad_terminals,regional_faction_source,control_sources,weapon_sources,biped_sources,faction_kits,faction_body_issue,can_append_transport:can_append_squad_terminals||regional_faction_source&&can_append_faction_kits,vehicle_sources,can_append_encounter,
             vehicle_flight,vehicle_flight_issue,
             control_settings,control_settings_issue,control_requires_player_activation,machine_settings,machine_settings_issue,
             bounding_radius: radius,
