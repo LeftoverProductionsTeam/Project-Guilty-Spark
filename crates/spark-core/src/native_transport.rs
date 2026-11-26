@@ -2,6 +2,102 @@
 //! field reader, reviewed source transaction and compiled marker decoder.
 use super::*;
 
+pub fn verify_vehicle_bsp_preservation(before: &[u8], after: &[u8]) -> Result<()> {
+    let original = loose_scenario_vehicle_masks(before)?;
+    if original.iter().all(|&mask| mask == 0) {
+        return Ok(());
+    }
+    let edited = loose_scenario_vehicle_masks(after)?;
+    if edited.get(..original.len()) != Some(original.as_slice()) {
+        return invalid(
+            "The native tag writer changed existing vehicle BSP ownership. Choose a writer that preserves aircraft regions. The working scenario is unchanged.",
+        );
+    }
+    Ok(())
+}
+
+// Older native writers omit this field from their listing and clear it when
+// serializing a scenario. Read only the HEK prefix needed to verify it.
+fn loose_scenario_vehicle_masks(bytes: &[u8]) -> Result<Vec<u16>> {
+    use crate::binary::Reader;
+    const HEADER: usize = 64;
+    const VEHICLE: usize = 120;
+    let reader = Reader(bytes);
+    if reader.bytes(36, 4)? != b"scnr" || reader.bytes(60, 4)? != b"blam" {
+        return invalid("Vehicle ownership verification requires a loose scenario tag");
+    }
+    let number = |offset| -> Result<usize> {
+        Ok(u32::from_be_bytes(reader.bytes(offset, 4)?.try_into().unwrap()) as usize)
+    };
+    let dependency = |row| -> Result<usize> {
+        let length = number(row + 8)?;
+        Ok(if length == 0 { 0 } else { length + 1 })
+    };
+
+    let mut cursor = HEADER + 0x5b0;
+    let mut skip = |size| -> Result<usize> {
+        let start = cursor;
+        reader.bytes(start, size)?;
+        cursor += size;
+        Ok(start)
+    };
+    for field in [0, 0x10, 0x20] {
+        skip(dependency(HEADER + field)?)?;
+    }
+    // HEK stores each reflexive's fixed rows first, then its child payload.
+    for (field, stride) in [
+        (0x30, 16), (0x40, 32), (0xec, 8), (0xf8, 120), (0x104, 0),
+        (0x118, 48), (0x124, 36), (0x204, 36), (0x210, 72), (0x21c, 48),
+        (0x228, 120), (0x234, 48),
+    ] {
+        let count = number(HEADER + field)?;
+        if stride == 0 {
+            skip(count)?;
+            continue;
+        }
+        let size = count.checked_mul(stride)
+            .ok_or_else(|| crate::SparkError::Invalid("Scenario array size overflow".into()))?;
+        let rows = skip(size)?;
+        if matches!(field, 0x30 | 0x40 | 0x118 | 0x21c | 0x234) {
+            for index in 0..count {
+                let row = rows + index * stride;
+                skip(if field == 0x118 { number(row + 28)? } else { dependency(row)? })?;
+            }
+        }
+    }
+    let count = number(HEADER + 0x240)?;
+    if count > 32767 {
+        return invalid("Vehicle ownership verification exceeds the native placement bound");
+    }
+    let vehicles = skip(count * VEHICLE)?;
+    (0..count).map(|index| {
+        Ok(u16::from_be_bytes(reader.bytes(vehicles + index * VEHICLE + 32, 2)?.try_into().unwrap()))
+    }).collect()
+}
+
+#[cfg(test)]
+#[test]
+fn loose_scenario_edit_detects_cleared_vehicle_ownership() {
+    let rows = 64 + 0x5b0 + 16 + 4;
+    let mut source = vec![0; rows + 2 * 120];
+    source[36..40].copy_from_slice(b"scnr");
+    source[60..64].copy_from_slice(b"blam");
+    source[64 + 0x30..64 + 0x34].copy_from_slice(&1u32.to_be_bytes());
+    source[64 + 0x240..64 + 0x244].copy_from_slice(&2u32.to_be_bytes());
+    let sky = 64 + 0x5b0;
+    source[sky + 8..sky + 12].copy_from_slice(&3u32.to_be_bytes());
+    source[sky + 16..sky + 20].copy_from_slice(b"sky\0");
+    source[rows + 32..rows + 34].copy_from_slice(&1u16.to_be_bytes());
+    source[rows + 152..rows + 154].copy_from_slice(&2048u16.to_be_bytes());
+    assert_eq!(loose_scenario_vehicle_masks(&source).unwrap(), [1, 2048]);
+    let mut edited = source.clone();
+    edited[rows + 8] = 1;
+    assert!(verify_vehicle_bsp_preservation(&source, &edited).is_ok());
+    edited[rows + 152..rows + 154].fill(0);
+    assert!(verify_vehicle_bsp_preservation(&source, &edited).is_err());
+    assert!(verify_vehicle_bsp_preservation(&source, &edited[..rows]).is_err());
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeFlightRecording {

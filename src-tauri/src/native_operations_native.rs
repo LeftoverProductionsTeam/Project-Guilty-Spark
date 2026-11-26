@@ -1205,7 +1205,9 @@ pub(super) async fn native_operation_preview(
     if maps::hash_file(&exe).map_err(error)?!=executable_sha256{return Err("Native writer changed during the preview; no source was selected".into());}
     let after_fields=fields(&state,&source.project,&candidate,&source.tag)?;let mut field_changes=recipes::reviewed_difference(&before_fields,&after_fields,&operation).map_err(error)?;
     field_changes.extend(copy_differences);
-    let after=bounded_read(&candidate.join(&relative),MAX_TAG)?;let after_sha256=hash_bytes(&after);verify_bytes(&candidate,&source.tag,&after_sha256)?;
+    let after=bounded_read(&candidate.join(&relative),MAX_TAG)?;
+    if source.class == "scnr" { recipes::verify_vehicle_bsp_preservation(&before, &after).map_err(error)?; }
+    let after_sha256=hash_bytes(&after);verify_bytes(&candidate,&source.tag,&after_sha256)?;
     if maps::hash_file(&source.tags.join(&relative)).map_err(error)?!=before_sha256{return Err("Working source changed during preview. The candidate is retained; refresh before making another preview.".into());}
     let mut expected_candidate=imported_dependencies.clone();expected_candidate.extend(generated_dependencies.clone());expected_candidate.insert(source.tag.replace('\\',"/"),after_sha256.clone());
     if transaction::inventory(&candidate).map_err(error)?!=expected_candidate{return Err("The native operation changed unexpected candidate files; no revision was selected".into());}
@@ -1262,6 +1264,10 @@ pub(super) async fn native_operation_accept(
             return Err("The current native fields no longer match the reviewed starting source".into());
         }
         verify_firefight_plan(&project, &build, &current_fields, &receipt.operation)?;
+        if receipt.class == "scnr" {
+            let edited = bounded_read(&candidate.join(&relative), MAX_TAG)?;
+            recipes::verify_vehicle_bsp_preservation(&before, &edited).map_err(error)?;
+        }
         recipes::reviewed_difference(&current_fields, &actual_fields, &receipt.operation).map_err(error)?;
     }
     verify_bytes(&candidate,&receipt.tag,&receipt.after_sha256)?;
