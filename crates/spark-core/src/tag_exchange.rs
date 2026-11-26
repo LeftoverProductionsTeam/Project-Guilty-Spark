@@ -161,18 +161,18 @@ pub(crate) fn verify_source_snapshot(source:&project::Source,resources:Option<&P
     Ok(())
 }
 // Invader's recursive cache extractor invokes its cache compiler with empty
-// build parameters. Some valid actor particle dependencies fail that path.
+// build parameters. Valid actor and vehicle particle dependencies can fail that path.
 // Direct extraction plus the existing native dependency reader avoids that
 // compiler path; it does not ignore extraction errors or missing references.
-fn actor_closure(query:&str,output:&str,files:&[ExtractedFile])->Result<std::collections::BTreeSet<String>> {
+fn direct_asset_closure(query:&str,output:&str,files:&[ExtractedFile])->Result<std::collections::BTreeSet<String>> {
     let mut wanted=std::collections::BTreeSet::from([query.replace('\\',"/")]);
     for row in crate::native_operations::dependency_lines(output)? {
-        if row.reported_broken{return invalid(format!("Native actor dependency is broken: {}",row.path));}
+        if row.reported_broken{return invalid(format!("Native asset dependency is broken: {}",row.path));}
         wanted.insert(row.path);
     }
-    if wanted.len()>2048{return invalid("Native actor closure exceeds2048checked tags");}
+    if wanted.len()>2048{return invalid("Native asset closure exceeds 2048 checked tags");}
     let available:std::collections::BTreeSet<_>=files.iter().map(|file|file.path.as_str()).collect();
-    if let Some(missing)=wanted.iter().find(|path|!available.contains(path.as_str())){return invalid(format!("Direct extraction is missing an actor dependency: {missing}"));}
+    if let Some(missing)=wanted.iter().find(|path|!available.contains(path.as_str())){return invalid(format!("Direct extraction is missing an asset dependency: {missing}"));}
     Ok(wanted)
 }
 /// The owner must click an explicit extraction button. Only a *new*, managed tags directory is written.
@@ -224,13 +224,13 @@ pub fn extract_selected_tag(
     // keep schema-1 reuse and recursive dependency extraction. Known legacy
     // normalization uses schema 3 and its exact derived-input hash.
     let whole_cache=tag.class=="scnr";
-    let direct_actor=tag.class=="actv";
-    let actor_reader=if direct_actor {Some(build::tool_path(tools,"invader-dependency").ok_or_else(||SparkError::Invalid("invader-dependency is required to recover a complete actor closure".into()))?)}else{None};
-    if let Some(reader)=&actor_reader{reject_links(reader)?;}
+    let direct_asset=matches!(tag.class.as_str(),"actv"|"vehi");
+    let dependency_reader=if direct_asset {Some(build::tool_path(tools,"invader-dependency").ok_or_else(||SparkError::Invalid("invader-dependency is required to recover the complete native asset closure".into()))?)}else{None};
+    if let Some(reader)=&dependency_reader{reject_links(reader)?;}
     if cancel.load(std::sync::atomic::Ordering::Relaxed){return invalid("Native extraction cancelled before input preparation");}
     let prepared_legacy=crate::legacy::normalized_extraction_input(source,inspection)?;
-    let mut inputs=ExtractInputs{legacy_input_sha256:prepared_legacy.as_ref().map(|(_,report)|report.input_sha256.clone()),schema_version:if direct_actor{4}else if prepared_legacy.is_some(){3}else if whole_cache{2}else{1},tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
-    if let Some(reader)=&actor_reader{inputs.tools.insert("invader-dependency".into(),maps::hash_file(reader)?);}
+    let mut inputs=ExtractInputs{legacy_input_sha256:prepared_legacy.as_ref().map(|(_,report)|report.input_sha256.clone()),schema_version:if tag.class=="vehi"{5}else if direct_asset{4}else if prepared_legacy.is_some(){3}else if whole_cache{2}else{1},tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
+    if let Some(reader)=&dependency_reader{inputs.tools.insert("invader-dependency".into(),maps::hash_file(reader)?);}
     if let Some(receipt)=reusable_extraction(managed_root,source,&project.id,&query,&inputs)?{return Ok(receipt);}
     let out_root=managed_root.join("tag-exchanges");
     reject_links(&out_root)?;fs::create_dir_all(&out_root)?;
@@ -271,17 +271,18 @@ pub fn extract_selected_tag(
             return invalid("Invader identifies the source cache as protected or unknown; extraction stopped");
         }
         let mut arguments=vec!["--tags".into(),tags.to_string_lossy().into_owned(),"--maps".into(),resources.to_string_lossy().into_owned()];
-        if whole_cache||direct_actor {arguments.push("--non-mp-globals".into());}
+        if whole_cache||direct_asset {arguments.push("--non-mp-globals".into());}
         else {arguments.extend(["--recursive".into(),"--search".into(),query.clone()]);}
         arguments.push(extraction_input.to_string_lossy().into_owned());
         runner.run(&executable,&arguments,&staging,"extract",70)?;
-        if let Some(reader)=&actor_reader {
-            let (all,_)=inventory(&tags)?;
-            let output=runner.run(reader,&["-t".into(),tags.to_string_lossy().into_owned(),"-r".into(),query.clone()],&staging,"actor-dependencies",72)?;
-            let wanted=actor_closure(&query,&output,&all)?;
-            if maps::hash_file(reader)?!=inputs.tools["invader-dependency"]{return invalid("Native actor dependency reader changed during extraction");}
+        if let Some(reader)=&dependency_reader {
+            let staging_limit=if source.cache_version==13{MAX_MCC_SCENARIO_FILES}else{MAX_FILES};
+            let (all,_)=inventory_with_limit(&tags,staging_limit)?;
+            let output=runner.run(reader,&["-t".into(),tags.to_string_lossy().into_owned(),"-r".into(),query.clone()],&staging,"asset-dependencies",72)?;
+            let wanted=direct_asset_closure(&query,&output,&all)?;
+            if maps::hash_file(reader)?!=inputs.tools["invader-dependency"]{return invalid("Native asset dependency reader changed during extraction");}
             // Only newly extracted files inside this request's owned staging.
-            // Do not retain a second complete map tag library for one actor.
+            // Retain only the selected asset and its checked native closure.
             for file in all.iter().filter(|file|!wanted.contains(&file.path)) {let path=tags.join(safe_relative(&file.path)?);reject_links(&path)?;fs::remove_file(path)?;}
         }
         let (files,total_bytes) = inventory_with_limit(&tags, extraction_file_limit(source.cache_version, &query))
@@ -484,9 +485,9 @@ mod tests {
     #[test]
     fn direct_actor_closure_refuses_missing_broken_or_escaping_dependencies(){
         let files=["actors/pilot.actor_variant","actors/body.biped"].map(|path|super::ExtractedFile{path:path.into(),bytes:1,sha256:"a".repeat(64)});
-        let selected=super::actor_closure("actors\\pilot.actor_variant","actors\\body.biped\n",&files).unwrap();
+        let selected=super::direct_asset_closure("actors\\pilot.actor_variant","actors\\body.biped\n",&files).unwrap();
         assert_eq!(selected.len(),2);
-        for output in ["actors/missing.biped\n","actors/body.biped [BROKEN]\n","../outside.biped\n"] {assert!(super::actor_closure("actors/pilot.actor_variant",output,&files).is_err());}
+        for output in ["actors/missing.biped\n","actors/body.biped [BROKEN]\n","../outside.biped\n"] {assert!(super::direct_asset_closure("actors/pilot.actor_variant",output,&files).is_err());}
     }
 
     use super::*;
