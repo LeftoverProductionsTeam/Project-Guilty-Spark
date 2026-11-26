@@ -3,10 +3,10 @@
 Task: Product Completion V2.1. P0 compact MegaWorld, P1 creator toolchain, P2 flagship game creation, P3 quality and compatibility.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 b120bb2 SHA-256 33ed688467a252ea777f0303579bf66e825bc39d635caeddb533e9287006d050. The packaged Windows editor drafted and reopened native terrain and picked both landing faces with ordinary viewport clicks. Save and Undo/Redo passed the focused editor check. Previous holds d130edf.
+Latest verified revision: Win64 Spark 871c4d9b. Native HMV 16 import, Save, reopen and exact export copy passed. Previous is 33ed6884. Forerunner EECBBD64 keeps exact 12649191 and fcfe9d44 MegaWorld ground preview.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native is a retained regression fixture. The 8ef8f62 checkpoint has the physical seat, flight and HUD evidence.
-Next action: native HMV 16 import, Save, reopen and runtime readback. Supported 1–7 and 11–16 round trips retain advanced records. Authoritative Forge operations and safe reload need runtime contracts. Private Spark d9381c9a showed the west-valley UV risk in the ordinary BSP preview. Manifold A/B emitted identical JMS. Keep Latest and the accepted ground preview. Validate partial overlaps, seams and a native Timberland–Blood Gulch crossing in parallel.
+Next action: finish native spawner/seat creation, vehicle placement flags and carrier gameplay A/B. Existing spawner/seat retargets and gravity passed edited Demo copy readback 219c7fcf. Original Demo b38f3550 and banks were rehashed. Both missing cues lie beyond the available sounds bank. Continue operation-level Forge and guarded reload and the compact Timberland–Blood Gulch join in parallel.
 
 PRODUCT COMPLETION V2.1 sets the current priorities. P0 is reliable compact world construction. P1 is the full creator toolchain. P2 is flagship game creation. P3 is product quality and compatibility. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Existing Be Native and stand-alone tests are retained regression fixtures. Reuse the existing Spark and Forerunner contracts and keep the current Latest ground preview playable.
 

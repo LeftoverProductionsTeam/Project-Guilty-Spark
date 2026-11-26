@@ -166,6 +166,7 @@ export const classNames: Record<string, string> = {
   matg: 'Globals',
   actv: 'Actor variant',
   coll: 'Collision model',
+  phys: 'Physics',
   eqip: 'Equipment',
   jpt: 'Damage effect',
 };

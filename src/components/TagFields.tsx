@@ -24,14 +24,17 @@ export default function TagFields({
     const target=tags.find(candidate=>candidate.id===id);
     return target ? renamedTagPath(project,target) : 'Unresolved reference · '+id;
   };
+  const usesCarrierReference = tag.fields.some(field => field.targetClass === 'actv' || field.targetClass === 'vehi');
   return tag.fields.length ? (
     <>
+      {usesCarrierReference && <p className="subtle">Choose a replacement from this map. Save an edited map copy and test it in the target game.</p>}
+      {tag.class === 'phys' && <p className="subtle">These coefficients apply to every object that uses this physics tag.</p>}
       {tag.fields.map((field) => {
         const value = fieldValue(project, tag, field),
           changed = value !== field.value;
-        const projectileField=field.kind==='reference'&&field.targetClass==='proj';
+        const detailedReference = field.kind === 'reference' && ['proj', 'actv', 'vehi'].includes(field.targetClass ?? '');
         const references=field.kind==='reference' ? tags.filter(candidate=>candidate.class===field.targetClass) : [];
-        if(projectileField)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
+        if(detailedReference)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
         const picker = field.kind === 'reference' && (
           <select
             id={`${prefix}-${field.key}`}
@@ -47,7 +50,7 @@ export default function TagFields({
               const path = renamedTagPath(project, candidate);
               return (
                 <option key={candidate.id} value={candidate.id}>
-                  {projectileField
+                  {detailedReference
                     ? <span>{shortPath(path)} · {path.split(/[\\/]/).slice(0, -1).join('/') || 'map root'}</span>
                     : shortPath(path)}
                 </option>
@@ -56,7 +59,7 @@ export default function TagFields({
           </select>
         );
         return (
-          <div className={['property-row', changed && 'changed', projectileField && 'property-row--projectile'].filter(Boolean).join(' ')} key={field.key}>
+          <div className={['property-row', changed && 'changed', detailedReference && 'property-row--projectile'].filter(Boolean).join(' ')} key={field.key}>
             <div>
               <label htmlFor={`${prefix}-${field.key}`}>{field.label}</label>
               <small>
@@ -69,7 +72,7 @@ export default function TagFields({
             </div>
             <div className="property-value">
               {field.kind === 'reference' ? (
-                projectileField ? (
+                detailedReference ? (
                   <div className="property-projectile-picker">
                     {picker}
                     <span className="property-projectile-path" aria-hidden="true">{referencePath(value)}</span>
@@ -99,13 +102,13 @@ export default function TagFields({
               <div className="property-diff">
                 <span>
                   {field.kind === 'reference'
-                    ? projectileField ? referencePath(field.value) : shortPath(referencePath(field.value))
+                    ? detailedReference ? referencePath(field.value) : shortPath(referencePath(field.value))
                     : formatNumber(field.value)}
                 </span>
                 <ArrowRight size={11} />
                 <strong>
                   {field.kind === 'reference'
-                    ? projectileField ? referencePath(value) : shortPath(referencePath(value))
+                    ? detailedReference ? referencePath(value) : shortPath(referencePath(value))
                     : formatNumber(value)}
                 </strong>
               </div>

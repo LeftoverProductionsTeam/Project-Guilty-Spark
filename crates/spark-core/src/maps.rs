@@ -1147,7 +1147,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         })
         .count();
     if legacy_spawners > 0 {
-        diagnostics.push(Diagnostic::warning("LEGACY_OBJECT_SPAWNERS", format!("{legacy_spawners} weapon tags instantiate non-projectile objects. Their observed dependencies are read-only; ordinary editing-kit compilers may reject this legacy mechanic and target-runtime behavior is unverified.")));
+        diagnostics.push(Diagnostic::warning("LEGACY_OBJECT_SPAWNERS", format!("{legacy_spawners} weapon tags instantiate non-projectile objects. Verified vehicle references can be retargeted to another vehicle in an edited cache copy. Ordinary editing-kit compilers may reject legacy spawner tags. Verify runtime behavior on the selected target.")));
     }
     let scenario_id = r.u32(start + 4)?;
     let scenario = tags
@@ -1743,6 +1743,20 @@ fn read_fields(
             )?;
         }
     }
+    if matches!(version, 5 | 6 | 7 | 13 | 609) && tag.class == "phys" {
+        // Only independent runtime coefficients. Mass and moment edits also
+        // require rebuilding the inertia matrices and per-point values.
+        space.pointer(space.address + (at - space.begin) as u32, 0x80)?;
+        for (offset, key, label, maximum) in [
+            (0x1c, "physics-gravity-scale", "Gravity scale", 1000.0),
+            (0x20, "physics-ground-friction", "Ground friction", 1000.0),
+            (0x28, "physics-ground-damping", "Ground damping fraction", 1.0),
+            (0x38, "physics-water-friction", "Water friction", 1000.0),
+            (0x48, "physics-air-friction", "Air friction", 1.0),
+        ] {
+            numeric(r, tag, at + offset, key, label, maximum, "")?;
+        }
+    }
     if matches!(version,5|6|7|13|609) && tag.class=="vehi" {
         // Native Vehicle inherits Unit (0x2f0); these fields are in the common
         // pinned HEK layout. Standard source fields, not runtime extensions.
@@ -1757,13 +1771,14 @@ fn read_fields(
         space.pointer(space.address + (at - space.begin) as u32, 752)?;
         reference(r, tag, at + 588, "Spawned actor", None, ids)?;
         let (seats, count) = space.block(r, at + 740, 284, 16)?;
+        let editable_seat_actor = (tag.class == "vehi" && matches!(version, 5 | 6 | 7 | 13 | 609)).then_some("actv");
         for i in 0..count {
             reference(
                 r,
                 tag,
                 seats + i * 284 + 248,
                 &format!("Seat {} · built-in actor", i + 1),
-                None,
+                editable_seat_actor,
                 ids,
             )?;
         }
@@ -1867,18 +1882,14 @@ fn read_fields(
                 Some("proj"),
                 ids,
             )?;
-            if r.fourcc(t + 0x94)? != "proj" {
-                // Historical spawner mods place a different object class in this
-                // slot. Expose the observed dependency without offering an edit
-                // or claiming the target runtime supports that legacy behavior.
-                reference(
-                    r,
-                    tag,
-                    t + 0x94,
-                    &format!("Trigger {} · legacy object spawner (read-only)", i + 1),
-                    None,
-                    ids,
-                )?;
+            let trigger_class = r.fourcc(t + 0x94)?;
+            if trigger_class != "proj" {
+                // A same-class edit keeps an existing legacy vehicle spawner.
+                // It does not turn a normal projectile trigger into an object spawner.
+                let carrier = (trigger_class == "vehi" && matches!(version, 5 | 6 | 7 | 13 | 609)).then_some("vehi");
+                let description = if carrier.is_some() { "legacy object spawner · vehicle" }
+                    else { "legacy object spawner (read-only)" };
+                reference(r, tag, t + 0x94, &format!("Trigger {} · {description}", i + 1), carrier, ids)?;
             }
         }
     }
