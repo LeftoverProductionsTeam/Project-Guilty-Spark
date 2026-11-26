@@ -5805,7 +5805,7 @@ async function mockRecoveredMission(page:Page,blueprint=false,beforeOpen?:(page:
   if(blueprint)m.projects.a.project.studio.missions=[];
   const missionSource={encounters:groups.map(name=>({name,initiallyCreated:false})),weapons:[{tagPath:'forerunner/be_native/technology',placements:[0,2],startingEquipment:false,objects:[{index:0,name:'be_technology',notPlacedAutomatically:true,createIssue:null},{index:2,name:'already_placed',notPlacedAutomatically:false,createIssue:'Automatic placement is enabled'}]},{tagPath:'weapons/pistol/pistol',placements:[1],startingEquipment:true,objects:[{index:1,name:'loadout_pistol',notPlacedAutomatically:true,createIssue:null}]}]};
   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
-   if(command==='native_tag_context'&&blueprint)return{projectId:'a',buildId:'mission-source',class:'scnr',tag:'level.scenario',tagSha256:'e'.repeat(64),sourceTarget:'gbx-custom',canAppendEncounter:true,protectedSquadEncounters:[],guidanceObjects:m.guidanceObjects??[],scenarioFlags:m.guidanceFlags??[],scenarioCommandLists:m.escortCommandLists??[],scenarioSquads:groups.map((encounterName,encounter)=>({encounter,encounterName,name:'squad',normalCount:1,insaneCount:1})),scenarioVolumes:areas.map(name=>({name,kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,4,4]}})),scenarioDevices:(m.missionFieldControls??['extraction_deploy','extraction_activate']).map((name:string,index:number)=>({name,class:'ctrl',index,nameIndex:index,tagPath:'device/control',position:[0,0,0],rotationRadians:[0,0,0]})),missionSource};
+   if(command==='native_tag_context'&&blueprint)return{projectId:'a',buildId:'mission-source',class:'scnr',tag:'level.scenario',tagSha256:'e'.repeat(64),sourceTarget:'gbx-custom',canAppendEncounter:true,protectedSquadEncounters:[],guidanceObjects:m.guidanceObjects??[],scenarioFlags:m.guidanceFlags??[],scenarioCommandLists:m.escortCommandLists??[],scenarioSquads:groups.map((encounterName,encounter)=>({encounter,encounterName,name:'squad',normalCount:1,insaneCount:1})),scenarioVolumes:(m.missionFieldZones??areas).map((name:string)=>({name,kind:1,geometry:{forward:[1,0,0],up:[0,0,1],corner:[0,0,0],dimensions:[4,4,4]}})),scenarioDevices:(m.missionFieldControls??['extraction_deploy','extraction_activate']).map((name:string,index:number)=>({name,class:'ctrl',index,nameIndex:index,tagPath:'device/control',position:[0,0,0],rotationRadians:[0,0,0]})),missionSource};
 
    if(command==='runtime_workbench_report'){const value=await invoke(command,args);value.sourceIssue=null;value.toolsIssue=null;value.workingSource={target:'gbx-custom',buildId:'mission-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64)};return value;}
    if(command==='working_script_sources'){m.missionReads++;if(blueprint)return{projectId:'a',buildId:'mission-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64),sourceSha256:'d'.repeat(64),modules:[...(m.insertionController&&!m.insertionMissing?[{filename:'gs_'+m.insertionRole+'_transport.hsc',sha256:'b'.repeat(64),bytes:m.insertionController.length,unavailable:null}]:[]),...(m.recoveredModule?[{filename:m.recoveredModule.filename,sha256:m.recoveredModule.sha256,bytes:m.recoveredModule.content.length,unavailable:null}]:[])],cameraReview:{tagIdentity:'e'.repeat(64),scenarioType:0,cameras:[],scriptNames:m.recoveredNames??['original'],triggerVolumes:m.missionFieldZones??areas},missionReview:{collectorAdvisories:m.collectorAdvisories,objects:m.guidanceObjects??[],flags:m.guidanceFlags??[],extractionSquads:m.scopedTerminals??[],weapons:missionSource.weapons,encounters:missionSource.encounters,squads:groups.map((encounterName,encounter)=>({encounter,encounterName,name:'squad',normalCount:1,insaneCount:1})),devices:[...(m.missionFieldControls??['extraction_deploy','extraction_activate']),...(m.scopedTerminals??[]).map((row:any)=>'extraction_squad_'+String(row.terminal.number).padStart(2,'0'))].map(name=>({name,class:'ctrl'})),protectedEncounters:[],escortRoutes:m.escortRoutes??null}};return{projectId:'a',buildId:'mission-source',tagsDirectory:'owned/tags',projectFingerprint:'c'.repeat(64),sourceSha256:'d'.repeat(64),modules:m.missionFlags.handwritten?[{filename:'gs_mission.hsc',sha256:'a'.repeat(64),bytes:128,unavailable:null}]:[],cameraReview:{tagIdentity:(m.missionFlags.stale&&m.missionReads>1?'f':'e').repeat(64),scenarioType:0,cameras:[],scriptNames:m.missionFlags.collision?['original','GS_MISSION']:['original'],triggerVolumes:['pad']},missionReview:{collectorAdvisories:m.collectorAdvisories,encounters:[{name:'guards',initiallyCreated:m.missionFlags.active}],squads:m.missionFlags.missing?[]:[{encounter:0,squad:0,encounterName:'guards',name:'squad',normalCount:1,insaneCount:1}],devices:[],protectedEncounters:m.missionFlags.protected?['guards']:[]}};}
@@ -5885,6 +5885,29 @@ test('recovered mission prepares the selected faction evacuation control',async(
  const editor=page.locator('.native-script-attachment').filter({has:form}).getByRole('textbox',{name:'Edit source',exact:true});
  await expect(editor).toContainText('(device_set_power extraction_spirit_activate 1)');
  await expect(editor).not.toContainText('(device_set_power extraction_activate');
+});
+
+test('Black Echo blueprint connects a dedicated Spirit field without a shared control',async({page})=>{
+ await mockRecoveredMission(page,true,async page=>{
+  await page.evaluate(()=>{
+   const m=(window as any).__sparkMock;
+   m.missionFieldControls=['extraction_deploy','extraction_spirit_activate'];
+   m.missionFieldZones=['be_insert','be_survivors','be_artifact','be_containment','be_extract','extraction_return','extraction_spirit_zone'];
+  });
+ });
+ const read=page.getByRole('button',{name:'Read native Black Echo source',exact:true});
+ await revealPagedControl(read);await read.click();
+ const roles=page.getByText('Black Echo faction & encounters',{exact:true});
+ await revealPagedControl(roles);await roles.click();
+ await page.getByRole('combobox',{name:'Black Echo faction',exact:true}).selectOption('covenant');
+ const connect=page.getByRole('button',{name:'Connect Forerunner Black Echo objectives',exact:true});
+ await revealPagedControl(connect);await connect.click();
+ await openMissionBeats(page);
+ await expect(page.getByRole('combobox',{name:'Mission arrival source 1',exact:true})).toHaveValue('spirit');
+ await expect(page.locator('.studio-mission-record').first().getByLabel('Scenario trigger-volume identifier',{exact:true})).toHaveValue('extraction_spirit_zone');
+ await expect(page.getByRole('combobox',{name:'Mission evacuation control 7',exact:true})).toHaveValue('extraction_spirit_activate');
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.missions?.[6]?.triggerRef)).toBe('extraction_spirit_activate');
 });
 
 test('recovered escort route survives history and reopening and refuses an out-of-rally final stop',async({page})=>{

@@ -19,7 +19,8 @@ describe('Project-integrated Creator Studio', () => {
       {...base,class:'ctrl',index:3,name:'extraction_squad_22'},
       {...base,class:'ctrl',index:4,name:'extraction_squad_23'},
     ]);
-    expect(review.missing).toEqual(['extraction_activate']);
+    expect(review.missing).toEqual(['evacuation control']);
+    expect(extractionTerminalReview([{...base,class:'ctrl',index:1,name:'extraction_deploy'},{...base,class:'ctrl',index:2,name:'extraction_spirit_activate'}]).missing).toEqual([]);
     expect(review.terminals.map(row=>[row.purpose,row.issue,row.canLocate])).toEqual([
       ['Deploy','Duplicate scenario name',false],
       ['Review loadout',null,true],
@@ -388,6 +389,16 @@ it('authors and connects the complete recovered Black Echo blueprint without rep
  const cov=connectBlackEchoObjectives(covenantDraft,()=>'',withSpirit);
  expect(cov.studio!.missions[0]).toMatchObject({id:covenantDraft.studio!.missions[0].id,trigger:'triggerVolume',triggerRef:'spirit_zone',transportInsertion:'spirit'});
  expect(connectBlackEchoObjectives(cov,()=>'',withSpirit)).toBe(cov);
+ const dedicated=structuredClone(withSpirit);
+ dedicated.scenarioDevices![1].name='extraction_spirit_activate';
+ dedicated.scenarioVolumes=dedicated.scenarioVolumes!.filter(row=>row.name!=='extraction_zone');
+ dedicated.scenarioVolumes.push({...field,name:'extraction_spirit_zone'});
+ const connectedDedicated=connectBlackEchoObjectives(covenantDraft,()=>'',dedicated);
+ expect(connectedDedicated.studio!.missions[0]).toMatchObject({triggerRef:'extraction_spirit_zone',transportInsertion:'spirit'});
+ expect(connectedDedicated.studio!.missions[6].triggerRef).toBe('extraction_spirit_activate');
+ expect(connectBlackEchoObjectives(connectedDedicated,()=>'',dedicated)).toBe(connectedDedicated);
+ const partial={...dedicated,scenarioDevices:[dedicated.scenarioDevices![0]]};
+ expect(()=>connectBlackEchoObjectives(covenantDraft,()=>'',partial)).toThrow(/extraction control: extraction_spirit_activate/);
  expect(JSON.stringify(covenantDraft.studio!.missions[0])).not.toContain('spirit_zone');
  for(const kind of ['active','recipe','missing','stale','malformed'] as const){const bad=structuredClone(source);if(kind==='active')bad.missionSource!.encounters[0].initiallyCreated=true;if(kind==='recipe')bad.protectedSquadEncounters=['be_marines'];if(kind==='missing')bad.scenarioVolumes!.shift();if(kind==='stale')bad.buildId='other';if(kind==='malformed')bad.missionSourceIssue='Unreadable profile';expect(()=>addBlackEchoDraft(project,()=>'',bad)).toThrow();}
  expect(()=>connectBlackEchoObjectives(draft,()=>'',{...source,sourceTarget:'mcc-cea'})).toThrow(/CE609/);

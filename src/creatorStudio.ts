@@ -5,7 +5,7 @@ import type {NativeTagContext} from './nativeOperations';
  * Halo CE server commands are exported ONLY as a validated, user-reviewed
  * plaintext draft. The other runtime families deliberately have no exporter.
  */
-import {addLogicTrigger,setNativeLogicName} from './nativeLogic.ts';
+import {addLogicTrigger,missionExtractionFields,setNativeLogicName} from './nativeLogic.ts';
 import type {Project} from './types';
 import {validMachinimaSettings} from './machinima.ts';
 
@@ -48,7 +48,9 @@ export function extractionTerminalReview(devices: NonNullable<NativeTagContext['
       canLocate: tagClass === 'ctrl' && !!name && !duplicate,
     }];
   });
-  return {terminals, missing: ['extraction_deploy','extraction_activate'].filter(name => !seen.has(name))};
+  const missing = ['extraction_deploy'].filter(name => !seen.has(name));
+  if(!missionExtractionFields.some(field=>seen.has(field.control)))missing.push('evacuation control');
+  return {terminals, missing};
 }
 
 /** Native radio cue: imported snd! closure, not a separate audio engine. */
@@ -253,15 +255,33 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
   if(pelicans.length>1||pelicans.some(row=>row.name!=='extraction_pelican'||row.class!=='vehi'))throw Error('Use one named native Pelican vehicle: extraction_pelican. Review the current scenario names before connecting.');
   if(pelicans.length===1)arrival={transport:'pelican',pad:'extraction_zone',aircraft:'Pelican'};
  }
- const arrivalPad=arrival?.pad??(authoredArrival?insertion.triggerRef:null);
+ let evacuation: string=missionExtractionFields[0].control;
  if(!forge||forge.native){
   requireNativeBlackEcho(base,nativeSource,{rescue:beats[1].encounterName,facility:beats[2].encounterName,defense:beats[5].encounterName});if(nativeSource!.sourceTarget!=='gbx-custom')throw Error('Forerunner settlement requires reviewed standard CE609 solo source; other engines do not provide its callback.');
-  for(const name of ['extraction_return','extraction_zone'])if(nativeSource!.scenarioVolumes?.filter(row=>row.name===name&&row.kind===1&&row.geometry).length!==1)throw Error('Author a unique readable native extraction pad: '+name);
+  const [sharedField,pelicanField,spiritField]=missionExtractionFields;
+  const factionField=covenant?spiritField:pelicanField;
+  const named=(name:string)=>nativeSource.scenarioDevices?.filter(row=>row.name.toLowerCase()===name)??[];
+  const areas=(name:string)=>nativeSource.scenarioVolumes?.filter(row=>row.name.toLowerCase()===name)??[];
+  const hasFactionRoute=named(factionField.control).length>0||areas(factionField.zone).length>0;
+  const field=beats[6].trigger==='manual'
+    ?beats[6].squadNumber==null&&hasFactionRoute?factionField:sharedField
+    :missionExtractionFields.find(row=>row.control===beats[6].triggerRef);
+  if(!field)throw Error('Select a supported native evacuation control in the final objective.');
+  evacuation=field.control;
+  if(arrival&&hasFactionRoute)arrival.pad=factionField.zone;
+  const arrivalPad=arrival?.pad??(authoredArrival?insertion.triggerRef:null);
+  for(const name of ['extraction_return',field.zone]){
+   const pads=areas(name);
+   if(pads.length!==1||pads[0].name!==name||pads[0].kind!==1||!pads[0].geometry)throw Error('Author a unique readable native extraction pad: '+name);
+  }
   if(arrivalPad){
-   const pads=nativeSource.scenarioVolumes?.filter(row=>row.name.toLowerCase()===arrivalPad.toLowerCase())??[];
+   const pads=areas(arrivalPad.toLowerCase());
    if(pads.length!==1||pads[0].name!==arrivalPad||pads[0].kind!==1||!pads[0].geometry)throw Error('Author a unique readable native arrival pad: '+arrivalPad+'. Accept, build and read native source again.');
   }
-  for(const name of ['extraction_deploy','extraction_activate'])if(nativeSource!.scenarioDevices?.filter(row=>row.name===name&&row.class==='ctrl').length!==1)throw Error('Author a unique native extraction control: '+name);
+  for(const name of ['extraction_deploy',field.control]){
+   const controls=named(name);
+   if(controls.length!==1||controls[0].name!==name||controls[0].class!=='ctrl'||controls[0].interactionDisabled)throw Error('Author a unique usable native extraction control: '+name);
+  }
  }else if(forge.gameMode!=='campaign'||!['haloCustomEdition','chupathingyCe'].includes(forge.runtimeId))throw Error('Choose an editable standard Custom Edition campaign build target for Forerunner. Other runtimes do not provide its settled-extraction callback.');
  const pickup=beats[3],containment=beats[4];
  const useContainmentVisit=containment.conditionVolume==='be_containment'&&
@@ -280,7 +300,7 @@ export function connectBlackEchoObjectives(project:Project,nextId:()=>string,nat
    hudText:useContainmentVisit&&beat.hudText==='Recover classified technology'?'Recover the technology. Visit the containment area before pickup to investigate the Flood.':beat.hudText};
   if(index===4&&useContainmentVisit)return {...beat,conditionVisitDuring:pickup.id,
    objective:'This optional encounter runs if anyone visited the containment area during technology recovery. Otherwise continue to extraction defense.'};
-  if(index===6&&beat.trigger==='manual')return {...beat,trigger:'forerunnerExtractionSettled',triggerRef:'extraction_activate',
+  if(index===6&&beat.trigger==='manual')return {...beat,trigger:'forerunnerExtractionSettled',triggerRef:evacuation,
    objective:'Activate evacuation after the objectives, then physically return to the hub. Forerunner completes this objective only after surviving players and gear settle.'};
   return beat;
  });
