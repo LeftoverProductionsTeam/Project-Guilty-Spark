@@ -385,10 +385,6 @@ export default function BspAssembly({
   const atlasDonor=atlasBase&&draft&&placedLayout&&atlasAdjacentRegions(placedLayout.regions,atlasBase)
     .find(region=>region.cacheSha256===draft.donorSource.sha256&&region.bspIndex===draft.donorBspIndex);
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
-  const savedPlan = project.bspAssembly;
-  const donorPositionApplied = !!draft && !!savedPlan && draft.donorProjectId === savedPlan.donorProjectId
-    && draft.donorBspIndex === savedPlan.donorBspIndex && draft.yawDegrees === savedPlan.yawDegrees
-    && draft.translation.every((axis, index) => axis === savedPlan.translation[index]);
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
@@ -425,7 +421,9 @@ export default function BspAssembly({
         const points=draft.highGround.points;
         update({highGround:{...draft.highGround,points:points.map((old,index)=>index===(base?0:points.length-1)?point:old)}});
       } else {
-        update({ tunnelPoints: draft.tunnelPoints.map((old, index) => index === (base ? 0 : 1) ? point : old) });
+        if (!routeDraft) return;
+        const points = routeDraft.tunnelPoints;
+        updateRoute({ tunnelPoints: points.map((old, index) => index === (base ? 0 : points.length - 1) ? point : old) });
       }
       setEdgeTarget(null);
       setPickingLanding(null);
@@ -680,7 +678,7 @@ export default function BspAssembly({
               </details>
               {!draft.separateNativeBsps && <>
               <div className="bsp-actions" aria-label="Connection routes">
-                <label>Route <select aria-label="Connection route" value={selectedSection?`section:${selectedSection.id}`:infantry?'infantry':ridge?'highGround':'primary'} onChange={e=>setRouteView(e.target.value as typeof routeView)} disabled={busy}>
+                <label>Route <select aria-label="Connection route" value={selectedSection?`section:${selectedSection.id}`:infantry?'infantry':ridge?'highGround':'primary'} onChange={e=>setRouteView(e.target.value as typeof routeView)} disabled={busy||!!pickingLanding}>
                   <option value="primary">{draft.openRoad?'Primary road':'Primary tunnel'}</option>
                   {draft.infantryTunnel&&<option value="infantry">Infantry tunnel</option>}
                   {draft.highGround&&<option value="highGround">High-ground route</option>}
@@ -900,6 +898,14 @@ export default function BspAssembly({
                 the section transform; matching editable tags are required. Donor weapons, vehicles,
                 objectives, scripts and named-object bindings are separate.
               </p>
+              {!ridge && (!draft.separateNativeBsps || canExtend && baseParts.length <= 14) && (
+                <div className="bsp-actions" aria-label="Pick connection landings">
+                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'base'}
+                    onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
+                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'donor'}
+                    onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
+                </div>
+              )}
               <div className="bsp-waypoints">
                 {routeDraft!.tunnelPoints.map((point, i) => (
                   <div key={i}>
@@ -995,11 +1001,7 @@ export default function BspAssembly({
                     </label>}
                     <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
-                    <div className="bsp-actions">
-                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
-                      <button type="button" disabled={busy || !selectionMatches || !donorPositionApplied} onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
-                    </div>
-                    <p className="subtle">Apply the donor position before picking landings. Adjust either floor point with the coordinate fields. With preservation enabled, apply and save the connection, then build for MCC13. The connector gets its own BSP slot. For an enclosed tunnel, add bends to route around stock geometry. Leave straight space around each landing for the native switches.</p>
+                    <p className="subtle">With preservation enabled, apply and save the connection, then build for MCC13. The connector gets its own BSP slot. Leave straight space around each landing for the native switches.</p>
                   </div>}
                   {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
                     onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>

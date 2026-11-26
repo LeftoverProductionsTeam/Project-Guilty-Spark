@@ -3935,6 +3935,54 @@ test('Construction applies and saves a flat land bridge with a separate cave', a
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.bspAssembly??null)).toBeNull();
 });
 
+test('Construction picks the two draft landings without moving an authored bend', async ({page}) => {
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{
+  const w=window as any, invoke=w.__TAURI_INTERNALS__.invoke;
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   const value=await invoke(command,args);
+   if(command!=='plan_bsp_assembly')return value;
+   w.__landingDonorHash=value.donorSource.sha256;
+   return {...value,translation:[5,10,2],yawDegrees:90,tunnelPoints:[[0,0,0],[3,2,0],[8,4,1]]};
+  };
+ });
+ await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
+ const panel=page.getByRole('region',{name:'Construction panel',exact:true});
+ const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
+ await (await constructionControl(page,'button','Plan connected tunnel')).click();
+ await (await constructionControl(page,'button','Pick donor landing')).click();
+ const cancel=page.getByRole('button',{name:'Cancel landing selection',exact:true});
+ await expect(cancel).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.some((row:any)=>row.command==='open_bsp_assembly_donor'))).toBe(true);
+ await page.evaluate(async()=>{
+  const module='/src/mapSession.ts';
+  const {writeMapSession}=await import(module);
+  writeMapSession('a','world.surface-selection',{sourceHash:'f'.repeat(64),bspIndex:0,shaderTagId:1,triangle:0,point:[1,0,2]});
+ });
+ await expect(cancel).toBeVisible();
+ await page.evaluate(async()=>{
+  const module='/src/mapSession.ts';
+  const {writeMapSession}=await import(module);
+  writeMapSession('a','world.surface-selection',{sourceHash:(window as any).__landingDonorHash,bspIndex:0,shaderTagId:1,triangle:0,point:[1,0,2]});
+ });
+ await expect(cancel).toBeHidden();
+ await (await constructionControl(page,'button','Pick current BSP landing')).click();
+ await expect(cancel).toBeVisible();
+ await page.evaluate(async()=>{
+  const module='/src/mapSession.ts';
+  const {writeMapSession}=await import(module);
+  writeMapSession('a','world.surface-selection',{sourceHash:(window as any).__sparkMock.projects.a.project.source.sha256,bspIndex:0,shaderTagId:1,triangle:0,point:[-1,-2,0]});
+ });
+ await expect(cancel).toBeHidden();
+ await (await constructionControl(page,'button','Apply connection')).click();
+ await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.tunnelPoints)).toEqual([[-1,-2,0],[3,2,0],[5,11,4]]);
+ await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly??null)).toBeNull();
+ await page.keyboard.press('Control+Shift+z');await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.tunnelPoints)).toEqual([[-1,-2,0],[3,2,0],[5,11,4]]);
+});
+
 test('three-route Construction controls use one reachable scrolling drawer',async({page})=>{
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
  const panel=page.getByRole('region',{name:'Construction panel',exact:true});const summary=panel.locator('.bsp-assembly>summary');await revealPagedControl(summary);await summary.click();
