@@ -49,6 +49,7 @@ fn main() -> Result<()> {
         quad(&mut mesh, &mut slots, p, 0);
     }
     let mut geometry = AssemblyGeometry {
+        exact_sky_portals: Vec::new(),
         mesh,
         triangle_materials: slots,
         materials: vec![AssemblyMaterial {

@@ -562,6 +562,10 @@ pub fn run_with_reviewed_runtime(
     connection_plans.push(plan.clone());
     let routes = crate::bsp_assembly::verify_compiled_routes(&file, &connection_plans)?;
     let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
+    let verified_sky_portals = crate::bsp_assembly::verify_compiled_sky_portals(&manifest, &file, &compiled)?;
+    if verified_sky_portals > 0 {
+        runner.emit("sky-portal-readback", format!("{verified_sky_portals} restored doorway outlines matched the compiled cluster boundaries"), 92, "success");
+    }
     let imported_teleporters = crate::bsp_netgame_flags::verify_merged_manifest(&manifest,&file,&compiled)?;
     if let Some(report)=imported_teleporters { project::atomic_write(&dir.join("teleporter-readback.json"), &serde_json::to_vec_pretty(&report)?, false)?; }
     if let Some(report) = crate::bsp_pickups::verify_merged_manifest(&manifest, &file, &compiled)? {

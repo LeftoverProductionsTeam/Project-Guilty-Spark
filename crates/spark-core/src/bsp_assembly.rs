@@ -303,6 +303,7 @@ pub struct AssemblyGeometry {
     pub mesh: MeshData,
     pub materials: Vec<AssemblyMaterial>,
     pub triangle_materials: Vec<usize>,
+    pub exact_sky_portals: Vec<Vec<V>>,
     pub report: AssemblyReport,
 }
 /// The editor displays this same validated source mesh, using each original
@@ -1024,11 +1025,14 @@ fn generate_end(
         assembly.terrain_seam.as_ref().map(|_|terrain::render_edge(&donor,assembly.donor_bsp_index,false).map(|edge|edge-0.25+assembly.translation[0])).transpose()?,
         partition.map(|(seam, end)| (end, seam.separation_axis)),
     )?;
-    if assembly.restore_donor_sky_portals && !matches!(partition, Some((_, PartitionEnd::Base))) {
-        portal_count += append_donor_sky_portals(
-            assembly, &donor, &mut mesh, &mut materials, &mut triangle_materials,
-        )?;
-    }
+    let exact_sky_portals = if assembly.restore_donor_sky_portals {
+        donor_sky_portal_outlines(assembly, &donor)?
+    } else {
+        Vec::new()
+    };
+    portal_count += append_exact_portals(
+        &exact_sky_portals, &mut mesh, &mut materials, &mut triangle_materials,
+    )?;
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
@@ -1038,7 +1042,7 @@ fn generate_end(
     } else {
         "This rebuild regenerates collision, portals and lightmaps. Original per-cluster weather, sound and render-only details require review. Donor scenery is optional. Campaign actors, scripts and gameplay objects are outside this build."
     };
-    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials}, overlap_floor))
+    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials,exact_sky_portals}, overlap_floor))
 }
 fn is_source_surface_effect(tag: &maps::Tag) -> bool {
     if tag.class == "swat" {
@@ -1332,18 +1336,15 @@ fn add_portals(
     }
     Ok(count)
 }
-fn append_donor_sky_portals(
-    plan: &BspAssembly,
-    donor: &MapInspection,
-    mesh: &mut MeshData,
-    materials: &mut Vec<AssemblyMaterial>,
-    slots: &mut Vec<usize>,
-) -> Result<usize> {
+fn donor_sky_portal_outlines(plan: &BspAssembly, donor: &MapInspection) -> Result<Vec<Vec<V>>> {
+    if plan.donor_source.sha256 != donor.sha256 {
+        return invalid("Restored sky portal donor changed after it was selected");
+    }
     let path = &plan.donor_source.preserved_path;
     let source = crate::bsp_audio::inspect_ambience_for_bsp(path, &donor.sha256, Some(plan.donor_bsp_index))?;
     let clusters = &source.bsps.first().ok_or_else(|| SparkError::Invalid("Donor BSP has no native visibility data".into()))?.clusters;
     let portals = maps::compiled_portals(path, donor, plan.donor_bsp_index)?;
-    let cuts = portals.into_iter().enumerate().filter_map(|(index, portal)| {
+    portals.into_iter().enumerate().filter_map(|(index, portal)| {
         let front = clusters.get(usize::try_from(portal.front_cluster).ok()?)?;
         let back = clusters.get(usize::try_from(portal.back_cluster).ok()?)?;
         (front.sky != back.sky).then_some((index, portal))
@@ -1351,9 +1352,18 @@ fn append_donor_sky_portals(
         if portal.flags != 0 {
             return invalid(format!("Donor sky portal {index} has native flags that require source review"));
         }
-        let points = portal.ring.into_iter().map(|point| transform(point, plan.translation, plan.yaw_degrees)).collect::<Vec<_>>();
-        let triangles = crate::bsp_visibility::exact_outline_triangles(&points)
-            .map_err(|err| SparkError::Invalid(format!("Donor sky portal {index}: {err}")))?;
+        Ok(portal.ring.into_iter().map(|point| transform(point, plan.translation, plan.yaw_degrees)).collect())
+    }).collect()
+}
+
+fn append_exact_portals(
+    outlines: &[Vec<V>],
+    mesh: &mut MeshData,
+    materials: &mut Vec<AssemblyMaterial>,
+    slots: &mut Vec<usize>,
+) -> Result<usize> {
+    let cuts = outlines.iter().map(|points| {
+        let triangles = crate::bsp_visibility::exact_outline_triangles(points)?;
         Ok((points, triangles))
     }).collect::<Result<Vec<_>>>()?;
     let triangles: usize = cuts.iter().map(|(_, indices)| indices.len()).sum();
@@ -1380,7 +1390,7 @@ fn append_donor_sky_portals(
         let [a, b, c] = triangles[0].map(|index| points[index]);
         let n = normal(a, b, c);
         let first = (mesh.positions.len() / 3) as u32;
-        for point in points {
+        for point in *points {
             mesh.positions.extend(point.map(|axis| axis as f32));
             mesh.normals.extend(n.map(|axis| axis as f32));
             mesh.uvs.extend([0., 0.]);
@@ -1411,6 +1421,81 @@ pub fn generate_project(
     Ok(geometry)
 }
 
+fn same_portal_perimeter(a: &[V], b: &[V]) -> bool {
+    // Tool can subdivide polygon edges when it welds the exact portal to
+    // adjacent structure triangles. Compare continuous edges in both directions.
+    const TOLERANCE_SQUARED: f64 = 0.002 * 0.002;
+    let is_on_boundary = |point, ring: &[V]| {
+        ring.iter().zip(ring.iter().cycle().skip(1)).any(|(&start, &end)| {
+            let edge = sub(end, start);
+            let length_squared = dot(edge, edge);
+            let offset = sub(point, start);
+            let residual = if length_squared > 0. {
+                sub(offset, mul(edge, (dot(offset, edge) / length_squared).clamp(0., 1.)))
+            } else {
+                offset
+            };
+            dot(residual, residual) <= TOLERANCE_SQUARED
+        })
+    };
+    a.len() >= 3 && b.len() >= 3
+        && a.iter().all(|&point| is_on_boundary(point, b))
+        && b.iter().all(|&point| is_on_boundary(point, a))
+}
+
+fn match_compiled_sky_portal(
+    outline: &[V],
+    compiled: &[maps::CompiledPortal],
+    matched: &mut std::collections::BTreeSet<usize>,
+) -> Result<()> {
+    let mut candidates = compiled.iter().enumerate().filter(|(_, portal)| {
+        portal.flags == 0 && portal.front_cluster >= 0 && portal.back_cluster >= 0
+            && portal.front_cluster != portal.back_cluster
+            && same_portal_perimeter(outline, &portal.ring)
+    });
+    let Some((index, _)) = candidates.next() else {
+        return invalid("Compiled BSP is missing a restored sky portal between distinct clusters");
+    };
+    if candidates.next().is_some() || !matched.insert(index) {
+        return invalid("Compiled BSP has overlapping restored sky portals");
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_compiled_sky_portals(
+    manifest: &serde_json::Value,
+    path: &Path,
+    map: &MapInspection,
+) -> Result<usize> {
+    let Some(value) = manifest.get("exactSkyPortals") else { return Ok(0) };
+    let outlines: Vec<Vec<V>> = serde_json::from_value(value.clone())?;
+    if outlines.is_empty() { return Ok(0); }
+    let compiled = maps::compiled_portals(path, map, 0)?;
+    let mut matched = std::collections::BTreeSet::new();
+    for outline in &outlines {
+        match_compiled_sky_portal(outline, &compiled, &mut matched)?;
+    }
+    Ok(matched.len())
+}
+
+fn inherited_sky_portals(
+    connections: &[BspAssembly],
+    compiled: &[maps::CompiledPortal],
+) -> Result<(Vec<Vec<V>>, std::collections::BTreeSet<usize>)> {
+    let mut outlines = Vec::new();
+    let mut matched = std::collections::BTreeSet::new();
+    for plan in connections.iter().filter(|plan| plan.restore_donor_sky_portals) {
+        let source = &plan.donor_source;
+        let donor = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
+        for outline in donor_sky_portal_outlines(plan, &donor)? {
+            match_compiled_sky_portal(&outline, compiled, &mut matched)
+                .map_err(|err| SparkError::Invalid(format!("Inherited {} sky portal: {err}", plan.donor_title)))?;
+            outlines.push(outline);
+        }
+    }
+    Ok((outlines, matched))
+}
+
 fn retain_base_portals(project: &Project, base: &MapInspection, geometry: &mut AssemblyGeometry) -> Result<()> {
     if !project.inherited_bsp_connections.is_empty() {
         let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing base source".into()))?;
@@ -1420,10 +1505,16 @@ fn retain_base_portals(project: &Project, base: &MapInspection, geometry: &mut A
             return invalid("Retaining visibility cuts requires a single compiled BSP");
         }
         let rings = maps::compiled_portals(&source.preserved_path, base, 0)?;
-        let cuts: Vec<_> = rings.iter().filter(|portal| portal.flags == 0)
-            .filter_map(|portal| crate::bsp_visibility::retained_tunnel_quad(&portal.ring).ok())
+        let (exact, matched) = inherited_sky_portals(&project.inherited_bsp_connections, &rings)?;
+        let cuts: Vec<_> = rings.iter().enumerate()
+            .filter(|(index, portal)| !matched.contains(index) && portal.flags == 0)
+            .filter_map(|(_, portal)| crate::bsp_visibility::retained_tunnel_quad(&portal.ring).ok())
             .collect();
-        let needs_review = rings.len() - cuts.len();
+        let needs_review = rings.len() - cuts.len() - matched.len();
+        geometry.report.portal_count += append_exact_portals(
+            &exact, &mut geometry.mesh, &mut geometry.materials, &mut geometry.triangle_materials,
+        )?;
+        geometry.exact_sky_portals.extend(exact);
         if needs_review > 0 {
             geometry.report.warnings.push(format!(
                 "{needs_review} inherited portal outlines need source review. This rebuild retains the simple tunnel cuts and regenerates visibility for the rest.",
@@ -1679,7 +1770,7 @@ pub fn generate_preserved_connector(
             2. * landings[0].1, 2. * landings[1].1, landings[0].2.max(landings[1].2))],
     };
     Ok(PreservedConnector {
-        geometry: AssemblyGeometry { mesh, materials, triangle_materials, report },
+        geometry: AssemblyGeometry { mesh, materials, triangle_materials, exact_sky_portals: Vec::new(), report },
         switches,
         overlaps,
     })
@@ -2869,7 +2960,7 @@ mod tests {
         assert_eq!(add_portals(&mut mesh,&mut materials,&mut slots,&plan,&base,&donor,None,None).unwrap(),2);
         assert_eq!(mesh.positions[0],3.);
         assert_eq!(mesh.positions[12],7.);
-        let geometry=AssemblyGeometry{mesh,materials,triangle_materials:slots,report:AssemblyReport{input_triangles:0,output_triangles:4,connector_triangles:0,generated_uv_faces:0,walk_samples:0,portal_count:2,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
+        let geometry=AssemblyGeometry{exact_sky_portals: vec![],mesh,materials,triangle_materials:slots,report:AssemblyReport{input_triangles:0,output_triangles:4,connector_triangles:0,generated_uv_faces:0,walk_samples:0,portal_count:2,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
         assert!(export_jms(&geometry).unwrap().contains("+portal\r\n<none>\r\n"));
         if let crate::bsp_visibility::VisibilityZone::Tunnel{start,..}=&mut plan.visibility_zones[0]{*start=0.05;}
         assert!(add_portals(&mut MeshData::default(),&mut vec![],&mut vec![],&plan,&base,&donor,None,None).is_err());
@@ -3254,6 +3345,18 @@ mod tests {
         assert!(verify_route(&mesh,&plan).unwrap_err().to_string().contains("Infantry tunnel"));
     }
     #[test]
+    fn restored_sky_portal_matches_only_its_native_perimeter() {
+        let trapezoid = [[4., 0., 0.], [4., 0.2, 1.], [4., 1.1, 1.], [4., 1.3, 0.]];
+        let split = [[4.000031, 0., 0.], [4.000031, 0.1, 0.5], [4.000031, 0.2, 1.],
+            [4.000031, 1.1, 1.], [4.000031, 1.3, 0.]];
+        assert!(same_portal_perimeter(&trapezoid, &split));
+        let mut moved = split;
+        moved[1][1] += 0.04;
+        assert!(!same_portal_perimeter(&trapezoid, &moved));
+        assert!(!same_portal_perimeter(&trapezoid, &split.map(|[x,y,z]| [x+0.01,y,z])));
+    }
+
+    #[test]
     fn secondary_portals_cannot_hide_a_primary_route_without_isolated_cuts() {
         let mut plan=dual_route_plan();
         plan.infantry_tunnel=Some(InfantryTunnel{points:vec![[0.,0.,0.],[25.,8.,0.],[75.,8.,0.],[100.,0.,0.]],width:2.,height:1.6,shader_path:"fixture/stone".into()});
@@ -3440,7 +3543,7 @@ mod tests {
  }
  #[test] fn joined_preview_keeps_each_native_shader_owner_world_positions_uvs_and_unbaked_status(){
   let mesh=MeshData{positions:vec![0.,0.,0.,1.,0.,0.,0.,1.,0.],normals:vec![0.,0.,1.,0.,0.,1.,0.,0.,1.],uvs:vec![0.,0.,1.,0.,0.,1.],indices:vec![0,1,2,0,1,2,0,1,2],..Default::default()};
-  let mut geometry=AssemblyGeometry{mesh,materials:vec![AssemblyMaterial{name:"base".into(),source:0,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"donor".into(),source:1,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"+portal".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}],triangle_materials:vec![0,1,2],report:AssemblyReport{input_triangles:2,output_triangles:3,connector_triangles:0,generated_uv_faces:0,walk_samples:1,portal_count:1,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
+  let mut geometry=AssemblyGeometry{exact_sky_portals: vec![],mesh,materials:vec![AssemblyMaterial{name:"base".into(),source:0,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"donor".into(),source:1,shader_path:Some("native/floor".into()),shader_class:Some("senv".into()),flags:0,collision_only:false},AssemblyMaterial{name:"+portal".into(),source:0,shader_path:None,shader_class:None,flags:0,collision_only:false}],triangle_materials:vec![0,1,2],report:AssemblyReport{input_triangles:2,output_triangles:3,connector_triangles:0,generated_uv_faces:0,walk_samples:1,portal_count:1,route_clearance:vec![],donor_scenery:0,warnings:vec![]}};
   let base=inspected(10);let donor=inspected(20);let views=viewport_surfaces(&geometry,&base,&donor).unwrap();assert_eq!(views.len(),2);
   for (view,id) in views.iter().zip([10,20]) {assert_eq!(view.mesh.positions,geometry.mesh.positions);assert_eq!(view.mesh.uvs,geometry.mesh.uvs);assert_eq!(view.mesh.indices,vec![0,1,2]);assert_eq!(view.mesh.material_ranges[0].shader_tag_id,id);assert!(!view.mesh.material_ranges[0].has_lightmap_uvs);assert_eq!(view.mesh.material_ranges[0].lightmap_page,-1);}
   let mut missing=donor.clone();missing.tags.clear();assert!(viewport_surfaces(&geometry,&base,&missing).unwrap_err().to_string().contains("native tag"));
