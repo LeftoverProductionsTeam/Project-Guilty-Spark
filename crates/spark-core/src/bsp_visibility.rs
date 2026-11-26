@@ -212,6 +212,52 @@ pub(crate) fn retained_tunnel_quad(ring: &[Point]) -> Result<[Point; 4]> {
     authored_portal_quad([(start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5, bottom], normal, size, top - bottom)
 }
 
+/// Triangulates a convex compiled outline without replacing its sealed edges.
+pub(crate) fn exact_outline_triangles(points: &[Point]) -> Result<Vec<[usize; 3]>> {
+    if !(3..=128).contains(&points.len()) || points.iter().flatten().any(|v| !v.is_finite()) {
+        return invalid("Exact portal needs 3–128 finite native vertices");
+    }
+    let origin = points[0];
+    let relative = |p: Point| std::array::from_fn::<_, 3, _>(|i| p[i] - origin[i]);
+    let cross = |a: Point, b: Point| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    let dot = |a: Point, b: Point| a.iter().zip(b).map(|(a,b)| a*b).sum::<f64>();
+    let mut plane = [0.; 3];
+    for pair in points[1..].windows(2) {
+        let n = cross(relative(pair[0]), relative(pair[1]));
+        for axis in 0..3 { plane[axis] += n[axis]; }
+    }
+    let length = dot(plane, plane).sqrt();
+    if length < 1e-8 {
+        return invalid("Exact portal outline has no usable plane");
+    }
+    plane = plane.map(|v| v / length);
+    let tolerance = points.iter().flatten().copied().map(f64::abs).fold(1., f64::max) * 8. * f64::from(f32::EPSILON);
+    if points.iter().any(|&p| dot(relative(p), plane).abs() > tolerance) {
+        return invalid("Exact portal outline is not planar");
+    }
+    for (&a, &b) in points.iter().zip(points.iter().cycle().skip(1)) {
+        let edge = std::array::from_fn(|i| b[i] - a[i]);
+        let edge_length = dot(edge, edge).sqrt();
+        if edge_length <= 1e-8 || points.iter().any(|&p| {
+            let offset = std::array::from_fn(|i| p[i] - a[i]);
+            dot(cross(edge, offset), plane) < -tolerance * edge_length
+        }) {
+            return invalid("Exact portal needs a convex outline without collapsed edges");
+        }
+    }
+    // A fan can preserve intermediate collinear edges if its pivot is off
+    // their line. Refuse outlines that need general polygon subdivision.
+    for start in 0..points.len() {
+        let triangles = (1..points.len()-1).map(|i| [start, (start+i)%points.len(), (start+i+1)%points.len()]).collect::<Vec<_>>();
+        if triangles.iter().all(|&[a,b,c]| {
+            dot(cross(std::array::from_fn(|i| points[b][i]-points[a][i]), std::array::from_fn(|i| points[c][i]-points[a][i])), plane) > 1e-8
+        }) {
+            return Ok(triangles);
+        }
+    }
+    invalid("Exact portal outline needs additional subdivision to retain all its edges")
+}
+
 /// A portal follows the actual closed air volume, not a rectangle guessed from
 /// world bounds. Parallel road/ridge spaces can overlap and need one full cut.
 #[derive(Debug)]
@@ -254,6 +300,16 @@ pub(crate) fn clipped_portal(space:&manifold_rust::manifold::Manifold, center:Po
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn native_portal_fan_keeps_trapezoidal_edges_and_rejects_twists() {
+        let gate = [[4.,0.,0.], [4.,0.2,1.], [4.,1.1,1.], [4.,1.3,0.]];
+        assert_eq!(super::exact_outline_triangles(&gate).unwrap(), vec![[0,1,2], [0,2,3]]);
+        let mut twisted = gate;
+        twisted[2][0] += 0.1;
+        assert!(super::exact_outline_triangles(&twisted).is_err());
+        assert!(super::exact_outline_triangles(&[gate[0], gate[2], gate[1], gate[3]]).is_err());
+    }
+
     use super::*;
     fn tunnel(segment: usize, start: f64, end: f64) -> VisibilityZone {
         VisibilityZone::Tunnel {

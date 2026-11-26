@@ -845,7 +845,11 @@ export default function BspAssembly({
               <fieldset>
                 <legend>Build layout</legend>
                 <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy || canExtend}
-                  onChange={event => update({ separateNativeBsps: event.target.checked, preserveDonorBsp: event.target.checked && draft.preserveDonorBsp, tunnelBakeFill: event.target.checked && draft.tunnelBakeFill })} /> Separate native BSPs</label>
+                  onChange={event => update({ separateNativeBsps: event.target.checked, restoreDonorSkyPortals: event.target.checked ? false : draft.restoreDonorSkyPortals, preserveDonorBsp: event.target.checked && draft.preserveDonorBsp, tunnelBakeFill: event.target.checked && draft.tunnelBakeFill })} /> Separate native BSPs</label>
+                {!draft.separateNativeBsps && <label title="Restore original donor portal outlines that separate native sky regions. Check portal source and rebuild to confirm that the doorway geometry still seals.">
+                  <input type="checkbox" checked={draft.restoreDonorSkyPortals ?? false} disabled={busy}
+                    onChange={event => update({ restoreDonorSkyPortals: event.target.checked })} /> Restore donor sky portals
+                </label>}
                 {draft.separateNativeBsps && <>
                   <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
                   {canExtend && baseParts.length <= 14 && <div>

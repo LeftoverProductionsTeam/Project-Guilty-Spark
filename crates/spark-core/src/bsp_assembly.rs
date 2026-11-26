@@ -68,6 +68,8 @@ pub struct BspAssembly {
     #[serde(default, skip_serializing_if = "is_false")]
     pub preserve_donor_bsp: bool,
     #[serde(default, skip_serializing_if = "is_false")]
+    pub restore_donor_sky_portals: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub tunnel_bake_fill: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
@@ -193,6 +195,9 @@ impl BspAssembly {
             return invalid("Tunnel shader path is too long");
         }
         crate::bsp_visibility::validate(&self.visibility_zones, &self.tunnel_points)?;
+        if self.restore_donor_sky_portals && (self.separate_native_bsps || self.preserve_donor_bsp) {
+            return invalid("Restore donor sky portals applies to combined BSP geometry");
+        }
         if self.open_road && (self.tunnel_width < 3. || self.tunnel_height < 3.) {
             return invalid("An open road needs at least 3 world units of width and clear height; vehicle handling still requires a game test");
         }
@@ -1009,7 +1014,7 @@ fn generate_end(
         index_start: 0,
         index_count: mesh.indices.len(),
     });
-    let portal_count = add_portals(
+    let mut portal_count = add_portals(
         &mut mesh,
         &mut materials,
         &mut triangle_materials,
@@ -1019,6 +1024,11 @@ fn generate_end(
         assembly.terrain_seam.as_ref().map(|_|terrain::render_edge(&donor,assembly.donor_bsp_index,false).map(|edge|edge-0.25+assembly.translation[0])).transpose()?,
         partition.map(|(seam, end)| (end, seam.separation_axis)),
     )?;
+    if assembly.restore_donor_sky_portals && !matches!(partition, Some((_, PartitionEnd::Base))) {
+        portal_count += append_donor_sky_portals(
+            assembly, &donor, &mut mesh, &mut materials, &mut triangle_materials,
+        )?;
+    }
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
@@ -1322,6 +1332,67 @@ fn add_portals(
     }
     Ok(count)
 }
+fn append_donor_sky_portals(
+    plan: &BspAssembly,
+    donor: &MapInspection,
+    mesh: &mut MeshData,
+    materials: &mut Vec<AssemblyMaterial>,
+    slots: &mut Vec<usize>,
+) -> Result<usize> {
+    let path = &plan.donor_source.preserved_path;
+    let source = crate::bsp_audio::inspect_ambience_for_bsp(path, &donor.sha256, Some(plan.donor_bsp_index))?;
+    let clusters = &source.bsps.first().ok_or_else(|| SparkError::Invalid("Donor BSP has no native visibility data".into()))?.clusters;
+    let portals = maps::compiled_portals(path, donor, plan.donor_bsp_index)?;
+    let cuts = portals.into_iter().enumerate().filter_map(|(index, portal)| {
+        let front = clusters.get(usize::try_from(portal.front_cluster).ok()?)?;
+        let back = clusters.get(usize::try_from(portal.back_cluster).ok()?)?;
+        (front.sky != back.sky).then_some((index, portal))
+    }).map(|(index, portal)| {
+        if portal.flags != 0 {
+            return invalid(format!("Donor sky portal {index} has native flags that require source review"));
+        }
+        let points = portal.ring.into_iter().map(|point| transform(point, plan.translation, plan.yaw_degrees)).collect::<Vec<_>>();
+        let triangles = crate::bsp_visibility::exact_outline_triangles(&points)
+            .map_err(|err| SparkError::Invalid(format!("Donor sky portal {index}: {err}")))?;
+        Ok((points, triangles))
+    }).collect::<Result<Vec<_>>>()?;
+    let triangles: usize = cuts.iter().map(|(_, indices)| indices.len()).sum();
+    if mesh.indices.len() / 3 + triangles > MAX_OUTPUT_TRIANGLES {
+        return invalid("Restored donor sky portals exceed the connected source triangle budget");
+    }
+    if cuts.is_empty() {
+        return Ok(0);
+    }
+    let slot = materials.iter().position(|material| material.name == "+exactportal")
+        .unwrap_or_else(|| {
+            let slot = materials.len();
+            materials.push(AssemblyMaterial {
+                name: "+exactportal".into(),
+                source: 1,
+                shader_path: None,
+                shader_class: None,
+                flags: 0,
+                collision_only: false,
+            });
+            slot
+        });
+    for (points, triangles) in &cuts {
+        let [a, b, c] = triangles[0].map(|index| points[index]);
+        let n = normal(a, b, c);
+        let first = (mesh.positions.len() / 3) as u32;
+        for point in points {
+            mesh.positions.extend(point.map(|axis| axis as f32));
+            mesh.normals.extend(n.map(|axis| axis as f32));
+            mesh.uvs.extend([0., 0.]);
+        }
+        for triangle in triangles {
+            mesh.indices.extend(triangle.map(|index| first + index as u32));
+            slots.push(slot);
+        }
+    }
+    Ok(cuts.len())
+}
+
 pub fn generate_project(
     project: &Project,
     base: &MapInspection,
@@ -2185,6 +2256,7 @@ pub fn plan_from_bsp(
         sections:vec![],arch_segments:None,
         visibility_zones: vec![],
         native_seals: vec![],
+        restore_donor_sky_portals: false,
     };
     if let Some(preset) = regional_preset {
         if !retaining || base.mesh.parts.len() > 14 {
