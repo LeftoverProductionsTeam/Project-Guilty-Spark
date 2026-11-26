@@ -6008,6 +6008,15 @@ test('native BSP flight review checks the supplied first leg and navigates nativ
  const observed=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1).points);
  expect(observed[12]).toEqual([cx,cy,cz]);
  expect(observed[37]).toEqual([79.221,-122.37,2.505]);
+ const pelican=form.getByRole("button",{name:"Use Pelican hull (10.2 × 7.6)",exact:true});
+ await revealPagedControl(pelican);await pelican.click();
+ await expect(result).toHaveCount(0);
+ await expect(form.getByRole("spinbutton",{name:"Footprint half-length",exact:true})).toHaveValue("5.1");
+ await expect(half).toHaveValue("3.8");
+ await revealPagedControl(survey);await survey.click();
+ const hull=await page.evaluate(()=>(window as any).__sparkMock.geometryCalls.at(-1).points);
+ expect(hull[0][0]).toBeCloseTo(cx-5.1);
+ expect(hull[0][1]).toBeCloseTo(cy-3.8);
  await page.evaluate(()=>(window as any).__sparkMock.commandProtected=[0]);
  await page.locator('.native-tag-operations:visible').getByRole('button',{name:'Refresh source',exact:true}).click();
  await expect(form).toContainText('recipe-owned AI group');
