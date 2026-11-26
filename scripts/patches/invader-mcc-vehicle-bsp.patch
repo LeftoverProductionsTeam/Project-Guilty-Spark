@@ -1,0 +1,39 @@
+Based on SnowyMouse Invader 696830ff80af227e84e7237c2ef26eb2301ed110.
+License: GPL-3.0-only, as in the upstream files.
+Preserve standard MCC vehicle BSP masks while leaving classic cache padding zero.
+
+diff --git a/src/tag/hek/definition/scenario.json b/src/tag/hek/definition/scenario.json
+--- a/src/tag/hek/definition/scenario.json
++++ b/src/tag/hek/definition/scenario.json
+@@ -1077,8 +1077,14 @@
+                 "type": "Euler3D"
+             },
+             {
++                "type": "uint16",
++                "name": "bsp indices",
++                "engines": ["mcc"],
++                "comment": "MCC scenario vehicle native on_bsp_flags bitmask"
++            },
++            {
+                 "type": "pad",
+-                "size": 4
++                "size": 2
+             },
+             {
+                 "name": "appearance player index",
+diff --git a/src/tag/parser/compile/scenario/pre_compile.cpp b/src/tag/parser/compile/scenario/pre_compile.cpp
+--- a/src/tag/parser/compile/scenario/pre_compile.cpp
++++ b/src/tag/parser/compile/scenario/pre_compile.cpp
+@@ -676,4 +676,11 @@
+         merge_child_scenarios(workload, tag_index, *this);
+-
++
++        // MCC vehicle ownership occupies padding in the classic layouts.
++        if(workload.get_build_parameters()->details.build_game_engine != HEK::GameEngine::GAME_ENGINE_MCC_COMBAT_EVOLVED_ANNIVERSARY) {
++            for(auto &vehicle : this->vehicles) {
++                vehicle.bsp_indices = 0;
++            }
++        }
++
+         if(!workload.cache_file_type.has_value()) {
+             workload.cache_file_type = this->type;
