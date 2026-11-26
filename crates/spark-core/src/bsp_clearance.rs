@@ -479,6 +479,7 @@ mod tests {
             separate_native_bsps: false,
             preserve_donor_bsp: false,
             tunnel_bake_fill: false,
+            directional_donor_landing: false,
             include_donor_scenery: false,
             translation: [0.; 3],
             yaw_degrees: 0.,

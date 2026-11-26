@@ -539,7 +539,7 @@ pub fn run_with_reviewed_runtime(
         };
         let compiled_tag_hashes = crate::tool_transaction::inventory(&tags)?;
         let receipt = serde_json::json!({"schemaVersion": 1, "build": record, "compiledTagHashes": compiled_tag_hashes,
-            "residentBsps": inspection.mesh.parts.len() + 1, "partitions": parts.receipt, "cache": cache.receipt, "detailSources": detail,
+            "residentBsps": parts.structure_tags.len(), "partitions": parts.receipt, "cache": cache.receipt, "detailSources": detail,
             "gameplayLimits": limits, "reviewedForerunnerSha256": review.map(|review| &review.executable_sha256),
             "authoredScenario": authored, "originalHashesVerified": true, "gameplayVerified": false, "streaming": false});
         project::atomic_write(&dir.join("megaworld-receipt.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;

@@ -73,6 +73,9 @@ pub struct BspAssembly {
     pub outdoor_sky_split: Option<f64>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub tunnel_bake_fill: bool,
+    /// Fit the connector floor across the two directional donor switches.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub directional_donor_landing: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub include_donor_scenery: bool,
     pub translation: [f64; 3],
@@ -157,6 +160,9 @@ impl BspAssembly {
         }
         if self.tunnel_bake_fill && (!self.preserve_donor_bsp || self.open_road) {
             return invalid("Tunnel bake lighting requires an enclosed connector between intact BSPs");
+        }
+        if self.directional_donor_landing && (!self.preserve_donor_bsp || self.open_road) {
+            return invalid("Directional landing requires an enclosed connector with the donor BSP intact");
         }
         if self.sections.len()>8||self.arch_segments.is_some_and(|n|!(2..=12).contains(&n))||self.arch_segments.is_some()&&(self.open_road||self.terrain_seam.is_some()) {
             return invalid("Choose at most eight seam sections; an enclosed arch needs 2-12 roof segments");
@@ -1794,6 +1800,7 @@ pub fn generate_preserved_connector(
     review.separate_native_bsps = false;
     review.preserve_donor_bsp = false;
     review.tunnel_bake_fill = false;
+    review.directional_donor_landing = false;
     review.base_bsp_index = 0;
 
     let common_separation = intact_common_separation(&base.mesh, base.mesh.parts.len(), &donor.mesh, 0, plan.translation, forward)?;
@@ -1820,7 +1827,7 @@ pub fn generate_preserved_connector(
     let trigger = |from, to, center, distance: f64| partition_switch(
         from, to, offset(center, distance - 0.45), forward, plan.tunnel_width, plan.tunnel_height,
     );
-    // The two 0.9-unit triggers stay disjoint and entirely within the verified flat floor.
+    // Keep the two 0.9-unit triggers disjoint within the verified landing.
     let base_switch = intact_switch_distance(landings[0].1);
     let donor_switch = intact_switch_distance(landings[1].1);
     let switches = [
@@ -1832,7 +1839,10 @@ pub fn generate_preserved_connector(
     let prior = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
     let volumes = maps::scenario_volume_readback(&source.preserved_path, base)?;
     verify_intact_switch_spacing(&switches, &prior.transitions, &volumes)?;
-    let points = intact_floor_points(overlaps, forward, plan.open_road)?;
+    let landing = plan.directional_donor_landing.then(|| {
+        fit_directional_landing(&checker, end, forward, donor_switch, plan.tunnel_width, plan.translation)
+    }).transpose()?;
+    let points = intact_floor_points(overlaps, forward, plan.open_road, landing.as_ref())?;
     if !common_separation {
         verify_intact_neighborhood((&base.mesh, &base_collision), (&donor.mesh, &donor_collision),
             0, plan.translation, base.mesh.parts.len(), plan, &points)?;
@@ -1866,7 +1876,7 @@ pub fn generate_preserved_connector(
         validate_native_bsp_point([point[0].into(), point[1].into(), point[2].into()])?;
     }
     review.tunnel_points.insert(0, overlaps[0][0]);
-    review.tunnel_points.push(overlaps[1][1]);
+    review.tunnel_points.push(landing.as_ref().map_or(overlaps[1][1], |ramp| ramp.point(overlaps[1][1])));
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
     let route_clearance = if plan.open_road {
         let [walk_samples, _] = checker.verify_land_bridge(&review)?;
@@ -1876,23 +1886,30 @@ pub fn generate_preserved_connector(
         checker.verify_return(&review)?;
         checker.verify_details(&review)?
     };
-    for overlap in overlaps {
-        if checker.floor_profile(overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
+    for overlap in &overlaps[..if landing.is_some() { 1 } else { 2 }] {
+        if checker.floor_profile(*overlap)?.into_iter().any(|z| (z - overlap[0][2]).abs() > 0.02) {
             return invalid("Connector surface does not match a reviewed landing");
         }
     }
+    let directional_drop = landing.as_ref().map(|ramp| verify_directional_landing(&checker, ramp)).transpose()?;
     let level_span = [points[0], *points.last().unwrap()];
-    let chart_points = if level_span[0][2] == level_span[1][2] { &level_span[..] } else { &points[..] };
+    let chart_points = if points.iter().all(|point| point[2] == points[0][2]) { &level_span[..] } else { &points[..] };
     let mut render = connector_charts(chart_points, side, height, sky);
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
     append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
+    let mut warnings = vec![format!("Shared floor spans {:.2} and {:.2} units. Runtime travel requires playtesting.",
+        2. * landings[0].1, 2. * landings[1].1)];
+    if let Some((ramp, drop)) = landing.as_ref().zip(directional_drop) {
+        warnings.push(format!("Donor switches have a {:.1}% connector grade and an at most {:.3}-unit sampled step down.", ramp.grade * 100., drop));
+    } else {
+        warnings.push(format!("Maximum floor difference is {:.3} units.", landings[0].2.max(landings[1].2)));
+    }
     let report = AssemblyReport {
         input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
         generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
         portal_count: 0, route_clearance, donor_scenery: 0,
-        warnings: vec![format!("Shared floor spans {:.2} and {:.2} units. Maximum floor difference is {:.3} units. Runtime travel requires playtesting.",
-            2. * landings[0].1, 2. * landings[1].1, landings[0].2.max(landings[1].2))],
+        warnings,
     };
     Ok(PreservedConnector {
         geometry: AssemblyGeometry { mesh, materials, triangle_materials, exact_sky_portals: Vec::new(), report },
@@ -2028,7 +2045,7 @@ fn intact_connector_solid(points: &[V], side: V, height: f64, sky: Option<usize>
     // A level passage needs no coplanar joins at the landing zones. Unioning
     // them adds needless narrow charts when the corridor is oblique.
     let end = *points.last().unwrap();
-    if points[0][2] == end[2] {
+    if points.iter().all(|point| point[2] == end[2]) {
         return passage_solid(points[0], end, side, side, height, 0, sky);
     }
     let mut solids = points.windows(2).map(|pair| passage_solid(pair[0], pair[1], side, side, height, 0, sky));
@@ -2116,11 +2133,100 @@ fn intact_switch_distance(span: f64) -> f64 {
     (span - 0.75).min(1.3)
 }
 
-fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool) -> Result<Vec<V>> {
+struct DirectionalLanding {
+    center: V,
+    forward: V,
+    grade: f64,
+    floor_z: f64,
+    samples: Vec<LandingSample>,
+}
+
+struct LandingSample {
+    point: V,
+    station: f64,
+    stock_z: f64,
+    into_donor: bool,
+}
+
+impl DirectionalLanding {
+    fn point(&self, mut point: V) -> V {
+        point[2] = self.floor_z + self.grade * dot(sub(point, self.center), self.forward);
+        point
+    }
+}
+
+const LANDING_MIN_DROP: f64 = 0.002;
+const LANDING_MAX_DROP: f64 = 0.09;
+
+fn fit_directional_landing(
+    stock: &crate::bsp_clearance::RouteChecker, center: V, forward: V,
+    switch_distance: f64, width: f32, translation: V,
+) -> Result<DirectionalLanding> {
+    let half_width = f64::from(width) / 2. - 0.02;
+    let side = [-forward[1], forward[0], 0.];
+    let mut samples = Vec::with_capacity(162);
+    for into_donor in [false, true] {
+        let switch_center = if into_donor { switch_distance } else { -switch_distance };
+        for step in 0..=8 {
+            let station = switch_center - 0.43 + 0.86 * f64::from(step) / 8.;
+            for lane in -4..=4 {
+                let point = add(add(center, mul(forward, station)), mul(side, half_width * f64::from(lane) / 4.));
+                let local = sub(point, translation).map(|axis| axis as f32);
+                let stock_z = stock.native_surface_z(local).map(|z| f64::from(z) + translation[2])
+                    .ok_or_else(|| SparkError::Invalid("A directional donor switch has unsupported floor. Move its landing clear of the gap.".into()))?;
+                samples.push(LandingSample { point, station, stock_z, into_donor });
+            }
+        }
+    }
+    let (grade, floor_z) = solve_directional_landing(&samples).ok_or_else(|| SparkError::Invalid(
+        "The donor switches cannot both receive a shallow downhill step within a 10% grade. Choose a different landing.".into()
+    ))?;
+    Ok(DirectionalLanding { center, forward, grade, floor_z, samples })
+}
+
+fn solve_directional_landing(samples: &[LandingSample]) -> Option<(f64, f64)> {
+    // Leave headroom for the compiler's float conversion and triangle planes.
+    let min = LANDING_MIN_DROP + 0.001;
+    let max = LANDING_MAX_DROP - 0.001;
+    for step in 0..=100 {
+        let grade = f64::from(step) / 1000.;
+        let (mut low, mut high) = (f64::NEG_INFINITY, f64::INFINITY);
+        for sample in samples {
+            let level = sample.stock_z - grade * sample.station;
+            let (min_delta, max_delta) = if sample.into_donor { (min, max) } else { (-max, -min) };
+            low = low.max(level + min_delta);
+            high = high.min(level + max_delta);
+        }
+        if low <= high && low.is_finite() && high.is_finite() {
+            return Some((grade, (low + high) * 0.5));
+        }
+    }
+    None
+}
+
+fn verify_directional_landing(
+    connector: &crate::bsp_clearance::RouteChecker, landing: &DirectionalLanding,
+) -> Result<f64> {
+    let mut max_drop: f64 = 0.;
+    for sample in &landing.samples {
+        let expected = landing.point(sample.point);
+        let z = connector.native_surface_z(expected.map(|p| p as f32))
+            .map(f64::from).ok_or_else(|| SparkError::Invalid("Directional connector floor is missing inside a switch".into()))?;
+        let drop = if sample.into_donor { z - sample.stock_z } else { sample.stock_z - z };
+        if !(LANDING_MIN_DROP..=LANDING_MAX_DROP).contains(&drop) || (z - expected[2]).abs() > 0.001 {
+            return invalid(format!("Directional connector floor differs from the reviewed downhill step ({drop:.4} units)"));
+        }
+        max_drop = max_drop.max(drop);
+    }
+    Ok(max_drop)
+}
+
+fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool, landing: Option<&DirectionalLanding>) -> Result<Vec<V>> {
     let outside = mul(forward, CONNECTOR_END_CAP);
     let slope_margin = mul(forward, 0.2);
     let start = add(overlaps[0][1], slope_margin);
     let end = sub(overlaps[1][0], slope_margin);
+    let end = landing.map_or(end, |ramp| ramp.point(end));
     let mut points = vec![sub(overlaps[0][0], outside), start];
     let rise = end[2] - start[2];
     if open_road && rise != 0. {
@@ -2134,7 +2240,8 @@ fn intact_floor_points(overlaps: [[V; 2]; 2], forward: V, open_road: bool) -> Re
         deck[2] = start[2].max(end[2]);
         points.push(deck);
     }
-    points.extend([end, add(overlaps[1][1], outside)]);
+    let cap = add(overlaps[1][1], outside);
+    points.extend([end, landing.map_or(cap, |ramp| ramp.point(cap))]);
     Ok(points)
 }
 
@@ -2151,14 +2258,18 @@ pub(crate) fn verify_intact_connector_collision(
     route.separate_native_bsps = false;
     route.preserve_donor_bsp = false;
     route.tunnel_bake_fill = false;
+    route.directional_donor_landing = false;
     route.base_bsp_index = 0;
     let mut samples = Vec::with_capacity(2);
     let mut max_delta: f64 = 0.;
-    for (slot, overlap) in [plan.base_bsp_index, original_count + 1].into_iter().zip(overlaps) {
+    let donor_slot = original_count + 1;
+    for (slot, overlap) in [plan.base_bsp_index, donor_slot].into_iter().zip(overlaps) {
         let region = crate::bsp_clearance::RouteChecker::for_part(&collision, slot)?;
         route.tunnel_points = overlap.to_vec();
         let both = if plan.open_road { region.verify_land_bridge(&route)? }
             else { [region.verify(&route)?, region.verify_return(&route)?] };
+        samples.push(both);
+        if slot == donor_slot && plan.directional_donor_landing { continue; }
         let original = region.floor_profile(overlap)?;
         let added = connector.floor_profile(overlap)?;
         if original.len() != added.len() || original.is_empty() {
@@ -2166,26 +2277,36 @@ pub(crate) fn verify_intact_connector_collision(
         }
         let delta = original.into_iter().zip(added).map(|(a,b)| (a-b).abs()).fold(0., f64::max);
         max_delta = max_delta.max(delta);
-        samples.push(both);
     }
     if max_delta > 0.02 { return invalid("Compiled intact connector landing floors are misaligned"); }
     let [start, end] = [plan.tunnel_points[0], plan.tunnel_points[1]];
     let delta = sub(end, start);
     let forward = mul([delta[0], delta[1], 0.], 1. / delta[0].hypot(delta[1]));
-    let points = intact_floor_points(overlaps, forward, plan.open_road)?;
+    let mut directional_review = None;
+    let landing = if plan.directional_donor_landing {
+        let stock = crate::bsp_clearance::RouteChecker::for_part(&collision, donor_slot)?;
+        let span = dot(sub(overlaps[1][1], end), forward);
+        let ramp = fit_directional_landing(&stock, end, forward, intact_switch_distance(span), plan.tunnel_width, [0.; 3])?;
+        let drop = verify_directional_landing(&connector, &ramp)?;
+        max_delta = max_delta.max(drop);
+        directional_review = Some(serde_json::json!({"grade": ramp.grade, "maxSwitchDrop": drop, "samples": ramp.samples.len()}));
+        Some(ramp)
+    } else { None };
+    let points = intact_floor_points(overlaps, forward, plan.open_road, landing.as_ref())?;
     // Apply the identical neighboring-region proof to the exact compiled
     // geometry when the donor did not use a single separation plane.
-    let donor_slot = original_count + 1;
     if !intact_common_separation(&compiled.mesh, original_count, &compiled.mesh, donor_slot, [0.; 3], forward)? {
         verify_intact_neighborhood((&compiled.mesh, &collision), (&compiled.mesh, &collision), donor_slot,
             [0.; 3], original_count, plan, &points)?;
     }
     route.tunnel_points = [overlaps[0][0]].into_iter()
-        .chain(points[1..points.len() - 1].iter().copied()).chain([overlaps[1][1]]).collect();
+        .chain(points[1..points.len() - 1].iter().copied())
+        .chain([landing.as_ref().map_or(overlaps[1][1], |ramp| ramp.point(overlaps[1][1]))]).collect();
     let corridor = if plan.open_road { connector.verify_land_bridge(&route)? }
         else { [connector.verify(&route)?, connector.verify_return(&route)?] };
     Ok(serde_json::json!({
         "connectorSamples": corridor, "landingSamples": samples, "maxFloorDelta": max_delta,
+        "directionalDonorLanding": directional_review,
         "bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
     }))
 }
@@ -2458,6 +2579,7 @@ pub fn plan_from_bsp(
         separate_native_bsps: retaining,
         preserve_donor_bsp: false,
         tunnel_bake_fill: false,
+        directional_donor_landing: false,
         include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,
@@ -2528,7 +2650,7 @@ pub fn plan_from_bsp(
             let overlaps=[base_overlap,donor_overlap.map(|point|add(point,placed.translation))];
             let checked=(|| {
                 placed.validate()?;
-                let points=intact_floor_points(overlaps,toward,placed.open_road)?;
+                let points=intact_floor_points(overlaps,toward,placed.open_road,None)?;
                 verify_intact_connector_vehicles(&points, toward, &placed, &base_vehicles, &donor_vehicles)?;
                 for point in &points {validate_native_bsp_point(*point)?;}
                 if donor_pickups.iter().any(|row|intact_connector_contains_placement(
@@ -2992,7 +3114,7 @@ mod tests {
         let side = [0., 3., 0.];
         for [west, east] in [[0., 0.], [0., 3.], [3., 0.]] {
             let landings = [[[0., 0., west], [3., 0., west]], [[33., 0., east], [36., 0., east]]];
-            let points = intact_floor_points(landings, forward, true).unwrap();
+            let points = intact_floor_points(landings, forward, true, None).unwrap();
             assert_eq!(points.len(), if west == east { 4 } else { 5 });
             assert_eq!([points[0][2], points[1][2]], [west, west]);
             assert_eq!([points[points.len()-2][2], points[points.len()-1][2]], [east, east]);
@@ -3007,7 +3129,38 @@ mod tests {
             assert_eq!(flat.face_id.iter().filter(|&&slot| slot == 1).count(), 2);
         }
         let too_steep = [[[0., 0., 0.], [3., 0., 0.]], [[11., 0., 3.], [14., 0., 3.]]];
-        assert!(intact_floor_points(too_steep, forward, true).is_err());
+        assert!(intact_floor_points(too_steep, forward, true, None).is_err());
+    }
+
+    #[test]
+    fn directional_donor_landing_keeps_both_receiving_floors_downhill() {
+        let donor = maps::MeshData {
+            positions: vec![-2., -1., -0.04, 2., -1., 0.04, 2., 1., 0.05, -2., 1., -0.03],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            ..Default::default()
+        };
+        let stock = crate::bsp_clearance::RouteChecker::new(&donor).unwrap();
+        let forward = [1., 0., 0.];
+        let ramp = fit_directional_landing(&stock, [0.; 3], forward, 0.65, 2., [0.; 3]).unwrap();
+        let landings = [[[-32., 0., 0.], [-28., 0., 0.]], [[-1.4, 0., 0.], [1.4, 0., 0.]]];
+        let connector = |fit| {
+            let points = intact_floor_points(landings, forward, false, fit).unwrap();
+            let body = intact_connector_solid(&points, [0., 1., 0.], 1.6, None, &AtomicBool::new(false)).unwrap();
+            let mut materials = vec![AssemblyMaterial {
+                name: "tunnel".into(), source: 0, shader_path: None, shader_class: None,
+                flags: 0, collision_only: false,
+            }];
+            let (mesh, _) = collision_layer(&body.get_mesh_gl64(-1), &mut materials).unwrap();
+            crate::bsp_clearance::RouteChecker::new(&mesh).unwrap()
+        };
+        assert!(verify_directional_landing(&connector(None), &ramp).is_err());
+        assert!(verify_directional_landing(&connector(Some(&ramp)), &ramp).unwrap() <= LANDING_MAX_DROP);
+
+        let blocked = [
+            LandingSample { point: [0.; 3], station: -0.65, stock_z: 0., into_donor: false },
+            LandingSample { point: [0.; 3], station: 0.65, stock_z: 1., into_donor: true },
+        ];
+        assert!(solve_directional_landing(&blocked).is_none());
     }
 
     #[test]

@@ -315,6 +315,7 @@ export default function BspAssembly({
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
+      if (!next.preserveDonorBsp || next.openRoad) next.directionalDonorLanding = undefined;
       latest.current = { ...latest.current, signature: assemblySignature(next) };
       draftNow.current=next;setDraft(next);
       setReport(null);
@@ -899,6 +900,11 @@ export default function BspAssembly({
                       title="Bakes neutral light into the enclosed connector. The selected surface shader stays intact.">
                       <input type="checkbox" checked={draft.tunnelBakeFill ?? false} disabled={busy}
                         onChange={event => update({ tunnelBakeFill: event.target.checked })} /> Bake tunnel lighting
+                    </label>}
+                    {draft.preserveDonorBsp && !draft.openRoad && <label
+                      title="Fit a shallow grade so the receiving floor is lower at each donor switch. The donor stays intact.">
+                      <input type="checkbox" checked={draft.directionalDonorLanding ?? false} disabled={busy}
+                        onChange={event => update({ directionalDonorLanding: event.target.checked })} /> Fit floor at donor switches
                     </label>}
                     <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>

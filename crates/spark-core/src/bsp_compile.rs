@@ -91,6 +91,10 @@ fn recover_missing_roots(source:&Path,recovered:&Path,bsp:&str,scenery:&[crate::
     runner.emit("bsp-recovery",format!("Recovered only missing donor dependencies: {} files, {bytes} bytes; existing editable tags take precedence",files.len()),38,"info");
     Ok(())
 }
+fn native_reference_matches(observed: &str, expected: &str) -> bool {
+    observed.trim().replace('\\', "/").eq_ignore_ascii_case(&expected.replace('\\', "/"))
+}
+
 fn namespace_materials(
     source: &Path,
     bsp: &str,
@@ -168,7 +172,7 @@ fn namespace_materials(
         if !model.is_file() {
             return invalid(format!("Donor source GBX model is missing: {reference}"));
         }
-        if !observed.trim().eq_ignore_ascii_case(&reference) {
+        if !native_reference_matches(&observed, &reference) {
             runner.run(
                 &edit,
                 &[
@@ -196,7 +200,7 @@ fn namespace_materials(
                 "bsp-scenery-model-check",
                 39,
             )?;
-            if !readback.trim().eq_ignore_ascii_case(&reference) {
+            if !native_reference_matches(&readback, &reference) {
                 return invalid("Prepared scenery model reference readback failed");
             }
             model_reference_changes.push(serde_json::json!({"tag":relative,"beforeReference":observed.trim(),"afterReference":reference,"sourceSha256":source_hash,"preparedTagSha256":maps::hash_file(&output)?}));
@@ -915,7 +919,7 @@ fn bind_partition_scenario(
         if bsp_count()? != paths.len() { return invalid("Native scenario BSP count differs from the reviewed source"); }
         for (index, path) in paths.iter().enumerate() {
             let observed = run(vec!["-G".into(), format!("structure_bsps[{index}].structure_bsp")])?;
-            if !observed.trim().eq_ignore_ascii_case(&format!("{path}.scenario_structure_bsp")) {
+            if !native_reference_matches(&observed, &format!("{path}.scenario_structure_bsp")) {
                 return invalid(format!("Native scenario BSP slot {index} differs from the reviewed structure"));
             }
         }
@@ -1739,7 +1743,7 @@ pub(crate) fn apply_base_transforms(project: &Project, base: &MapInspection, edi
                 format!("{palette}[{slot}].name")
             };
             let actual = query("-G", reference)?;
-            if !actual.trim().replace('/',"\\").eq_ignore_ascii_case(&expected.replace('/',"\\")) {
+            if !native_reference_matches(&actual, &expected) {
                 return invalid(format!("{} native tag reference differs from the source; reconcile it before rebuilding",row.object_id));
             }
         }
