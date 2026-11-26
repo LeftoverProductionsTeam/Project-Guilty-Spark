@@ -870,6 +870,10 @@ export default function BspAssembly({
               {draft.terrainSeam&&<div className="bsp-settings">
                 <label>Shoulders<NumberField value={draft.terrainSeam.shoulderWidth} min={2} max={24} step={0.5} label="Terrain shoulder width" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,shoulderWidth:value}})}/></label>
                 <label>Bank height<NumberField value={draft.terrainSeam.bankHeight} min={0} max={12} step={0.25} label="Terrain bank height" onCommit={value=>update({terrainSeam:{...draft.terrainSeam!,bankHeight:value}})}/></label>
+                {draft.terrainSeam.bearingDegrees !== undefined && <label title="Match a full-width grade to the stock ground beyond both landings, with shallow terrain fill where needed.">
+                  <input type="checkbox" checked={draft.terrainSeam.gradeRoad ?? false} disabled={busy}
+                    onChange={event=>update({terrainSeam:{...draft.terrainSeam!,gradeRoad:event.target.checked||undefined}})}/> Grade full road width
+                </label>}
                 <button disabled={busy||draft.terrainSeam.bankHeight===0} onClick={()=>{setDraft(flattenTerrainConnector(draft));setReport(null);}}>Start with flat connector</button>
                 <span>Low-poly strip between the original edges; source texture scale stays intact. Start flat, then shape the shoulders and banks. Apply, check source and compile before playtesting.</span>
               </div>}

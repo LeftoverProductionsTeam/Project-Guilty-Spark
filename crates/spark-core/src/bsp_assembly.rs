@@ -941,13 +941,21 @@ fn generate_end(
                 let right = right.ok_or_else(|| SparkError::Invalid("The terrain seam needs two regions".into()))?;
                 Some(terrain::trim_donor(right, &donor, &donor_mesh, &donor_faces, assembly, sky_material.unwrap(), &token)?)
             } else { right };
+            let mut road_support=None;
             if let (Some(ribbon),Some(slots))=(&terrain_ribbon,terrain_materials){
                 let generated = ribbon.solid(assembly, slots, sky_material.unwrap())?;
                 let generated = ribbon.preserve_teleporter_floors(generated, &combined, base_path, base,
-                    &base_mesh, assembly.base_bsp_index, ([0.; 3],0.), slots[0], lowest_source - 1., &token)?;
+                    &base_mesh, assembly.base_bsp_index, ([0.; 3],0.), slots[0], lowest_source - 1., &token,false)?;
                 let donor_space = right.as_ref().ok_or_else(|| SparkError::Invalid("The terrain seam needs its stock donor".into()))?;
                 let generated = ribbon.preserve_teleporter_floors(generated, donor_space, &assembly.donor_source.preserved_path, &donor,
-                    &donor_mesh, assembly.donor_bsp_index, (assembly.translation,assembly.yaw_degrees), slots[1], lowest_source - 1., &token)?;
+                    &donor_mesh, assembly.donor_bsp_index, (assembly.translation,assembly.yaw_degrees), slots[1], lowest_source - 1., &token,false)?;
+                if assembly.terrain_seam.as_ref().is_some_and(|seam|seam.grade_road) {
+                    let support=ribbon.road_support(assembly,slots)?;
+                    let support=ribbon.preserve_teleporter_floors(support,&combined,base_path,base,
+                        &base_mesh,assembly.base_bsp_index,([0.;3],0.),slots[0],lowest_source-1.,&token,true)?;
+                    road_support=Some(ribbon.preserve_teleporter_floors(support,donor_space,&assembly.donor_source.preserved_path,&donor,
+                        &donor_mesh,assembly.donor_bsp_index,(assembly.translation,assembly.yaw_degrees),slots[1],lowest_source-1.,&token,true)?);
+                }
                 combined=checked(combined.boolean_with_engine_and_token(&generated,OpType::Add,BooleanEngine::Auto,Some(&token)),"Terrain seam join")?;
             }
             for (route_index,(route, material)) in routes.iter().zip(&passage_materials).enumerate() {
@@ -981,6 +989,10 @@ fn generate_end(
                     &right, OpType::Add, BooleanEngine::Auto, Some(&token),
                 ), "Donor join")?
             } else { combined };
+            if let Some(support)=road_support {
+                united=checked(united.boolean_with_engine_and_token(&support,OpType::Subtract,BooleanEngine::Auto,Some(&token)),
+                    "Graded terrain road support")?;
+            }
             if matches!(partition, Some((seam, PartitionEnd::Donor)) if seam.separation_axis[2] != 0.) {
                 // Where the approach crosses an outdoor region, its ramp
                 // must remain solid even above the donor's lower ground.
@@ -4077,6 +4089,7 @@ mod tests {
             shoulder_width: 8.,
             bank_height: 0.,
             bearing_degrees: None,
+            grade_road: false,
             base_shader_path: "fixture/base".into(),
             donor_shader_path: "fixture/donor".into(),
         });
@@ -4170,7 +4183,7 @@ mod tests {
         road.tunnel_points=vec![[0.,0.,0.],[0.,-18.,0.]];
         road.yaw_degrees=90.;
         road.terrain_seam=Some(TerrainSeam{
-            shoulder_width:8.,bank_height:4.,bearing_degrees:None,
+            shoulder_width:8.,bank_height:4.,bearing_degrees:None,grade_road:false,
             base_shader_path:"fixture/grass".into(),donor_shader_path:"fixture/snow".into(),
         });
         assert!(road.validate().is_err());

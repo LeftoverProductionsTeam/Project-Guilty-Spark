@@ -36,7 +36,7 @@ export interface BspAssembly {
   tunnelHeight: number;
   tunnelShaderPath: string;
   openRoad?: boolean;
-  terrainSeam?: {shoulderWidth:number;bankHeight:number;baseShaderPath:string;donorShaderPath:string;bearingDegrees?:number};
+  terrainSeam?: {shoulderWidth:number;bankHeight:number;baseShaderPath:string;donorShaderPath:string;bearingDegrees?:number;gradeRoad?:boolean};
   infantryTunnel?: {points:Vec3[];width:number;height:number;shaderPath:string};
   highGround?: {points:Vec3[];width:number;height:number;shaderPath:string};
   sections?:SeamSection[];

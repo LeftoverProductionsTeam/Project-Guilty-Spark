@@ -516,7 +516,16 @@ impl RouteChecker {
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
-    let mut prior_lanes=[None;2];
+    let graded_road = assembly.terrain_seam.as_ref().is_some_and(|seam| seam.grade_road);
+    let lane_fractions: Vec<f64> = if graded_road {
+        // A standing capsule can fall through a gap between the center and edge
+        // checks. Keep the graded road's interior samples within its diameter.
+        let intervals = ((f64::from(assembly.tunnel_width) - 0.45) / 0.36).ceil() as usize;
+        (0..=intervals).map(|i| 2. * i as f64 / intervals as f64 - 1.).collect()
+    } else {
+        vec![-1., 1.]
+    };
+    let mut prior_lanes = vec![None; lane_fractions.len()];
     // Match the same mitered cross sections used by the ridge solid. A lane
     // sampled at a segment's perpendicular can cross onto the next graded
     // segment near a turn and compare the next ramp height to the old one.
@@ -544,8 +553,8 @@ impl RouteChecker {
                 let lateral = add(sides[segment], mul(sub(sides[segment + 1], sides[segment]), t));
                 // A centerline can cross a narrow triangle or hide a tear
                 // under one wheel. Review both sides at the same elevation.
-                for (lane,sign) in [-1., 1.].into_iter().enumerate() {
-                    let point = add([p[0], p[1], z], mul(lateral, sign));
+                for (lane,&fraction) in lane_fractions.iter().enumerate() {
+                    let point = add([p[0], p[1], z], mul(lateral, fraction));
                     let Some(height)=index.floor_in_range(point,&mut scratch,0.30,0.30) else {
                         return invalid(format!(
                             "The route loses lateral floor support near {:.2}, {:.2}, {:.2}. Fill the gap or move the landing onto a wider floor.",
@@ -750,19 +759,36 @@ mod tests {
         let error = verify_route(&m, &plan()).unwrap_err().to_string();
         assert!(error.contains("clearance in segment 1 near 5.00, 0.00, 0.00"), "{error}");
     }
-    #[test]
-    fn return_sampling_keeps_the_authored_terrain_orientation() {
+    fn outdoor_road() -> BspAssembly {
         let mut road = plan();
         road.open_road = true;
         road.tunnel_width = 6.;
         road.tunnel_height = 4.;
         road.terrain_seam = Some(crate::bsp_assembly::TerrainSeam {
+            grade_road: false,
             shoulder_width: 8.,
             bank_height: 0.,
             bearing_degrees: None,
             base_shader_path: "fixture/grass".into(),
             donor_shader_path: "fixture/snow".into(),
         });
+        road
+    }
+    #[test]
+    fn graded_road_detects_an_obstruction_between_the_center_and_edges() {
+        let mut road = outdoor_road();
+        let seam = road.terrain_seam.as_mut().unwrap();
+        seam.bearing_degrees = Some(0.);
+        let mut mesh = corridor(road.tunnel_width.into(), road.tunnel_height.into());
+        quad(&mut mesh, [[5., 0.9, 0.], [5., 1.6, 0.], [5., 1.6, 1.6], [5., 0.9, 1.6]]);
+        assert!(verify_route(&mesh, &road).is_ok());
+        road.terrain_seam.as_mut().unwrap().grade_road = true;
+        let error = verify_route(&mesh, &road).unwrap_err().to_string();
+        assert!(error.contains("route side has a step or obstruction"), "{error}");
+    }
+    #[test]
+    fn return_sampling_keeps_the_authored_terrain_orientation() {
+        let mut road = outdoor_road();
         let mesh = corridor(road.tunnel_width.into(), road.tunnel_height.into());
         let checker = RouteChecker::new(&mesh).unwrap();
         assert_eq!(checker.verify(&road).unwrap(), checker.verify_return(&road).unwrap());

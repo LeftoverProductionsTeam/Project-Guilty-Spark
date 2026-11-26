@@ -1,6 +1,9 @@
 //! Source-derived terrain ribbon for the existing connected-BSP boolean builder.
 //! This is authoring metadata and native source generation, never a runtime patch.
 use super::*;
+
+const ROAD_FILL_DEPTH: f64 = 1.5;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
 pub struct TerrainSeam {
@@ -11,6 +14,8 @@ pub struct TerrainSeam {
     /// World-space normal of the boundary strip. Legacy terrain uses east.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bearing_degrees: Option<f64>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub grade_road: bool,
 }
 impl TerrainSeam {
     fn axis(&self) -> V {
@@ -25,6 +30,9 @@ impl TerrainSeam {
             || self.bearing_degrees.is_none() && plan.yaw_degrees.abs()>1e-7
             || self.bearing_degrees.is_some_and(|angle| !angle.is_finite() || angle.abs() > 360.) {
             return invalid("A terrain seam needs one straight open road, shoulders of 2–24 units and banks of 0–12 units");
+        }
+        if self.grade_road && self.bearing_degrees.is_none() {
+            return invalid("Grade the full road width on a terrain seam placed in Atlas");
         }
         let d=sub(plan.tunnel_points[1],plan.tunnel_points[0]);
         if dot(d,self.axis())<4. || d[0].hypot(d[1])>96. {
@@ -135,7 +143,7 @@ fn plan_terrain(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut pla
             .ok_or_else(||SparkError::Invalid("Outdoor floor requires its exact native environment shader".into()))?;
         Ok(tag.path.clone())
     };
-    let mut seam=TerrainSeam{shoulder_width:8.,bank_height:4.,base_shader_path:String::new(),donor_shader_path:String::new(),bearing_degrees:None};
+    let mut seam=TerrainSeam{shoulder_width:8.,bank_height:4.,base_shader_path:String::new(),donor_shader_path:String::new(),bearing_degrees:None,grade_road:false};
     let start=plan.tunnel_points[0];
     let plan_end=plan.tunnel_points[1];
     let (start,base_face,end,donor_face)=if let Some(bearing)=bearing {
@@ -267,7 +275,7 @@ impl Ribbon {
         let source_boundary=(boundary.base_max+boundary.donor_min)/2.;
         let flat=seam.bank_height==0.;
         let placed=seam.bearing_degrees.is_some();
-        let rows=stations(length,(source_boundary-dot(start,boundary.axis))/dot(d,boundary.axis),flat&&!placed).into_iter().map(|t|{
+        let mut rows=stations(length,(source_boundary-dot(start,boundary.axis))/dot(d,boundary.axis),flat&&!placed).into_iter().map(|t|{
             let center=add(start,mul(d,t));let blend=if flat{0.}else{(std::f64::consts::PI*t).sin().powi(2)};
             offsets.iter().enumerate().map(|(j,offset)|{
                 let mut p=add(center,mul(side,*offset));let native=profiles[0][j]*(1.-t)+profiles[1][j]*t;
@@ -278,6 +286,39 @@ impl Ribbon {
                 p
             }).collect::<Vec<_>>()
         }).collect::<Vec<_>>();
+        if seam.grade_road {
+            let direction=mul([d[0],d[1],0.],1./length);
+            let collar=(length*0.18).clamp(1.5,3.);
+            let floor_row=|point:V,on_donor:bool|->Result<Vec<V>> {
+                offsets.iter().map(|offset| {
+                    let mut p=add(point,mul(side,*offset));
+                    p[2]=if on_donor {
+                        let local=world_to_donor(p,plan);
+                        source_floor(b,bf,plan.donor_bsp_index,local,0.05)?.0[2]+plan.translation[2]
+                    } else {source_floor(a,af,0,p,0.05)?.0[2]};
+                    Ok(p)
+                }).collect()
+            };
+            let before=floor_row(sub(start,mul(direction,collar)),false)?;
+            let after=floor_row(add(end,mul(direction,collar)),true)?;
+            if (before[3][2]-start[2]).abs()>0.35*collar || (after[3][2]-end[2]).abs()>0.35*collar {
+                return invalid("The graded road needs walkable terrain just beyond both landings. Pick a gentler approach." );
+            }
+            let last=rows.len()-1;
+            for (index,row) in rows.iter_mut().enumerate() {
+                let t=dot(sub(row[3],start),direction)/length;
+                let height=start[2]+(end[2]-start[2])*t;
+                for p in &mut row[2..=4] { p[2]=height; }
+                // Blend the deck into the existing shoulder across the next half-band.
+                for (edge,shoulder) in [(0,1),(6,5)] {
+                    if index==0 || index==last {
+                        row[shoulder][2]=(row[edge][2]+height)*0.5;
+                    }
+                }
+            }
+            rows.insert(0,before);
+            rows.push(after);
+        }
         let roof=a.positions.chunks_exact(3).map(|p|p[2] as f64).chain(b.positions.chunks_exact(3).map(|p|p[2] as f64+plan.translation[2])).fold(f64::NEG_INFINITY,f64::max)+0.25;
         let projection=|inspection:&MapInspection,index:usize,path:&str,at:V|->Result<RenderTri>{
             let tag=inspection.tags.iter().find(|tag|tag.class=="senv"&&tag.path==path).ok_or_else(||SparkError::Invalid("Terrain material no longer exists in its original source".into()))?;
@@ -297,6 +338,7 @@ impl Ribbon {
     pub(super) fn preserve_teleporter_floors(
         &self, mut ribbon: Manifold, source_space: &Manifold, path: &Path, map: &MapInspection,
         mesh: &MeshData, bsp: usize, placement: (V,f64), material: usize, lowest: f64, token: &CancelToken,
+        protect_air: bool,
     ) -> Result<Manifold> {
         if map.header.scenario_type != 1 { return Ok(ribbon); }
         let existing = maps::scenario_netgame_flags(path, map)?;
@@ -313,21 +355,32 @@ impl Ribbon {
             near[2] += 0.05;
             let Some(floor) = checker.native_ground_z(near, 0.5) else { continue; };
             if (flag.position[2] - floor).abs() > 0.15 { continue; }
-            if f64::from(floor) + placement.0[2] <= min[2] + 0.03 { continue; }
+            const AIR_CLEARANCE: f64 = 0.6;
+            let z_limit = if protect_air { min[2] - ROAD_FILL_DEPTH - AIR_CLEARANCE } else { min[2] + 0.03 };
+            if f64::from(floor) + placement.0[2] <= z_limit { continue; }
             let side = [0., radius, 0.];
             let envelope = passage_solid([x - radius, y, lowest], [x + radius, y, lowest],
-                side, side, z + 0.6 - lowest, material, None)?;
-            let native_solid = checked(envelope.boolean_with_engine_and_token(
-                source_space, OpType::Subtract, BooleanEngine::Auto, Some(token),
+                side, side, z + AIR_CLEARANCE - lowest, material, None)?;
+            let operation=if protect_air {OpType::Intersect} else {OpType::Subtract};
+            let protected = checked(envelope.boolean_with_engine_and_token(
+                source_space, operation, BooleanEngine::Auto, Some(token),
             ), "Native teleporter floor protection")?;
             ribbon = checked(ribbon.boolean_with_engine_and_token(
-                &native_solid, OpType::Subtract, BooleanEngine::Auto, Some(token),
+                &protected, OpType::Subtract, BooleanEngine::Auto, Some(token),
             ), "Terrain seam around a native teleporter floor")?;
         }
         Ok(ribbon)
     }
 
     pub fn solid(&self,plan:&BspAssembly,materials:[usize;2],sky:usize)->Result<Manifold>{
+        self.closed_strip(plan,materials,Some(sky),0..=6)
+    }
+
+    pub fn road_support(&self,plan:&BspAssembly,materials:[usize;2])->Result<Manifold>{
+        self.closed_strip(plan,materials,None,2..=4)
+    }
+
+    fn closed_strip(&self,plan:&BspAssembly,materials:[usize;2],sky:Option<usize>,columns:std::ops::RangeInclusive<usize>)->Result<Manifold>{
         let mut gl=MeshGL64{num_prop:5,..Default::default()};
         let mut emit=|points:[V;3],material:usize,source:usize|->Result<()> {
             let first=gl.num_vert() as u64;
@@ -338,24 +391,46 @@ impl Ribbon {
             }
             gl.tri_verts.extend([first,first+1,first+2]);gl.face_id.push(material as u64);Ok(())
         };
-        let top=|p:V|[p[0],p[1],self.roof];let last=self.rows.len()-1;
+        let top=|p:V|if sky.is_some(){[p[0],p[1],self.roof]}else{p};
+        let bottom=|p:V|if sky.is_some(){p}else{[p[0],p[1],p[2]-ROAD_FILL_DEPTH]};
+        let (left,right)=(*columns.start(),*columns.end());
+        let last=self.rows.len()-1;
+        let graded=plan.terrain_seam.as_ref().is_some_and(|seam|seam.grade_road);
+        let vertex=|row:usize,column:usize| {
+            let mut point=self.rows[row][column];
+            if graded && (row==0 || row==last) {
+                // Terminate the cut in stock air and the fill below the stock floor.
+                point[2]+=if sky.is_some(){0.05}else{-0.05};
+            } else if graded && sky.is_some() {
+                // Overlap the fill into the cut instead of subtracting a coplanar face.
+                point[2]-=match column {2..=4=>0.04,1|5=>0.02,_=>0.};
+            }
+            point
+        };
         let boundary=self.boundary;
         for i in 0..last {
             let section=mul(add(self.rows[i][3],self.rows[i+1][3]),0.5);
             let source=usize::from(dot(section,boundary.axis)>=(boundary.base_max+boundary.donor_min)/2.);
-            for j in 0..6 {
-            let(a,b,c,d)=(self.rows[i][j],self.rows[i+1][j],self.rows[i+1][j+1],self.rows[i][j+1]);
-            emit([a,d,c],materials[source],source)?;emit([a,c,b],materials[source],source)?;
-            emit([top(a),top(b),top(c)],sky,source)?;emit([top(a),top(c),top(d)],sky,source)?;
+            let upper=sky.unwrap_or(materials[source]);
+            for j in left..right {
+                let(a,b,c,d)=(vertex(i,j),vertex(i+1,j),vertex(i+1,j+1),vertex(i,j+1));
+                emit([bottom(a),bottom(d),bottom(c)],materials[source],source)?;
+                emit([bottom(a),bottom(c),bottom(b)],materials[source],source)?;
+                emit([top(a),top(b),top(c)],upper,source)?;emit([top(a),top(c),top(d)],upper,source)?;
+            }
+            for (j,reverse) in [(left,false),(right,true)] {
+                let(a,b)=(vertex(i,j),vertex(i+1,j));let mut q=[bottom(a),bottom(b),top(b),top(a)];if reverse{q.reverse();}
+                emit([q[0],q[1],q[2]],upper,source)?;emit([q[0],q[2],q[3]],upper,source)?;
+            }
         }
-        for (j,reverse) in [(0,false),(6,true)] {
-            let(a,b)=(self.rows[i][j],self.rows[i+1][j]);let mut q=[a,b,top(b),top(a)];if reverse{q.reverse();}
-            emit([q[0],q[1],q[2]],sky,source)?;emit([q[0],q[2],q[3]],sky,source)?;
-        }}
-        for (i,reverse) in [(0,false),(last,true)] {for j in 0..6 {
-            let(a,b)=(self.rows[i][j],self.rows[i][j+1]);let mut q=[a,top(a),top(b),b];if reverse{q.reverse();}
-            emit([q[0],q[1],q[2]],sky,0)?;emit([q[0],q[2],q[3]],sky,0)?;
-        }}
+        for (i,reverse) in [(0,false),(last,true)] {
+            let source=if sky.is_some(){0}else{usize::from(i==last)};
+            let material=sky.unwrap_or(materials[source]);
+            for j in left..right {
+                let(a,b)=(vertex(i,j),vertex(i,j+1));let mut q=[bottom(a),top(a),top(b),bottom(b)];if reverse{q.reverse();}
+                emit([q[0],q[1],q[2]],material,source)?;emit([q[0],q[2],q[3]],material,source)?;
+            }
+        }
         gl.merge();checked(Manifold::from_mesh_gl64(&gl),"Source-profile terrain seam")
     }
 }
@@ -438,6 +513,9 @@ mod tests{
         let rows=(0..=8).map(|i|[-11f64,-7.,-3.,0.,3.,7.,11.].iter().map(|y|[i as f64*4.,*y,((y.abs()-3.)/8.).max(0.).powi(2)*4.]).collect()).collect();
         let ribbon=Ribbon{rows,roof:20.,projections:[project(0.),project(0.)],boundary:Boundary{axis:[1.,0.,0.],base_max:15.,donor_min:17.}};
         let body=ribbon.solid(&plan,[0,1],2).unwrap();assert!(body.volume()>10_000.);
+        let support=ribbon.road_support(&plan,[0,1]).unwrap();
+        assert!((support.volume()-32.*6.*ROAD_FILL_DEPTH).abs()<1e-8);
+        assert!(support.get_mesh_gl64(-1).face_id.iter().all(|id| *id==0 || *id==1));
         let mesh=body.get_mesh_gl64(-1);assert!(mesh.face_id.contains(&0)&&mesh.face_id.contains(&1)&&mesh.face_id.contains(&2));
         for (index,tri) in mesh.tri_verts.chunks_exact(3).enumerate(){let material=mesh.face_id[index];if material==2{continue;}
             for id in tri{let values=&mesh.vert_properties[*id as usize*5..*id as usize*5+5];let local_x=values[0]-if material==1{20.}else{0.};assert!((values[3]-local_x/4.).abs()<1e-8);assert!((values[4]-values[1]/4.).abs()<1e-8);}
