@@ -165,6 +165,7 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
   }, [canvas]);
   useEffect(() => () => texture.dispose(), [texture]);
   const history = useRef<ImageData[]>([]);
+  const lastStamp = useRef<{ x: number; y: number; chart: number } | null>(null);
   useEffect(() => { history.current = []; setRevision(0); }, [canvas]);
 
   function stamp(uv: THREE.Vector2, start: boolean) {
@@ -175,12 +176,24 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
     }
     const x = uv.x * atlasSize;
     const y = (1 - uv.y) * atlasSize;
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    gradient.addColorStop(0, color + 'd9');
-    gradient.addColorStop(0.5, color + '8c');
-    gradient.addColorStop(1, color + '00');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    // Procedural shapes have six known UV islands. Never draw a connecting
+    // line across those islands or across an unknown seam on an imported OBJ.
+    const chart = form === 'selected' ? -1 : Math.floor(uv.x * 3) + 3 * Math.floor(uv.y * 2);
+    const previous = start ? null : lastStamp.current;
+    const interpolate = previous && chart >= 0 && previous.chart === chart;
+    const length = interpolate ? Math.hypot(x - previous.x, y - previous.y) : 0;
+    const steps = Math.min(128, Math.max(1, Math.ceil(length / (radius * 0.45))));
+    for (let step = 1; step <= steps; step++) {
+      const cx = interpolate ? previous.x + (x - previous.x) * step / steps : x;
+      const cy = interpolate ? previous.y + (y - previous.y) * step / steps : y;
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      gradient.addColorStop(0, color + 'd9');
+      gradient.addColorStop(0.5, color + '8c');
+      gradient.addColorStop(1, color + '00');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    }
+    lastStamp.current = { x, y, chart };
     texture.needsUpdate = true;
   }
 

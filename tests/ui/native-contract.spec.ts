@@ -8126,13 +8126,45 @@ test('Asset Workshop shapes a curved plow, paints it, and exports the source and
   const canvas=editor.locator('canvas');
   await expect(canvas).toBeVisible();
   const rect=(await canvas.boundingBox())!;
-  await page.mouse.click(rect.x+rect.width/2,rect.y+rect.height/2);
+  await editor.getByRole('slider',{name:'Brush size',exact:true}).press('Home');
+  const centerX=rect.x+rect.width/2, centerY=rect.y+rect.height/2;
+  await page.mouse.move(centerX-18,centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX+18,centerY);
+  await page.mouse.up();
   await expect(editor.getByRole('button',{name:'Undo paint',exact:true})).toBeEnabled();
   const [png] = await Promise.all([page.waitForEvent('download'),editor.getByRole('button',{name:'Export paint PNG',exact:true}).click()]);
   expect(png.suggestedFilename()).toBe('plow_steel.png');
   const pixels=await readFile((await png.path())!);
   expect(pixels.readUInt32BE(16)).toBe(512);
   expect(pixels.readUInt32BE(20)).toBe(512);
+  const stroke=await page.evaluate(async encoded=>{
+    const bitmap=await createImageBitmap(await (await fetch('data:image/png;base64,'+encoded)).blob());
+    const buffer=new OffscreenCanvas(bitmap.width,bitmap.height);
+    const ctx=buffer.getContext('2d')!;
+    ctx.drawImage(bitmap,0,0);
+    const {data}=ctx.getImageData(0,0,bitmap.width,bitmap.height);
+    const colored=new Set<number>();
+    const width=bitmap.width;
+    for (let i=0;i<data.length;i+=4) if (data[i]>data[i+1]+14) colored.add(i/4);
+    const pixels=colored.size;
+    let islands=0;
+    while (colored.size) {
+      const first=colored.values().next().value!;
+      colored.delete(first);
+      const queue=[first];
+      for (let i=0;i<queue.length;i++) {
+        const p=queue[i];
+        for(const neighbor of [p-width,p+width,p%width?p-1:p,p%width<width-1?p+1:p])
+          if (colored.delete(neighbor)) queue.push(neighbor);
+      }
+      islands++;
+    }
+    bitmap.close();
+    return {pixels,islands};
+  },pixels.toString('base64'));
+  expect(stroke.pixels).toBeGreaterThan(30);
+  expect(stroke.islands).toBe(1);
   await editor.getByRole('button',{name:'Undo paint',exact:true}).click();
   await expect(editor.getByRole('button',{name:'Undo paint',exact:true})).toBeDisabled();
 });
