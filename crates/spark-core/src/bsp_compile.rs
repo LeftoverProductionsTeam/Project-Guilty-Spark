@@ -842,8 +842,10 @@ fn with_native_bake_scenario<'a>(
     let source = tags.join(safe_relative(&scenario_tag)?);
     let original_hash = maps::hash_file(&source)?;
     let copy = safe_relative(scenario_path)?.with_file_name(format!("gsbake_{}", &runner.id[..8]));
-    // Invader's save-as joins this path directly to its host tags directory.
-    let copy_tag = format!("{}.scenario", copy.to_string_lossy().replace('\\', "/"));
+    // Invader joins save-as to the host filesystem root. Windows verbatim
+    // tag roots require backslashes even though tag IDs accept either spelling.
+    let copy_tag = copy.with_extension("scenario").to_string_lossy()
+        .replace(['\\', '/'], std::path::MAIN_SEPARATOR_STR);
     let file = tags.join(copy.with_extension("scenario"));
     reject_links(&file)?;
     if file.try_exists()? {
