@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectEntrypoints, checkSourceEntrypoints } from './check-source-entrypoints.mjs';
+import { inspectEntrypoints, checkSourceEntrypoints, windowsMappingIssue } from './check-source-entrypoints.mjs';
 
 test('module contracts reject generated caches and retired archives in all import forms', () => {
   for (const file of [
@@ -40,4 +40,17 @@ test('the actual application, tests, packaging and executable documentation use 
   const result = await checkSourceEntrypoints();
   assert.ok(result.checkedFiles > 100);
   assert.equal(result.issues, 0);
+});
+
+test('native mapping operations are refused while ordinary physical paths work', () => {
+  for (const code of [
+    'spawn("subst.exe", ["U:", root]);',
+    'extern "system" { fn DefineDosDeviceW() -> i32; }',
+    'New-PSDrive -Name U -Root "$root"',
+    'mountvol.exe U: "$volume"',
+    'Mount-VHD -Path $file',
+    'net use U: "\\server\workspace"',
+  ]) assert.match(windowsMappingIssue(code)?.reason ?? '', /physical folders/);
+  assert.equal(windowsMappingIssue('// Old SUBST mapping was removed\nconst cwd = "D:/Project";'), null);
+  assert.equal(windowsMappingIssue('GetShortPathNameW(root, buffer, capacity);'), null);
 });

@@ -1,6 +1,34 @@
 //! Relative paths for legacy native tools running inside an owned physical project directory.
 
 #[cfg(windows)]
+pub(crate) fn prepare_command(
+    executable: &std::path::Path,
+    workspace: &std::path::Path,
+    args: &[String],
+    phase: &str,
+) -> crate::Result<(Option<Vec<String>>, Option<std::path::PathBuf>)> {
+    let tool = executable.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+    let extended = tool == "invader-extract.exe";
+    let relative = match tool.as_str() {
+        "invader-build.exe" => phase == "compile-ce",
+        "invader-refactor.exe" => matches!(phase, "asset-references" | "tag-renaming" | "xbox-model-references"),
+        "invader-convert.exe" => phase == "xbox-model-to-pc",
+        "invader-edit.exe" => matches!(phase, "asset-native-readback" | "asset-placement" | "tag-renaming"
+            | "bsp-scenery-model" | "bsp-scenery-model-check" | "model-adaptation-readback"
+            | "recovery-readback" | "recovery-dependencies" | "recovery-data"),
+        "invader-dependency.exe" => matches!(phase, "dependencies" | "asset-dependencies"
+            | "tag-renaming" | "bsp-dependencies" | "recovery-readback" | "recovery-dependencies" | "recovery-data"),
+        "invader-recover.exe" => matches!(phase, "recovery-readback" | "recovery-dependencies" | "recovery-data"),
+        _ => false,
+    };
+    let normalized = (extended || relative).then(|| extraction_arguments(args, workspace, extended)).transpose()?;
+    let working_directory = if tool == "invader-refactor.exe" {
+        short_physical_directory(workspace)
+    } else { None };
+    Ok((normalized, working_directory))
+}
+
+#[cfg(windows)]
 pub(crate) fn extraction_arguments(args: &[String], workspace: &std::path::Path, extended_tags: bool) -> crate::Result<Vec<String>> {
     use std::path::Path;
     crate::reject_links(workspace)?;

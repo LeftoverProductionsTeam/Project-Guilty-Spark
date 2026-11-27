@@ -63,9 +63,18 @@ export function inspectEntrypoints(filename, text) {
   return issues;
 }
 
+export function windowsMappingIssue(text) {
+  const command = /\b(?:subst(?:\.exe)?|DefineDosDevice(?:A|W)?|New-PSDrive|mountvol(?:\.exe)?|(?:New|Mount)-VHD|WNetAddConnection(?:2|3)?[AW]?)\b|\bnet(?:\.exe)?\s+use\s+["']?(?:[A-Z]:|\*(?=\s|["']|$))/i;
+  const lines = text.split(/\r?\n/);
+  const index = lines.findIndex((line) => !/^\s*(?:\/\/|\/\*|\*|#)/.test(line) && command.test(line));
+  return index === -1 ? null : { line: index + 1, specifier: lines[index].trim(),
+    reason: 'Spark build and QA code must use existing physical folders without drive mapping APIs.' };
+}
+
 export async function checkSourceEntrypoints(root = fileURLToPath(new URL('..', import.meta.url))) {
   const issues = [],
-    stack = ['src', 'tests', 'scripts', 'public', '.github', 'docs'];
+    stack = ['src', 'tests', 'scripts', 'public', '.github', 'docs', 'crates/spark-core/src',
+      'crates/spark-core/examples', 'src-tauri/src', 'src-tauri/examples'];
   const files = ['vite.config.ts', 'vitest.config.ts', 'playwright.config.ts', 'package.json', 'README.md'];
   while (stack.length) {
     const directory = stack.pop();
@@ -73,11 +82,17 @@ export async function checkSourceEntrypoints(root = fileURLToPath(new URL('..', 
       const relative = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) throw Error(`Linked source check path refused: ${relative}`);
       if (entry.isDirectory()) stack.push(relative);
-      else if (/\.(?:[cm]?[jt]sx?|md|html|ya?ml)$/i.test(entry.name)) files.push(relative);
+      else if (/\.(?:[cm]?[jt]sx?|md|html|ya?ml|rs|ps1|sh|bat|cmd|cs|c|cpp)$/i.test(entry.name)) files.push(relative);
     }
   }
   for (const file of files) {
     const text = await fs.readFile(path.join(root, file), 'utf8');
+    if (/\.(?:[cm]?[jt]sx?|ya?ml|rs|ps1|sh|bat|cmd|cs|c|cpp)$/i.test(file)
+        && !['check-source-entrypoints.mjs', 'check-source-entrypoints.test.mjs'].includes(path.basename(file))
+        && !file.startsWith('docs' + path.sep)) {
+      const mapping = windowsMappingIssue(text);
+      if (mapping) issues.push({ file, ...mapping });
+    }
     if (/\.[cm]?[jt]sx?$/i.test(file)) issues.push(...inspectEntrypoints(file, text));
     else if (/\.md$/i.test(file)) {
       // Historical path inventories are preserved. Executable module examples
@@ -103,6 +118,10 @@ export async function checkSourceEntrypoints(root = fileURLToPath(new URL('..', 
     }
     if (file === 'package.json') {
       const commands = Object.values(JSON.parse(text).scripts ?? {});
+      for (const text of commands) {
+        const mapping = windowsMappingIssue(text);
+        if (mapping) issues.push({ file, ...mapping });
+      }
       for (const command of commands)
         for (const match of command.matchAll(
           /(?:^|\s)(["']?[^\s"']*(?:\.local|preserved[\\/]recovery-(?:archives|metadata))[^\s"']*)/g,
