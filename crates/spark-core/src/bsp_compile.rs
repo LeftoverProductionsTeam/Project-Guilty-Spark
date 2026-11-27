@@ -649,6 +649,7 @@ fn native_step(
     ];
     command.extend_from_slice(args);
     let log = runner.run(tool, &command, workspace, phase, 48)?;
+    check_lightmap_target(phase, &log)?;
     let lower = log.to_ascii_lowercase();
     let isolated_lighting = phase == "bsp-isolated-lightmaps";
     let diagnostic = lower.lines().filter(|line| {
@@ -671,6 +672,18 @@ fn native_step(
     }
     Ok(log)
 }
+fn check_lightmap_target(phase: &str, log: &str) -> Result<()> {
+    if matches!(phase, "bsp-lightmaps" | "bsp-isolated-lightmaps") {
+        for line in log.lines().map(str::trim) {
+            let normalized = line.to_ascii_lowercase();
+            if normalized.starts_with("warning: did not find any bsps by the name ") {
+                return invalid(format!("Halo Tool skipped the lighting target: {line}"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn isolated_lightmaps_shell_warning(line: &str) -> bool {
     // These shell assets are not inputs to radiosity. Native output is
     // independently required before accepting an isolated lighting run.
@@ -2300,6 +2313,18 @@ mod base_transform_tests {
         assert!(verify_compiled_base(&project, &base, &base).is_err());
         project.scene[0].rotation[1] = 0.25;
         assert!(base_transforms(&project, &base).is_err());
+    }
+
+
+    #[test]
+    fn lightmap_target_must_be_selected_even_after_successful_tool_exit() {
+        let skipped = "WARNING: Did NOT find any bsps by the name 'levels\\spark\\entrance' to light\r\ndone";
+        for phase in ["bsp-lightmaps", "bsp-isolated-lightmaps"] {
+            let error = check_lightmap_target(phase, skipped).unwrap_err().to_string();
+            assert!(error.contains("skipped the lighting target"));
+            assert!(error.contains(r"levels\spark\entrance"));
+            assert!(check_lightmap_target(phase, "lightmap 0: 128 by 128\ndone").is_ok());
+        }
     }
 
     #[test]
