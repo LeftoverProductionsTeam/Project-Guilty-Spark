@@ -1619,7 +1619,11 @@ fn append_stock_render(
             }
             let volumes = if all_faces || tag.class == "swat" { exclusions } else { &[] };
             let source = RenderTri { p: points, n: normal(points[0], points[1], points[2]), uv: uvs };
-            for polygon in exclude_passage_volume(points, volumes) {
+            for mut polygon in exclude_passage_volume(points, volumes) {
+                if polygon.len() > 3 {
+                    let anchor = crate::bsp_triangulate::clipped_render_fan(&polygon);
+                    polygon.rotate_left(anchor);
+                }
                 for pair in polygon[1..].windows(2) {
                     // Tool reverses JMS index order when emitting native BSP
                     // surfaces. Convert the copied native indices back to

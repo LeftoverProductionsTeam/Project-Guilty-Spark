@@ -59,6 +59,30 @@ fn chart_property(m: &MeshGL64, face: [u64; 3], weights: V, property: usize) -> 
         m.vert_properties[id as usize * m.num_prop as usize + property] * weight
     }).sum()
 }
+/// Triangulate a clipped convex render polygon without changing its boundary.
+/// Prefer the fan whose smallest triangle altitude survives Tool's precision best.
+pub(super) fn clipped_render_fan(polygon: &[V]) -> usize {
+    let native: Vec<_> = polygon.iter().copied()
+        .map(crate::bsp_assembly::native_export_point).collect();
+    let mut best = (0, -1.);
+    for anchor in 0..native.len() {
+        let mut altitude = f64::INFINITY;
+        for index in 1..native.len() - 1 {
+            let a = native[anchor];
+            let b = native[(anchor + index) % native.len()];
+            let c = native[(anchor + index + 1) % native.len()];
+            let ab = sub(b, a);
+            let ac = sub(c, a);
+            let bc = sub(c, b);
+            let longest = dot(ab, ab).max(dot(ac, ac)).max(dot(bc, bc));
+            let normal = cross(ab, ac);
+            altitude = altitude.min(dot(normal, normal) / longest.max(1e-30));
+        }
+        if altitude > best.1 { best = (anchor, altitude); }
+    }
+    best.0
+}
+
 pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m, None, false) }
 pub(crate) fn improve_at_native_precision(m: &mut MeshGL64) -> usize { improve_material(m, None, true) }
 fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool) -> usize {
@@ -713,5 +737,23 @@ mod tests {
         let mut m = needle(); let positions = m.vert_properties.clone(); let indices = m.tri_verts.clone(); let materials = m.face_id.clone();
         assert!(refine_native_needles(&mut m, 2, 0).unwrap_err().to_string().contains("budget"));
         assert_eq!(m.vert_properties, positions);assert_eq!(m.tri_verts,indices);assert_eq!(m.face_id,materials);
+    }
+}
+
+#[cfg(test)]
+mod clipped_render_fan_tests {
+    use super::*;
+
+    #[test]
+    fn clipped_stock_polygon_avoids_a_native_collapsed_fan() {
+        // In Tool's float centimeter coordinates the second vertex lies on
+        // the bottom edge. Rotating the fan triangulates both strips.
+        let polygon = [
+            [945., 140., -15.7],
+            [945.02, 140.000001, -15.7],
+            [945.10, 140., -15.7],
+            [945., 140.10, -15.7],
+        ];
+        assert_eq!(clipped_render_fan(&polygon), 1);
     }
 }
