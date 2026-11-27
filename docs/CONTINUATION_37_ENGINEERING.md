@@ -45,3 +45,9 @@ Fresh source results: 494 Rust passed / seven opt-in ignored; 216 frontend tests
 ## First founder acceptance
 
 Open a validated MCC H1 source project, save it, expand Runtime & Tools details and Baboon, choose the verified portable folder, and open the scenario or selected Tag Editor tag. Save in Baboon, wait for a stable file change, review the complete changed files, keep a new working revision, close the external editor and choose **Build working tag edits**. Open the built map in a separate tab. Use **Restore starting source to a new revision** to recover; the later revisions and last compiled map remain available. Structural source edits require native review rather than automatic application.
+
+### Independent Invader rebuild of a reviewed weapon field
+
+The installed Invader extracted 2,455 tags from owned CE Blood Gulch 81764a45. A direct MCC build exposed the known stock Warthog gunner enum failure. The stock MCC cache also yielded 333 extraction errors, including the missing teleporter-loop sound. The successful disposable CE-derived build used Spark’s existing three hash-pinned stock corrections and verified every before/after hash.
+
+Invader changed the pistol bounding radius to 0.375 in the disposable tag tree and compiled MCC13 325e00bc8b9d24a312774e9cb24f5f8447707ae7475852cb46d688c2df41bc63, 70,198,960 bytes, CRC 412658FF. Independent extraction read 0.375. Restoring the exact starting weapon tag and rebuilding produced MCC13 fc30de029f1f47e082795026c4361b61af6e2a527b9938c52250ac5b41c4528e, CRC 66F0595A. Independent extraction read 0.1. The original map and all three resource banks rehashed unchanged. Live Invader Qt Save and Spark’s project Apply/Undo followed by Build remain separate acceptance gates. The successful run disposed 144,946,063 logical bytes.
