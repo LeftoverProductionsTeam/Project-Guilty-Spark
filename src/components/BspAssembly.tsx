@@ -239,10 +239,6 @@ export default function BspAssembly({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
-  const draftNow=useRef(draft);draftNow.current=draft;
-  const operation = useRef(0),
-    mounted = useRef(false);
-  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex });
   const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
   const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
@@ -251,6 +247,10 @@ export default function BspAssembly({
     ? [...new Set(analyzeHaloToolLog(currentStructureCheck.messages.join('\n')).diagnostics.map(issue => issue.action))]
     : [];
 
+  const draftNow=useRef(draft);draftNow.current=draft;
+  const operation = useRef(0),
+    mounted = useRef(false);
+  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex });
   latest.current = { projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex };
   const options = sectionList?.donor === donor ? sectionList.values : [];
   const loadingOptions = native && open && !!donor && sectionList?.donor !== donor && !optionsError;
@@ -456,10 +456,6 @@ export default function BspAssembly({
       if(current()&&latest.current.signature===signature&&latest.current.donor===value.donorProjectId&&latest.current.index===value.donorBspIndex&&latest.current.baseIndex===(value.baseBspIndex??0)){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
-  function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
-    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
-  }
-  function armEdge(target:'base'|'donor', landing:typeof pickingLanding = null){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
   async function checkNativeStructure() {
     if (!draft || !applied || !selectionMatches || busy) return;
     const key = structureKey;
@@ -470,6 +466,10 @@ export default function BspAssembly({
       if (current()) setStructureCheck({ ...check, key });
     });
   }
+  function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
+  }
+  function armEdge(target:'base'|'donor', landing:typeof pickingLanding = null){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
       <div className="bsp-vector">
@@ -1032,18 +1032,6 @@ export default function BspAssembly({
                       onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
                     <p className="subtle">With preservation enabled, apply and save the connection, then build for MCC13. The connector gets its own BSP slot. Leave straight space around each landing for the native switches.</p>
                   </div>}
-                  {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
-                    onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
-                    <option value={0}>BSP 0 · Current region</option>
-                    <option value={1}>BSP 1 · Donor region</option>
-                  </select></label>}
-                </>}
-              </fieldset>
-              <div className="bsp-actions">
-                <button
-                  disabled={busy || (draft.separateNativeBsps && (!draft.preserveDonorBsp || !!draft.openRoad)) || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
-                  onClick={() => {
-                    const a = routeDraft!.tunnelPoints.at(-2)!,
                   <button type="button" disabled={busy || !native || !selectionMatches || !applied}
                     onClick={() => void checkNativeStructure()}>Check structure in Halo Tool</button>
                   <small>Apply and save the connection first. This checks native collision and structure before lighting and map compilation.</small>
@@ -1077,6 +1065,18 @@ export default function BspAssembly({
                       </details>}
                     </div>
                   )}
+                  {!canExtend && <label>Preview native BSP <select value={nativeBspIndex} disabled={busy}
+                    onChange={event => {setNativeBspIndex(Number(event.target.value)); setReport(null);}}>
+                    <option value={0}>BSP 0 · Current region</option>
+                    <option value={1}>BSP 1 · Donor region</option>
+                  </select></label>}
+                </>}
+              </fieldset>
+              <div className="bsp-actions">
+                <button
+                  disabled={busy || (draft.separateNativeBsps && (!draft.preserveDonorBsp || !!draft.openRoad)) || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
+                  onClick={() => {
+                    const a = routeDraft!.tunnelPoints.at(-2)!,
                       b = routeDraft!.tunnelPoints.at(-1)!;
                     updateRoute({
                       tunnelPoints: [
