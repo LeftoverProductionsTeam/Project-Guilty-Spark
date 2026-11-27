@@ -147,13 +147,14 @@ export default function BaboonTools({
         setMessage('Verified the Baboon executable and matching Halo 1 definitions. No tag has been opened.');
     });
   }
-  async function open() {
+  async function open(useInvaderQt = false) {
     if (!projectId || dirty) return;
     const version = generation.current;
     await perform(async () => {
       const prepared = await call<{ sessionId: string; tag: string; files: number }>('baboon_prepare', {
         projectId,
         tagId: tagId ?? null,
+        useInvaderQt,
       });
       if (version !== generation.current) return;
       setSessionId(prepared.sessionId);
@@ -165,7 +166,7 @@ export default function BaboonTools({
       await refresh();
       if (version === generation.current)
         setMessage(
-          `Sent ${prepared.tag} to Baboon in this map’s isolated editing kit (${prepared.files} native files). Save there, then keep the stable changes below.`,
+          `Opened ${prepared.tag} in ${useInvaderQt ? 'Invader Qt' : 'Baboon'} from a private copy. Save there, then review the stable changes below.`,
         );
     });
   }
@@ -220,7 +221,7 @@ export default function BaboonTools({
   return (
     <details className="baboon-tools" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary>
-        Baboon · native tag editing{' '}
+        {tagId != null ? 'External tag editors' : 'Baboon · native tag editing'}{' '}
         <Pill tone={report?.installed ? 'green' : 'muted'}>
           {report?.installed ? `Verified ${report.installed.version}` : 'Set up'}
         </Pill>
@@ -269,6 +270,10 @@ export default function BaboonTools({
               : 'Open this map’s scenario in Baboon'}
         </button>
       )}
+      {tagId != null && report?.invaderQtReady && (
+        <button type="button" disabled={!native || busy || dirty || !report.sourceReady}
+          onClick={() => void open(true)}>Edit this tag with Invader Qt</button>
+      )}
       {dirty && (
         <p className="subtle">
           Save and build the current map before handing its tags to another editor. Your Spark draft stays
@@ -312,7 +317,7 @@ export default function BaboonTools({
           )}
           <strong>{observed.tag}</strong>
           <p>
-            {observed.running ? 'Baboon is open' : 'Baboon is closed'} ·{' '}
+            {observed.editorName ?? 'Baboon'} {observed.running ? 'is open' : 'is closed'} ·{' '}
             {observed.changes.status === 'saving'
               ? 'Waiting for a stable save'
               : `${observed.changes.changedFiles} saved native file changes`}{' '}

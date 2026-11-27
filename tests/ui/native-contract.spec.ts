@@ -1588,7 +1588,7 @@ test('native handoff warnings keep updating with tool controls closed and across
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('reviewed loose-tag values apply together through project Undo',async({page})=>{
+test('Invader Qt receives the selected tag and shared reviewed values support Undo',async({page})=>{
   await mockDesktop(page);
   await openFixture(page);
   const field=page.getByRole('spinbutton').first();
@@ -1596,10 +1596,16 @@ test('reviewed loose-tag values apply together through project Undo',async({page
   await page.evaluate(()=>{
     const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);
     const map=w.__sparkMock.projects.a,tag=map.inspection.tags[0];
+    w.__sparkMock.invaderPrepare=null;
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
-      if(command==='baboon_report')return {installed:{version:'0.3.2',directory:'C:/fixture'},sourceReady:true,sessionId:'fixture',compatibleKits:[]};
-      if(command==='baboon_poll')return {sessionId:'fixture',tag:'weapons/test.weapon',running:false,revisions:[],
+      if(command==='baboon_report')return {installed:{version:'0.3.2',directory:'C:/fixture'},sourceReady:true,invaderQtReady:true,sessionId:'fixture',compatibleKits:[]};
+      const poll={sessionId:'fixture',tag:'weapons/test.weapon',editorName:'Invader Qt',running:false,revisions:[],
         changes:{status:'changed',revision:1,changedFiles:1,totalFiles:1,changes:[{path:'weapons/test.weapon',kind:'modified'}]}};
+      if(command==='baboon_prepare'){
+        w.__sparkMock.invaderPrepare=args;
+        return {sessionId:'fixture',tag:'weapons/test.weapon',files:1};
+      }
+      if(command==='baboon_poll'||command==='baboon_launch')return poll;
       if(command==='baboon_review_project_fields')return {sessionId:'fixture',revision:1,projectId:'a',tagId:tag.id,
         sourceSha256:map.project.source.sha256,tag:'weapons/test.weapon',
         fields:[{key:tag.fields[0].key,label:tag.fields[0].label,before:tag.fields[0].value,after:33,unit:''}]};
@@ -1609,6 +1615,9 @@ test('reviewed loose-tag values apply together through project Undo',async({page
   await page.getByRole('tab',{name:'Native Output',exact:true}).click();
   await page.locator('.baboon-tools > summary:visible').first().click();
   await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-baboon-session',{detail:{projectId:'a'}})));
+  await page.getByRole('button',{name:'Edit this tag with Invader Qt',exact:true}).click();
+  const prepared=await page.evaluate(()=>(window as any).__sparkMock.invaderPrepare);
+  expect(prepared).toEqual({projectId:'a',tagId:expect.any(Number),useInvaderQt:true});
   await page.getByRole('button',{name:'Review values for this project',exact:true}).click();
   await expect(page.getByText(/→ 33/)).toBeVisible();
   await page.getByRole('button',{name:'Apply reviewed values',exact:true}).click();

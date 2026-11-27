@@ -29,6 +29,8 @@ pub(super) struct Session {
     definitions_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_field_admission: Option<ProjectFieldAdmission>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    invader_executable: Option<PathBuf>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -131,6 +133,7 @@ pub(super) struct Dashboard {
     session_id: Option<String>,
     sessions: Vec<SessionSummary>,
     source_ready: bool,
+    invader_qt_ready: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -362,6 +365,12 @@ pub(super) fn compilation_source(
     transaction::fork(&source, &output, cancel).map_err(error)?;
     Ok(output)
 }
+fn invader_qt(state: &AppState, project: &Project) -> Reply<(PathBuf, String)> {
+    let directory = native_tag_parser::invader_directory(state, project)?;
+    let (executable, hash, _) = dependency_install::pe_identity(&directory.join("invader-edit-qt.exe"))?;
+    Ok((executable, hash))
+}
+
 #[tauri::command]
 pub(super) async fn baboon_report(
     app: tauri::AppHandle,
@@ -371,9 +380,10 @@ pub(super) async fn baboon_report(
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let (installed,setup_issue)=match installation(&state){Ok(i)=>(Some(i),None),Err(e)=>(None,Some(e))};
-        let mut source_issue=None;let mut source_ready=false;let mut session_id=None;let mut sessions:Vec<SessionSummary>=vec![];
+        let mut source_issue=None;let mut source_ready=false;let mut invader_qt_ready=false;let mut session_id=None;let mut sessions:Vec<SessionSummary>=vec![];
         if let Some(id)=project_id {
             check_document_owner(&state,&id,&owner)?;let p=lock(&state.library)?.get(&id).map_err(error)?;
+            invader_qt_ready=invader_qt(&state,&p).is_ok();
             match current_native_build(&state,&p).and_then(|b|runtime_workbench::compiled_tags(&state,&p,&b)){Ok(_)=>source_ready=true,Err(e)=>source_issue=Some(format!("Baboon edits loose MCC H1 tags, not this preserved compiled cache. Build or convert this map to a validated MCC working tag tree first. {e}"))}
             let recent:Option<String>=lock(&state.library)?.setting(&latest_key(&id)).map_err(error)?;
             if let Some(id)=recent {if load(&state,&id,&owner,&p.id).is_ok(){session_id=Some(id);}}
@@ -381,7 +391,7 @@ pub(super) async fn baboon_report(
             if sessions.len()>32{return Err("Native handoff history exceeds its supported bound".into());}
             sessions.retain(|s|s.owner==owner);
         }
-        Ok(Dashboard{installed,setup_issue,source_issue,source_ready,session_id,sessions,compatible_kits:baboon::KITS})
+        Ok(Dashboard{installed,setup_issue,source_issue,source_ready,invader_qt_ready,session_id,sessions,compatible_kits:baboon::KITS})
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -415,12 +425,19 @@ pub(super) async fn baboon_prepare(
     window: tauri::WebviewWindow,
     project_id: String,
     tag_id: Option<u32>,
+    use_invader_qt: Option<bool>,
 ) -> Reply<Prepared> {
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
         let started=Instant::now();let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_native_build(&state,&p)?;
-        let tags=runtime_workbench::compiled_tags(&state,&p,&build)?;let installed=installation(&state)?;
+        let tags=runtime_workbench::compiled_tags(&state,&p,&build)?;
+        let use_invader_qt = use_invader_qt.unwrap_or(false);
+        if use_invader_qt && tag_id.is_none() {
+            return Err("Select the exact tag to edit in Invader Qt".into());
+        }
+        let invader = use_invader_qt.then(|| invader_qt(&state, &p)).transpose()?;
+        let installed = (!use_invader_qt).then(|| installation(&state)).transpose()?;
         let fingerprint=p.fingerprint().map_err(error)?;
         let mut history:Vec<SessionSummary>=lock(&state.library)?.setting(&history_key(&project_id)).map_err(error)?;
         if history.len()>=32{return Err("This map retains 32 native handoffs. Select a previous handoff to review/recover it before preparing more; no source was deleted.".into());}
@@ -432,14 +449,20 @@ pub(super) async fn baboon_prepare(
         let baseline=transaction::fork(&tags,&directory.join("baseline"),cancel.clone()).map_err(error)?;
         let kit=directory.join("HCEEK");fs::create_dir(&kit).map_err(error)?;
         if transaction::fork(&directory.join("baseline"),&kit.join("tags"),cancel).map_err(error)?!=baseline {return Err("The native source fork did not preserve its baseline".into());}
-        baboon::prepare_instance(&installed,&directory.join("editor"),&kit).map_err(error)?;
+        let (invader_executable, executable_sha256, definitions_sha256) = if let Some(installed) = installed {
+            baboon::prepare_instance(&installed, &directory.join("editor"), &kit).map_err(error)?;
+            (None, installed.executable_sha256, installed.definitions_sha256)
+        } else {
+            let (path, hash) = invader.ok_or("The selected editor is unavailable")?;
+            (Some(path), hash, String::new())
+        };
         if lock(&state.library)?.get(&project_id).map_err(error)?.fingerprint().map_err(error)?!=fingerprint {return Err("The map changed while preparing Baboon. Its source copies remain available; prepare the current saved revision again".into());}
-        let session=Session{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint,parent_build_id:build.id,selected_tag:selected.clone(),initial_baseline:baseline.clone(),baseline,revisions:vec![],executable_sha256:installed.executable_sha256,definitions_sha256:installed.definitions_sha256,project_field_admission:None};
+        let session=Session{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint,parent_build_id:build.id,selected_tag:selected.clone(),initial_baseline:baseline.clone(),baseline,revisions:vec![],executable_sha256,definitions_sha256,project_field_admission:None,invader_executable};
         save(&state,&session)?;
         history.push(SessionSummary{id:id.clone(),tag:selected.clone(),owner:session.owner.clone()});
         lock(&state.library)?.set_setting(&history_key(&project_id),&history).map_err(error)?;
         lock(&state.library)?.set_setting(&latest_key(&project_id),&Some(id.clone())).map_err(error)?;
-        Ok(Prepared{session_id:id,tag:selected,files:session.baseline.len(),elapsed_ms:started.elapsed().as_millis(),detail:"Prepared native tags, an unchanged baseline and a separate portable Baboon profile. Save in Baboon, review detected changes, then keep them as a new working revision.".into()})
+        Ok(Prepared{session_id:id,tag:selected,files:session.baseline.len(),elapsed_ms:started.elapsed().as_millis(),detail:"Prepared a private edit tree and unchanged baseline. Save in the external editor, then review supported values or keep the complete working revision.".into()})
     }).await.map_err(error)?
 }
 fn watched(state: &AppState, session: &Session) -> Reply<Arc<Mutex<Watched>>> {
@@ -489,6 +512,7 @@ pub(super) struct Poll {
     integrity: core::native_tag_integrity::Report,
     writer_context: String,
     writer_evidence: native_save_evidence::SaveEvidence,
+    editor_name: String,
 }
 fn poll(state: &AppState, session: &Session) -> Reply<Poll> {
     let watched = watched(state, session)?;
@@ -551,7 +575,8 @@ fn poll(state: &AppState, session: &Session) -> Reply<Poll> {
             2,
         )?;
     }
-    let writer_context=format!("Baboon handoff{}; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",watch.child.as_ref().map(|c|format!(" · last launched PID {}",c.id())).unwrap_or_default());
+    let editor_name = if session.invader_executable.is_some() { "Invader Qt" } else { "Baboon" };
+    let writer_context=format!("{editor_name} handoff{}; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",watch.child.as_ref().map(|c|format!(" · last launched PID {}",c.id())).unwrap_or_default());
     Ok(Poll {
         session_id: session.id.clone(),
         tag: session.selected_tag.clone(),
@@ -561,9 +586,11 @@ fn poll(state: &AppState, session: &Session) -> Reply<Poll> {
         revisions: session.revisions.clone(),
         integrity,
         writer_context,
+        editor_name: editor_name.into(),
         writer_evidence: native_save_evidence::collect(&watch.monitor, vec![native_save_evidence::ToolAssociation {
-            tool: "Baboon".into(), version: "0.3.2 (prepared reviewed binary)".into(),
-            executable: root(state, &session.id)?.join("editor/Baboon.exe"),
+            tool: editor_name.into(),
+            version: if session.invader_executable.is_some() { "Prepared binary fingerprint" } else { "0.3.2 (prepared reviewed binary)" }.into(),
+            executable: session.invader_executable.clone().unwrap_or(root(state, &session.id)?.join("editor/Baboon.exe")),
             executable_sha256: session.executable_sha256.clone(),
             process_id: watch.child.as_ref().map(Child::id),
             basis: if watch.child.is_some() { "Associated prepared handoff and last Spark-launched process; actual writer unconfirmed" } else { "Prepared handoff only; no Spark-observed launch in this watch, actual writer unknown" }.into(),
@@ -610,21 +637,28 @@ pub(super) async fn baboon_launch(
             );
         }
         let directory = root(&state, &session.id)?;
-        let editor = baboon::inspect(&directory.join("editor"), "HCEEK").map_err(error)?;
-        if editor.executable_sha256 != session.executable_sha256
-            || editor.definitions_sha256 != session.definitions_sha256
-        {
-            return Err(
-                "The prepared editor or definitions changed; prepare a new verified handoff".into(),
-            );
-        }
         let tags = directory.join("HCEEK/tags");
-        let arguments = baboon::launch_arguments(
-            "HCEEK",
-            &tags,
-            &tags.join(core::safe_relative(&session.selected_tag).map_err(error)?),
-        )
-        .map_err(error)?;
+        let selected = core::safe_relative(&session.selected_tag).map_err(error)?;
+        // Reuse the established path and class checks before launching either editor.
+        let baboon_arguments = baboon::launch_arguments("HCEEK", &tags, &tags.join(&selected)).map_err(error)?;
+        let mut command = if let Some(expected) = &session.invader_executable {
+            let (executable, hash) = invader_qt(&state, &p)?;
+            if &executable != expected || hash != session.executable_sha256 {
+                return Err("Invader Qt changed since the working copy was prepared. Prepare it again.".into());
+            }
+            let mut command = Command::new(executable);
+            command.current_dir(&directory).args(["-t", "HCEEK/tags", &session.selected_tag]);
+            command
+        } else {
+            let editor = baboon::inspect(&directory.join("editor"), "HCEEK").map_err(error)?;
+            if editor.executable_sha256 != session.executable_sha256 ||
+                editor.definitions_sha256 != session.definitions_sha256 {
+                return Err("The prepared editor or definitions changed; prepare a new verified handoff".into());
+            }
+            let mut command = Command::new(editor.executable);
+            command.current_dir(editor.directory).args(baboon_arguments);
+            command
+        };
         let watched = watched(&state, &session)?;
         let mut watch = lock(&watched)?;
         if watch
@@ -632,15 +666,9 @@ pub(super) async fn baboon_launch(
             .as_mut()
             .is_some_and(|c| c.try_wait().ok().flatten().is_none())
         {
-            return Err("This handoff already has a running Baboon window".into());
+            return Err("This handoff already has a running editor window".into());
         }
-        watch.child = Some(
-            Command::new(&editor.executable)
-                .args(&arguments)
-                .current_dir(&editor.directory)
-                .spawn()
-                .map_err(error)?,
-        );
+        watch.child = Some(command.stdin(std::process::Stdio::null()).spawn().map_err(error)?);
         drop(watch);
         poll(&state, &session)
     })
@@ -770,7 +798,7 @@ mod project_field_tests {
             schema_version: 1, id: String::new(), owner: String::new(), project_id: String::new(),
             fingerprint: String::new(), parent_build_id: String::new(), selected_tag: tag.clone(),
             initial_baseline: baseline.clone(), baseline, revisions: vec![],
-            executable_sha256: String::new(), definitions_sha256: String::new(),
+            executable_sha256: String::new(), definitions_sha256: String::new(), invader_executable: None,
             project_field_admission: Some(ProjectFieldAdmission {
                 candidate_sha256: "reviewed".into(), tag_id: 1,
                 fields: vec![ProjectFieldValue { key: "ready-time".into(), label: "Ready time".into(),

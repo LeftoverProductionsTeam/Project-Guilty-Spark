@@ -12,6 +12,7 @@ export interface BaboonDashboard {
   setupIssue: string | null;
   sourceIssue: string | null;
   sourceReady: boolean;
+  invaderQtReady?: boolean;
   sessionId: string | null;
   sessions?: { id: string; tag: string }[];
   compatibleKits: { game: string; names: string[]; flag: string; family: string }[];
@@ -19,6 +20,7 @@ export interface BaboonDashboard {
 export interface BaboonPoll {
   sessionId: string;
   tag: string;
+  editorName?: string;
   running: boolean;
   processId: number | null;
   changes: {
