@@ -36,7 +36,7 @@ export default function Compare({
   const [saved, setSaved] = useMapState(scope, 'compare.saved', false);
   const [epoch, setEpoch] = useState(0);
   const [category, setCategory] = useMapState(scope, 'compare.category', 'all');
-  const [status, setStatus] = useMapState(scope, 'compare.status', 'all');
+  const [status, setStatus] = useMapState<string>(scope, 'compare.status', 'auto');
   const [query, setQuery] = useMapState(scope, 'compare.query', '');
   const [page, setPage] = useMapState(scope, 'compare.page', 0);
   const [pageSize, setPageSize] = useState(12);
@@ -73,23 +73,24 @@ export default function Compare({
     };
   }, [leftId, rightId, epoch, saved, dirty]);
   const comparison = useMemo(() => (pair ? compareProjects(pair[0], pair[1], saved) : null), [pair, saved]);
-  const rows = useMemo(
-    () =>
-      comparison?.rows.filter(
-        (row) =>
-          (category === 'all' || row.category === category) &&
-          (status === 'all' || row.status === status) &&
-          `${row.subject} ${row.property} ${row.before} ${row.after}`
-            .toLowerCase()
-            .includes(query.toLowerCase()),
-      ) ?? [],
-    [comparison, category, status, query],
-  );
   const counts = useMemo(() => {
     const result = { added: 0, removed: 0, changed: 0, unknown: 0 };
     for (const row of comparison?.rows ?? []) result[row.status]++;
     return result;
   }, [comparison]);
+  const selectedStatus = status === 'auto' ? (counts.changed ? 'changed' : 'all') : status;
+  const rows = useMemo(
+    () =>
+      comparison?.rows.filter(
+        (row) =>
+          (category === 'all' || row.category === category) &&
+          (selectedStatus === 'all' || row.status === selectedStatus) &&
+          `${row.subject} ${row.property} ${row.before} ${row.after}`
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+      ) ?? [],
+    [comparison, category, selectedStatus, query],
+  );
   const hasComparison = comparison !== null;
   useEffect(() => {
     const element = list.current;
@@ -180,7 +181,7 @@ export default function Compare({
           </button>
         </div>
       </header>
-      {maps.length >= 2 && <p className="compare-purpose">Choose two versions of a map to review changes. Use the status filters to focus on changed values or tags present on only one side.</p>}
+      {maps.length >= 2 && <p className="compare-purpose">Choose the maps to compare. Changed shows decoded values that differ. Added and Removed show tags or objects present in only one map.</p>}
       {maps.length < 2 ? (
         <Empty icon={<ArrowLeftRight size={28} />} title="Import two map variants">
           Use Import map or archive in the library to add restoration candidates, then compare them here.
@@ -223,7 +224,7 @@ export default function Compare({
                       ))}
                     </div>
                   </details>
-                  <details className="analysis-coverage" open>
+                  <details className="analysis-coverage">
                     <summary>Comparison coverage and limits</summary>
                     <div>
                       {comparison.coverage.map((item) => (
@@ -256,14 +257,21 @@ export default function Compare({
           {pair && comparison && (
             <>
               <div className="compare-controls">
-                <div className="analysis-summary">
-                  <span title={`${comparison.unchangedAuditedTags} unchanged audited tags`}>
-                    {comparison.matchedTags} matched
-                  </span>
-                  {(['added', 'removed', 'changed', 'unknown'] as const).map((value) => (
-                    <Pill key={value} tone={value === 'unknown' ? 'amber' : 'muted'}>
-                      {counts[value]} {value}
-                    </Pill>
+                <div className="analysis-summary compare-statuses" role="group" aria-label="Difference status">
+                  {(['all', 'changed', 'added', 'removed', 'unknown'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={'compare-status' + (value === 'unknown' ? ' compare-status-unknown' : '')}
+                      aria-pressed={selectedStatus === value}
+                      onClick={() => {
+                        setStatus(value);
+                        setPage(0);
+                      }}
+                    >
+                      {value === 'all' ? 'All differences' : value[0].toUpperCase() + value.slice(1)}
+                      <span>{value === 'all' ? comparison.rows.length : counts[value]}</span>
+                    </button>
                   ))}
                 </div>
                 <div className="analysis-filters">
@@ -289,19 +297,6 @@ export default function Compare({
                   >
                     <option value="all">All categories</option>
                     {[...new Set(comparison.rows.map((row) => row.category))].sort().map((value) => (
-                      <option key={value}>{value}</option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Difference status"
-                    value={status}
-                    onChange={(e) => {
-                      setStatus(e.target.value);
-                      setPage(0);
-                    }}
-                  >
-                    <option value="all">All statuses</option>
-                    {['added', 'removed', 'changed', 'unknown'].map((value) => (
                       <option key={value}>{value}</option>
                     ))}
                   </select>
@@ -345,7 +340,7 @@ export default function Compare({
               </div>
               {!rows.length && (
                 <Notice tone="info">
-                  No decoded differences match this view. Undecoded tag and asset contents remain unknown.
+                  {comparison.rows.length ? 'No differences match these filters.' : 'No differences were found in the decoded content.'}
                 </Notice>
               )}
               <nav className="compact-pagination" aria-label="Difference pages">
