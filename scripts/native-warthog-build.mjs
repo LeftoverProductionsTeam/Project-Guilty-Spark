@@ -1,7 +1,7 @@
 // Compile and independently read back a rigid Workshop plow on the classic Warthog rig.
 import {buildNativeRigidPartCollision} from './native-rigid-part-collision.mjs';
 import {compileNativePartPaint} from './native-rigid-part-material.mjs';
-import {plowMesh} from '../src/plowMesh.ts';
+import {plowMesh,plowProfiles} from '../src/plowMesh.ts';
 import {appendRecoveredJmsMaterial,attachRigidPartToRecoveredJms,normalizeRecoveredJmsChecksum,readRecoveredJms} from '../src/haloRiggedJms.ts';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -20,7 +20,7 @@ async function readShapeProject(file, originalMapHash){
   if(project.source?.sha256&&project.source.sha256!==originalMapHash)
     throw Error('Saved draft uses a different source cache from this vehicle');
   const percent=value=>Number.isFinite(value)&&value>=0&&value<=100;
-  if(!draft||draft.shape!=='plow'||!['moldboard','rounded','v'].includes(draft.profile)||
+  if(!draft||draft.shape!=='plow'||!plowProfiles.includes(draft.profile)||
      !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(draft.id)||
      !Array.isArray(draft.dimensions)||draft.dimensions.length!==3||
      !draft.dimensions.every(value=>Number.isFinite(value)&&value>=.05&&value<=32)||

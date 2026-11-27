@@ -246,7 +246,7 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, projectId
 
   return <section className="asset-part-editor" aria-label="Shape and paint" hidden={!visible}>
     <div className="asset-part-viewport">
-      {visible && activity.active && activity.graphicsResident && !restoringPaint && <Canvas frameloop="demand" camera={{ position: [3.4, -4, 2.5], up: [0, 0, 1], fov: 42 }} dpr={[1, 1.5]}>
+      {visible && activity.active && activity.graphicsResident && !restoringPaint && <Canvas frameloop="demand" camera={{ position: [4, -3.3, 2.5], up: [0, 0, 1], fov: 42 }} dpr={[1, 1.5]}>
         <color attach="background" args={['#101c2a']} />
         <ambientLight intensity={1.35} />
         <directionalLight position={[4, -2, 6]} intensity={2} />
@@ -265,14 +265,19 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, projectId
         {selectedHasUv && <option value="selected">Selected OBJ</option>}
       </select></label>
       {form !== 'selected' && <div className="asset-part-dimensions">
-        {['Depth', 'Width', 'Height'].map((label, axis) => <label key={label}>{label}
+        {[form === 'plow' ? 'Thickness' : 'Depth', 'Width', 'Height'].map((label, axis) => <label key={label}>{label}
           <NumberField label={label} value={size[axis]} min={0.05} max={32} step={0.05}
             onCommit={value => setSize(previous => previous.map((old, index) => index === axis ? value : old) as Vec3)} />
         </label>)}
       </div>}
       {form === 'plow' && <div className="asset-part-dimensions">
-        <label>Blade profile <select value={profile} onChange={event => setProfile(event.target.value as PlowProfile)}>
+        <label>Blade profile <select value={profile} onChange={event => {
+          const next = event.target.value as PlowProfile;
+          if (next === 'box-plow' && wrap === 0) setWrap(60);
+          setProfile(next);
+        }}>
           <option value="moldboard">Road plow</option>
+          <option value="box-plow">Box plow · curved with side wings</option>
           <option value="rounded">Rounded wings</option>
           <option value="v">V-plow</option>
         </select></label>

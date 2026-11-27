@@ -1,6 +1,7 @@
 import type { MeshData, Vec3 } from './types';
 
-export type PlowProfile = 'moldboard' | 'rounded' | 'v';
+export const plowProfiles = ['moldboard', 'box-plow', 'rounded', 'v'] as const;
+export type PlowProfile = typeof plowProfiles[number];
 
 export interface VehicleMount {
   sourceSha256: string;
@@ -24,8 +25,9 @@ export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: numb
   detail: 'render' | 'collision' = 'render'): MeshData {
   // A straight blade is constant across its width. One collision column
   // keeps its exact profile without introducing seams at the hull join.
-  const columns = detail === 'render' ? 16 : wrap === 0 ? 1 : 8;
-  const rows = detail === 'collision' ? 4 : 12;
+  const box = profile === 'box-plow';
+  const columns = detail === 'render' ? 16 : wrap === 0 ? 1 : box ? 4 : 8;
+  const rows = detail === 'collision' ? 4 : box ? 24 : 12;
   const mesh: MeshData = { positions: [], indices: [], uvs: [], label: 'Plow blade', source: 'Spark shape' };
   const rake = Math.min(depth, height * 0.7);
   const scoopDepth = height * 0.65 * scoop / 100;
@@ -42,6 +44,13 @@ export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: numb
     const arc = sagitta > 0
       ? (halfHeight ** 2 - z ** 2) / (Math.sqrt(radius ** 2 - z ** 2) + radius - sagitta)
       : 0;
+    if (box) {
+      // The straight center retains its circular section. The outer quarters
+      // turn forward, reaching farther at the cutting edge than at the top.
+      const returnWing = Math.max(0, 2 * Math.abs(center) - 1);
+      return [side * depth / 2 - arc + wingDepth * returnWing * (1 - 0.5 * up),
+        width * (across - 0.5), height * up];
+    }
     const recess = profile === 'moldboard' ? arc : 4 * scoopDepth * up * (1 - up);
     return [side * depth / 2 + rake * up - recess - wingDepth * wing,
       width * (across - 0.5), height * up];

@@ -908,6 +908,7 @@ try{
     const nativeKit=process.env.SPARK_WARTHOG_NATIVE_KIT;
     if(nativeKit&&(!nativeMap||!invaderDirectory||!process.env.SPARK_WARTHOG_BLENDER))
       throw Error('Native Workshop proof needs the Warthog map, H1A Kit, Invader and Blender');
+    const expectedProfile = !nativeKit || process.env.SPARK_WARTHOG_BOX_PLOW === '1' ? 'box-plow' : 'moldboard';
     const expectedWidth=nativeKit?'1.03':'3';
     const expectedCurl=nativeKit?'80':'65';
     const expectedHeight=nativeKit?'0.65':'0.72';
@@ -929,7 +930,7 @@ try{
     const profile = editor.getByRole('combobox', { name: 'Blade profile', exact: true });
     await expect(profile).toHaveValue('moldboard');
     await profile.selectOption('v');
-    await profile.selectOption('moldboard');
+    await profile.selectOption(expectedProfile);
     const scoop = editor.getByRole('spinbutton', { name: 'Blade curl (%)', exact: true });
     await scoop.fill(expectedCurl);
     await scoop.press('Tab');
@@ -960,7 +961,7 @@ try{
     await expect(canvas).toHaveCount(0);
     await toggle.click();
     await expect(width).toHaveValue(expectedWidth);
-    await expect(profile).toHaveValue('moldboard');
+    await expect(profile).toHaveValue(expectedProfile);
     await expect(scoop).toHaveValue(expectedCurl);
     await expect(undo).toBeEnabled();
     await undo.click();
@@ -970,6 +971,7 @@ try{
       await editor.getByText('Review Warthog mount',{exact:true}).click();
       await editor.getByRole('combobox',{name:'Mount vehicle',exact:true}).selectOption(String(vehicle.id));
       await editor.getByRole('button',{name:'Fit road plow',exact:true}).click();
+      await profile.selectOption(expectedProfile);
       await expect(editor.getByRole('spinbutton',{name:'Mount X',exact:true})).toHaveValue('1.098');
     }
     const apply = editor.getByRole('button', { name: 'Apply shape & paint', exact: true });
@@ -985,7 +987,7 @@ try{
     expect(entry).toBeTruthy();
     const saved=(await invoke(main,'open_project',{id:entry.id})).project.shapeDraft;
     const dimensions=[.22,Number(expectedWidth),Number(expectedHeight)];
-    expect(saved).toMatchObject({shape:'plow',profile:'moldboard',curl:Number(expectedCurl),dimensions});
+    expect(saved).toMatchObject({shape:'plow',profile:expectedProfile,curl:Number(expectedCurl),sweep:expectedProfile==='box-plow'?60:0,dimensions});
     if(vehicle)expect(saved.vehicleMount).toEqual({sourceSha256:opened.inspection.sha256,vehicleTagId:vehicle.id,vehiclePath:vehicle.path,position:[1.098,0,.127]});
     const painted=await main.evaluate(async url=>{
       const image=new Image();image.src=url;await image.decode();
@@ -1003,12 +1005,13 @@ try{
     await main.locator('.map-card[data-project-id="'+entry.id+'"]').click();
     await chooseTool(main,'Asset workshop');
     const reopened=main.getByRole('region',{name:'Shape and paint'});
+    await expect(reopened.getByRole('combobox',{name:'Blade profile',exact:true})).toHaveValue(expectedProfile);
     await expect(reopened.getByRole('spinbutton',{name:'Width',exact:true})).toHaveValue(expectedWidth);
     await expect(reopened.getByRole('spinbutton',{name:'Blade curl (%)',exact:true})).toHaveValue(expectedCurl);
     await reopened.getByRole('button',{name:'Apply shape & paint',exact:true}).click();
     await expect(reopened.getByRole('status')).toHaveText('This shape and paint are already in the project.');
     expect((await invoke(main,'open_project',{id:entry.id})).project.shapeDraft).toEqual(saved);
-    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: Number(expectedCurl), width: Number(expectedWidth), pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
+    report.shapePaint = { shape: 'plow', profile: expectedProfile, curl: Number(expectedCurl), width: Number(expectedWidth), pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
     step('Shaped and painted the plow, undid and redid the project draft, then restored the same paint after a native app restart', report.shapePaint);
     if(nativeKit){
       let editedVehicleRule;

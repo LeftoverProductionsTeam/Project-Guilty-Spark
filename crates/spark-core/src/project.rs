@@ -40,7 +40,7 @@ pub struct ShapeDraft {
 impl ShapeDraft {
     fn validate(&self) -> Result<()> {
         if !matches!(self.shape.as_str(), "plow" | "box" | "wedge")
-            || !matches!(self.profile.as_str(), "moldboard" | "rounded" | "v")
+            || !matches!(self.profile.as_str(), "moldboard" | "box-plow" | "rounded" | "v")
             || self.dimensions.iter().any(|n| !(0.05..=32.).contains(n))
             || !(0.0..=100.).contains(&self.curl)
             || !(0.0..=100.).contains(&self.sweep)

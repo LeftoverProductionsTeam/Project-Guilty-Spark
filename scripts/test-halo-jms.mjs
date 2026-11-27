@@ -44,6 +44,29 @@ for(let row=0;row<5;row++)for(let edge=0;edge<2;edge++)
   assert.deepEqual(roadCollision.positions.slice((row*2+edge)*3,(row*2+edge)*3+3),
     roadBlade.positions.slice((row*3*17+edge*16)*3,(row*3*17+edge*16)*3+3));
 
+const boxBlade=plowMesh([.22,3,.72],85,60,'box-plow');
+const boxFlat=plowMesh([.22,3,.72],0,60,'box-plow');
+const boxStraight=plowMesh([.22,3,.72],85,0,'box-plow');
+assert.deepEqual(boxBlade.uvs,boxFlat.uvs);
+assert.deepEqual(boxBlade.uvs,boxStraight.uvs);
+const boxRadius=(.36**2+(.72*.38*.85)**2)/(2*.72*.38*.85);
+for(let row=0;row<=24;row++){
+  const center=(row*17+8)*3;
+  const z=boxBlade.positions[center+2]-.36;
+  assert.ok(Math.abs(Math.hypot(.11-boxBlade.positions[center]+boxRadius-.72*.38*.85,z)-boxRadius)<1e-12);
+}
+assert.equal(boxBlade.positions[4*3],boxBlade.positions[12*3]);
+assert.ok(boxBlade.positions[0]>boxBlade.positions[8*3]);
+assert.ok(boxBlade.positions[0]-boxBlade.positions[8*3] >
+  boxBlade.positions[24*17*3]-boxBlade.positions[(24*17+8)*3]);
+for(const blade of [boxBlade,plowMesh([.22,3,.72],85,60,'box-plow','collision')]){
+  const topology=auditQuickForgeMesh(blade);
+  assert.equal(topology.edgeClosedShellCandidates,1);
+  assert.equal(topology.windingConflicts,0);
+  assert.equal(topology.nonManifoldEdges,0);
+  assert.ok(exportMeshJms(blade).triangles>0);
+}
+
 const recovered=[
   '8200','4180762708','2',
   'frame hull','1','-1','0 0 0 1','0 0 42',
