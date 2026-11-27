@@ -3,10 +3,10 @@
 Task: Product Completion V2.1. P0 compact MegaWorld, P1 creator toolchain, P2 flagship game creation, P3 quality and compatibility.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 Spark b1392c32. Native QuickForge created a CE map and selected the actual Forerunner installation without changing its build target; compact layout passed at 800×600 through ultrawide. Previous 16e43940 preserves the earlier Forerunner UI release.
+Latest verified revision: Win64 Spark ab6e71ab adds Join BSP partial coplanar overlap preflight. Native retained Timberland–Sidewinder preview matched previous b1392c32, including the same four preexisting collapsed faces. Source hashes were preserved. Previous is b1392c32.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native is a retained regression fixture. The 8ef8f62 checkpoint has the physical seat, flight and HUD evidence.
-Next action: verify the packaged partial-face preflight using the retained Timberland–Sidewinder recipe. The BSP and Construction tests pass. Continue operation-level Forge, guarded reload, compact Timberland–Blood Gulch and the original Demo comparison.
+Next action: trace the four persistent donor-face collapses in the retained Timberland–Sidewinder recipe, then continue the compact Timberland–Blood Gulch join. Continue operation-level Forge and guarded reload. Forerunner confirmed native Evolved and Alpha rollover on the installed conversion. Original Demo parity and handheld spawner use are open.
 
 PRODUCT COMPLETION V2.1 sets the current priorities. P0 is reliable compact world construction. P1 is the full creator toolchain. P2 is flagship game creation. P3 is product quality and compatibility. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Existing Be Native and stand-alone tests are retained regression fixtures. Reuse the existing Spark and Forerunner contracts and keep the current Latest ground preview playable.
 
