@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canHandoff, listingExpired, nativeRegionalTransportIssue, nativeTransportSourceKind, nativeTransportRecordingIssue, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
+import { canHandoff, listingExpired, nativeMissionSourceKind, nativeRegionalTransportIssue, nativeTransportSourceKind, nativeTransportRecordingIssue, nativeTransportRouteIssue, relocateRuntimeRegistration } from './runtimeWorkbench';
 import type { CommunityJoinAssessment, CommunityListingView } from './runtimeWorkbench';
 
 const view: CommunityListingView = {
@@ -89,6 +89,10 @@ describe('native Extraction route review', () => {
     expect(nativeTransportSourceKind('mcc-cea', 1, hubs.slice(0, 1))).toBeNull();
     expect(nativeTransportSourceKind('mcc-cea', 1, [...hubs, hubs[0]])).toBeNull();
     expect(nativeTransportSourceKind('mcc-cea', 0, hubs)).toBeNull();
+    expect(nativeMissionSourceKind('mcc-cea', 0, [])).toBe('solo');
+    expect(nativeMissionSourceKind('mcc-cea', 1, hubs)).toBe('regional');
+    expect(nativeMissionSourceKind('mcc-cea', 1, [...hubs, hubs[0]])).toBeNull();
+    expect(nativeMissionSourceKind('gbx-custom', 1, hubs)).toBeNull();
 
     const options = {
       ...legacy, pilot: 'pilot', pilotSeat: 'P-driver', hub: 'pelican_return', field: 'extraction_pelican_zone', hoverFieldTransfer: true,

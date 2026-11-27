@@ -533,6 +533,23 @@ export function sameMissionData(a:NativeMissionBinding['missions'],b:NativeMissi
     hudObjective:beat.hudObjective??null,hudText:beat.hudText??null,checkpoint:beat.checkpoint??null,completeMission:beat.completeMission??null,conditionVolume:beat.conditionVolume??null,conditionGroup:beat.conditionGroup??null,conditionVisitDuring:beat.conditionVisitDuring??null,conditionOutside:beat.conditionOutside??null,soundCue:beat.soundCue??null,cinematicCue:beat.cinematicCue??null}));
   return sameJson(normalize(a),normalize(b));
 }
+export function validateRegionalGroundMission(missions: CreatorStudioDocument['missions']): void {
+  if (!missions.length || missions.some(beat => beat.squadNumber == null || beat.transportInsertion != null))
+    throw Error('MegaWorld ground missions need numbered squad objectives with no aircraft insertion.');
+  const scopes = new Map<number, CreatorStudioDocument['missions']>();
+  for (const beat of missions) {
+    const number = beat.squadNumber!;
+    const beats = scopes.get(number) ?? [];
+    beats.push(beat);
+    scopes.set(number, beats);
+  }
+  for (const [number, beats] of scopes) {
+    const settlement = beats.at(-1);
+    if (settlement?.trigger !== 'forerunnerExtractionSettled' || settlement.resetOnDeployment !== true)
+      throw Error('Squad ' + number + ' needs a final Forerunner extraction settled objective with reset on deployment enabled.');
+  }
+}
+
 export interface NativeMissionReview {
   projectId:string;
   document:Project['quickForge'];
@@ -553,12 +570,15 @@ export async function reviewNativeCampaignMission(project:Project):Promise<Nativ
 }
 /** Read the existing recovered metadata without executing or rewriting native source.
  * The caller owns pinned native I/O and must recheck that source before adoption. */
-export async function reviewRecoveredCampaignMission(project:Project,module:{filename:string;content:string;sha256:string},target:string):Promise<NativeMissionReview>{
+export async function reviewRecoveredCampaignMission(project:Project,module:{filename:string;content:string;sha256:string},target:string, regional=false):Promise<NativeMissionReview>{
   if(project.quickForge&&!project.quickForge.native||!['gbx-custom','mcc-cea'].includes(target))throw Error('Recovered mission review requires CE609 or MCC working source.');
   if(!/^[A-Za-z0-9_-]{1,31}\.hsc$/.test(module.filename)||!/^[a-f0-9]{64}$/.test(module.sha256)||new TextEncoder().encode(module.content).length>256*1024||await nativeMissionHash(module.content)!==module.sha256)throw Error('Recovered mission module identity changed. No project data was adopted.');
   const config=await readRecoveredMissionSource(module.content);
   if(config.composition?config.composition.filename!==module.filename:module.filename.toLowerCase()!=='gs_mission.hsc')throw Error('Recovered mission filename does not match its reviewed ownership.');
-  if(config.forerunner&&target!=='gbx-custom')throw Error('This Forerunner mission requires CE609 source; no incompatible data was adopted.');
+  if(regional && target==='mcc-cea') {
+    if(!config.forerunner) throw Error('This regional mission must target Forerunner.');
+    validateRegionalGroundMission(config.missions);
+  } else if(config.forerunner&&target!=='gbx-custom')throw Error('This Forerunner mission requires CE609 or reviewed MegaWorld source; no incompatible data was adopted.');
   return {projectId:project.id,document:project.quickForge,module:{filename:module.filename,content:module.content},binding:{schemaVersion:1,missions:structuredClone(config.missions),activation:config.activation,sourceSha256:module.sha256,cinematic:structuredClone(config.shots),cinematicIntro:false},localMissions:structuredClone(project.studio?.missions??[]),localShots:structuredClone(project.studio?.shots??[]),recovered:{project,sha256:module.sha256,target,composition:config.composition}};
 }
 /** Explicit replacement of mission data only. Source modules and unrelated

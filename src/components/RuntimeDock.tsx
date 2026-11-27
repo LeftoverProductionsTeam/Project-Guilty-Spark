@@ -23,7 +23,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { call, native } from '../api';
-import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,nativeTransportLegs,nativeTransportAiRoute,validNativeTransportSeats,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission } from '../haloScript';
+import { exportPlannedFirefightRound,exportHaloCeTransport,readNativeTransportSource,nativeTransportPrefix,nativeTransportLegs,nativeTransportAiRoute,validNativeTransportSeats,recoveredCampaignMission,composeRecoveredCampaignMission,haloSourceDeclarations,readRecoveredMissionSource,recoveredMissionPrefix,reviewRecoveredCampaignMission,validateRegionalGroundMission } from '../haloScript';
 import type {NativeTransportOptions,NativeTransportLeg,NativeMissionReview} from '../haloScript';
 import { downloadLocalText } from '../exportHelpers';
 import { useMapState, readMapSession, writeMapSession, compiledSourceSessionId, compiledSourceHint, COMPILED_SOURCE_KEY } from '../mapSession';
@@ -40,7 +40,7 @@ import type {
   ToolLaunchPlan,
   ToolProcessView,
 } from '../runtimeWorkbench';
-import { availabilityLabel, evidenceLabel, nativeRegionalTransportIssue, nativeTransportRouteIssue, nativeTransportRecordingIssue, nativeTransportSourceKind, runtimeNames } from '../runtimeWorkbench';
+import { availabilityLabel, evidenceLabel, nativeMissionSourceKind, nativeRegionalTransportIssue, nativeTransportRouteIssue, nativeTransportRecordingIssue, nativeTransportSourceKind, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import { integrityBlocks, type NativeTagIntegrityReport } from '../nativeTagIntegrity';
@@ -217,6 +217,7 @@ export default function RuntimeDock({
     window.addEventListener('guilty-spark-open-native-mission',open);return()=>window.removeEventListener('guilty-spark-open-native-mission',open);
   },[project?.id]);
   const nativeCameras=modules?.cameraReview;
+  const missionSourceKind=nativeMissionSourceKind(report?.workingSource?.target,nativeCameras?.scenarioType,nativeCameras?.triggerVolumes??[]);
   const transportSourceKind=nativeTransportSourceKind(report?.workingSource?.target,nativeCameras?.scenarioType,nativeCameras?.triggerVolumes??[]);
   const takeCamera=nativeCameras?.cameras.find(p=>String(p.index)===cinematicCamera)??nativeCameras?.cameras[0];
   const currentCinematic=cinematicPlan?.key===scriptSourceKey&&cinematicPlan.tagIdentity===nativeCameras?.tagIdentity&&cinematicPlan.shotsKey===nativeCinematicTakeKey(project?.studio)&&cinematicPlan.name===cinematicName.trim()&&cinematicPlan.content===selectedScript?.content?cinematicPlan:null;
@@ -563,13 +564,13 @@ export default function RuntimeDock({
   }
   async function readRecoveredMissionReview(input:Project):Promise<NativeMissionReview>{
     const source=report?.workingSource,inventory=modules,module=pickedMissionModule,key=scriptSourceKey;
-    if(!source||!inventory||!module||module.unavailable||dirty||busy||working||moduleBusy||inventory.cameraReview?.scenarioType!==0)throw Error('Save, read native mission source and choose an available generated campaign module first.');
+    if(!source||!inventory||!module||module.unavailable||dirty||busy||working||moduleBusy||!missionSourceKind)throw Error('Save, read native mission source and choose an available generated mission module first.');
     const request=++moduleRequest.current;setModuleBusy(true);setError('');
     try{
       const value=await call<WorkingScriptSource>('working_script_source',{projectId:input.id,expectedBuildId:source.buildId,expectedSourceDirectory:source.tagsDirectory,expectedProjectFingerprint:source.projectFingerprint,expectedSourcesSha256:inventory.sourceSha256,filename:module.filename,expectedSha256:module.sha256});
       if(request!==moduleRequest.current||key!==currentScriptSourceKey.current||currentProject.current!==input)throw Error('Source or project changed during mission review. No data was adopted.');
       if(!sourceSelectionMatches(value.selection,source)||value.selection.sourceSha256!==inventory.sourceSha256||value.script.filename!==module.filename||value.script.sha256!==module.sha256||value.script.replacesSha256!==module.sha256)throw Error('Recovered mission source identity changed. Read source again.');
-      const review=await reviewRecoveredCampaignMission(input,value.script,source.target??'');
+      const review=await reviewRecoveredCampaignMission(input,value.script,source.target??'',missionSourceKind==='regional');
       if(request!==moduleRequest.current||key!==currentScriptSourceKey.current||currentProject.current!==input)throw Error('Source or project changed during mission review. No data was adopted.');
       return review;
     }finally{if(request===moduleRequest.current)setModuleBusy(false);}
@@ -646,10 +647,19 @@ export default function RuntimeDock({
     const request=++moduleRequest.current,selection=++scriptSelection.current,key=scriptSourceKey,draft=input.scenarioScriptDraft;
     setModuleBusy(true);setError('');const release=beginProjectMutation(input.id);
     try {
-      if(!['gbx-custom','mcc-cea'].includes(source.target??'')||review.scenarioType!==0)throw Error('Recovered mission source requires reviewed CE609 or MCC solo source.');
+      if(!missionSourceKind)throw Error('Recovered mission source requires solo source or reviewed MCC13 MegaWorld faction hubs.');
+      const regional=missionSourceKind==='regional';
+      const forerunner=source.target==='gbx-custom'||regional;
+      if(regional){
+        validateRegionalGroundMission(studio.missions);
+        for(const zone of ['extraction_unsc_ground_zone','extraction_cov_ground_zone'])
+          if(review.triggerVolumes.filter(name=>name===zone).length!==1)throw Error('Native MegaWorld ground evacuation volume is missing or ambiguous: '+zone);
+        for(const name of ['extraction_unsc_deploy','extraction_covenant_deploy','extraction_unsc_ground_call','extraction_cov_ground_call'])
+          if(refs.devices.filter(device=>device.name===name&&device.class==='ctrl').length!==1)throw Error('Native MegaWorld control is missing or ambiguous: '+name);
+      }
       const composition=missionModule?reviewedMissionOriginal:null;
       if(missionModule&&(!composition||!missionOwnershipConfirmed))throw Error('Read and explicitly review the selected original module ownership before preparing a composed revision.');
-      const generated=composition?await composeRecoveredCampaignMission(studio,activation,source.target==='gbx-custom',composition.content,{filename:composition.filename,sourceSha256:composition.sha256,retiredStartups,replaceExtractionCallback:replaceMissionCallback}):recoveredCampaignMission(studio,activation,source.target==='gbx-custom');
+      const generated=composition?await composeRecoveredCampaignMission(studio,activation,forerunner,composition.content,{filename:composition.filename,sourceSha256:composition.sha256,retiredStartups,replaceExtractionCallback:replaceMissionCallback}):recoveredCampaignMission(studio,activation,forerunner);
       const scopes=[...new Set(studio.missions.flatMap(beat=>beat.squadNumber==null?[]:[beat.squadNumber]))];
       for(const number of scopes){
         const matches=refs.extractionSquads?.filter(row=>row.terminal.number===number);
@@ -692,7 +702,7 @@ export default function RuntimeDock({
         if(refs.protectedEncounters.includes(name))throw Error('This encounter is recipe-owned; use its existing controller instead of a second spawn owner.');
       }
       const settlement=studio.missions.filter(beat=>beat.trigger==='forerunnerExtractionSettled');
-      if(settlement.length){
+      if(settlement.length&&!regional){
         const shared=settlement.find(beat=>beat.squadNumber==null);
         const field=missionExtractionFields.find(row=>row.control===(shared?.triggerRef??'extraction_activate'));
         if(!field)throw Error('Choose a supported native evacuation control.');
@@ -1278,12 +1288,13 @@ export default function RuntimeDock({
               <p>Use saved Mission Director objectives with this native solo scenario. Read the current references, prepare, Save and review the draft, then Attach source &amp; compile. Native camera points own their poses; use the existing cinematic/source tools to edit them. Missing dependencies stop the build.</p>
               <button type="button" disabled={busy||working||dirty||moduleBusy} onClick={()=>void listScriptModules(true,false,true)}>Read native mission source</button>
               {!!modules?.missionReview?.collectorAdvisories?.length&&<Notice tone="info"><ul>{modules.missionReview.collectorAdvisories.map(issue=><li key={issue}>{issue}</li>)}</ul></Notice>}
+              {missionSourceKind==='regional'&&<p className="subtle">MegaWorld ground operations use numbered squads. Give each squad a readiness gate and a final settled-extraction objective with reset on deployment enabled.</p>}
               <label>Recovered mission activation<select value={recoveredActivation} disabled={busy||working||moduleBusy} onChange={event=>setRecoveredActivation(event.target.value as 'manual'|'startup')}><option value="manual">Manual · wake gs_mission from another script</option><option value="startup">Startup · wait for players</option></select></label>
               <label>Mission source destination<select aria-label="Mission source destination" value={missionModule} disabled={busy||working||moduleBusy} onChange={event=>{setMissionModule(event.target.value);setMissionOriginal(null);setMissionOwnershipConfirmed(false);setRecoveredMissionPlan(null);}}><option value="">New gs_mission.hsc module</option>{missionModule&&(!pickedMissionModule||pickedMissionModule.unavailable)&&<option value={missionModule}>{pickedMissionModule?'Unavailable':'Missing'} selected module · {missionModule}</option>}{modules?.modules.filter(row=>!row.unavailable).map(row=><option key={row.filename} value={row.filename}>Reviewed revision · {row.filename}</option>)}</select></label>
               <p className="subtle">To restore editable objectives from an existing Spark-authored native module, choose it above and review its recovered mission data. Apply rechecks source and uses project Undo/Redo; it does not execute HaloScript or change native files.</p>
               <MissionSourceReview project={project} edit={onEdit} onActivation={setRecoveredActivation}
                 exportLocal={()=>downloadLocalText('mission-draft.json',exportStudioEvidence(project.studio??emptyCreatorStudio(),project),'application/json')}
-                nativeSource={{key:JSON.stringify([scriptSourceKey,missionModule,pickedMissionModule?.sha256,modules?.sourceSha256,nativeCameras?.tagIdentity]),disabled:busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable||!workingSourceAvailable||nativeCameras?.scenarioType!==0,read:readRecoveredMissionReview,verify:verifyRecoveredMissionReview,applied:recoveredMissionAdopted}}/>
+                nativeSource={{key:JSON.stringify([scriptSourceKey,missionModule,pickedMissionModule?.sha256,modules?.sourceSha256,nativeCameras?.tagIdentity]),disabled:busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable||!missionSourceKind,read:readRecoveredMissionReview,verify:verifyRecoveredMissionReview,applied:recoveredMissionAdopted}}/>
               {missionModule&&<details open><summary>Review original controller ownership</summary>
                 <button type="button" disabled={busy||working||dirty||moduleBusy||!pickedMissionModule||!!pickedMissionModule.unavailable} onClick={()=>void readMissionComposition()}>Read original mission module</button>
                 {(!pickedMissionModule||pickedMissionModule.unavailable)&&<p>{pickedMissionModule?.unavailable??'The selected module is unavailable in this source. Read native mission source, then choose an available module or the new-module workflow.'}</p>}
@@ -1296,7 +1307,7 @@ export default function RuntimeDock({
                   <label><input type="checkbox" aria-label="Confirm original mission ownership" checked={missionOwnershipConfirmed} disabled={busy||working||moduleBusy} onChange={event=>{setMissionOwnershipConfirmed(event.target.checked);setRecoveredMissionPlan(null);}}/>I reviewed the selected controller changes and remaining startup/continuous scripts for competing gameplay ownership.</label>
                 </>}
               </details>}
-              <button type="button" disabled={busy||working||dirty||moduleBusy||!modules?.missionReview||!nativeCameras||!!missionModule&&(!reviewedMissionOriginal||!missionOwnershipConfirmed)} onClick={()=>void prepareRecoveredMission()}>Prepare recovered mission draft</button>
+              <button type="button" disabled={busy||working||dirty||moduleBusy||!modules?.missionReview||!nativeCameras||!missionSourceKind||!!missionModule&&(!reviewedMissionOriginal||!missionOwnershipConfirmed)} onClick={()=>void prepareRecoveredMission()}>Prepare recovered mission draft</button>
               {nativeRecoveredMissionDraft&&<button type="button" disabled={busy||working||moduleBusy} onClick={()=>{if(selectedScript){const end=selectedScript.content.indexOf('\n',recoveredMissionPrefix.length);keepScriptDraft({...selectedScript,content:selectedScript.content.slice(end+1),reviewed:false});setRecoveredMissionPlan(null);}}}>Use mission draft as manual HaloScript</button>}
               {nativeRecoveredMissionDraft&&!currentRecoveredMissionIdentity&&<small>Mission or source review is stale. Read source and prepare again before compiling.</small>}
             </details>}

@@ -2,7 +2,7 @@ import type {NativeTagContext} from './nativeOperations';
 import {inspectScenarioBindings} from './scenarioBindings';
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
-import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,reviewRecoveredCampaignMission,recoveredCampaignMission,composeRecoveredCampaignMission,readRecoveredMissionSource,sameMissionData,exportHaloCeMission,nativeMissionBinding} from './haloScript';
+import {applyNativeCampaignMission,attachNativeCampaignMission,reviewNativeCampaignMission,reviewRecoveredCampaignMission,recoveredCampaignMission,composeRecoveredCampaignMission,readRecoveredMissionSource,sameMissionData,exportHaloCeMission,nativeMissionBinding,validateRegionalGroundMission} from './haloScript';
 import {defaultNativePlayerProfile} from './firefight';
 import { describe, expect, it } from 'vitest';
 import { extractionTerminalReview, connectBlackEchoObjectives, addBlackEchoDraft, blackEchoMission, defaultBlackEchoOptions, emptyCreatorStudio, exportHaloCeServerInit, exportStudioEvidence, validateCreatorStudio, missionSoundProblems, missionCinematicShots, missionCameraUsers } from './creatorStudio';
@@ -537,6 +537,30 @@ it('restores recovered mission and shot data through the existing review history
   const stale={...project,studio:{...project.studio!,missions:[{...project.studio!.missions[0],title:'Changed during review'}]}};expect(()=>applyNativeCampaignMission(stale,review)).toThrow(/changed after review/);
   expect((await readRecoveredMissionSource(output.content)).missions).toEqual(studio.missions);expect((await reviewRecoveredCampaignMission(project,module,'mcc-cea')).binding.missions).toEqual(studio.missions);
  }
+});
+
+it('recovers repeatable numbered ground operations for a reviewed MegaWorld source', async () => {
+ const project=campaignDraft();project.quickForge=null;
+ const studio=emptyCreatorStudio();
+ studio.missions=[1,2].flatMap(squadNumber => [
+  {id:'hunt'+squadNumber,title:'Clear the field',objective:'Defeat the encounter',trigger:'encounterCleared' as const,encounterName:'hunt_'+squadNumber,squadNumber},
+  {id:'settle'+squadNumber,title:'Evacuate',objective:'Return and bank',trigger:'forerunnerExtractionSettled' as const,triggerRef:'extraction_activate',encounterName:'',squadNumber,resetOnDeployment:true},
+ ]);
+ validateRegionalGroundMission(studio.missions);
+ const output=recoveredCampaignMission(studio,'startup',true);
+ expect(output.content).toContain('(script continuous forerunner_squad_01_begin');
+ expect(output.content).toContain('(device_group_set extraction_squad_02_ready 1)');
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(output.content));
+ const sha256=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+ const module={filename:output.filename,content:output.content,sha256};
+ await expect(reviewRecoveredCampaignMission(project,module,'mcc-cea',true)).resolves.toMatchObject({binding:{missions:studio.missions}});
+ await expect(reviewRecoveredCampaignMission(project,module,'mcc-cea')).rejects.toThrow(/reviewed MegaWorld/);
+ const missingReset=structuredClone(studio.missions);
+ missingReset[3].resetOnDeployment=false;
+ expect(()=>validateRegionalGroundMission(missingReset)).toThrow(/Squad 2/);
+ const mixed=structuredClone(studio.missions);
+ mixed[0].squadNumber=null;
+ expect(()=>validateRegionalGroundMission(mixed)).toThrow(/numbered squad/);
 });
 
 it('refuses corrupted unknown or incompatible recovered mission data without replacing the draft',async()=>{

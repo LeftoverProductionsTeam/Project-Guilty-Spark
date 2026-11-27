@@ -213,6 +213,11 @@ export function nativeTransportSourceKind(target: string | undefined, scenarioTy
   return null;
 }
 
+export function nativeMissionSourceKind(target: string | undefined, scenarioType: number | undefined, volumes: readonly string[]) {
+  if (target === 'mcc-cea' && scenarioType === 0) return 'solo';
+  return nativeTransportSourceKind(target, scenarioType, volumes);
+}
+
 export function nativeRegionalTransportIssue(options: NativeTransportOptions): string | null {
   const role = options.faction === 'unsc' ? 'pelican' : 'spirit';
   if (options.hub !== role + '_return' || options.field !== 'extraction_' + role + '_zone') {
