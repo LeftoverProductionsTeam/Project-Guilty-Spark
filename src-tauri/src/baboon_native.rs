@@ -27,6 +27,15 @@ pub(super) struct Session {
     revisions: Vec<String>,
     executable_sha256: String,
     definitions_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project_field_admission: Option<ProjectFieldAdmission>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectFieldAdmission {
+    candidate_sha256: String,
+    tag_id: u32,
+    fields: Vec<ProjectFieldValue>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -167,12 +176,30 @@ pub(super) fn guard_regeneration(state: &AppState, project: &Project) -> Reply<(
     for item in history {
         let session = load(state, &item.id, &item.owner, &project.id)?;
         let external = root(state, &session.id)?.join("HCEEK/tags");
-        if transaction::inventory(&external).map_err(error)? != session.baseline {
+        let current = transaction::inventory(&external).map_err(error)?;
+        if current != session.baseline && !matches_reviewed_project_fields(project, &session, &current) {
             return Err("Baboon has saved native changes that are not reconciled. Review or restore that handoff before regenerating this map. Existing source and compiled maps remain available.".into());
         }
     }
     Ok(())
 }
+// The exact external tag remains as recovery source. A normal build can
+// consume the reviewed values only after all of them are saved in the project.
+fn matches_reviewed_project_fields(project: &Project, session: &Session, current: &transaction::Inventory) -> bool {
+    let Some(admission) = &session.project_field_admission else { return false; };
+    current.get(&session.selected_tag) == Some(&admission.candidate_sha256)
+        && current.len() == session.baseline.len()
+        && session.baseline.iter().all(|(path, hash)|
+            path == &session.selected_tag || current.get(path) == Some(hash))
+        && !admission.fields.is_empty()
+        && admission.fields.iter().all(|field| {
+            let value = project.tag_edits.iter().find(|edit|
+                edit.tag_id == admission.tag_id && edit.field_key == field.key);
+            value.map_or(Some(field.original), |edit| edit.value.as_f64())
+                .is_some_and(|value| value as f32 == field.after as f32)
+        })
+}
+
 pub(super) fn working_source(
     state: &AppState,
     project: &Project,
@@ -407,7 +434,7 @@ pub(super) async fn baboon_prepare(
         if transaction::fork(&directory.join("baseline"),&kit.join("tags"),cancel).map_err(error)?!=baseline {return Err("The native source fork did not preserve its baseline".into());}
         baboon::prepare_instance(&installed,&directory.join("editor"),&kit).map_err(error)?;
         if lock(&state.library)?.get(&project_id).map_err(error)?.fingerprint().map_err(error)?!=fingerprint {return Err("The map changed while preparing Baboon. Its source copies remain available; prepare the current saved revision again".into());}
-        let session=Session{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint,parent_build_id:build.id,selected_tag:selected.clone(),initial_baseline:baseline.clone(),baseline,revisions:vec![],executable_sha256:installed.executable_sha256,definitions_sha256:installed.definitions_sha256};
+        let session=Session{schema_version:1,id:id.clone(),owner,project_id:project_id.clone(),fingerprint,parent_build_id:build.id,selected_tag:selected.clone(),initial_baseline:baseline.clone(),baseline,revisions:vec![],executable_sha256:installed.executable_sha256,definitions_sha256:installed.definitions_sha256,project_field_admission:None};
         save(&state,&session)?;
         history.push(SessionSummary{id:id.clone(),tag:selected.clone(),owner:session.owner.clone()});
         lock(&state.library)?.set_setting(&history_key(&project_id),&history).map_err(error)?;
@@ -664,6 +691,204 @@ pub(super) async fn baboon_reconcile(
         Ok(Reconciled{accepted:true,review,source:Some(output),reason:"Kept a new native working revision. Existing placements, external files, source tags and the last compiled map are preserved. Close native editors, then Build working tag edits.".into()})
     }).await.map_err(error)?
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ProjectFieldReview {
+    session_id: String,
+    revision: u64,
+    project_id: String,
+    source_sha256: String,
+    tag_id: u32,
+    tag: String,
+    fields: Vec<ProjectFieldValue>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectFieldValue {
+    key: String,
+    label: String,
+    before: f64,
+    after: f64,
+    original: f64,
+    unit: String,
+}
+
+fn reviewed_project_fields(
+    project: &Project,
+    tag: &maps::Tag,
+    baseline: &str,
+    candidate: &str,
+) -> Reply<Vec<ProjectFieldValue>> {
+    use spark_core::native_operations::number;
+
+    let mut reviewed = Vec::new();
+    for (key, native_key) in [
+        ("bounding-radius", "bounding_radius"),
+        ("acceleration-scale", "acceleration_scale"),
+        ("ready-time", "ready_time"),
+        ("autoaim-range", "autoaim_range"),
+    ] {
+        let Some(field) = tag.fields.iter().find(|field| field.key == key && field.kind == "f32") else {
+            continue;
+        };
+        let before = number(baseline, native_key).map_err(error)?;
+        let after = number(candidate, native_key).map_err(error)?;
+        if before == after {
+            continue;
+        }
+        let original = field.value.as_f64().ok_or("Spark source field is not numeric")?;
+        let saved = project.tag_edits.iter().find(|value| value.tag_id == tag.id && value.field_key == key)
+            .map_or(&field.value, |value| &value.value).as_f64().ok_or("Spark's saved field is not numeric")?;
+        // The native field listing can round values. Match Float32 identity or
+        // account for at most half of its six-decimal display step.
+        if before as f32 != saved as f32 && (before - saved).abs() > 0.0000005 {
+            return Err(format!("{} differs between the starting native source and the saved map. Review the loose tag separately.", field.label));
+        }
+        if after < field.min || after > field.max {
+            return Err(format!("{} is outside Spark's supported range", field.label));
+        }
+        let after = f64::from(after as f32);
+        if after as f32 != saved as f32 {
+            reviewed.push(ProjectFieldValue {
+                key: key.into(), label: field.label.clone(), before: saved, after, original, unit: field.unit.clone(),
+            });
+        }
+    }
+    Ok(reviewed)
+}
+
+#[cfg(test)]
+mod project_field_tests {
+    use super::*;
+
+    #[test]
+    fn project_build_admission_pins_the_reviewed_save_and_all_project_values() {
+        let tag = "weapons/test.weapon".to_owned();
+        let other = "weapons/other.weapon".to_owned();
+        let baseline = transaction::Inventory::from([(tag.clone(), "starting".into()), (other.clone(), "unchanged".into())]);
+        let session = Session {
+            schema_version: 1, id: String::new(), owner: String::new(), project_id: String::new(),
+            fingerprint: String::new(), parent_build_id: String::new(), selected_tag: tag.clone(),
+            initial_baseline: baseline.clone(), baseline, revisions: vec![],
+            executable_sha256: String::new(), definitions_sha256: String::new(),
+            project_field_admission: Some(ProjectFieldAdmission {
+                candidate_sha256: "reviewed".into(), tag_id: 1,
+                fields: vec![ProjectFieldValue { key: "ready-time".into(), label: "Ready time".into(),
+                    before: 0., after: 2., original: 0., unit: "seconds".into() }],
+            }),
+        };
+        let mut current = session.baseline.clone();
+        current.insert(tag, "reviewed".into());
+        let mut project = Project::new("Loose tag fixture");
+        assert!(!matches_reviewed_project_fields(&project, &session, &current));
+        project.tag_edits.push(core::project::TagEdit { tag_id: 1, field_key: "ready-time".into(), value: 2.into() });
+        assert!(matches_reviewed_project_fields(&project, &session, &current));
+        current.insert(other, "unreviewed".into());
+        assert!(!matches_reviewed_project_fields(&project, &session, &current));
+    }
+
+    #[test]
+    fn loose_tag_review_imports_only_supported_values_and_refuses_a_conflict() {
+        let project = Project::new("Loose tag fixture");
+        let tag: maps::Tag = serde_json::from_value(serde_json::json!({
+            "id": 1, "index": 1, "class": "weap", "path": "weapons/test", "dataOffset": 256,
+            "external": false, "references": [],
+            "fields": [
+                {"key":"bounding-radius","label":"Bounding radius","offset":260,"kind":"f32",
+                    "value":0.6000000238418579,"min":0,"max":10000,"unit":"world units","targetClass":null},
+                {"key":"ready-time","label":"Ready time","offset":1080,"kind":"f32",
+                    "value":1.0,"min":0,"max":300,"unit":"seconds","targetClass":null}
+            ]
+        })).unwrap();
+        let before = "bounding_radius (0.600000) float32\nready_time (1) float32\nother (7) uint32";
+        let after = "bounding_radius (0.75) float32\nready_time (2) float32\nother (9) uint32";
+        let reviewed = reviewed_project_fields(&project, &tag, before, after).unwrap();
+        assert_eq!(reviewed.iter().map(|field| (field.key.as_str(), field.after)).collect::<Vec<_>>(),
+            vec![("bounding-radius", 0.75), ("ready-time", 2.)]);
+        assert!(reviewed_project_fields(&project, &tag, before, &after.replace("(2)", "(301)")).is_err());
+        let mut conflicting = project;
+        conflicting.tag_edits.push(core::project::TagEdit { tag_id: 1, field_key: "ready-time".into(), value: 3.into() });
+        assert!(reviewed_project_fields(&conflicting, &tag, before, after).unwrap_err().contains("saved map"));
+    }
+}
+
+#[tauri::command]
+pub(super) async fn baboon_review_project_fields(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    project_id: String,
+    session_id: String,
+    tag_id: u32,
+) -> Reply<ProjectFieldReview> {
+    let owner = window.label().to_owned();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _source = native_operations_native::source_guard()?;
+        let state = app.state::<AppState>();
+        native_operations_native::require_idle(&state)?;
+        check_document_owner(&state, &project_id, &owner)?;
+        studio_native_source::require_unshared(&state, &project_id)?;
+        let mut session = load(&state, &session_id, &owner, &project_id)?;
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        if project.fingerprint().map_err(error)? != session.fingerprint {
+            return Err("The saved project changed since preparing this handoff. Open a fresh working copy for project-field review.".into());
+        }
+        let inspection = inspect(&state, &project)?;
+        let tag = inspection.tags.iter().find(|tag| tag.id == tag_id && !tag.external)
+            .ok_or("Select the embedded tag that was sent to the editor")?;
+        let relative = format!("{}.{}", tag.path.replace('\\', "/"), core::tag_exchange::extension(&tag.class).map_err(error)?);
+        if !relative.eq_ignore_ascii_case(&session.selected_tag) {
+            return Err("This handoff belongs to another tag. Select the exact tag sent to the editor.".into());
+        }
+        let observed = poll(&state, &session)?;
+        if observed.changes.status == "saving" || observed.integrity.blocked() {
+            return Err("Wait for the stable save and a completed integrity check before reviewing fields.".into());
+        }
+        let watch = watched(&state, &session)?;
+        let accepted = lock(&watch)?.monitor.accepted_hashes().get(&session.selected_tag).cloned()
+            .ok_or("The external tag is missing from the stable save")?;
+        let initial = session.initial_baseline.get(&session.selected_tag)
+            .ok_or("This handoff has no verified starting tag")?;
+        let root = root(&state, &session_id)?;
+        let baseline = root.join("baseline");
+        let candidate = root.join("HCEEK/tags");
+        let path = core::safe_relative(&session.selected_tag).map_err(error)?;
+        let build = current_native_build(&state, &project)?;
+        let current = runtime_workbench::compiled_tags(&state, &project, &build)?;
+        let hash_at = |root: &Path| -> Reply<String> {
+            let file = root.join(&path);
+            core::reject_links(&file).map_err(error)?;
+            maps::hash_file(&file).map_err(error)
+        };
+        if build.id != session.parent_build_id || hash_at(&current)? != *initial || hash_at(&baseline)? != *initial {
+            return Err("The native source has changed since this editor was prepared. Review both source revisions separately.".into());
+        }
+        if hash_at(&candidate)? != accepted {
+            return Err("The external tag changed during review. Wait for the stable save.".into());
+        }
+        native_operations_native::verify_bytes(&candidate, &session.selected_tag, &accepted)?;
+        let before = native_operations_native::fields(&state, &project, &baseline, &session.selected_tag)?;
+        let after = native_operations_native::fields(&state, &project, &candidate, &session.selected_tag)?;
+        let fields = reviewed_project_fields(&project, tag, &before, &after)?;
+        if hash_at(&candidate)? != accepted || hash_at(&baseline)? != *initial || hash_at(&current)? != *initial ||
+            lock(&state.library)?.get(&project_id).map_err(error)?.fingerprint().map_err(error)? != session.fingerprint {
+            return Err("The working source or saved project changed during review. Review the latest save again.".into());
+        }
+        session.project_field_admission = (!fields.is_empty()).then(|| ProjectFieldAdmission {
+            candidate_sha256: accepted, tag_id, fields: fields.clone(),
+        });
+        save(&state, &session)?;
+        Ok(ProjectFieldReview {
+            session_id,
+            revision: observed.changes.revision,
+            project_id,
+            source_sha256: inspection.sha256.clone(),
+            tag_id,
+            tag: session.selected_tag,
+            fields,
+        })
+    }).await.map_err(error)?
+}
+
 pub(super) fn has_running(project_id: &str) -> Reply<bool> {
     // Session membership is checked through receipts by callers; this prevents a
     // new compiler job while a handoff process is still saving its private fork.

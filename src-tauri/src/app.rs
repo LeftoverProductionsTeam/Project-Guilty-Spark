@@ -3899,6 +3899,7 @@ pub fn run() {
             baboon_native::baboon_prepare,
             baboon_native::baboon_launch,
             baboon_native::baboon_poll,
+            baboon_native::baboon_review_project_fields,
             baboon_native::baboon_reconcile,
             baboon_native::baboon_restore_start,
             native_operations_native::native_tag_context,

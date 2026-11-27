@@ -35,6 +35,16 @@ export interface BaboonPoll {
   writerContext?: string;
   writerEvidence?: import('./nativeTagIntegrity').NativeSaveEvidence;
 }
+export interface BaboonProjectFieldReview {
+  sessionId: string;
+  revision: number;
+  projectId: string;
+  sourceSha256: string;
+  tagId: number;
+  tag: string;
+  fields: { key: string; label: string; before: number; after: number; unit: string }[];
+}
+
 export interface BaboonReconciled {
   accepted: boolean;
   source: string | null;

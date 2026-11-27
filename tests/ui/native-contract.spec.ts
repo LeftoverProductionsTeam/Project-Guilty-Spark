@@ -1588,6 +1588,37 @@ test('native handoff warnings keep updating with tool controls closed and across
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('reviewed loose-tag values apply together through project Undo',async({page})=>{
+  await mockDesktop(page);
+  await openFixture(page);
+  const field=page.getByRole('spinbutton').first();
+  const original=await field.inputValue();
+  await page.evaluate(()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);
+    const map=w.__sparkMock.projects.a,tag=map.inspection.tags[0];
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='baboon_report')return {installed:{version:'0.3.2',directory:'C:/fixture'},sourceReady:true,sessionId:'fixture',compatibleKits:[]};
+      if(command==='baboon_poll')return {sessionId:'fixture',tag:'weapons/test.weapon',running:false,revisions:[],
+        changes:{status:'changed',revision:1,changedFiles:1,totalFiles:1,changes:[{path:'weapons/test.weapon',kind:'modified'}]}};
+      if(command==='baboon_review_project_fields')return {sessionId:'fixture',revision:1,projectId:'a',tagId:tag.id,
+        sourceSha256:map.project.source.sha256,tag:'weapons/test.weapon',
+        fields:[{key:tag.fields[0].key,label:tag.fields[0].label,before:tag.fields[0].value,after:33,unit:''}]};
+      return invoke(command,args);
+    };
+  });
+  await page.getByRole('tab',{name:'Native Output',exact:true}).click();
+  await page.locator('.baboon-tools > summary:visible').first().click();
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('guilty-spark-baboon-session',{detail:{projectId:'a'}})));
+  await page.getByRole('button',{name:'Review values for this project',exact:true}).click();
+  await expect(page.getByText(/→ 33/)).toBeVisible();
+  await page.getByRole('button',{name:'Apply reviewed values',exact:true}).click();
+  await expect(page.getByText('Applied to the Spark project. Use Undo to restore the previous values.')).toBeVisible();
+  await page.getByRole('tab',{name:'Properties',exact:true}).click();
+  await expect(field).toHaveValue('33');
+  await page.keyboard.press('Control+z');
+  await expect(field).toHaveValue(original);
+});
+
 test('dependency setup offers a reviewed official install action without launching on inspection or cancel',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{

@@ -9,6 +9,7 @@ import {
   type BaboonDashboard,
   type BaboonPoll,
   type BaboonReconciled,
+  type BaboonProjectFieldReview,
 } from '../baboon';
 import './baboonTools.css';
 import NativeTagIntegrity from './NativeTagIntegrity';
@@ -23,16 +24,19 @@ export default function BaboonTools({
   dirty = false,
   epoch = 0,
   monitorOnly = false,
+  onApplyProjectFields,
 }: {
   project?: Project | null;
   tagId?: number;
   dirty?: boolean;
   epoch?: number;
   monitorOnly?: boolean;
+  onApplyProjectFields?: (review: BaboonProjectFieldReview) => boolean;
 }) {
   const [report, setReport] = useState<BaboonDashboard | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [observed, setObserved] = useState<BaboonPoll | null>(null);
+  const [fieldReview, setFieldReview] = useState<BaboonProjectFieldReview | null>(null);
   const [review, setReview] = useState<BaboonReconciled | null>(null);
   const [busy, setBusy] = useState(false),
     [expanded, setExpanded] = useState(false);
@@ -56,6 +60,7 @@ export default function BaboonTools({
   useEffect(() => {
     generation.current++;
     setObserved(null);
+    setFieldReview(null);
     setReview(null);
     setReport(null);
     setSessionId(null);
@@ -177,6 +182,31 @@ export default function BaboonTools({
       if (version === generation.current) setObserved(observed);
     });
   }
+  const currentFieldReview = fieldReview?.sessionId === sessionId && fieldReview.tagId === tagId &&
+    fieldReview.revision === observed?.changes.revision && observed.changes.status !== 'saving' &&
+    !integrityBlocks(observed.integrity) ? fieldReview : null;
+  async function reviewProjectFields() {
+    if (!projectId || !sessionId || tagId == null) return;
+    const version = generation.current;
+    setFieldReview(null);
+    await perform(async () => {
+      const review = await call<BaboonProjectFieldReview>('baboon_review_project_fields', {projectId, sessionId, tagId});
+      if (generation.current !== version) return;
+      setFieldReview(review);
+      if (!review.fields.length) setMessage('This save has no supported project-field changes.');
+    });
+  }
+  function applyProjectFields() {
+    if (!currentFieldReview?.fields.length || !onApplyProjectFields) return;
+    try {
+      if (!onApplyProjectFields(currentFieldReview)) return;
+      setFieldReview(null);
+      setError('');
+      setMessage('Applied to the Spark project. Use Undo to restore the previous values.');
+    } catch (problem) {
+      setError(String(problem));
+    }
+  }
   async function restore() {
     if (!projectId || !sessionId || dirty) return;
     const version = generation.current;
@@ -253,6 +283,7 @@ export default function BaboonTools({
             onChange={(e) => {
               setSessionId(e.target.value || null);
               setObserved(null);
+              setFieldReview(null);
               setReview(null);
             }}
           >
@@ -295,6 +326,23 @@ export default function BaboonTools({
                 </li>
               ))}
             </ul>
+          )}
+          {onApplyProjectFields && tagId != null && observed.changes.changedFiles > 0 && (
+            <div>
+              <button type="button" disabled={busy || observed.changes.status === 'saving' ||
+                integrityBlocks(observed.integrity)} onClick={() => void reviewProjectFields()}>
+                Review values for this project
+              </button>
+              {currentFieldReview && currentFieldReview.fields.length > 0 && (
+                <>
+                  <ul>{currentFieldReview.fields.map(field => (
+                    <li key={field.key}>{field.label} {Number(field.before.toPrecision(7))} → {Number(field.after.toPrecision(7))} {field.unit}</li>
+                  ))}</ul>
+                  <p className="subtle">Apply the listed values together as one undoable Spark edit. The full external save is kept in the working copy.</p>
+                  <button type="button" disabled={busy} onClick={applyProjectFields}>Apply reviewed values</button>
+                </>
+              )}
+            </div>
           )}
           <button
             type="button"

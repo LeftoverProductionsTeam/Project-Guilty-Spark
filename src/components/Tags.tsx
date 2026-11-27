@@ -25,6 +25,8 @@ import { downloadLocalText } from '../exportHelpers';
 import { call, native } from '../api';
 import {useMapState,writeMapSession} from '../mapSession';
 import BaboonTools from './BaboonTools';
+import {applyComparedField, tagIdentity} from '../compare';
+import type {BaboonProjectFieldReview} from '../baboon';
 import NativeTagOperations from './NativeTagOperations';
 import SmartEditPanel from './SmartEditPanel';
 import TagRenamePanel from './TagRenamePanel';
@@ -55,7 +57,7 @@ export default function Tags({
   inspection: MapInspection | null;
   entries: LibraryEntry[];
   onSelectMap: (id: string) => void;
-  edit: (p: Project, d: string) => void;
+  edit: (p: Project, d: string) => void | boolean;
   notify: (m: string) => void;
   focusTagId?: number | null;
   onFocusHandled?: () => void;
@@ -93,6 +95,16 @@ export default function Tags({
     jobId:string;tagRoot:string;files:{path:string;bytes:number;sha256:string}[];
     totalBytes:number;status:string;requestedTag:string;notice:string;
   }|null>(null);
+  function applyNativeFields(review: BaboonProjectFieldReview) {
+    const tag = inspection?.tags.find(item => item.id === review.tagId);
+    if (!tag || !inspection || selected !== review.tagId)
+      throw Error('Select the reviewed tag in the original map before applying its values.');
+    const revised = review.fields.reduce((current, field) => applyComparedField(current, inspection, {
+      projectId: review.projectId, sourceSha256: review.sourceSha256, tagId: tag.id,
+      tagKey: tagIdentity(tag), fieldKey: field.key, kind: 'f32', before: field.before, after: field.after,
+    }), project);
+    return edit(revised, 'Apply reviewed native tag values') !== false;
+  }
   async function refreshTagExchanges() {
     if (!native) return;
     try {
@@ -632,7 +644,7 @@ export default function Tags({
                 )}
               </details>
             <div className="tag-native-tools">
-            <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
+            <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} onApplyProjectFields={applyNativeFields} />
             <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} onLevelEditor={onLevelEditor} />
             <TagDuplicatePanel
               key={`duplicate:${project.id}:${selectedTag.id}`}
