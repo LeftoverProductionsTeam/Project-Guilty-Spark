@@ -2600,7 +2600,7 @@ fn generate_preserved_connector_for_slots(
         None => (intact_route_points(overlaps, plan, landing.as_ref())?, None),
     };
     if bent || !common_separation {
-        verify_intact_neighborhood(base.render_mesh.as_ref(), (&base.mesh, &base_collision), (&donor_layout.mesh, donor_collision),
+        verify_intact_neighborhood((&source.preserved_path, base, &base_collision), (&donor_layout.mesh, donor_collision),
             donor_index, stock_shift, retained_slots(), plan, &points)?;
     }
     review.tunnel_points = points[1..points.len() - 1].to_vec();
@@ -3291,9 +3291,11 @@ fn retained_surface_overlap(mesh: &MeshData, slot: usize, corners: &[V; 8]) -> R
 /// from each neighbor. Protect both render and collision bounds, then check
 /// the entire passage envelope against every nonparticipating BSP.
 fn verify_intact_neighborhood(
-    base_render: Option<&MeshData>, base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
+    retained_source: (&Path, &MapInspection, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
     translation: V, slots: impl IntoIterator<Item = usize>, plan: &BspAssembly, points: &[V],
 ) -> Result<()> {
+    let (cache, base, collision) = retained_source;
+    let base_render = base.render_mesh.as_ref();
     let route = &plan.tunnel_points;
     let forward = horizontal_direction(&[route[0], *route.last().unwrap()]);
     // The retained routes can be much longer than the new connector. A
@@ -3317,9 +3319,10 @@ fn verify_intact_neighborhood(
             .fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| [lo.min(value), hi.max(value)]));
         (corners, bounds)
     }).collect::<Vec<_>>();
-    let mut bounds_only = None;
+    let mut occupancy = Vec::new();
+    let mut segments = Vec::new();
     for slot in slots {
-        let retained = box_for(base, slot, [0.; 3])?;
+        let retained = box_for((&base.mesh, collision), slot, [0.; 3])?;
         // A conforming Atlas road may span an ordinary compact seam gap.
         // Unrelated native regions still need the full placement buffer.
         let separation = if slot == plan.base_bsp_index && uses_atlas_road_landing(plan) { 1.6 } else { 8. };
@@ -3327,20 +3330,33 @@ fn verify_intact_neighborhood(
             return invalid(format!("The intact donor needs {separation} units of separation from BSP {slot}"));
         }
         if slot == plan.base_bsp_index { continue; }
+        let mut passage_bounds = retained;
+        if let Some(render) = base_render.filter(|mesh| mesh.parts.get(slot).is_some_and(|part| part.index_count != 0)) {
+            for (bounds, axis) in passage_bounds.iter_mut().zip(axes) {
+                let rendered = projected_bounds(render, slot, [0.; 3], 0., axis)?;
+                *bounds = [bounds[0].min(rendered[0]), bounds[1].max(rendered[1])];
+            }
+        }
         for (segment, (corners, bounds)) in corridor.iter().enumerate() {
-            if separated_bounds(retained, *bounds, NEIGHBOR_CLEARANCE) { continue; }
-            for (kind, mesh) in [("collision", Some(base.1)), ("render", base_render)] {
+            if separated_bounds(passage_bounds, *bounds, NEIGHBOR_CLEARANCE) { continue; }
+            let render = base_render.filter(|mesh| mesh.parts.get(slot).is_some_and(|part| part.index_count != 0));
+            for (kind, mesh) in [("collision", Some(collision)), ("render", render)] {
                 if let Some(mesh) = mesh {
                     if let Some([x, y, z]) = retained_surface_overlap(mesh, slot, corners)? {
-                        return invalid(format!("Passage segment {} is within 0.05 units of {kind} geometry in unrelated BSP {slot} near ({x:.3}, {y:.3}, {z:.3})", segment + 1));
+                        return invalid(format!("Passage segment {} intersects the clearance envelope of {kind} geometry in unrelated BSP {slot} near ({x:.3}, {y:.3}, {z:.3})", segment + 1));
                     }
                 }
             }
-            bounds_only.get_or_insert((slot, segment + 1));
+            if plan.open_road || render.is_none() {
+                return invalid(format!("Passage segment {} overlaps the bounds of unrelated BSP {slot}. This overlap requires a complete enclosed route and render mesh for volume review.", segment + 1));
+            }
+            occupancy.push((slot, *corners));
+            segments.push(segment + 1);
         }
     }
-    if let Some((slot, segment)) = bounds_only {
-        return invalid(format!("Passage segment {segment} overlaps the bounds of unrelated BSP {slot}. Available collision and render triangles were clear. Native region occupancy still needs review."));
+    if let Some((query, [x, y, z])) = maps::occupied_bsp_volume(cache, base, &occupancy)? {
+        let (slot, _) = occupancy[query];
+        return invalid(format!("Passage segment {} overlaps native region BSP {slot} near ({x:.3}, {y:.3}, {z:.3})", segments[query]));
     }
     Ok(())
 }
@@ -4077,7 +4093,7 @@ pub(crate) fn verify_intact_connector_collision(
         return invalid("Compiled intact extension has the wrong BSP count");
     }
     let (collision, _) = maps::collision_source(cache, compiled)?;
-    verify_bound_intact_connector(&collision, compiled, plan, overlaps, [original_count, original_count + 1], [None; 2])
+    verify_bound_intact_connector(cache, &collision, compiled, plan, overlaps, [original_count, original_count + 1], [None; 2])
 }
 
 pub fn verify_rebuilt_connector_collision(
@@ -4092,7 +4108,7 @@ pub fn verify_rebuilt_connector_collision(
     }
     let closures = verify_compiled_entrance_closures(plan, overlaps, slots, rebuilt_entrances, &scenario.transitions)?;
     let (collision, _) = maps::collision_source(cache, compiled)?;
-    let mut result = verify_bound_intact_connector(&collision, compiled, plan, overlaps, slots, closures)?;
+    let mut result = verify_bound_intact_connector(cache, &collision, compiled, plan, overlaps, slots, closures)?;
     if rebuilt_entrances.contains(&true) {
         result["switchFloorReadback"] = verify_rebuilt_switch_floors(&collision, plan, slots, rebuilt_entrances,
             &scenario.transitions)?;
@@ -4176,7 +4192,7 @@ fn verify_rebuilt_switch_floors(
 }
 
 fn verify_bound_intact_connector(
-    collision: &MeshData, compiled: &MapInspection, plan: &BspAssembly,
+    cache: &Path, collision: &MeshData, compiled: &MapInspection, plan: &BspAssembly,
     overlaps: [[V; 2]; 2], [connector_slot, donor_slot]: [usize; 2], closures: [Option<EntranceClosure>; 2],
 ) -> Result<serde_json::Value> {
     let connector = crate::bsp_clearance::RouteChecker::for_part(collision, connector_slot)?;
@@ -4259,7 +4275,7 @@ fn verify_bound_intact_connector(
     // Apply the same neighboring-region proof to the compiled route.
     let neighbors = || (0..collision.parts.len()).filter(|slot| *slot != connector_slot && *slot != donor_slot);
     if path.len() > 2 || !intact_common_separation(&compiled.mesh, neighbors(), &compiled.mesh, donor_slot, [0.; 3], forward)? {
-        verify_intact_neighborhood(compiled.render_mesh.as_ref(), (&compiled.mesh, collision), (&compiled.mesh, collision), donor_slot,
+        verify_intact_neighborhood((cache, compiled, collision), (&compiled.mesh, collision), donor_slot,
             [0.; 3], neighbors(), plan, &points)?;
     }
     route.tunnel_points = [overlaps[0][0]].into_iter()
@@ -4895,7 +4911,7 @@ fn plan_from_bsp_placement(
                     return invalid("The planned passage overlaps a native donor pickup. Choose another heading or move the landing clear of the original item.");
                 }
                 if !intact_common_separation(&base.mesh,0..count,&donor.mesh,index,placed.translation,toward)? {
-                    verify_intact_neighborhood(base.render_mesh.as_ref(), (&base.mesh,&base_mesh),(&donor.mesh,&donor_mesh),
+                    verify_intact_neighborhood((&base_source.preserved_path, base, &base_mesh),(&donor.mesh,&donor_mesh),
                         index,placed.translation,0..count,&placed,&points)?;
                 }
                 Ok(())

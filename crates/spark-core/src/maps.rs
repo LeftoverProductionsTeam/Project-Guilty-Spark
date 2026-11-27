@@ -2104,6 +2104,131 @@ fn collision_leaf_index(r:&Reader,space:&Space,root:usize,point:[f32;3],budget:&
  }
  invalid("Compiled BSP tree is cyclic or exceeds the supported traversal depth")
 }
+
+type VolumePoint = [f64; 3];
+
+fn occupied_collision_volume(
+    corners: [VolumePoint; 8], nodes: usize, leaves: usize,
+    mut branch: impl FnMut(usize) -> Result<([f32; 3], f32, [u32; 2])>,
+) -> Result<Option<VolumePoint>> {
+    const OUTSIDE: u32 = u32::MAX;
+    const LEAF_BIT: u32 = 0x8000_0000;
+    const POINT_LIMIT: usize = 192;
+    let mut budget = 2_000_000usize;
+    let mut pending = vec![(0, corners.to_vec(), 0)];
+    while let Some((child, points, depth)) = pending.pop() {
+        if child == OUTSIDE || points.is_empty() { continue; }
+        if child & LEAF_BIT != 0 {
+            if (child & !LEAF_BIT) as usize >= leaves { return invalid("Compiled BSP leaf index is invalid"); }
+            return Ok(Some(std::array::from_fn(|axis| points.iter().map(|p| p[axis]).sum::<f64>() / points.len() as f64)));
+        }
+        if child as usize >= nodes || depth >= nodes.min(4096) {
+            return invalid("Compiled BSP volume path is invalid or cyclic");
+        }
+        budget = budget.checked_sub(points.len())
+            .ok_or_else(|| SparkError::Invalid("Native BSP volume review exceeds its traversal budget".into()))?;
+        let (normal, offset, [back, front]) = branch(child as usize)?;
+        let normal_length = normal.iter().map(|v| f64::from(*v).powi(2)).sum::<f64>().sqrt();
+        if !offset.is_finite() || !normal_length.is_finite() || normal_length < 1e-6 {
+            return invalid("Compiled BSP partition plane is nonfinite or degenerate");
+        }
+        let distances: Vec<_> = points.iter().map(|point|
+            normal.into_iter().zip(*point).map(|(axis, value)| f64::from(axis) * value).sum::<f64>() - f64::from(offset)
+        ).collect();
+        // Preserve both branches in the rounding margin of the native f32 plane.
+        let margin = normal_length * 0.001;
+        if distances.iter().all(|&d| d > margin) {
+            pending.push((front, points, depth + 1));
+        } else if distances.iter().all(|&d| d < -margin) {
+            pending.push((back, points, depth + 1));
+        } else {
+            for (target, sign) in [(back, 1.), (front, -1.)] {
+                if target == OUTSIDE { continue; }
+                let plane: Vec<_> = distances.iter().map(|distance| sign * distance - margin).collect();
+                let mut clipped: Vec<_> = points.iter().zip(&plane).filter_map(|(&point, &distance)|
+                    (distance <= 0.).then_some(point)).collect();
+                // Including all straddling chords also includes every true
+                // hull edge. The extra points remain in the convex volume.
+                for (i, &a) in plane.iter().enumerate() {
+                    for (j, &b) in plane.iter().enumerate().skip(i + 1) {
+                        budget = budget.checked_sub(1)
+                            .ok_or_else(|| SparkError::Invalid("Native BSP volume review exceeds its clipping budget".into()))?;
+                        if !((a < 0. && b > 0.) || (a > 0. && b < 0.)) { continue; }
+                        let fraction = a / (a - b);
+                        let point = std::array::from_fn(|axis| points[i][axis] + fraction * (points[j][axis] - points[i][axis]));
+                        if !clipped.contains(&point) { clipped.push(point); }
+                        if clipped.len() > POINT_LIMIT {
+                            return invalid("Native BSP volume review exceeds its clipped point budget");
+                        }
+                    }
+                }
+                pending.push((target, clipped, depth + 1));
+            }
+        }
+    }
+    Ok(None)
+}
+
+pub(crate) fn occupied_bsp_volume(
+    path: &Path, inspection: &MapInspection, queries: &[(usize, [VolumePoint; 8])],
+) -> Result<Option<(usize, VolumePoint)>> {
+    if queries.is_empty() { return Ok(None); }
+    if queries.len() > 256 || queries.iter().flat_map(|(_, corners)| corners.iter().flatten())
+        .any(|coord| !coord.is_finite() || coord.abs() > 1e6)
+    {
+        return invalid("Native BSP volume review exceeds its input budget");
+    }
+    let (header, bytes, hash) = read_cache_snapshot_shared(path)?;
+    if hash != inspection.sha256 { return invalid("Compiled map changed after BSP inspection"); }
+    let r = Reader(&bytes);
+    let space = cache_tag_space(&r, &header)?;
+    let mut scenarios = inspection.tags.iter().filter(|tag| tag.class == "scnr" && tag.path == inspection.scenario_path);
+    let scenario = scenarios.next().and_then(|tag| tag.data_offset)
+        .ok_or_else(|| SparkError::Invalid("Compiled scenario data is unavailable".into()))? as usize;
+    if scenarios.next().is_some() { return invalid("Compiled scenario is ambiguous"); }
+    let (table, count) = space.block(&r, scenario + 0x5a4, 32, 16)?;
+    for (query, &(slot, corners)) in queries.iter().enumerate() {
+        if slot >= count { return invalid("Native volume review refers to an unavailable BSP"); }
+        let entry = table + slot * 32;
+        let begin = r.u32(entry)? as usize;
+        let size = r.u32(entry + 4)? as usize;
+        r.bytes(begin, size)?;
+        if size < 24 { return invalid("Compiled BSP region is too small"); }
+        let region = Space { begin, end: begin + size, address: r.u32(entry + 8)? };
+        let bsp = region.pointer(r.u32(begin)?, 648)?;
+        let (tree, tree_count) = region.block(&r, bsp + 0xb0, 96, 16)?;
+        if tree_count != 1 { return invalid("Volume review requires one standard native collision tree"); }
+        let (nodes, node_count) = region.block(&r, tree, 12, 262144)?;
+        let (planes, plane_count) = region.block(&r, tree + 12, 16, 262144)?;
+        let (_, leaves) = region.block(&r, tree + 24, 8, 262144)?;
+        if node_count == 0 || plane_count == 0 || leaves == 0 { return invalid("Compiled BSP has no usable partition tree"); }
+        let occupied = occupied_collision_volume(corners, node_count, leaves, |index| {
+            let row = nodes + index * 12;
+            let plane = r.u32(row)? as usize;
+            if plane >= plane_count { return invalid("Compiled BSP partition plane index is invalid"); }
+            let field = planes + plane * 16;
+            Ok((vec3(&r, field)?, r.f32(field + 12)?, [r.u32(row + 4)?, r.u32(row + 8)?]))
+        })?;
+        if let Some(point) = occupied { return Ok(Some((query, point))); }
+    }
+    Ok(None)
+}
+
+#[cfg(test)]
+#[test]
+fn partition_volume_finds_a_thin_leaf_between_clear_corners() {
+    const OUTSIDE: u32 = u32::MAX;
+    const LEAF: u32 = 0x8000_0000;
+    let corners = |min, max| std::array::from_fn(|i| [if i & 1 == 0 { min } else { max },
+        (i & 2) as f64 * 0.5, (i & 4) as f64 * 0.25]);
+    let branch = |i| Ok(([1., 0., 0.], if i == 0 { 0.1 } else { 0.15 },
+        if i == 0 { [OUTSIDE, 1] } else { [LEAF, OUTSIDE] }));
+    let point = occupied_collision_volume(corners(-1., 1.), 2, 1, branch).unwrap().unwrap();
+    assert!((0.099..=0.151).contains(&point[0]));
+    assert!(occupied_collision_volume(corners(-3., -2.), 2, 1, branch).unwrap().is_none());
+    assert!(occupied_collision_volume(corners(2., 3.), 2, 1, branch).unwrap().is_none());
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeBspPlacements {

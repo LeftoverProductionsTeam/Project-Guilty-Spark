@@ -5,7 +5,7 @@ Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b. Previous fb126341 / e6cab303.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependencies and road-plow collision. Exact 61f8d17b appeared in Forerunner’s Zombies chooser. Windows blocked Host before map load. Latest guides users to Play Solo and keeps Stop available after edits.
-Next action: Prove continuous native BSP 6 occupancy is clear before changing its conservative bounds gate. Compact replay segment 3 had no triangle hits or occupied samples (909 checked). f5a4ca22, 919fbcce and fd7a49fa survive in the reviewed replay folder. b5178c77 is missing. Drive the Spark plow independently.
+Next action: Bake the regenerated Ice Fields entrance and verify stock wall facing. Reviewed source b43883d8 clears continuous BSP 6 occupancy and matches all four switches. Recover the lost Carousel ramp parameters and bake that slot separately. f5a4ca22, 919fbcce and fd7a49fa survive. b5178c77 is missing. Drive the Spark plow independently.
 
 ## Acceptance
 
