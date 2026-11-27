@@ -13,6 +13,14 @@
 
 See the [active checkpoint](ACTIVE_TASK.md) for exact artifacts. The existing Forerunner Spark integration contract defines the runtime diagnostic fields.
 
+## Curved Warthog attachments
+
+| Source and output | Implemented and desktop-tested | Remaining game checks |
+| --- | --- | --- |
+| Owned MCC13 multiplayer source → separate MCC13 cache | Spark Latest 62fe560c built the saved road-plow curve, paint and reviewed mount from the Windows Build button using H1A Tool, Invader and Blender. Native dependency, collision and CRC readback passed. Spark reopened cache `61f8d17bdb771f31e9c5ba6ae320aaa29d5170e881db250560a85cb86f60fbda` | Driving and blade contact on this exact output. V-plow collision and Monitor patrol are separate open work |
+
+Open the map in Spark, then use Asset Workshop → Shape & Paint → Road plow. Set Blade curl, review the Warthog mount, apply and save. Use Build & playtest → Build vehicle attachment.
+
 ## November 7 — source-native asset transfer acceptance
 
 | Exact source → destination | Asset / required native closure | Proven endpoint | Remaining gate |

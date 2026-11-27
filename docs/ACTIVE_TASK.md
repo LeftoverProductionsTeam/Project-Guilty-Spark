@@ -3,9 +3,9 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark e0af2992 / ce3c14f7. Windows Shape & Paint previewed the painted plow on the source Demolisher, applied it, passed Undo/Redo and restored its exact mount and paint after Save/restart. Previous 96ab5c7e / 9b5d9937. Monitor patrol remains open.
-Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Windows Workshop review built through the native harness with the actual vehicle and mount, project 340e4fce / paint c2506158 / MCC13 660523e6. Correct CRC, no road-plow collision warnings. Ordinary Spark Build integration, driving and V-plow warning remain open.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the clean road blade and expose reviewed native vehicle attachment through Spark Build.
+Latest verified revision: Spark 7e13dc7e / 62fe560c. Windows passed curved plow review, Undo/Redo, Save/restart, normal native Build and verified cache reopen. Previous e0af2992 / ce3c14f7.
+Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependency readback and clean road-plow collision.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the Spark-built road blade and verify contact. V-plow collision and Monitor patrol remain open.
 
 ## Acceptance
 
