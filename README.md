@@ -102,7 +102,7 @@ There's a **Learning Center** with searchable workflow guides and an in-app glos
 
 These are the big ambitions, **not a list of magically finished features**:
 
-- **MegaWorld:** Forerunner Latest includes a playable 19-region ground Extraction preview. The compact world is still in private acceptance. Ice Fields wall opacity has passed one matched native view. Wider visual checks and two-way vehicle traversal remain open.
+- **MegaWorld:** Forerunner Latest includes a playable 19-region ground Extraction preview. The compact world is still in private acceptance. The Ice Fields wall opacity check and a continuous on-foot round trip to Carousel passed on the private candidate. Wider visual checks and two-way vehicle traversal remain open.
 - **Zombie Apocalypse and Firefight:** original zombie mechanics, native AI encounters, proper wave survival, sounds, scoring and co-op. Authoring tools and native experiments exist; full accepted player combat isn't done.
 - **Extraction:** The released ground preview supports faction deployment, field pickups, evacuation calls and banking. The full regional loot-pool package and the compact geometry are separate private candidates. Synchronized hunts and aircraft extraction remain unfinished.
 - **More ways to play together:** multiplayer AI, expanded co-op, more peers, runtime bridges and split-screen. Real engine/peer acceptance is still ahead.
