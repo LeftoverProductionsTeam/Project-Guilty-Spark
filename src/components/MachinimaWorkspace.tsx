@@ -27,6 +27,7 @@ import {
 } from '../machinima';
 import type { MachinimaSettings } from '../machinima';
 import { captureFrame, recordViewport } from '../machinimaCapture';
+import {HREC_INPUT_LIMIT,hrecCameraShots,readHrecTake,type HrecTakeSource} from '../hrecTake';
 import { downloadLocalText } from '../exportHelpers';
 import { Notice, NumberField } from './ui';
 import MachinimaRig from './MachinimaRig';
@@ -181,8 +182,10 @@ export default function MachinimaWorkspace({
   const bridge = useRef<DirectorBridge>({ pose: null, canvas: null }),
     stopRecording = useRef<(() => void) | null>(null),
     takeInput = useRef<HTMLInputElement>(null),
+    replayInput=useRef<HTMLInputElement>(null), replayEpoch=useRef(0),
     mounted = useRef(true);
   const [animation,setAnimation]=useState<AnimationPreview|null>(null);
+  const [replay,setReplay]=useState<HrecTakeSource|null>(null),[replayTrack,setReplayTrack]=useState(0),[replayName,setReplayName]=useState('');
   const [nativeResolution,setNativeResolution]=useState('desktop'),[launching,setLaunching]=useState(false);
   const actorSources=data.entries.filter(entry=>typeof entry.version==='number'&&entry.version>0);
   const [sourceId, setSourceId] = useMapState(project.id,'director.source',
@@ -196,8 +199,10 @@ export default function MachinimaWorkspace({
   useWorkspaceFileActions('director:'+project.id,[
     {id:'export-take',label:'Export camera take…',run:()=>downloadLocalText('spark-camera-take.json',encodeCameraTake(shots,settings),'application/json')},
     {id:'import-take',label:'Import camera take…',disabled:playing||recording,run:()=>takeInput.current?.click()},
+    {id:'import-hrec',label:'Import Forerunner recording…',disabled:playing||recording||!inspection,run:()=>replayInput.current?.click()},
     {id:'export-shots',label:'Export shot list CSV…',run:()=>downloadLocalText('spark-shot-list.csv',shotListCsv(shots),'text/csv')},
   ]);
+  useEffect(()=>{replayEpoch.current++;setReplay(null);return ()=>{replayEpoch.current++;};},[project.id,inspection?.sha256]);
   const rememberedTime=useRef(time);rememberedTime.current=time;useEffect(()=>()=>writeMapSession(project.id,'director.time',rememberedTime.current),[project.id]);
   useEffect(() => {
     mounted.current = true;
@@ -216,8 +221,9 @@ export default function MachinimaWorkspace({
   }, [shots, selected]);
   function save(next: CameraShot[], description: string, preferences: MachinimaSettings = settings) {
     const updated={...studio,shots:next,machinima:{...preferences}},problems=validateCreatorStudio(updated);
-    if(problems.length){setMessage(problems.join('; '));return;}
+    if(problems.length){setMessage(problems.join('; '));return false;}
     edit({ ...project, studio: updated }, description);
+    return true;
   }
   function preference<K extends keyof MachinimaSettings>(key: K, value: MachinimaSettings[K]) {
     save(shots, 'Change director ' + key, { ...settings, [key]: value });
@@ -436,6 +442,52 @@ export default function MachinimaWorkspace({
               }
             }}
           />
+          <details>
+            <summary>Forerunner camera takes</summary>
+            <button disabled={playing||recording||!inspection} onClick={()=>replayInput.current?.click()}>
+              <Upload size={15}/> Open HREC recording
+            </button>
+            <input ref={replayInput} type="file" accept=".hrec,application/octet-stream" hidden
+              onChange={async event=>{
+                const file=event.currentTarget.files?.[0];
+                event.currentTarget.value='';
+                if(!file||!inspection)return;
+                const ticket=++replayEpoch.current;
+                setReplay(null);
+                try{
+                  if(file.size>HREC_INPUT_LIMIT)throw Error('The recording exceeds 64 MiB.');
+                  const take=await readHrecTake(await file.arrayBuffer());
+                  if(ticket!==replayEpoch.current)return;
+                  const name=inspection.header.name.toLowerCase();
+                  if(take.mapName!==name||take.mapSha256&&take.mapSha256!==inspection.sha256)
+                    throw Error('Open the matching preserved map before importing this recording.');
+                  setReplayTrack(0);
+                  setReplayName(file.name.replace(/\.hrec$/i,'').slice(0,90));
+                  setReplay(take);
+                }catch(error){if(ticket===replayEpoch.current)notify(String(error));}
+              }}/>
+            {replay&&<>
+              <label className="field-label">Take name<input value={replayName} maxLength={90}
+                onChange={event=>setReplayName(event.target.value)}/></label>
+              <label className="field-label">Recorded player view<select value={replayTrack}
+                onChange={event=>setReplayTrack(Number(event.target.value))}>
+                {replay.tracks.map((track,index)=><option key={index} value={index}>
+                  Player {track.player+1} · {((track.end-track.start)/replay.rate).toFixed(1)} s · start tick {track.start}
+                </option>)}
+              </select></label>
+              {!replay.mapSha256 && <small>This recording identifies the map by name. Review the keys against the open map.</small>}
+              <button type="button" disabled={playing||recording} onClick={()=>{
+                try{
+                  const remaining=(studio.engineMachinima?.enabled ? 64 : 256)-shots.length;
+                  const imported=hrecCameraShots(replay,replayTrack,replayName,Math.min(remaining,64));
+                  if(save([...shots,...imported],'Import camera take · '+replayName)){
+                    setSelected(imported[0].id);
+                    setMessage('Appended '+imported.length+' editable recording keys to the timeline.');
+                  }
+                }catch(error){notify(String(error));}
+              }}>Append camera take</button>
+            </>}
+          </details>
           <button onClick={() => downloadLocalText('spark-shot-list.csv', shotListCsv(shots), 'text/csv')}>
             Export shot list CSV
           </button>

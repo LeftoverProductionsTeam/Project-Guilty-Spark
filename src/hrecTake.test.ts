@@ -1,0 +1,42 @@
+import {expect,it} from 'vitest';
+import {gzipSync} from 'node:zlib';
+import {hrecCameraShots,readHrecTake} from './hrecTake';
+
+const u32=(value:number)=>[value&255,value>>>8&255,value>>>16&255,value>>>24];
+const record=(kind:number,bytes:number[])=>[kind,...u32(bytes.length),...bytes];
+
+function recording(){
+  const map=[...'timberland'].map(ch=>ch.charCodeAt(0));
+  const header=record(1,[...u32(0),60,0,0,map.length,...map,0]);
+  const identity=record(16,[1,0,...Array.from({length:32},()=>0xab)]);
+  const frame=(tick:number,player:number,x:number,flags:number)=>{
+    const bytes=new Uint8Array(26),view=new DataView(bytes.buffer);
+    bytes[0]=player;bytes[1]=flags;bytes[20]=255;
+    view.setFloat32(2,x,true);view.setInt16(14,1600,true);
+    return record(4,[...u32(tick),1,...bytes]);
+  };
+  const block=[...header,...identity,...frame(0,0,3,0),...frame(15,0,4,8),...frame(75,0,50,0),...frame(90,0,51,0)];
+  return Uint8Array.from([72,82,69,67,...u32(2),82,...u32(block.length),...u32(block.length),...block]).buffer;
+}
+
+it('uses exact map identity, ticks and live camera poses without bridging player gaps',async()=>{
+  const source=await readHrecTake(recording());
+  expect(source.mapSha256).toBe('ab'.repeat(32));
+  expect(source.mapName).toBe('timberland');
+  expect(source.tracks.map(({player,start,end})=>[player,start,end])).toEqual([[0,0,15],[0,75,90]]);
+  const shots=hrecCameraShots(source,0,'Arrival');
+  expect(shots[0]).toMatchObject({name:'Arrival · 1',cameraPosition:[3,0,1.6],lookAt:[4,0,1.6],fov:70,durationMs:250,easing:'cut'});
+  expect(shots[1]).toMatchObject({fov:30});
+});
+it('refuses a partial recording block without adopting any camera keys',async()=>{
+  await expect(readHrecTake(recording().slice(0,-1))).rejects.toThrow('block size');
+});
+
+it('uses the same camera data in gzip blocks and refuses misdeclared expansion',async()=>{
+  const original=new Uint8Array(recording());
+  const payload=original.subarray(17),compressed=gzipSync(payload);
+  const gzip=Uint8Array.from([...original.subarray(0,8),71,...u32(payload.length),...u32(compressed.length),...compressed]);
+  expect(await readHrecTake(gzip.buffer)).toEqual(await readHrecTake(original.buffer));
+  new DataView(gzip.buffer).setUint32(9,payload.length-1,true);
+  await expect(readHrecTake(gzip.buffer)).rejects.toThrow('decompressed recording exceeds the import limit');
+});

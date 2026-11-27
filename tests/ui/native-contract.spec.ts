@@ -7275,6 +7275,41 @@ test('Chupathingy Forge places and reopens a base-map control', async ({page}) =
   await expect(physics).toHaveValue('fixed');
 });
 
+test('Forerunner HREC camera keys enter the normal Machinima timeline and Undo',async({page})=>{
+  await mockDesktop(page);
+  await openFixture(page);
+  const identity=await page.evaluate(()=>{
+    const row=(window as any).__sparkMock.projects.a.inspection;
+    return {map:row.header.name.toLowerCase(),sha:row.sha256};
+  });
+  const u32=(v:number)=>{const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;};
+  const text=(v:string)=>Buffer.concat([Buffer.from([Buffer.byteLength(v)]),Buffer.from(v)]);
+  const record=(kind:number,data:Buffer)=>Buffer.concat([Buffer.from([kind]),u32(data.length),data]);
+  const frame=(tick:number,x:number)=>{
+    const sample=Buffer.alloc(26);
+    sample.writeFloatLE(x,2);sample.writeInt16LE(1600,14);sample[20]=255;
+    return record(4,Buffer.concat([u32(tick),Buffer.from([1]),sample]));
+  };
+  const map=record(1,Buffer.concat([u32(0),Buffer.from([60,0,0]),text(identity.map),Buffer.from([0])]));
+  const exact=record(16,Buffer.concat([Buffer.from([1,0]),Buffer.from(identity.sha,'hex')]));
+  const payload=Buffer.concat([map,exact,frame(0,2),frame(15,4)]);
+  const hrec=Buffer.concat([Buffer.from('HREC'),u32(2),Buffer.from('R'),u32(payload.length),u32(payload.length),payload]);
+  await chooseTool(page,'Machinima');
+  await openDrawer(page,'Camera keys');
+  const box=page.locator('.director-shots');
+  const summary=box.getByText('Forerunner camera takes',{exact:true,includeHidden:true});
+  await revealPagedControl(summary);await summary.click();
+  await box.locator('input[type=file][accept^=".hrec"]').setInputFiles({name:'Opening.hrec',mimeType:'application/octet-stream',buffer:hrec});
+  await expect(box.getByRole('textbox',{name:'Take name'})).toHaveValue('Opening');
+  await box.getByRole('button',{name:'Append camera take',exact:true}).click();
+  await page.keyboard.press('Control+s');
+  const keys=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.shots);
+  await expect.poll(keys).toMatchObject([{name:'Opening · 1',cameraPosition:[2,0,1.6],durationMs:250},{name:'Opening · 2',cameraPosition:[4,0,1.6]}]);
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+s');
+  await expect.poll(async()=>(await keys())?.length??0).toBe(0);
+});
+
 test('advanced HMV16 placement edits save and undo without changing its effect data', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => {
