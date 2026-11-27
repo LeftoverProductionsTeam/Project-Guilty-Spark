@@ -58,6 +58,21 @@ export function readRecoveredJms(text: string) {
   };
 }
 
+/** Append one compiler-facing shader name without changing any stock slot index. */
+export function appendRecoveredJmsMaterial(text: string, name: string) {
+  const { rows, nodes, materials } = readRecoveredJms(text);
+  if (!/^[a-z][a-z0-9_]{0,47}$/.test(name) || materials.some(material => material.toLowerCase() === name)) {
+    throw new Error('Choose a unique native material name');
+  }
+  if (materials.length >= 256) throw new Error('Recovered JMS material capacity reached');
+  const countAt = 3 + 5 * nodes.length;
+  rows[countAt] = String(materials.length + 1);
+  rows.splice(countAt + 1 + 2 * materials.length, 0, name, '<none>');
+  const result = rows.join('\n') + '\n';
+  if (result.length > maxSourceLength) throw new Error('Recovered JMS source exceeds 32 MiB');
+  return result;
+}
+
 export function attachRigidPartToRecoveredJms(text: string, mesh: MeshData, mount: {
   node: string;
   region: string;

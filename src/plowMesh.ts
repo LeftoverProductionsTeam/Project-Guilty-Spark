@@ -1,6 +1,6 @@
 import type { MeshData, Vec3 } from './types';
 
-export type PlowProfile = 'rounded' | 'v';
+export type PlowProfile = 'moldboard' | 'rounded' | 'v';
 
 export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile,
   detail: 'render' | 'collision' = 'render'): MeshData {
@@ -9,11 +9,21 @@ export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: numb
   const mesh: MeshData = { positions: [], indices: [], uvs: [], label: 'Plow blade', source: 'Spark shape' };
   const rake = Math.min(depth, height * 0.7);
   const scoopDepth = height * 0.65 * scoop / 100;
+  // Use a circular section for the road blade. Limit the sagitta to keep
+  // the lip short of vertical and the thickness faces well defined.
+  const halfHeight = height / 2;
+  const sagitta = height * 0.38 * scoop / 100;
+  const radius = sagitta > 0 ? (halfHeight ** 2 + sagitta ** 2) / (2 * sagitta) : 0;
   const wingDepth = width * 0.33 * wrap / 100;
   const position = (side: number, across: number, up: number): Vec3 => {
     const center = 2 * across - 1;
     const wing = profile === 'v' ? Math.abs(center) : center * center;
-    return [side * depth / 2 + rake * up - 4 * scoopDepth * up * (1 - up) - wingDepth * wing,
+    const z = height * (up - 0.5);
+    const arc = sagitta > 0
+      ? (halfHeight ** 2 - z ** 2) / (Math.sqrt(radius ** 2 - z ** 2) + radius - sagitta)
+      : 0;
+    const recess = profile === 'moldboard' ? arc : 4 * scoopDepth * up * (1 - up);
+    return [side * depth / 2 + rake * up - recess - wingDepth * wing,
       width * (across - 0.5), height * up];
   };
   // Separate UV islands for the front, back and edges. Step counts match on

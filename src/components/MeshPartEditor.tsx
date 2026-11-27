@@ -92,9 +92,9 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
   const activity = useWorkspaceActivity();
   const [shape, setShape] = useState<Shape | 'selected'>('plow');
   const [size, setSize] = useState<Vec3>([0.22, 2.5, 0.72]);
-  const [scoop, setScoop] = useState(62);
-  const [wrap, setWrap] = useState(30);
-  const [profile, setProfile] = useState<PlowProfile>('rounded');
+  const [scoop, setScoop] = useState(80);
+  const [wrap, setWrap] = useState(0);
+  const [profile, setProfile] = useState<PlowProfile>('moldboard');
   const [painting, setPainting] = useState(false);
   const [color, setColor] = useState('#701b17');
   const [radius, setRadius] = useState(18);
@@ -196,13 +196,15 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
       </div>}
       {form === 'plow' && <div className="asset-part-dimensions">
         <label>Blade profile <select value={profile} onChange={event => setProfile(event.target.value as PlowProfile)}>
-          <option value="rounded">Rounded</option><option value="v">V-plow</option>
+          <option value="moldboard">Road plow</option>
+          <option value="rounded">Rounded wings</option>
+          <option value="v">V-plow</option>
         </select></label>
-        <label>Scoop (%)
-          <NumberField label="Scoop (%)" value={scoop} min={0} max={100} step={1} onCommit={setScoop} />
+        <label>Blade curl (%)
+          <NumberField label="Blade curl (%)" value={scoop} min={0} max={100} step={1} onCommit={setScoop} />
         </label>
-        <label>Wrap (%)
-          <NumberField label="Wrap (%)" value={wrap} min={0} max={100} step={1} onCommit={setWrap} />
+        <label>Wing sweep (%)
+          <NumberField label="Wing sweep (%)" value={wrap} min={0} max={100} step={1} onCommit={setWrap} />
         </label>
       </div>}
       <div className="button-row">

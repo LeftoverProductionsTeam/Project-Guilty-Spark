@@ -914,9 +914,11 @@ try{
     const mesh = editor.getByRole('combobox', { name: 'Mesh' });
     await expect(mesh).toHaveValue('plow');
     const profile = editor.getByRole('combobox', { name: 'Blade profile', exact: true });
+    await expect(profile).toHaveValue('moldboard');
     await profile.selectOption('v');
-    const scoop = editor.getByRole('spinbutton', { name: 'Scoop (%)', exact: true });
-    await scoop.fill('80');
+    await profile.selectOption('moldboard');
+    const scoop = editor.getByRole('spinbutton', { name: 'Blade curl (%)', exact: true });
+    await scoop.fill('65');
     await scoop.press('Tab');
     const width = editor.getByRole('spinbutton', { name: 'Width', exact: true });
     await width.fill('3');
@@ -933,12 +935,12 @@ try{
     await expect(canvas).toHaveCount(0);
     await toggle.click();
     await expect(width).toHaveValue('3');
-    await expect(profile).toHaveValue('v');
-    await expect(scoop).toHaveValue('80');
+    await expect(profile).toHaveValue('moldboard');
+    await expect(scoop).toHaveValue('65');
     await expect(undo).toBeEnabled();
     await undo.click();
     await expect(undo).toBeDisabled();
-    report.shapePaint = { shape: 'plow', width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true };
+    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: 65, width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true };
     step('Shaped and painted the plow with the Windows app, hid the tool and undid the retained stroke', report.shapePaint);
   }
   if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){

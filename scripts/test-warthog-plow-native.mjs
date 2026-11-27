@@ -1,8 +1,9 @@
 // Bounded native render proof against an explicitly selected local Warthog cache.
 import {withDevelopmentWorkspace} from './native-qa-storage.mjs';
 import {buildNativeRigidPartCollision} from './native-rigid-part-collision.mjs';
+import {compileNativePartPaint} from './native-rigid-part-material.mjs';
 import {plowMesh} from '../src/plowMesh.ts';
-import {attachRigidPartToRecoveredJms,normalizeRecoveredJmsChecksum,readRecoveredJms} from '../src/haloRiggedJms.ts';
+import {appendRecoveredJmsMaterial,attachRigidPartToRecoveredJms,normalizeRecoveredJmsChecksum,readRecoveredJms} from '../src/haloRiggedJms.ts';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {execFile} from 'node:child_process';
@@ -22,6 +23,11 @@ const hash=async file=>{
 };
 const originalMapHash=await hash(map);
 const blender=process.env.SPARK_WARTHOG_BLENDER;
+const paintSource=process.env.SPARK_WARTHOG_PAINT_PNG;
+const buildPrivate=process.env.SPARK_WARTHOG_PRIVATE_MAP==='1';
+const bladeProfile=process.env.SPARK_WARTHOG_ROAD_BLADE==='1'?'moldboard':'v';
+const [curl,sweep]=bladeProfile==='moldboard'?[80,0]:[62,30];
+if(buildPrivate&&(!blender||!paintSource))throw Error('Private cache proof requires both paint and collision');
 if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the installed Blender executable');
 
 await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
@@ -56,14 +62,15 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const front=Math.max(...points.map(p=>p[0])),width=Math.max(...points.map(p=>p[1]))-Math.min(...points.map(p=>p[1])),bottom=Math.min(...points.map(p=>p[2]));
   const bladeWidth=Math.min(width*1.1/100,2.5);
   const dimensions=[.22,bladeWidth,.65];
-  const mesh=plowMesh(dimensions,62,30,'v');
+  const mesh=plowMesh(dimensions,curl,sweep,bladeProfile);
   const origin=[front+15,0,bottom+5],proof=[];
-  const mount={node:'frame hull',region:'hull',material:'warthog hull',position:origin.map(x=>x/100)};
+  const paint=paintSource?await compileNativePartPaint({source:path.resolve(paintSource),tags,data,run}):null;
+  const mount={node:'frame hull',region:'hull',material:paint?.name??'warthog hull',position:origin.map(x=>x/100)};
   for(const name of await fs.readdir(base)){
     const original=await fs.readFile(path.join(base,name),'utf8');
     let text;
     if(name.startsWith('__base')){
-      const part=attachRigidPartToRecoveredJms(original,mesh,mount);
+      const part=attachRigidPartToRecoveredJms(paint?appendRecoveredJmsMaterial(original,paint.name):original,mesh,mount);
       text=part.text;
       proof.push({name,original:part.originalTriangles,expected:part.originalTriangles+part.addedTriangles});
     }else text=normalizeRecoveredJmsChecksum(original);
@@ -71,6 +78,12 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   }
   const raw=await launch(kit,['model','vehicles\\warthog\\warthog']);
   const back=path.join(context.directory,'readback');await fs.mkdir(back);const candidate='vehicles\\warthog\\warthog\\warthog.gbxmodel';await run('recover',['-t',tags,'-d',back,candidate]);
+  if(paint){
+    const shaderCount=Number(await run('edit',['-t',tags,'-C','shaders',candidate]));
+    const fields=Array.from({length:shaderCount},(_,index)=>['-G','shaders['+index+'].shader']).flat();
+    const shaders=(await run('edit',['-t',tags,...fields,candidate])).trim().split(/\r?\n/);
+    if(shaders.filter(shader=>shader===paint.shader).length!==1)throw Error('Compiled model did not retain the dedicated blade shader');
+  }
   function markersEqual(before,after) {
     const decode=rows=>Array.from({length:Number(rows[0])},(_,index)=>rows.slice(1+index*6,7+index*6));
     const remaining=decode(after);
@@ -137,7 +150,7 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
     const contactWidth=bladeWidth*.42;
     collision=await buildNativeRigidPartCollision({
       context,tags,data,run,launch,compiler:kit,blender,originalTag:sourceCollision,source:stock,
-      blade:plowMesh(dimensions,62,30,'v','collision'),mount:{...mount,material:'metal'},
+      blade:plowMesh(dimensions,curl,sweep,bladeProfile,'collision'),mount:{...mount,material:'metal'},
       contactSamples:[[0,0],[contactWidth,0],[-contactWidth,0]],
     });
   }
@@ -154,8 +167,47 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   }
   if(revisedVehicle!==originalVehicle)throw Error('Vehicle variant changed fields beyond reviewed model references');
   if(await readVehicle(vehicle)!==originalVehicle)throw Error('Original extracted vehicle changed');
+  let privateMap=null;
+  if(buildPrivate){
+    const scenario=(await run('info',['-T','scenario_path',map])).trim();
+    if(!/^[-a-z0-9_ '\\]+$/i.test(scenario))throw Error('Cache has an unsupported scenario path');
+    await run('extract',['-G','-t',tags,map]);
+    const vehicleSource=path.join(tags,vehicle);
+    const variantSource=path.join(tags,variant);
+    if(await readVehicle(vehicle)!==originalVehicle)throw Error('Full extraction changed the verified vehicle baseline');
+    // Update only the vehicle in the disposable tag tree. The original scenario
+    // still uses the same palette index and placement data.
+    await fs.copyFile(variantSource,vehicleSource);
+    const maps=path.join(context.directory,'maps');
+    await fs.mkdir(maps);
+    // The official H1A compiler preserves the authored 3.0 melee flash;
+    // Invader's stricter guard refuses the original unchanged source.
+    const compilerSha256=await hash(kit);
+    if(compilerSha256!=='c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa')
+      throw Error('Use the verified H1A Tool for the private Zombie Survival build');
+    const compileLog=await launch(kit,['-data_dir','data','-tags_dir','tags','-game_root_dir','.',
+      'build-cache-file',scenario,'classic','none']);
+    if(!/successfully built cache file\./i.test(compileLog)||/### failed|exception halt/i.test(compileLog))
+      throw Error('H1A cache compile failed: '+compileLog.split(/\r?\n/).slice(-18).join('\n'));
+    const scenarioFile=path.win32.basename(scenario)+'.map';
+    const output=path.join(maps,scenarioFile);
+    if(!(await fs.lstat(output)).isFile()||await hash(kit)!==compilerSha256)throw Error('Invalid private H1A output');
+    const mismatch=(await run('info',['-T','crc32_mismatched',output])).trim();
+    const engine=(await run('info',['-T','engine',output])).trim();
+    if(mismatch!=='0'||engine!=='Halo: Combat Evolved Anniversary (MCC)')throw Error('Private cache engine or CRC differs');
+    const readback=path.join(context.directory,'private-map-tags');
+    await fs.mkdir(readback);
+    await run('extract',['-G','-r','-t',readback,'-s',vehicle,output]);
+    for(const [field,tag] of references){
+      if((await run('edit',['-t',readback,'-G',field,vehicle])).trim()!==tag)
+        throw Error('Compiled cache omitted the reviewed vehicle '+field);
+    }
+    if((await run('edit',['-t',readback,'-G','base_map',paint.shader])).trim()!==paint.bitmap)
+      throw Error('Compiled cache omitted the authored paint bitmap binding');
+    privateMap={sha256:await hash(output),scenario,engine,compilerSha256,crcMismatch:0,vehicleReferencesVerified:true,gameplayVerified:false};
+  }
   if(await hash(map)!==originalMapHash)throw Error('Original map changed during the native proof');
-  console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,proof,bladeTriangles:mesh.indices.length/3,bladeDimensions:dimensions,mountCentimeters:origin,
+  console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,paint,privateMap,proof,bladeTriangles:mesh.indices.length/3,bladeProfile,curl,sweep,bladeDimensions:dimensions,mountCentimeters:origin,
     compilerOutput:raw.slice(-250),scope:'Compiled vehicle tag readback; gameplay requires separate validation.'}));
   if(!proof.every(p=>p.after===p.expected&&p.matchedBlade===mesh.indices.length/3&&p.matchedStock===p.original&&p.checksum===stock.checksum&&p.rigIdentical&&p.markersIdentical))throw Error('H1A stock rig or blade failed exact readback');
-},{reservationBytes:512*1024**2});
+},{reservationBytes:buildPrivate?1024**3:512*1024**2});
