@@ -796,6 +796,7 @@ struct RegionPalette {
 
 #[derive(Debug, PartialEq, Serialize)]
 pub(crate) struct DonorEnvironment {
+    sky: Option<usize>,
     background: RegionPalette,
     acoustics: RegionPalette,
     weather: RegionPalette,
@@ -806,7 +807,7 @@ impl DonorEnvironment {
         [&self.background, &self.acoustics, &self.weather]
     }
 
-    fn read(run: &impl Fn(Vec<String>) -> Result<String>) -> Result<Option<Self>> {
+    fn read(run: &impl Fn(Vec<String>) -> Result<String>, same_scenario: bool) -> Result<Option<Self>> {
         let count = |key: &str, limit: usize| -> Result<usize> {
             let text = run(vec!["-C".into(), key.into()])?;
             text.trim().parse::<usize>().ok().filter(|n| *n <= limit)
@@ -839,7 +840,9 @@ impl DonorEnvironment {
             }
             return Ok(None);
         }
-        if sky.iter().any(Option::is_some) {
+        let first_sky = sky[0];
+        if (!same_scenario && first_sky.is_some()) || sky.iter().any(|&value| value != first_sky)
+            || (same_scenario && count("weather_polyhedra", 64)? != 0) {
             return Ok(None);
         }
         let mut palettes = Vec::with_capacity(REGION_PALETTES.len());
@@ -874,11 +877,11 @@ impl DonorEnvironment {
         }
         let [background, acoustics, weather] = palettes.try_into()
             .map_err(|_| SparkError::Invalid("Missing native environment palette".into()))?;
-        Ok(Some(Self { background, acoustics, weather }))
+        Ok(Some(Self { sky: first_sky, background, acoustics, weather }))
     }
 
     pub(crate) fn verify(&self, run: impl Fn(Vec<String>) -> Result<String>) -> Result<()> {
-        if Self::read(&run)?.as_ref() != Some(self) {
+        if Self::read(&run, self.sky.is_some())?.as_ref() != Some(self) {
             return invalid("Native donor environment differs from its reviewed audio and weather");
         }
         Ok(())
@@ -892,8 +895,26 @@ pub(crate) fn stage_donor_environment(
     target: impl Fn(Vec<String>) -> Result<String>,
     yaw_degrees: f64,
 ) -> Result<Option<DonorEnvironment>> {
-    let Some(mut expected) = DonorEnvironment::read(&source)? else { return Ok(None) };
-    let empty = DonorEnvironment::read(&target)?.ok_or_else(|| SparkError::Invalid(
+    stage_environment(source, target, yaw_degrees, false)
+}
+
+/// A replacement within the same scenario can reuse a uniform native sky index.
+/// Spatial fog, weather volumes and mixed assignments still need a cluster map.
+pub(crate) fn stage_replacement_environment(
+    source: impl Fn(Vec<String>) -> Result<String>,
+    target: impl Fn(Vec<String>) -> Result<String>,
+) -> Result<Option<DonorEnvironment>> {
+    stage_environment(source, target, 0.0, true)
+}
+
+fn stage_environment(
+    source: impl Fn(Vec<String>) -> Result<String>,
+    target: impl Fn(Vec<String>) -> Result<String>,
+    yaw_degrees: f64,
+    same_scenario: bool,
+) -> Result<Option<DonorEnvironment>> {
+    let Some(mut expected) = DonorEnvironment::read(&source, same_scenario)? else { return Ok(None) };
+    let empty = DonorEnvironment::read(&target, same_scenario)?.ok_or_else(|| SparkError::Invalid(
         "Generated donor BSP already has geometry-bound or mixed ambience".into()))?;
     if empty.palettes().iter().any(|palette| !palette.rows.is_empty() || palette.assigned_palette_index.is_some()) {
         return invalid("Generated donor environment is not empty");
@@ -908,6 +929,9 @@ pub(crate) fn stage_donor_environment(
     }
     let clusters: usize = target(vec!["-C".into(), "clusters".into()])?.parse()
         .map_err(|_| SparkError::Invalid("Generated BSP cluster count is invalid".into()))?;
+    if empty.sky != expected.sky {
+        set_cluster_assignment(&target, clusters, "sky", expected.sky.unwrap_or(usize::from(u16::MAX)))?;
+    }
     for (palette, (key, field, fields)) in expected.palettes().into_iter().zip(REGION_PALETTES) {
         if !palette.rows.is_empty() {
             target(vec!["-I".into(), key.into(), palette.rows.len().to_string(), "end".into()])?;
@@ -924,16 +948,23 @@ pub(crate) fn stage_donor_environment(
             if !args.is_empty() { target(args)?; }
         }
         if let Some(index) = palette.assigned_palette_index {
-            for start in (0..clusters).step_by(32) {
-                let args = (start..(start + 32).min(clusters)).flat_map(|cluster| {
-                    ["-S".into(), format!("clusters[{cluster}].{field}"), index.to_string()]
-                }).collect();
-                target(args)?;
-            }
+            set_cluster_assignment(&target, clusters, field, index)?;
         }
     }
     expected.verify(target)?;
     Ok(Some(expected))
+}
+
+fn set_cluster_assignment(
+    target: &impl Fn(Vec<String>) -> Result<String>, clusters: usize, field: &str, index: usize,
+) -> Result<()> {
+    for start in (0..clusters).step_by(32) {
+        let args = (start..(start + 32).min(clusters)).flat_map(|cluster| {
+            ["-S".into(), format!("clusters[{cluster}].{field}"), index.to_string()]
+        }).collect();
+        target(args)?;
+    }
+    Ok(())
 }
 
 /// Changes only a fresh job's copied BSP. The source tag tree remains hash-pinned by working_tags.
@@ -1191,6 +1222,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn uniform_sky_is_only_transferred_within_the_same_scenario() {
+        use std::cell::Cell;
+        let source_sky = Cell::new(2);
+        let target_sky = Cell::new(0);
+        let simulate = |sky: &Cell<usize>, args: Vec<String>| -> Result<String> {
+            match args[1].as_str() {
+                "clusters" => Ok("1".into()),
+                "clusters[*].sky" => Ok(sky.get().to_string()),
+                "clusters[0].sky" if args[0] == "-S" => {
+                    sky.set(args[2].parse().unwrap());
+                    Ok(String::new())
+                }
+                "clusters[*].fog" | "clusters[*].background_sound" |
+                "clusters[*].sound_environment" | "clusters[*].weather" => Ok("65535".into()),
+                "weather_polyhedra" | "background_sound_palette" | "sound_environment_palette" |
+                "weather_palette" => Ok("0".into()),
+                _ => invalid("Unexpected environment query"),
+            }
+        };
+        let source = |args| simulate(&source_sky, args);
+        let target = |args| simulate(&target_sky, args);
+        assert!(stage_donor_environment(source, target, 0.0).unwrap().is_none());
+        assert_eq!(target_sky.get(), 0);
+        let expected = stage_replacement_environment(source, target).unwrap().unwrap();
+        expected.verify(target).unwrap();
+        assert_eq!(target_sky.get(), 2);
+    }
+
+    #[test]
     fn packed_cluster_fog_uses_native_plane_bounds() {
         let review = |fog| DonorEnvironment::read(&|query| {
             Ok(match query[1].as_str() {
@@ -1200,7 +1260,7 @@ mod tests {
                 "clusters[*].fog" => fog,
                 _ => return invalid("Test received an unexpected native field"),
             }.into())
-        });
+        }, false);
         assert!(review("32768").unwrap().is_none());
         assert!(review("-32768").unwrap().is_none());
         assert!(review("32769").is_err());

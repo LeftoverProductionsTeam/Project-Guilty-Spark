@@ -532,17 +532,20 @@ fn build_partition_cache(
         }
     }
     let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
-    if let Some(environment) = &prepared.donor_environment {
+    let replacement_tag = replaced_slot.map(|slot| format!("{}.scenario_structure_bsp", prepared.structure_tags[slot]));
+    let reviewed_environment = prepared.replacement_environment.as_ref().zip(replacement_tag.as_deref())
+        .or_else(|| prepared.donor_environment.as_ref().map(|environment| (environment, prepared.donor_tag.as_str())));
+    if let Some((environment, tag)) = reviewed_environment {
         let readback = output.join("environment-tags");
         fs::create_dir(&readback)?;
         let extract = build::tool_path(tools, "invader-extract").unwrap();
         runner.run(&extract, &["-t".into(), readback.to_string_lossy().into_owned(), "-s".into(),
-            prepared.donor_tag.clone(), path.to_string_lossy().into_owned()], workspace, "partition-environment-readback", 91)?;
+            tag.into(), path.to_string_lossy().into_owned()], workspace, "partition-environment-readback", 91)?;
         let edit = build::tool_path(tools, "invader-edit").unwrap();
         environment.verify(|fields| {
             let mut args = vec!["-t".into(), readback.to_string_lossy().into_owned()];
             args.extend(fields);
-            args.push(prepared.donor_tag.clone());
+            args.push(tag.into());
             runner.run(&edit, &args, workspace, "partition-environment-readback", 91)
         })?;
     }
@@ -570,6 +573,7 @@ fn build_partition_cache(
     let receipt = serde_json::json!({"target": target.engine, "path": path, "sha256": map.sha256,
         "collision": collision, "tagMemory": memory, "nativeSwitches": transitions.transitions, "bspTagPaths": transitions.bsp_tag_paths, "lightmapPages": lightmap_pages,
         "donorEnvironmentVerified": prepared.donor_environment.is_some() || prepared.intact_sky_offset.is_some(),
+        "replacementEnvironmentVerified": prepared.replacement_environment.is_some(),
         "retainedEnvironmentsVerified": prepared.intact_sky_offset.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
         "netgameFlags": native_flags, "playerStarts": native_starts,
         "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if retain_collision { old_count - usize::from(replaced_slot.is_some()) } else { 0 }});

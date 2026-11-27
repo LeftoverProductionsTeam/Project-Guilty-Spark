@@ -1187,6 +1187,7 @@ pub(crate) struct PreparedPartitions {
     pub scenery: Vec<crate::bsp_scenery::Placement>,
     pub donor_tag: String,
     pub donor_environment: Option<crate::bsp_audio::DonorEnvironment>,
+    pub replacement_environment: Option<crate::bsp_audio::DonorEnvironment>,
     pub pickups: Option<crate::bsp_pickups::PreparedPickups>,
     pub netgame_flags: Option<crate::bsp_netgame_flags::PreparedFlags>,
     pub player_starts: Option<crate::bsp_player_starts::PreparedStarts>,
@@ -1642,6 +1643,28 @@ fn prepare_retained_connector(
             })?;
     }
     let flags = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
+    let replacement_environment = if bound {
+        let original = format!("{}.scenario_structure_bsp", structure_tags[slot]);
+        let replacement = format!("{bsp}.scenario_structure_bsp");
+        let original_file = tags.join(safe_relative(&original)?);
+        let original_hash = maps::hash_file(&original_file)?;
+        let invoke = |tag: &str, fields: Vec<String>| {
+            let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+            args.extend(fields);
+            args.push(tag.into());
+            runner.run(&edit, &args, workspace, "partition-environment", 68)
+        };
+        let environment = crate::bsp_audio::stage_replacement_environment(
+            |args| invoke(&original, args), |args| invoke(&replacement, args),
+        )?;
+        if maps::hash_file(&original_file)? != original_hash {
+            return invalid("Staged original structure changed during ambience transfer");
+        }
+        if environment.is_none() {
+            runner.emit("partition-environment", "Mixed or spatial ambience needs a reviewed cluster mapping", 68, "info");
+        }
+        environment
+    } else { None };
     for (file, hash) in &retained {
         if maps::hash_file(file)? != *hash { return invalid("Connector rebuild changed a retained BSP tag"); }
     }
@@ -1653,7 +1676,7 @@ fn prepare_retained_connector(
             "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": flags, "report": geometry.report}]});
     Ok(PreparedPartitions { receipt, switches: vec![], intact_overlaps: Some(intact.overlaps),
         intact_sky_offset: None, replacement_slots: Some([slot, island]), retained_entrance_caps: intact.retained_entrance_caps, overlap: intact.overlaps[0],
-        structure_tags, scenery: vec![], donor_tag, donor_environment: None, pickups: None, netgame_flags: None, player_starts: None })
+        structure_tags, scenery: vec![], donor_tag, donor_environment: None, replacement_environment, pickups: None, netgame_flags: None, player_starts: None })
 }
 
 pub(crate) fn prepare_partition_structure(
@@ -1806,7 +1829,7 @@ pub(crate) fn prepare_partition_structure(
         "retainedStructureTags": retained.len(),
         "overlap": overlap, "overlapSamples": overlap_samples, "maxFloorDelta": max_floor_delta, "intactOverlaps": intact_overlaps,
         "switches": switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, replacement_slots: None, retained_entrance_caps: [false; 2], structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, replacement_slots: None, retained_entrance_caps: [false; 2], structure_tags, scenery, donor_tag, donor_environment, replacement_environment: None, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(
