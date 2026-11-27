@@ -189,19 +189,8 @@ export default function ToolEcosystem({
     const installed=assessment.executableFound||!!row.userLauncher?.available||!!row.externalCompanion?.available;
     const Icon=/blender|foundry|reclaimer/i.test(tool.id)?Box:/sapien|osoyoos/i.test(tool.id)?Layers3:/build|haloTool/i.test(tool.id)?Hammer:/tag|baboon|guerilla|mozzarilla|invaderEditor/i.test(tool.id)?Tags:/extract|assembly|refinery/i.test(tool.id)?FileCode2:Wrench;
     const hasOpenTagSource = !!project?.source && (tool.handler === 'editTags' || tool.id === 'invaderEditor');
-    return (
-      <article className="gs-tool-card" key={tool.id} data-tool-id={tool.id}>
-        <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong><HelpTip label={`When to use ${tool.label}`} help={`${tool.workflow?.whenToUse??tool.purpose} ${tool.workflow?.sourceDirectory??tool.caveat}`}/></header>
-        <Pill tone={assessment.canUseWorkflow ? 'green' : 'muted'}>
-          {compact&&installed?'Installed':stateNames[assessment.state] ?? assessment.state}
-        </Pill>
-        <p className="gs-tool-purpose" title={tool.purpose}>
-          {tool.purpose}
-        </p>
-        {!!tool.runtimes?.length&&<small className="gs-tool-editions" title={tool.runtimes.join(', ')}>{tool.runtimes.map(id=>({mccSteam:'MCC H1',haloCustomEdition:'CE',openCe:'OpenCE',chupathingyCe:'Chupa'}[id]??id)).join(' · ')}</small>}
-        {hasOpenTagSource && <button className="gs-tool-use" onClick={()=>onOpenWorkspace('tags')}>Edit open map in Spark</button>}
-        {assessment.canUseWorkflow&&tool.id!=='baboon'&&tool.integration!=='externalCompanion'&&<button className="gs-tool-use" onClick={()=>open(tool)} disabled={busy}>Use with Current Project</button>}
-        {(assessment.executableFound || row.userLauncher?.available) &&
+    const showStandaloneUnderSetup = compact && hasOpenTagSource && tool.id === 'invaderEditor';
+    const standaloneLaunch = (assessment.executableFound || row.userLauncher?.available) &&
           desktop &&
           tool.integration !== 'externalCompanion' && (
             <button
@@ -211,7 +200,7 @@ export default function ToolEcosystem({
                 (!row.userLauncher?.available && assessment.state === 'requiresRuntime') ||
                 (tool.id === 'tagTest' && !assessment.canUseWorkflow)
               }
-              title="Open a blank scratch workspace. Use the managed map editing action to hand off the current map's working source."
+              title="Open the external application in its own workspace"
               onClick={() => {
                 if (tool.id === 'tagTest') {
                   open(tool);
@@ -230,11 +219,25 @@ export default function ToolEcosystem({
             >
               {projectId && tool.id !== 'tagTest' ? 'Launch standalone' : compact ? 'Launch' : `Launch ${tool.label}`}
             </button>
-          )}
+          );
+    return (
+      <article className="gs-tool-card" key={tool.id} data-tool-id={tool.id}>
+        <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong><HelpTip label={`When to use ${tool.label}`} help={`${tool.workflow?.whenToUse??tool.purpose} ${tool.workflow?.sourceDirectory??tool.caveat}`}/></header>
+        <Pill tone={assessment.canUseWorkflow ? 'green' : 'muted'}>
+          {compact&&installed?'Installed':stateNames[assessment.state] ?? assessment.state}
+        </Pill>
+        <p className="gs-tool-purpose" title={tool.purpose}>
+          {tool.purpose}
+        </p>
+        {!!tool.runtimes?.length&&<small className="gs-tool-editions" title={tool.runtimes.join(', ')}>{tool.runtimes.map(id=>({mccSteam:'MCC H1',haloCustomEdition:'CE',openCe:'OpenCE',chupathingyCe:'Chupa'}[id]??id)).join(' · ')}</small>}
+        {hasOpenTagSource && <button className="gs-tool-use" onClick={()=>onOpenWorkspace('tags')}>Edit open map in Spark</button>}
+        {assessment.canUseWorkflow&&tool.id!=='baboon'&&tool.id!=='invaderEditor'&&tool.integration!=='externalCompanion'&&<button className="gs-tool-use" onClick={()=>open(tool)} disabled={busy}>Use with Current Project</button>}
+        {!showStandaloneUnderSetup && standaloneLaunch}
         {compact&&desktop&&!installed&&tool.integration!=='externalCompanion'&&<button disabled={busy} onClick={()=>locate(tool)}>Locate {tool.label}</button>}
         {compact&&tool.integration==='externalCompanion'&&<button disabled={busy} onClick={()=>void companion(installed?'launch':'select')}>{installed?'Launch Mantle':'Select installed application'}</button>}
         {compact&&<ExternalBrowserLink className="small-button gs-tool-get" href={tool.releaseUrl??tool.sourceUrl} target="_blank" rel="noreferrer" title={`Official download or installation instructions for ${tool.label}`}>Get {tool.label}</ExternalBrowserLink>}
         <ToolOptions compact={compact}>
+        {showStandaloneUnderSetup && standaloneLaunch}
         {desktop && (!compact||installed) && tool.integration !== 'externalCompanion' && (
           <button
             type="button"

@@ -448,32 +448,55 @@ export default function RuntimeDock({
     writeMapSession(id, 'hosting.tab', tab);
     onNavigate('runtimes');
   }
+  const [toolRequest, setToolRequest] = useState<{
+    projectId: string;
+    actionId: string;
+    runtimeId: RuntimeId;
+  } | null>(null);
   useEffect(() => {
     const request = (event: Event) => {
       const detail = (event as CustomEvent<{ projectId: string; actionId: string; runtimeId?: RuntimeId }>)
         .detail;
       if (
-        detail?.projectId !== project?.id ||
+        !project || detail?.projectId !== project.id ||
         !['editTags', 'editLevel', 'testScene', 'workingTags', 'workingScripts'].includes(detail.actionId)
       )
         return;
+      if (plan) return;
       setDetails(true);
-      if(detail.actionId==='workingScripts'){setScriptsOpen(true);return;}
-      if (detail.runtimeId && detail.runtimeId !== runtime) {
-        setRuntime(detail.runtimeId);
+      if (detail.actionId === 'workingScripts') {
+        setToolRequest(null);
+        setScriptsOpen(true);
         return;
       }
-      if (detail.actionId === 'workingTags') return;
-      if (working || busy) {
-        setError('Wait for the active operation before preparing a native editor.');
+      const targetRuntime = detail.runtimeId ?? runtime;
+      if (targetRuntime !== runtime) setRuntime(targetRuntime);
+      if (detail.actionId === 'workingTags') {
+        setToolRequest(null);
         return;
       }
-      const action = report?.actions.find((action) => action.id === detail.actionId);
-      if (action) void act(action);
+      setError('');
+      setToolRequest({ projectId: detail.projectId, actionId: detail.actionId, runtimeId: targetRuntime });
     };
     window.addEventListener('guilty-spark-runtime-tool', request);
     return () => window.removeEventListener('guilty-spark-runtime-tool', request);
-  }, [project?.id, report, runtime, dirty, working, busy]);
+  }, [project, runtime, setRuntime, plan]);
+  useEffect(() => {
+    if (!toolRequest) return;
+    if (!details || toolRequest.projectId !== project?.id) {
+      setToolRequest(null);
+      return;
+    }
+    if (plan || runtime !== toolRequest.runtimeId || !report || busy) return;
+    setToolRequest(null);
+    if (working) {
+      setError('Wait for the active operation before preparing a native editor.');
+      return;
+    }
+    const action = report.actions.find(({ id }) => id === toolRequest.actionId);
+    if (action) void act(action);
+    else setError('This editor is unavailable for the selected Halo. Check the available tools below.');
+  }, [toolRequest, details, project?.id, plan, runtime, report, busy, working]);
   async function act(action: RuntimeDockAction) {
     setError('');
     setNotice('');

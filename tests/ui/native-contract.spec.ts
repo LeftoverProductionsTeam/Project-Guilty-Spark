@@ -1733,6 +1733,40 @@ test('runtime dock remembers each map target and rejects a late tool preview fro
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='launch_runtime_tool'))).toBe(false);
 });
 
+test('map-aware editor click survives a runtime switch and waits for its inspection', async ({page}) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  const runtime=page.getByLabel('Active Halo runtime',{exact:true});
+  await openStudioMenu(page);
+  await runtime.selectOption('openCe');
+  await page.evaluate(() => {
+    const w=window as any, invoke=w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);
+    w.__toolSwitch={release:null,previews:[]};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any) => {
+      if(command==='runtime_workbench_report'&&args.runtimeId==='mccSteam'){
+        const report=await invoke(command,args);
+        report.actions.find((action:any)=>action.id==='editLevel').availability='ready';
+        await new Promise<void>(resolve=>{w.__toolSwitch.release=resolve;});
+        return report;
+      }
+      if(command==='prepare_runtime_tool'){
+        w.__toolSwitch.previews.push(args);
+        return {id:'synthetic',runtimeId:'mccSteam',actionId:'editLevel',projectId:'a',buildId:'synthetic',executable:'C:/synthetic/sapien.exe',executableSha256:'a'.repeat(64),workingDirectory:'C:/synthetic/job',tagsDirectory:'C:/synthetic/job/tags',scenarioFile:'C:/synthetic/job/tags/level.scenario',arguments:[],startupScript:null,expiresAtUnix:Math.floor(Date.now()/1000)+90,detail:'Synthetic plan only'};
+      }
+      return invoke(command,args);
+    };
+    window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:'a',actionId:'editLevel',runtimeId:'mccSteam'}}));
+  });
+  await expect(runtime).toHaveValue('mccSteam');
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).__toolSwitch.release)).toBe('function');
+  expect(await page.evaluate(()=>(window as any).__toolSwitch.previews)).toHaveLength(0);
+  await page.evaluate(()=>(window as any).__toolSwitch.release());
+  await expect(page.getByRole('heading',{name:'Open Sapien',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__toolSwitch.previews)).toEqual([
+    {runtimeId:'mccSteam',projectId:'a',actionId:'editLevel'},
+  ]);
+});
+
 test('runtime dock observes an exited tool and makes its action available again', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
   await page.evaluate(() => {
