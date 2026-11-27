@@ -33,6 +33,30 @@ test('inline owned operations record their actual origin and clean their disposa
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
 });
 
+test('desktop build and native QA share one aggregate scratch budget', () => fixture(async parent => {
+  const source = new URL('./native-qa-storage.mjs', import.meta.url).href;
+  const env = {...process.env, SPARK_QA_STORAGE_ROOT: parent};
+  for (const name of ['CARGO_TARGET_DIR', 'SPARK_BUILD_WORKSPACE', 'SPARK_BUILD_NONCE', 'SPARK_GENERATED_ROOT']) delete env[name];
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import fs from 'node:fs/promises';
+    import path from 'node:path';
+    import assert from 'node:assert/strict';
+    import { beginQaStorage, withDevelopmentWorkspace } from ${JSON.stringify(source)};
+    const root = ${JSON.stringify(parent)};
+    const qa = path.join(root, 'native-qa');
+    await fs.mkdir(qa);
+    const finish = await beginQaStorage(qa, {workflow: 'aggregate-regression', appSha256: 'c'.repeat(64),
+      reservationBytes: 4 * 1024 ** 3, minimumFreeBytes: 0});
+    try {
+      await assert.rejects(withDevelopmentWorkspace('desktop', async () => assert.fail('Admission should refuse'),
+        {reservationBytes: 13 * 1024 ** 3}), /aggregate storage budget/);
+      assert.ok(!(await fs.readdir(root)).some(name => name.startsWith('run-')),
+        'Rejected admission should leave no build workspace');
+    } finally { await finish('passed'); }
+  `], {env, encoding: 'utf8', windowsHide: true});
+  assert.equal(run.status, 0, run.stderr);
+}));
+
 test('a second process preserves another startup namespace before its receipt is published', async () => {
   const env={...process.env};
   for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];

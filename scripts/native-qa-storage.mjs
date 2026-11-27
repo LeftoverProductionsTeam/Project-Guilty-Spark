@@ -110,12 +110,10 @@ async function canonicalOutputPath(file) {
 const projectRoot = await canonicalOutputPath(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
 );
-const defaultQaRoot =
-  process.env.SPARK_QA_STORAGE_ROOT ??
-  path.join(
-    os.tmpdir(),
-    'GuiltySpark-QA-' + crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12),
-  );
+const scratchIdentity = checkout => crypto.createHash('sha256').update(key(checkout)).digest('hex').slice(0, 12);
+const canonicalScratchRoot = checkout => path.join(os.tmpdir(), 'GuiltySpark-QA-' + scratchIdentity(checkout));
+const legacyDevelopmentRoot = checkout => path.join(os.tmpdir(), 'GuiltySpark-Development-' + scratchIdentity(checkout));
+const defaultQaRoot = process.env.SPARK_QA_STORAGE_ROOT ?? canonicalScratchRoot(projectRoot);
 /** Runs before a harness creates its output, including legacy copied commands. */
 export async function assertQaOutputPath(
   root,
@@ -1379,6 +1377,62 @@ export async function beginQaStorage(
   return finish;
 }
 
+async function recoverDevelopmentRoot(base, legacy) {
+  // Recover ONLY declared scratch from dead owners. Unknown files and running
+  // compilers stay protected; do not evict them to satisfy a new reservation.
+  for (const name of await fs.readdir(base).catch(error => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  })) {
+    if (!/^run-[\w-]+$/.test(name)) continue;
+    const prior = path.join(base, name),
+      file = path.join(prior, 'storage-run.json');
+    await noLinks(file);
+    const text = await fs.readFile(file, 'utf8').catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (text === null) {
+      // Another live process can be between mkdtemp and receipt publication.
+      // Empty does not prove abandonment. Only the creator may retire its
+      // unpublished directory after its own admission fails.
+      const names=await fs.readdir(prior).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+      if (names===null || names.length===0) continue;
+      if (base === legacy) throw Error('Unrecognized legacy build contents are protected');
+      continue;
+    }
+    const row = JSON.parse(text);
+    if (row.workflow !== 'source-development') continue;
+    if (base === legacy && row.active && await qaProcessOwnershipActive(row))
+      throw Error('Legacy compiler output is still active; no second compiler workspace admitted');
+    if (
+      row.workflow === 'source-development' &&
+      row.active &&
+      !await qaProcessOwnershipActive(row)
+    )
+      await recoverQaScratch(prior, { storageRoot: base });
+    const finalText=await fs.readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+    if(finalText===null)continue; // Its active owner may have completed normally.
+    const final = JSON.parse(finalText);
+    if (final.workflow === 'source-development' && !final.active) {
+      try { await removeDevelopmentReceipt(base, prior, final); }
+      catch (error) {
+        // A different owner can finish retiring this completed namespace after
+        // the final receipt read. Only absence of the entire old root is benign;
+        // a missing child/lease in an existing root still fails closed. This
+        // grants no deletion authority and never relaxes the sealed inventory.
+        if (error.code !== 'ENOENT') throw error;
+        const remains = await fs.lstat(prior).catch(probe => {
+          if (probe.code === 'ENOENT') return null;
+          throw probe;
+        });
+        if (remains) throw error;
+      }
+    }
+  }
+
+}
+
 /** Build/test output shares the existing ownership and interruption protocol.
  * No cache survives a completed operation. Nested wrappers reuse ONLY the
  * live nonce-bound workspace supplied by their parent, never an arbitrary path.
@@ -1387,7 +1441,8 @@ export async function withDevelopmentWorkspace(
   workflow,
   action,
   {
-    reservationBytes = workflow.startsWith('frontend') || workflow === 'vite' ? 1024 ** 3 : 12 * 1024 ** 3,
+    reservationBytes = workflow.startsWith('frontend') || workflow === 'vite'
+      ? policy.qaFrontendReservationBytes : policy.qaDevelopmentReservationBytes,
   } = {},
 ) {
   if (!/^[\w.-]{1,64}$/.test(workflow)) throw Error('Invalid development workflow');
@@ -1421,55 +1476,11 @@ export async function withDevelopmentWorkspace(
       );
     return action({ directory, env: { ...process.env }, trackProcess: async () => {} });
   }
-  const identity = crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12);
-  const base = await assertQaOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`), {
-    reservationBytes: 0,
-  });
-  await fs.mkdir(base, { recursive: true });
-  // Recover ONLY declared scratch from dead owners. Unknown files and running
-  // compilers stay protected; do not evict them to satisfy a new reservation.
-  for (const name of await fs.readdir(base)) {
-    if (!/^run-[\w-]+$/.test(name)) continue;
-    const prior = path.join(base, name),
-      file = path.join(prior, 'storage-run.json');
-    await noLinks(file);
-    const text = await fs.readFile(file, 'utf8').catch((error) => {
-      if (error.code === 'ENOENT') return null;
-      throw error;
-    });
-    if (text === null) {
-      // Another live process can be between mkdtemp and receipt publication.
-      // Empty does not prove abandonment. Only the creator may retire its
-      // unpublished directory after its own admission fails.
-      const names=await fs.readdir(prior).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
-      if (names===null || names.length===0) continue;
-      throw Error('Unrecognized temporary build contents are protected');
-    }
-    const row = JSON.parse(text);
-    if (
-      row.workflow === 'source-development' &&
-      row.active &&
-      !await qaProcessOwnershipActive(row)
-    )
-      await recoverQaScratch(prior, { storageRoot: base });
-    const finalText=await fs.readFile(file,'utf8').catch(error=>{if(error.code==='ENOENT')return null;throw error;});
-    if(finalText===null)continue; // Its active owner may have completed normally.
-    const final = JSON.parse(finalText);
-    if (final.workflow === 'source-development' && !final.active) {
-      try { await removeDevelopmentReceipt(base, prior, final); }
-      catch (error) {
-        // A different owner can finish retiring this completed namespace after
-        // the final receipt read. Only absence of the entire old root is benign;
-        // a missing child/lease in an existing root still fails closed. This
-        // grants no deletion authority and never relaxes the sealed inventory.
-        if (error.code !== 'ENOENT') throw error;
-        const remains = await fs.lstat(prior).catch(probe => {
-          if (probe.code === 'ENOENT') return null;
-          throw probe;
-        });
-        if (remains) throw error;
-      }
-    }
+  const base = await assertQaOutputPath(defaultQaRoot, {reservationBytes: 0});
+  const legacy = await canonicalOutputPath(legacyDevelopmentRoot(projectRoot));
+  await fs.mkdir(base, {recursive: true});
+  for (const current of new Set([legacy, base])) {
+    await recoverDevelopmentRoot(current, legacy);
   }
   const run = await fs.mkdtemp(path.join(base, 'run-'));
   let finish;
@@ -1570,21 +1581,25 @@ export async function withDevelopmentWorkspace(
  * This view has no cleanup authority and never walks source/game/Git trees. */
 export async function readDevelopmentStorage(checkout = projectRoot) {
   const source = await canonicalOutputPath(checkout);
-  const identity = crypto.createHash('sha256').update(key(source)).digest('hex').slice(0, 12);
-  const base = await canonicalOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`));
+  const root = await canonicalOutputPath(key(source) === key(projectRoot) ? defaultQaRoot : canonicalScratchRoot(source));
+  const legacy = await canonicalOutputPath(legacyDevelopmentRoot(source));
   const report = {
     readOnly: true,
     source,
-    root: base,
+    root,
     runs: [],
     issues: [],
     intervalMs: Number(process.env.SPARK_STORAGE_SAMPLE_INTERVAL_MS ?? policy.qaSampleIntervalMs),
     note: 'Current/peak file allocation excludes filesystem overhead. Volume free space includes unrelated activity. Only sealed operation cleanup can authorize disposal.',
   };
-  const entries = await fs.readdir(base, { withFileTypes: true }).catch((error) => {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  });
+  const entries = [];
+  for (const base of new Set([root, legacy])) {
+    const children = await fs.readdir(base, {withFileTypes: true}).catch(error => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    entries.push(...children.map(entry => ({base, entry})));
+  }
   if (entries.length > 2048) throw Error('Development storage index exceeds its inspection bound');
   const read = async (file) => {
     await noLinks(file);
@@ -1592,12 +1607,13 @@ export async function readDevelopmentStorage(checkout = projectRoot) {
     if (!info.isFile() || info.size > 256 * 1024) throw Error('Unknown or oversized operation metadata');
     return JSON.parse(await fs.readFile(file, 'utf8'));
   };
-  for (const entry of entries) {
+  for (const {base, entry} of entries) {
     if (!/^run-[\w-]+$/.test(entry.name)) continue;
     const run = path.join(base, entry.name);
     try {
       if (!entry.isDirectory() || entry.isSymbolicLink()) throw Error('Linked or unknown operation root');
       const record = await read(path.join(run, 'storage-run.json'));
+      if (record.workflow !== 'source-development') continue;
       const lease = await read(
         path.join(base, '.leases', crypto.createHash('sha256').update(key(run)).digest('hex') + '.json'),
       );

@@ -12,6 +12,8 @@
   "qaDirectory": "artifacts/qa",
   "qaRunBytes": 4294967296,
   "qaTotalBytes": 17179869184,
+  "qaDevelopmentReservationBytes": 12884901888,
+  "qaFrontendReservationBytes": 1073741824,
   "qaMinimumFreeBytes": 4294967296,
   "qaEvidenceBytes": 8388608,
   "qaRetainedFixtureBytes": 268435456,
