@@ -913,8 +913,104 @@ fn with_native_bake_scenario<'a>(
     operation
 }
 
+// Resolve both the authored staging tree and the preserved cache through the
+// same native dependency reader. Existing authored files always take precedence.
+fn prepare_connector_scenery_dependencies(
+    scenery: &[crate::bsp_scenery::Placement], source: &project::Source, tools: &Toolchain,
+    runner: &Runner, workspace: &Path, tags: &Path,
+) -> Result<()> {
+    if scenery.is_empty() {
+        return Ok(());
+    }
+    let dependency = find_tool(tools, "invader-dependency")?;
+    let roots: BTreeSet<_> = scenery.iter().map(|row|
+        format!("{}.scenery", row.tag_path.replace('\\', "/"))).collect();
+    let read = |root: &str, recovered: Option<&Path>| {
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+        if let Some(directory) = recovered {
+            args.extend(["-t".into(), directory.to_string_lossy().into_owned()]);
+        }
+        args.extend(["-r".into(), root.into()]);
+        runner.run(&dependency, &args, workspace, "bsp-bake-dependencies", 63)
+    };
+    let mut incomplete = Vec::new();
+    let mut results = BTreeMap::new();
+    for root in &roots {
+        let staged = tags.join(safe_relative(root)?);
+        reject_links(&staged)?;
+        if !staged.is_file() {
+            incomplete.push(root);
+            continue;
+        }
+        let log = read(root, None)?;
+        let mut complete = true;
+        for row in crate::native_operations::dependency_lines(&log)? {
+            let staged = tags.join(safe_relative(&row.path)?);
+            reject_links(&staged)?;
+            complete &= !row.reported_broken && staged.is_file();
+        }
+        if complete {
+            results.insert(root.clone(), log);
+        } else {
+            incomplete.push(root);
+        }
+    }
+
+    let mut copied = 0;
+    if !incomplete.is_empty() {
+        let extractor = find_tool(tools, "invader-extract")?;
+        let resources = source.resource_directory.as_deref().or_else(|| source.preserved_path.parent())
+            .ok_or_else(|| SparkError::Invalid("Missing source directory for connector dependency recovery".into()))?;
+        crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+        let recovered = workspace.join("connector-bake-dependencies");
+        fs::create_dir(&recovered)?;
+        for batch in incomplete.chunks(24) {
+            let mut args = vec!["-G".into(), "-m".into(), resources.to_string_lossy().into_owned(),
+                "-t".into(), recovered.to_string_lossy().into_owned(), "-r".into()];
+            for root in batch {
+                args.extend(["-s".into(), (*root).clone()]);
+            }
+            args.push(source.preserved_path.to_string_lossy().into_owned());
+            runner.run(&extractor, &args, workspace, "bsp-bake-dependencies", 63)?;
+        }
+        crate::tag_exchange::verify_source_snapshot(source, Some(resources))?;
+        let mut required = BTreeSet::new();
+        for root in incomplete {
+            let log = read(root, Some(&recovered))?;
+            required.insert(root.clone());
+            required.extend(dependency_paths(&log)?);
+            results.insert(root.clone(), log);
+        }
+        if required.len() > 8192 {
+            return invalid("Connector lighting scenery dependency closure exceeds 8192 files");
+        }
+        // Check every input before staging any recovered file. The overlay
+        // read includes hidden descendants of files absent on the first pass.
+        let mut additions = Vec::new();
+        for path in required {
+            let target = tags.join(safe_relative(&path)?);
+            reject_links(&target)?;
+            if target.is_file() {
+                continue;
+            }
+            let input = dependency_input(tags, &recovered, &path)?;
+            additions.push((input.metadata()?.len(), maps::hash_file(&input)?, input, target));
+        }
+        for (size, hash, input, target) in additions {
+            crate::native_staging::copy_file(&input, &target, size, Some(&hash), runner.cancel)?;
+            copied += 1;
+        }
+    }
+    let (verified, _) = crate::native_staging::collect_dependency_files(tags, roots, false, 8192, 8192,
+        |root| results.remove(root).ok_or_else(|| SparkError::Invalid(format!("Missing dependency readback for {root}"))))?;
+    runner.emit("bsp-bake-dependencies",
+        format!("Verified {} scenery dependency files for lighting, recovered {copied} from the exact cache", verified.len()),
+        63, "info");
+    Ok(())
+}
+
 fn with_isolated_connector_bake(
-    project: &Project, inspection: &MapInspection, edit: &Path, runner: &Runner,
+    project: &Project, inspection: &MapInspection, tools: &Toolchain, edit: &Path, runner: &Runner,
     workspace: &Path, bsp: &str, replacement_slot: usize,
     mut bake: impl FnMut(&str, bool) -> Result<()>,
 ) -> Result<()> {
@@ -970,6 +1066,7 @@ fn with_isolated_connector_bake(
         local_scenery.push(object);
     }
     let scenery = crate::bsp_scenery::source_rows(&source.preserved_path, inspection, local_scenery)?;
+    prepare_connector_scenery_dependencies(&scenery, source, tools, runner, workspace, &tags)?;
 
     let parent = safe_relative(bsp)?.with_file_name(format!("gsbake_{}", &runner.id[..8]));
     let tag = parent.with_extension("scenario").to_string_lossy()
@@ -1522,7 +1619,7 @@ fn prepare_retained_connector(
         }
     }
     if stage == PartitionStage::Lighting {
-        with_isolated_connector_bake(project, inspection, &edit, runner, workspace, &bsp, slot,
+        with_isolated_connector_bake(project, inspection, tools, &edit, runner, workspace, &bsp, slot,
             |scenario, isolated| {
                 if plan.tunnel_bake_fill {
                     bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry, isolated)
