@@ -77,7 +77,7 @@ export function Assets({
   project: Project;
   meshes: Record<string, MeshData>;
   onImport: () => void;
-  onImportRevised:(path:string,sha256:string)=>Promise<void>;
+  onImportRevised:(handoffId:string,sha256:string)=>Promise<number>;
   onWorld: () => void;
 }) {
   const activity=useWorkspaceActivity();

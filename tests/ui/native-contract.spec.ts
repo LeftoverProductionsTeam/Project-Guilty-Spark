@@ -1936,11 +1936,18 @@ test('games and tools scopes connected Halo versions, editors and map handoffs',
   await revealPagedControl(page.getByRole('button', { name: 'Use with Current Project', exact: true,includeHidden:true }));await page.getByRole('button', { name: 'Use with Current Project', exact: true }).click();
   expect(await page.evaluate(() => (window as any).__toolHandoffs.at(-1))).toEqual({ runtimeId: 'haloCustomEdition', projectId: 'a', actionId: 'editTags' });
 });
-test('external geometry review requested during polling is not silently dropped', async ({page}) => {
+test('reviewed external geometry replaces placements without changing their poses and supports Undo', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => {
     const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
     w.__sparkMock.projects.a.project.assets=[{id:'geometry-fixture',name:'Synthetic triangle',kind:'obj',path:'C:/synthetic/triangle.obj',sha256:'c'.repeat(64),vertices:3,triangles:1,hasUvs:true,materials:['default']}];
+    const project=w.__sparkMock.projects.a.project;
+    project.scene=[11,22,33].map((x,index)=>({
+      id:'geometry-placement-'+index,name:'Placed part '+index,kind:'Workshop mesh',tagId:null,
+      position:[x,5,7],rotation:[0,0,0.4],scale:[1,1,2],visible:true,sourceOffset:null,rotationOffset:null,
+      assetId:index===2?null:'geometry-fixture',sourceModel:null,
+    }));
+    w.__initialGeometryScene=structuredClone(project.scene);
     w.__geometryReviews=0;
     w.__meshRequests=[];
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
@@ -1948,6 +1955,16 @@ test('external geometry review requested during polling is not silently dropped'
         w.__meshRequests.push(args);
         await new Promise<void>(resolve=>{w.__finishMeshPreview=resolve;});
         return {label:'Synthetic triangle',source:'OBJ',positions:[0,0,0,1,0,0,0,1,0],normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],indices:[0,1,2],parts:[]};
+      }
+      if(command==='pin_geometry_handoff'){
+        w.__geometryPin=args;
+        return {path:'C:/synthetic/accepted.obj',assetId:'geometry-fixture'};
+      }
+      if(command==='import_asset'){
+        w.__reviewedImport=args;
+        const asset={...project.assets[0],id:'accepted-fixture',name:'Accepted triangle',sha256:'d'.repeat(64),path:args.path};
+        const mesh={label:'Accepted triangle',source:'OBJ',positions:[0,0,0,2,0,0,0,1,0],normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],indices:[0,1,2],parts:[]};
+        return {project:{...project,assets:[...project.assets,asset]},asset,mesh,warnings:[]};
       }
       if(command==='prepare_geometry_handoff')return {handoff:{id:'synthetic-handoff',assetId:args.assetId,baselineSha256:'c'.repeat(64)},workingPath:'C:/synthetic/working.obj'};
       if(command==='geometry_handoff_status')return new Promise(resolve=>{w.__finishGeometryStatus=()=>resolve({bytes:80,modifiedNanos:'1'});});
@@ -1966,9 +1983,20 @@ test('external geometry review requested during polling is not silently dropped'
   await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishGeometryStatus)).toBe('function');
   await page.getByRole('button',{name:'Review geometry save',exact:true}).click();
   await page.evaluate(()=>(window as any).__finishGeometryStatus());
-  await expect(page.getByRole('button',{name:'Import reviewed geometry copy',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Apply reviewed geometry',exact:true})).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__geometryReviews)).toBe(1);
   await page.evaluate(()=>(window as any).__finishMeshPreview());
+  await page.getByRole('button',{name:'Apply reviewed geometry',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'Updated 2 existing placements'})).toBeVisible();
+  await page.keyboard.press('Control+s');
+  const initial=await page.evaluate(()=>(window as any).__initialGeometryScene);
+  const saved=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.scene);
+  await expect.poll(saved).toEqual(initial.map((item:any)=>item.assetId?{...item,assetId:'accepted-fixture'}:item));
+  expect(await page.evaluate(()=>(window as any).__geometryPin)).toEqual({projectId:'a',id:'synthetic-handoff',sha256:'d'.repeat(64)});
+  expect(await page.evaluate(()=>(window as any).__reviewedImport)).toEqual({id:'a',path:'C:/synthetic/accepted.obj',expectedSha256:'d'.repeat(64),libraryOnly:true});
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+s');
+  await expect.poll(saved).toEqual(initial);
 });
 
 test('compact library keeps its search and layout when leaving and returning', async ({ page }, testInfo) => {

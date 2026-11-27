@@ -2215,7 +2215,7 @@ async fn copy_project_asset(app:tauri::AppHandle,window:tauri::WebviewWindow,sou
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&target_id,&owner)?;let lib=lock(&state.library)?;let(project,asset,imported)=core::asset_transfer::copy_obj(&lib,&source_id,&asset_id,&target_id).map_err(error)?;Ok(AssetResult{project,asset,mesh:imported.mesh,warnings:imported.warnings})}).await.map_err(error)?
 }
 #[tauri::command]
-async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, path: Option<PathBuf>, expected_sha256: Option<String>) -> Reply<Option<AssetResult>> {
+async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, path: Option<PathBuf>, expected_sha256: Option<String>, library_only: Option<bool>) -> Reply<Option<AssetResult>> {
     let owner=window.label().to_string();
     let path=if let Some(path)=path{path}else{let file = rfd::AsyncFileDialog::new()
         .set_title("Import OBJ geometry into the Asset Workshop")
@@ -2273,20 +2273,22 @@ async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
         )
         .map_err(error)?;}
         p.assets.push(asset.clone());
-        p.scene.push(maps::SceneObject {
-            id: format!("asset-{}", uuid::Uuid::new_v4()),
-            name: asset.name.clone(),
-            kind: "Workshop mesh".into(),
-            tag_id: None,
-            position: [0.; 3],
-            rotation: [0.; 3],
-            scale: [1.; 3],
-            visible: true,
-            source_offset: None,
-            rotation_offset: None,
-            asset_id: Some(asset_id),
-            source_model: None,
-        });
+        if library_only != Some(true) {
+            p.scene.push(maps::SceneObject {
+                id: format!("asset-{}", uuid::Uuid::new_v4()),
+                name: asset.name.clone(),
+                kind: "Workshop mesh".into(),
+                tag_id: None,
+                position: [0.; 3],
+                rotation: [0.; 3],
+                scale: [1.; 3],
+                visible: true,
+                source_offset: None,
+                rotation_offset: None,
+                asset_id: Some(asset_id),
+                source_model: None,
+            });
+        }
         p.modified_at = chrono::Utc::now().to_rfc3339();
         lib.save(&p, None).map_err(error)?;
         Ok(Some(AssetResult {
@@ -4048,6 +4050,7 @@ pub fn run() {
             import_asset,
             tool_ecosystem_native::prepare_geometry_handoff,
             tool_ecosystem_native::review_geometry_handoff,
+            tool_ecosystem_native::pin_geometry_handoff,
             tool_ecosystem_native::geometry_handoff_status,
             tool_ecosystem_native::launch_geometry_tool,
             import_custom_sound,

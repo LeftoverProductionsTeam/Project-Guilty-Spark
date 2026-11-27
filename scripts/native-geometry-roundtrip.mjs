@@ -9,12 +9,15 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
   // The owning lifecycle runner registers every DCC/extraction child with the
   // same live budget and interruption lease as the actual application.
   if(typeof run!=='function')throw Error('Native geometry acceptance requires its owning QA process runner');
+  const handoffOnly=process.env.SPARK_GEOMETRY_HANDOFF_ONLY==='1';
   const blender=path.resolve(process.env.SPARK_GEOMETRY_BLENDER??''),tags=path.resolve(process.env.SPARK_GEOMETRY_TAGS??''),kit=path.resolve(process.env.SPARK_GEOMETRY_KIT??'');
-  for(const file of [blender,path.join(tags,'globals/globals.globals'),path.join(kit,'tool.exe'),path.join(invaderDirectory,'invader-edit.exe')])if(!(await fs.stat(file)).isFile())throw Error('Missing selected DCC/native input: '+file);
+  for(const file of (handoffOnly?[blender]:[blender,path.join(tags,'globals/globals.globals'),path.join(kit,'tool.exe'),path.join(invaderDirectory,'invader-edit.exe')]))if(!(await fs.stat(file)).isFile())throw Error('Missing selected DCC/native input: '+file);
   const fixtureFile=path.resolve('docs/fixtures/source-only-native-door.json');
   const fixtureHash=await hash(fixtureFile),fixture=JSON.parse(await fs.readFile(fixtureFile,'utf8'));
+  if(!handoffOnly){
   const boot=await invoke(main,'bootstrap');
   await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,hekDirectory:kit,hekTagsDirectory:tags,hekFlavor:'h1aEk',invaderDirectory:path.resolve(invaderDirectory)}});
+  }
   const created=await invoke(main,'create_quickforge_project',{title:'C70 genuine Blender round trip',template:'smallIndoorArena',target:'mccSteam'});
   const project={...created.project,quickForge:structuredClone(fixture.quickForge)};
   // Reuse the accepted room geometry, not its foreign library's door binding.
@@ -44,20 +47,34 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
   await expect(handoff.getByRole('status')).toContainText('External geometry save detected',{timeout:20000});
   const reviewedHash=await hash(working);expect(reviewedHash).not.toBe(baselineHash);
   const before=(await invoke(main,'open_project',{id:project.id})).project;
-  await handoff.getByRole('button',{name:'Import reviewed geometry copy',exact:true}).click();
+  await handoff.getByRole('button',{name:'Apply reviewed geometry',exact:true}).click();
   await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.assets.length).toBe(2);
   await main.keyboard.press('Control+s');
-  await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.scene.length).toBe(before.scene.length+1);
+  await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.scene.some(object=>object.assetId&&object.assetId!==originalAsset.id)).toBe(true);
   const adopted=(await invoke(main,'open_project',{id:project.id})).project,newAsset=adopted.assets.find(a=>a.id!==originalAsset.id);
-  expect(newAsset.sha256).toBe(reviewedHash);expect(newAsset.id).not.toBe(originalAsset.id);
+  expect(newAsset.sha256).toBe(reviewedHash);
+  expect(newAsset.id).not.toBe(originalAsset.id);
+  expect(adopted.scene).toEqual(before.scene.map(object=>object.assetId===originalAsset.id?{...object,assetId:newAsset.id}:object));
+  const secondSave=await run(blender,['--background','--factory-startup','--disable-autoexec','--python',script,'--',working],{windowsHide:true,timeout:90000,maxBuffer:1024*1024});
+  expect(secondSave.stdout).toContain('SPARK_DCC_EDIT=');
+  expect(await hash(working)).not.toBe(reviewedHash);
+  expect(await hash(newAsset.path)).toBe(reviewedHash);
   await main.keyboard.press('Control+z');await main.keyboard.press('Control+s');
-  await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.scene.length).toBe(before.scene.length);
+  await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.scene).toEqual(before.scene);
   await main.keyboard.press('Control+y');await main.keyboard.press('Control+s');
   await expect.poll(async()=>(await invoke(main,'open_project',{id:project.id})).project.scene.filter(o=>o.assetId===newAsset.id).length).toBe(1);
   await main.reload();await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${project.id}"]`).click();await chooseTool(main,'Asset workshop');
   await expect(main.locator('.asset-list>button')).toHaveCount(2);
   expect(await hash(original)).toBe(originalHash);expect(await hash(originalAsset.path)).toBe(assetHash);expect(await hash(baseline)).toBe(baselineHash);
-  step('Actual Blender edits a private OBJ; Spark detects, reviews and imports it, then author Undo/Redo/Save/reopen preserves both sources');
+  step('Windows Spark and Blender preserve the reviewed source across another Blender save, and Undo/Redo and Save/reopen preserve the placement');
+  if(handoffOnly){
+    report.geometryRoundTrip={projectId:project.id,blenderSha256:toolHash,baselineSha256:baselineHash,editedSha256:reviewedHash,originalAssetSha256:assetHash,stableAfterBlenderResave:true,undoVerified:true,nativeCompile:false,gameplayAccepted:false};
+    return;
+  }
+  // Keep an explicitly placed original as a compiler fidelity control.
+  const compilationProject=(await invoke(main,'open_project',{id:project.id})).project;
+  compilationProject.scene.push({...before.scene.find(object=>object.assetId===originalAsset.id),id:crypto.randomUUID(),position:[2,0,0]});
+  await invoke(main,'save_project',{project:compilationProject});
   const jobId=await invoke(main,'quickforge_build',{projectId:project.id});
   let build;await expect.poll(async()=>{
     const p=(await invoke(main,'open_project',{id:project.id})).project;build=p.builds.find(b=>b.id===jobId);
@@ -84,7 +101,7 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
     expect(fidelity).toHaveLength(2);
     for(const model of fidelity){expect(model.fidelity.windingPreserved).toBe(true);expect(model.fidelity.maxUvError).toBeLessThanOrEqual(.00005);expect(model.fidelity.minimumNormalDot).toBeGreaterThanOrEqual(.999);}
     await main.reload();await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${reopened.project.id}"]`).click();await chooseTool(main,'Tag editor');
-    const target=reopened.inspection.tags.find(tag=>tag.class==='scen'&&tag.path.replaceAll('\\','/')===modelSources[1].tag);
+    const target=reopened.inspection.tags.find(tag=>tag.class==='scen'&&tag.path.replaceAll('\\','/')===modelSources.find(model=>model.sourceSha256===reviewedHash).tag);
     await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(target.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('scen');await main.locator('.tag-row').click();
     const preview=main.getByRole('region',{name:'Actual model preview',exact:true}).locator('.native-model-preview');
     await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});

@@ -348,6 +348,25 @@ pub(super) async fn review_geometry_handoff(app:tauri::AppHandle,project_id:Stri
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::geometry_exchange::review(&lib,&project_id,&id).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
+pub(super) async fn pin_geometry_handoff(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    project_id: String,
+    id: String,
+    sha256: String,
+) -> Reply<core::geometry_exchange::Accepted> {
+    let owner = window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        check_document_owner(&state, &project_id, &owner)?;
+        let library = lock(&state.library)?;
+        core::geometry_exchange::pin_review(&library, &project_id, &id, &sha256).map_err(error)
+    })
+    .await
+    .map_err(error)?
+}
+
+#[tauri::command]
 pub(super) async fn geometry_handoff_status(app:tauri::AppHandle,project_id:String,id:String)->Reply<core::geometry_exchange::Stamp>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::geometry_exchange::stamp(&lib,&project_id,&id).map_err(error)}).await.map_err(error)?
 }

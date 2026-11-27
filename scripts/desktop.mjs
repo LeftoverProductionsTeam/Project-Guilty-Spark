@@ -64,9 +64,12 @@ async function validateAndPromote(context, releaseDir, verification) {
   if (verification === '--verify-monitor') await runDevelopmentCommand(process.execPath, [
     'scripts/test-native-monitor-portrait.mjs', executable, path.join(context.directory, 'playtest-monitor'),
   ], context);
-  if (verification === '--verify-shape-paint') await runDevelopmentCommand(process.execPath, [
+  if (['--verify-shape-paint', '--verify-creator'].includes(verification)) await runDevelopmentCommand(process.execPath, [
     'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-shape-paint'),
   ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_LAUNCH_ONLY: '1', SPARK_LIFECYCLE_SHAPE_PAINT: '1' } });
+  if (verification === '--verify-creator') await runDevelopmentCommand(process.execPath, [
+    'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-blender-geometry'),
+  ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_GEOMETRY: '1', SPARK_GEOMETRY_HANDOFF_ONLY: '1' } });
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
   if (git('rev-parse', 'HEAD') !== exported.sourceCommit || git('status', '--porcelain'))
     throw Error('Candidate source changed during native validation');
@@ -91,8 +94,8 @@ async function main() {
       const request = process.argv.slice(2);
       const playtest = request[0] === 'playtest';
       const verification = request[1];
-      if (playtest && (process.platform !== 'win32' || request.length > 2 || ![undefined, '--verify-monitor', '--verify-shape-paint'].includes(verification)))
-        throw Error('Use desktop playtest [--verify-monitor | --verify-shape-paint] on Windows');
+      if (playtest && (process.platform !== 'win32' || request.length > 2 || ![undefined, '--verify-monitor', '--verify-shape-paint', '--verify-creator'].includes(verification)))
+        throw Error('Use desktop playtest [--verify-monitor | --verify-shape-paint | --verify-creator] on Windows');
       const { args, exportTo } = prepareDesktopArguments(playtest ? ['build', '--no-bundle'] : request, config, {
         owned: Boolean(process.env.SPARK_BUILD_WORKSPACE),
       });

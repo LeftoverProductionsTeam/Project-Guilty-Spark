@@ -52,7 +52,7 @@ if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned 
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
 if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small native preview/context test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
-const reservationBytes=rebuildOnly?4*1024**3:previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
+const reservationBytes=rebuildOnly?4*1024**3:(previewOnly||contextOnly||geometryOnly&&process.env.SPARK_GEOMETRY_HANDOFF_ONLY==='1')?1024**3:logicOnly?2*1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:walkthroughOnly?'native-guided-walkthrough':process.env.SPARK_LIFECYCLE_PROJECT_SWITCH==='1'?'native-project-switching':launchOnly?'native-layout-only':geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};

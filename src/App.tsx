@@ -1377,6 +1377,32 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function applyGeometryRevision(projectId:string,handoffId:string,sha256:string) {
+    if(historyRef.current.current?.id!==projectId) throw Error('Return to the reviewed project before applying this geometry.');
+    setBusy(true);
+    try {
+      await save(false,projectId);
+      const revision=await call<{path:string;assetId:string}>('pin_geometry_handoff',{projectId,id:handoffId,sha256});
+      const result=await call<AssetResult>('import_asset',{
+        id:projectId,path:revision.path,expectedSha256:sha256,libraryOnly:true,
+      });
+      const latest=documentsRef.current.documents.find(document=>document.id===projectId)?.history.current;
+      if(!latest?.assets.some(asset=>asset.id===revision.assetId)) throw Error('The original asset is no longer in the project. The reviewed geometry is retained in the asset library.');
+      dispatchDocument({type:'history',id:projectId,action:{type:'assets',project:result.project}});
+      dispatchDocument({type:'mesh',id:projectId,...assetMeshScope(result.project,result.asset),mesh:result.mesh});
+      const count=latest.scene.filter(object=>object.assetId===revision.assetId).length;
+      if(count){
+        const scene=latest.scene.map(object=>object.assetId===revision.assetId?{...object,assetId:result.asset.id}:object);
+        if(!edit({...latest,assets:result.project.assets,scene},'Apply reviewed Blender geometry')) {
+          throw Error('The editing window changed before the placements could be updated.');
+        }
+      }
+      return count;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function importSound(position?:Vec3,path?:string){
     const target=historyRef.current.current;if(!target)return false;setBusy(true);
     try{await save(false,target.id);const result=await call<{project:Project;asset:import('./types').Asset}|null>('import_custom_sound',{projectId:target.id,...(path?{path}:{})});if(!result)return false;
@@ -1631,7 +1657,7 @@ export default function App() {
             project={current}
             meshes={meshes}
             onImport={() => void importAsset()}
-            onImportRevised={(path,sha256)=>importAsset(undefined,path,sha256,current.id)}
+            onImportRevised={(id,sha256)=>applyGeometryRevision(current.id,id,sha256)}
             onWorld={() => setWorkspace('world')}
           />
         );

@@ -87,3 +87,96 @@ pub fn review(lib:&Library,project_id:&str,id:&str)->Result<Review>{
         vertices:parsed.mesh.positions.len()/3,triangles:parsed.mesh.indices.len()/3,complete_uvs:parsed.complete_uvs,
         materials:parsed.materials,warnings:parsed.warnings})
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Accepted {
+    pub path: PathBuf,
+    pub asset_id: String,
+}
+
+/// Admit the exact reviewed bytes to the project's retained asset sources.
+/// Blender can keep writing its working file without changing accepted edits.
+pub fn pin_review(lib: &Library, project_id: &str, id: &str, sha256: &str) -> Result<Accepted> {
+    let ready = prepared(lib, project_id, id)?;
+    let bytes = bounded(&ready.working_path, MAX_BYTES)?;
+    let actual = digest(&bytes);
+    if actual != sha256 {
+        return invalid("Geometry changed since review. Review the new Blender save first.");
+    }
+    if actual == ready.handoff.baseline_sha256 {
+        return invalid("The working geometry still matches the original.");
+    }
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|_| SparkError::Invalid("Edited OBJ must be UTF-8".into()))?;
+    assets::parse_obj(text)?;
+
+    let root = lib.project_dir(project_id)?.join("geometry-revisions");
+    reject_links(&root)?;
+    fs::create_dir_all(&root)?;
+    let path = root.join(format!("{actual}.obj"));
+    reject_links(&path)?;
+    if !path.exists() {
+        let mut total = 0;
+        for (index, entry) in fs::read_dir(&root)?.enumerate() {
+            let entry = entry?;
+            let metadata = fs::symlink_metadata(entry.path())?;
+            if index >= 32 || !metadata.is_file() {
+                return invalid("The retained geometry revision directory needs review before accepting more geometry.");
+            }
+            total += metadata.len();
+            if total + bytes.len() as u64 > 128 * 1024 * 1024 {
+                return invalid("This project has reached its retained geometry revision limit.");
+            }
+        }
+        project::atomic_write_checked(&path, &bytes, false, Some(&project::FileRevision::default()))?;
+    }
+    if digest(&bounded(&path, MAX_BYTES)?) != actual {
+        return invalid("A retained geometry revision was changed. The working file remains available.");
+    }
+    Ok(Accepted { path, asset_id: ready.handoff.asset_id })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::project::Asset;
+
+    #[test]
+    fn accepted_geometry_remains_pinned_while_blender_saves_again() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let library = Library::open(&temporary.path().join("library"))?;
+        let mut project = library.create("Geometry review")?;
+        let id = uuid::Uuid::new_v4().to_string();
+        let path = library.project_dir(&project.id)?.join("assets").join(format!("{id}.obj"));
+        let original = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
+        project::atomic_write(&path, original.as_bytes(), false)?;
+        project.assets.push(Asset {
+            id: id.clone(),
+            name: "source.obj".into(),
+            kind: "obj".into(),
+            path: path.clone(),
+            sha256: digest(original.as_bytes()),
+            vertices: 3,
+            triangles: 1,
+            has_uvs: false,
+            materials: Vec::new(),
+        });
+        library.save(&project, None)?;
+        let fork = prepare(&library, &project.id, &id)?;
+        assert!(pin_review(&library, &project.id, &fork.handoff.id, &fork.handoff.baseline_sha256).is_err());
+
+        let edited = original.replace("v 1 0 0", "v 2 0 0");
+        fs::write(&fork.working_path, &edited)?;
+        let receipt = review(&library, &project.id, &fork.handoff.id)?;
+        let accepted = pin_review(&library, &project.id, &fork.handoff.id, &receipt.sha256)?;
+        assert_eq!(accepted.asset_id, id);
+        assert_eq!(pin_review(&library, &project.id, &fork.handoff.id, &receipt.sha256)?.path, accepted.path);
+
+        fs::write(&fork.working_path, original.replace("v 1 0 0", "v 3 0 0"))?;
+        assert!(pin_review(&library, &project.id, &fork.handoff.id, &receipt.sha256).is_err());
+        assert_eq!(fs::read_to_string(&accepted.path)?, edited);
+        assert_eq!(fs::read_to_string(path)?, original);
+        Ok(())
+    }
+}
