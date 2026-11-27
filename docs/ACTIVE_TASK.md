@@ -4,7 +4,7 @@ Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native ga
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 0751058f reviews the six retained b5178c77 crossings. HCEEK Tool c492789e baked the exact retained slot 10 in isolation with two lightmap pages. Spark Latest remains 356ec94f / d75b353d.
-Next action: Run the edited slot-10 bake with verified scenery closure, then package and playtest. Forerunner continues wider visuals and normal-spawn Warthog traversal.
+Next action: Package the saved slot-10 bake with the verified expanded-sky and vehicle-mask compiler, then verify rendered traversal. Continue the reusable entrance and scenery checks on the retained world before merging the sealed pools.
 
 ## Acceptance
 
@@ -36,9 +36,9 @@ Folder prefix is `megaworld-compact-native-`. Keep f5a4ca22 / 4a095213 as the re
 ## Failures and blockers
 
 - The previously missing Ice Fields wall passed the exact matched native view on b5178c77 / 4a7f6920 and Win64 2beae96a at tick 4350. Forerunner retained `compact-native-diagnostics/screens/window16560.bmp` at BSP 11, yaw −92°, OpenGL 800×600. Wider visual and Warthog checks remain open. Use the existing f5 camera at (928.6,183.1,-15.1), BSP 11, yaw -92°, Win64 OpenGL 800×600. The old rejected frame is `compact-corrected-route/screens/window21286.bmp` including white terrain and missing opaque walls. Keep snow/prop comparisons and ambience restoration open.
-- The Sidewinder–Timberland exposed stone seam remains unresolved. Owner screenshot `codex-clipboard-add9a910-829b-49ee-903f-9aae117ae160.png` and region attribution are retained in the owner thread; prior evidence is in 74db6049.
+- Sidewinder–Timberland exposed seam remains open (owner screenshot add9a910; 74db6049). On exact fd7a49fa, Forerunner tied the new terrain intrusion to the Timberland end of Infinity (BSP12, switch 22, eye 36.3/34.2/-20.5) and the dark cutout to the Chiron entrance (BSP0, eye 350/-38.1/-18.6). The tree screenshot remains unrouted.
 - Spark commit 4e218d25 runs retained-connector geometry checks before tag staging. Exact Death Island cache d893d81c reproduces retained-BSP intrusion at (-179.31, 387.98, 1.09) and now stops before creating a staging job. The Boarding Action control separately stops at (732.50, 53.19, -17.66). The exact b5178c77 source passed the in-place clearance check using its retained entrances and preserved switch volumes.
-- The edited slot 10 compiled and bound. Halo Tool accepted both scenery rows in the isolated scenario but stopped on the missing snow-boulder collider. Exact-cache recursive extraction recovered 29a38f5d, matching stock Ice Fields, and a retained-structure bake with both placements yielded two pages (BSP 6bcd2215, bitmap 1c5fe089). The ordinary build now preflights the full closure and batches missing tags. Exact test recovered 13/15 files across both roots with staged hashes preserved. Edited-cache packaging and gameplay remain open.
+- Spark 37b53042 verifies both scenery closures (15 files). The sparse test recovered 13 from exact source. Physical short paths in fe892849 fixed Halo Tool opening a 273-character tag path. Native slot 10 baked two pages (BSP 1745ccfd, bitmap 4d163cd5). Exact recipe and tags are under megaworld-compact-native-b5178c77/editor-bake-1745ccfd. Stock Windows Invader 5606801e refused 11 skies at its eight-slot limit. No playable cache from this edit.
 - Construction can select and save an in-place edit to an inherited isolated connector. Preview and Build require its original landings, switch volumes and BSP slot identities. The actual editor-led native bake/reopen and traversal remain unverified. This path edits the connector alone. The entrance ramp and floor patches in b517 still use the retained native repair harness.
 - Actual two-way Warthog use and final receipt regeneration await native acceptance. Do not infer either from sampled clearance.
 

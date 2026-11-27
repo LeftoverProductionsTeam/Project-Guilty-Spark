@@ -319,6 +319,14 @@ impl ConnectorFloor {
         dot(sub(point, self.vertices[0]), self.normal) / self.normal[2]
     }
 
+    pub(crate) fn overlaps_box(&self, low: V, high: V, height: f64) -> bool {
+        (0..3).all(|axis| {
+            let bottom = self.vertices.iter().map(|v| v[axis]).fold(f64::INFINITY, f64::min);
+            let top = self.vertices.iter().map(|v| v[axis]).fold(f64::NEG_INFINITY, f64::max);
+            high[axis] >= bottom && low[axis] <= top + if axis == 2 { height } else { 0. }
+        })
+    }
+
     pub(crate) fn contains(&self, point: V, height: f64) -> bool {
         self.edges().all(|(a, b)| self.side_distance(point, a, b) >= -1e-8)
             && (-0.05..=height).contains(&self.above_floor(point))

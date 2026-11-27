@@ -2626,6 +2626,22 @@ fn generate_preserved_connector_for_slots(
             ("Donor render", donor_render, donor_mesh_index, donor_clearance_shift),
         ], retained_closures)?;
     }
+    // Include both shared landing spans when looking for placed objects.
+    // BSP surfaces still use their separately reviewed entrance-cap rules.
+    let straight_floor;
+    let scenery_floor = if let Some(floor) = &shape {
+        floor
+    } else {
+        let cross_section = vec![side; points.len()];
+        straight_floor = mitered_connector_floor(&points, &cross_section)?;
+        &straight_floor
+    };
+    verify_passage_scenery(&source.preserved_path, base, &project.scene, [0.; 3],
+        scenery_floor, height, cancel)?;
+    if replacement.is_none() && plan.include_donor_scenery {
+        verify_passage_scenery(&plan.donor_source.preserved_path, &donor, &[], plan.translation,
+            scenery_floor, height, cancel)?;
+    }
     let contains = |position| shape.as_ref().map_or_else(
         || intact_connector_contains_placement(&points, forward, width, height, position),
         |shape| shape.iter().any(|face| face.contains(position, height)),
@@ -3067,6 +3083,77 @@ impl EntranceClosure {
         }
         Ok(())
     }
+}
+
+fn scenery_passage_hit(
+    mesh: &MeshData, object: &maps::SceneObject, shift: V,
+    floor: &[crate::bsp_clearance::ConnectorFloor], height: f64,
+) -> Result<Option<V>> {
+    let [yaw, pitch, roll] = object.rotation.map(f64::from);
+    let (sy, cy) = yaw.sin_cos();
+    let (sp, cp) = pitch.sin_cos();
+    let (sr, cr) = roll.sin_cos();
+    let center = add(object.position.map(f64::from), shift);
+    let mut placed = MeshData { indices: mesh.indices.clone(), ..Default::default() };
+    for vertex in mesh.positions.chunks_exact(3) {
+        let [x, y, z] = std::array::from_fn(|axis|
+            f64::from(vertex[axis]) * f64::from(object.scale[axis]));
+        // Match Halo yaw/pitch/roll as used by the native model viewport.
+        let (y, z) = (cr * y - sr * z, sr * y + cr * z);
+        let (x, z) = (cp * x + sp * z, -sp * x + cp * z);
+        placed.positions.extend(add([cy * x - sy * y, sy * x + cy * y, z], center)
+            .map(|value| value as f32));
+    }
+    Ok(crate::bsp_clearance::RouteChecker::new(&placed)?
+        .mitered_connector_intrusion(floor, height, [0.; 3]))
+}
+
+fn verify_passage_scenery(
+    path: &Path, inspection: &MapInspection, authored: &[maps::SceneObject], shift: V,
+    floor: &[crate::bsp_clearance::ConnectorFloor], height: f64, cancel: &AtomicBool,
+) -> Result<()> {
+    let (header, bytes, hash) = maps::read_cache_snapshot_shared(path)?;
+    if hash != inspection.sha256 {
+        return invalid("The scenery source changed during passage preview");
+    }
+    let edited: BTreeMap<_, _> = authored.iter().map(|object| (object.id.as_str(), object)).collect();
+    let mut collision = BTreeMap::new();
+    let mut render = BTreeMap::new();
+    for original in inspection.objects.iter().filter(|object| object.kind == "Scenery") {
+        let object = edited.get(original.id.as_str()).copied().unwrap_or(original);
+        let Some(tag_id) = object.tag_id else { continue };
+        if !object.visible { continue; }
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return invalid("Passage scenery check cancelled");
+        }
+        // An existing complete model preview gives a fast, conservative
+        // position bound. If unavailable, test the owned tag directly.
+        let origin = add(object.position.map(f64::from), shift);
+        let nearby = inspection.model_meshes.get(&tag_id).and_then(|mesh| mesh.object_lighting.as_ref())
+            .is_none_or(|bounds| {
+                let radius = (f64::from(bounds.radius) + dot(bounds.offset.map(f64::from), bounds.offset.map(f64::from)).sqrt())
+                    * object.scale.into_iter().map(|value| f64::from(value.abs())).fold(1., f64::max);
+                floor.iter().any(|face| face.overlaps_box(
+                    sub(origin, [radius; 3]), add(origin, [radius; 3]), height))
+            });
+        if !nearby { continue; }
+        let collider = collision.entry(tag_id).or_insert_with(||
+            crate::render::object_collision_mesh(&bytes, &header, &inspection.tags, tag_id).ok().flatten());
+        if let Some(mesh) = collider {
+            if let Some([x, y, z]) = scenery_passage_hit(mesh, object, shift, floor, height)? {
+                return invalid(format!("Scenery {} blocks the passage near ({x:.2}, {y:.2}, {z:.2}). Move the route around the object or review its placement.", object.name));
+            }
+        }
+        let model = inspection.model_meshes.get(&tag_id).or_else(|| render.entry(tag_id)
+            .or_insert_with(|| crate::render::object_model_mesh(&bytes, &header, &inspection.tags, tag_id, 0).ok().map(|(_, mesh)| mesh))
+            .as_ref());
+        if let Some(mesh) = model {
+            if let Some([x, y, z]) = scenery_passage_hit(mesh, object, shift, floor, height)? {
+                return invalid(format!("Scenery {} renders through the passage near ({x:.2}, {y:.2}, {z:.2}). Move the route clear of the object or review its placement.", object.name));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn verify_preserved_tunnel_intrusions(
@@ -5185,6 +5272,25 @@ mod tests {
         rows[2].arrival_marker = None;
         rows[2].trigger_index = rows[0].trigger_index;
         assert!(!review_leaf_switches(0, [3, 1], 5, &rows));
+    }
+
+    #[test]
+    fn preserved_route_detects_scenery_reaching_in_from_outside_the_passage() {
+        let floor = mitered_connector_floor(&[[0., 0., 0.], [5., 0., 0.], [5., 5., 0.]],
+            &[[0., 1., 0.], [-1., 1., 0.], [-1., 0., 0.]]).unwrap();
+        let mut tree = maps::SceneObject {
+            id: "Scenery-1".into(), name: "Tree".into(), kind: "Scenery".into(), tag_id: Some(1),
+            position: [7., 3., 0.], rotation: [0., 0., 0.], scale: [1.; 3],
+            visible: true, source_offset: Some(1), rotation_offset: None, asset_id: None, source_model: None,
+        };
+        let branch = MeshData {
+            positions: vec![0., 0., 0.5, -2., 0., 0.5, -2., 0., 1.5],
+            indices: vec![0, 1, 2], ..Default::default()
+        };
+        let hit = scenery_passage_hit(&branch, &tree, [0.; 3], &floor, 2.).unwrap().unwrap();
+        assert!((5. ..=6.001).contains(&hit[0]) && (hit[1] - 3.).abs() < 0.001 && hit[2] > 0., "{hit:?}");
+        tree.rotation[0] = std::f32::consts::PI;
+        assert!(scenery_passage_hit(&branch, &tree, [0.; 3], &floor, 2.).unwrap().is_none());
     }
 
     #[test]
