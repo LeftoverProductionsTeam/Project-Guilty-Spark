@@ -57,6 +57,7 @@ pub mod dual_wield;
 pub mod forge_build;
 mod forge_reuse;
 pub mod model_build;
+pub mod vehicle_attachment;
 pub mod forge_session;
 pub mod gameplay;
 pub mod session_frames;

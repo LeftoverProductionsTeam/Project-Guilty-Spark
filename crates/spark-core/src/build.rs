@@ -581,6 +581,7 @@ impl Runner<'_> {
             "info",
         );
         let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
+        if phase == "vehicle-attachment" { cmd.env_remove("NODE_OPTIONS").env_remove("NODE_PATH"); }
         #[cfg(windows)]
         let (native_args, physical_cwd) =
             crate::native_workspace::prepare_command(executable, cwd, args, phase)?;
@@ -671,7 +672,7 @@ impl Runner<'_> {
         // staged BSP must not be treated as safe to terminate mid-write.
         // A requested cancellation/soft timeout is honored *between* write
         // phases, after the current native process exits by itself.
-        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps" | "logic-names" | "logic-scenario" | "logic-script");
+        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps" | "logic-names" | "logic-scenario" | "logic-script" | "vehicle-attachment");
         // Native radiosity on a connected world can legitimately finish
         // past ten minutes. Keep a finite phase deadline and the same
         // between-writes cancellation and owned-storage checks.

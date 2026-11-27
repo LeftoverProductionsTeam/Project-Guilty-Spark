@@ -88,6 +88,14 @@ fn user_launcher(state:&AppState,id:&str)->Reply<Option<UserLauncher>>{
     let selected:Option<UserLauncher>=lock(&state.library)?.setting(&launcher_key(id)).map_err(error)?;
     Ok(selected.map(|mut item|{item.available=item.tool_id==id&&dependency_install::pe_identity(&item.path).is_ok_and(|(path,sha,arch)|path==item.path&&sha==item.sha256&&arch==item.architecture);item}))
 }
+pub(super) fn vehicle_blender(state:&AppState)->Reply<PathBuf>{
+    if let Some(selected)=user_launcher(state,"blenderHalo")?{
+        if selected.available {return Ok(selected.path);}
+        return Err("Locate the installed Blender application again under Games & tools".into());
+    }
+    installed_blender().ok_or_else(||"Locate the installed Blender application under Games & tools".into())
+}
+
 // Standalone launch is still distinct from a source handoff. Reject a missing,
 // changed or invalid executable before allocating even an empty launch folder.
 fn standalone_folder(root:&Path,candidate:&Path)->Reply<(PathBuf,String,PathBuf)>{

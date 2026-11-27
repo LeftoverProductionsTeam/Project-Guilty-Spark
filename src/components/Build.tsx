@@ -137,7 +137,7 @@ export default function Build({
             </button>
             {view==='build'&&<button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
               <Hammer size={15} />
-              {separateBsps ? (dirty ? 'Save & build native BSPs' : 'Build native BSPs') : ceTarget?(dirty?`Save & build for ${targetName}`:`Build for ${targetName}`):(dirty ? 'Save & convert to MCC' : 'Convert map to MCC')}
+              {project.shapeDraft?.vehicleMount ? (dirty ? 'Save & build vehicle attachment' : 'Build vehicle attachment') : separateBsps ? (dirty ? 'Save & build native BSPs' : 'Build native BSPs') : ceTarget?(dirty?`Save & build for ${targetName}`:`Build for ${targetName}`):(dirty ? 'Save & convert to MCC' : 'Convert map to MCC')}
             </button>}
           </>
         }

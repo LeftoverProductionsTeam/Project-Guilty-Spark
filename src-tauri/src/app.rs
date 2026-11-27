@@ -2021,6 +2021,18 @@ fn megaworld_runtime_review(state: &AppState, project: &project::Project) -> Rep
     Ok(Some(review))
 }
 
+fn vehicle_attachment_tools(state:&AppState, project:&Project, inspection:&MapInspection, tools:&Toolchain)->Reply<core::vehicle_attachment::Tools>{
+    let program_files=PathBuf::from(std::env::var_os("ProgramFiles").ok_or("Vehicle attachment builds require installed Windows tools")?);
+    let packaged=program_files.join("WindowsApps");
+    let standard=program_files.join("nodejs").join("node.exe");
+    let node=std::iter::once(standard).chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .filter(|path|path.starts_with(&packaged)).map(|path|path.join("node.exe")))
+        .find_map(|path|dependency_install::pe_identity(&path).ok().map(|identity|identity.0))
+        .ok_or("Install Node.js 24 or newer from its official installer to build mounted vehicle parts")?;
+    let blender=tool_ecosystem_native::vehicle_blender(state)?;
+    core::vehicle_attachment::prepare(project,inspection,tools,&node,&blender).map_err(error)
+}
+
 #[tauri::command]
 async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::CompatibilityReport> {
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
@@ -2040,6 +2052,10 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
             return Ok(report);
         }
         let tools=project_tools(&state,&p)?;
+        if core::vehicle_attachment::selected(&p) {
+            let issue=vehicle_attachment_tools(&state,&p,&i,&tools).err().or(origin_issue);
+            return Ok(build::CompatibilityReport{target:"mcc-cea".into(),pipeline:"Build and verify the reviewed Warthog attachment".into(),ready:issue.is_none(),blockers:issue.into_iter().collect(),warnings:vec![],bitmap_dependencies:None});
+        }
         let resolved=native_resources_native::for_project(&state,&p,&i).unwrap_or_else(|_|p.clone());
         let mut report=build::compatibility(&resolved, &i, &tools);
         if let Some(reason)=origin_issue{report.blockers.push(reason);report.ready=false;}
@@ -2091,9 +2107,13 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let project=if project.source.as_ref().is_some_and(|s|[6,7].contains(&s.cache_version)){
         native_resources_native::for_project(&state,&project,&inspection)?
     }else{project};
-    if core::megaworld_build::selected(&project){core::megaworld_build::preflight(&project,&inspection).map_err(error)?;}else{
-        let report = build::compatibility(&project, &inspection, &tools);
-        if !report.ready {return Err(report.blockers.join("\n"));}
+    let attachment=if core::vehicle_attachment::selected(&project){Some(vehicle_attachment_tools(&state,&project,&inspection,&tools)?)}else{None};
+    if attachment.is_none() {
+        if core::megaworld_build::selected(&project) { core::megaworld_build::preflight(&project,&inspection).map_err(error)?; }
+        else {
+            let report = build::compatibility(&project, &inspection, &tools);
+            if !report.ready {return Err(report.blockers.join("\n"));}
+        }
     }
     let megaworld_review = megaworld_runtime_review(&state, &project)?;
     let job_id = uuid::Uuid::new_v4().to_string();
@@ -2109,7 +2129,7 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let jobs = state.root.join("jobs");
     let returned = job_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let record = if core::megaworld_build::selected(&project){core::megaworld_build::run_with_reviewed_runtime(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e),megaworld_review.as_ref())}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
+        let record = if let Some(attachment)=&attachment{core::vehicle_attachment::run(&project,&inspection,attachment,&jobs,&job_id,&cancel,&|e|event(&app,e))}else if core::megaworld_build::selected(&project){core::megaworld_build::run_with_reviewed_runtime(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e),megaworld_review.as_ref())}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
         let state = app.state::<AppState>();
         match record {
             Ok(record) => {

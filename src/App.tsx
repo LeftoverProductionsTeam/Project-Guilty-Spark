@@ -1435,7 +1435,7 @@ export default function App() {
       if (historyRef.current.dirty) await save(true);
       const job = await call<string>('start_build', { id: current.id });
       setActiveJob(job);
-      notice('Conversion started. The build log records tool output and validation results.', 'success');
+      notice(current.shapeDraft?.vehicleMount?'Vehicle attachment build started.':'Conversion started. The build log records tool output and validation results.', 'success');
     } catch (e) {
       notice(String(e),'error');
     }

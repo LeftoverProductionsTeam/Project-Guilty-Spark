@@ -1018,12 +1018,41 @@ try{
       const projectSha256=crypto.createHash('sha256').update(projectBytes).digest('hex');
       expect(JSON.parse(projectBytes).shapeDraft).toEqual(saved);
       const paintSha256=crypto.createHash('sha256').update(Buffer.from(saved.paintPng.split(',')[1],'base64')).digest('hex');
-      const {stdout}=await runOwned(process.execPath,['scripts/test-warthog-plow-native.mjs',nativeMap,nativeKit,invaderDirectory],{
-        timeout:120000,maxBuffer:1024**2,windowsHide:true,env:{...process.env,
-          SPARK_WARTHOG_SHAPE_PROJECT:projectFile,SPARK_WARTHOG_PRIVATE_MAP:'1'}
-      });
-      const receipt=stdout.trim().split(/\r?\n/).map(line=>JSON.parse(line)).find(row=>row.privateMap);
-      expect(receipt.shapeDraft).toEqual({id:saved.id,savedProjectSha256:projectSha256,vehicleMount:saved.vehicleMount});
+      let receipt;
+      if(process.env.SPARK_WARTHOG_APP_BUILD==='1'){
+        const {settings}=await invoke(main,'bootstrap');
+        await invoke(main,'save_settings',{settings:{...settings,hekDirectory:path.dirname(nativeKit),hekFlavor:'h1aEk',invaderDirectory}});
+        const before=(await invoke(main,'open_project',{id:entry.id})).project.builds.map(build=>build.id);
+        await chooseTool(main,'Build & playtest');
+        const button=main.getByRole('button',{name:'Build vehicle attachment',exact:true});
+        const checks=await invoke(main,'compatibility',{id:entry.id});
+        expect(checks.blockers).toEqual([]);
+        await button.click();
+        await expect.poll(async()=>{
+          const boot=await invoke(main,'bootstrap');
+          const failed=boot.logs.filter(log=>log.projectId===entry.id&&log.phase==='failed').at(-1);
+          if(failed)throw Error(failed.message);
+          return (await invoke(main,'open_project',{id:entry.id})).project.builds
+            .some(build=>!before.includes(build.id)&&build.status==='validated');
+        },{timeout:120000}).toBe(true);
+        const build=(await invoke(main,'open_project',{id:entry.id})).project.builds.find(item=>!before.includes(item.id)&&item.status==='validated');
+        const output=path.resolve(build.output);
+        expect(path.relative(path.join(root,'library','jobs'),output)).not.toMatch(/^\.\./);
+        receipt=JSON.parse(await fs.readFile(path.join(path.dirname(output),'vehicle-attachment.json'),'utf8'));
+        expect(receipt.privateMap.sha256).toBe(build.sha256);
+        expect(crypto.createHash('sha256').update(await fs.readFile(output)).digest('hex')).toBe(build.sha256);
+        const snap=path.join(path.dirname(output),'receipt.json');
+        expect(JSON.parse(await fs.readFile(snap,'utf8')).id).toBe(build.id);
+        step('Built the reviewed Warthog attachment using Spark’s normal Build button and recorded the isolated native cache');
+      }else{
+        const {stdout}=await runOwned(process.execPath,['scripts/test-warthog-plow-native.mjs',nativeMap,nativeKit,invaderDirectory],{
+          timeout:120000,maxBuffer:1024**2,windowsHide:true,env:{...process.env,
+            SPARK_WARTHOG_SHAPE_PROJECT:projectFile,SPARK_WARTHOG_PRIVATE_MAP:'1'}
+        });
+        receipt=stdout.trim().split(/\r?\n/).map(line=>JSON.parse(line)).find(row=>row.privateMap);
+      }
+      expect(receipt.shapeDraft).toMatchObject({id:saved.id,vehicleMount:saved.vehicleMount});
+      if(process.env.SPARK_WARTHOG_APP_BUILD!=='1')expect(receipt.shapeDraft.savedProjectSha256).toBe(projectSha256);
       expect(receipt.mountCentimeters).toEqual(saved.vehicleMount.position.map(value=>value*100));
       expect(receipt.bladeDimensions).toEqual(dimensions);
       expect(receipt.curl).toBe(saved.curl);
