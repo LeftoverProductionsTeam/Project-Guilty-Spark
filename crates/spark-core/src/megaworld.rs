@@ -330,6 +330,53 @@ pub fn review_extraction_start_clearance(
     Ok(result)
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionVehicleParking {
+    pub position: [f64; 3],
+    pub yaw: f64,
+}
+
+pub fn review_extraction_vehicle_parking(
+    path: &Path, map: &MapInspection, regions: &[(u16, Vec<u16>)], radius: f64, resting_offset: f64,
+) -> Result<Vec<Option<ExtractionVehicleParking>>> {
+    if !radius.is_finite() || radius <= 0. || !resting_offset.is_finite() || resting_offset <= 0. {
+        return invalid("Vehicle parking needs positive native envelope and resting dimensions");
+    }
+    let starts = maps::scenario_region_starts(path, map)?;
+    let vehicles = maps::scenario_vehicles(path, map)?;
+    let mut reserved = Vec::<[f64; 3]>::new();
+    let mut result = Vec::with_capacity(regions.len());
+    let mut checkers = BTreeMap::new();
+    for (slot, rows) in regions {
+        let checker = match checkers.entry(*slot) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => entry.insert(
+                crate::bsp_clearance::RouteChecker::for_part(&map.mesh, usize::from(*slot))?),
+        };
+        let seeds = rows.iter().map(|&row| starts.get(usize::from(row))
+            .map(|start| start.position.map(f64::from))
+            .ok_or_else(|| crate::SparkError::Invalid("Vehicle parking references an invalid native start".into())))
+            .collect::<Result<Vec<_>>>()?;
+        let mut occupied = seeds.clone();
+        occupied.extend(vehicles.iter().map(|row| row.position.map(f64::from)));
+        occupied.extend(reserved.iter().copied());
+        let pose = checker.suggest_vehicle_parking(&seeds, &occupied, radius, resting_offset)
+            .map(|(position, yaw)| ExtractionVehicleParking { position, yaw });
+        if let Some(pose) = &pose {
+            let point = pose.position.map(|axis| axis as f32);
+            let locations = maps::bsp_point_locations(path, map, &[point], None)?;
+            if locations[0].bsps != [*slot] || !locations[0].supports.iter().any(|surface| surface.bsp == *slot) {
+                result.push(None);
+                continue;
+            }
+            reserved.push(pose.position);
+        }
+        result.push(pose);
+    }
+    Ok(result)
+}
+
 pub const REGIONAL_EXTRACTION_POOLS_FEATURE: &str = "extraction.regional_pools.v1";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]

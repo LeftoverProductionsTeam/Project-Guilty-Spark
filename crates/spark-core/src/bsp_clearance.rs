@@ -488,6 +488,55 @@ impl RouteChecker {
         }
         Ok(floor)
     }
+    /// Look for a short supported drive-off lane around an authored region's
+    /// starts. Returned poses are candidates for native object acceptance.
+    pub(crate) fn suggest_vehicle_parking(
+        &self, starts: &[V], occupied: &[V], radius: f64, resting_offset: f64,
+    ) -> Option<(V, f64)> {
+        let mut scratch = Vec::new();
+        let index = &self.index;
+        // A one-diameter exit beyond the parked hull keeps a spawn out of
+        // dead-end pockets. The searches below are local to each seed.
+        for &start in starts {
+            for distance in [2., 3., 4., 5.] {
+                for direction in 0..16 {
+                    let yaw = f64::from(direction) * std::f64::consts::TAU / 16.;
+                    let forward = [yaw.cos(), yaw.sin(), 0.];
+                    let candidate = add(start, mul(forward, distance));
+                    let Some(z) = index.floor_in_range(candidate, &mut scratch, 0.55, 0.35) else { continue; };
+                    let ground = [candidate[0], candidate[1], z];
+                    if occupied.iter().any(|other| {
+                        let delta = sub(ground, *other);
+                        delta[0].hypot(delta[1]) < radius + 0.30 && delta[2].abs() < 1.4
+                    }) { continue; }
+                    for heading in [yaw, yaw + std::f64::consts::FRAC_PI_2, yaw - std::f64::consts::FRAC_PI_2] {
+                        let along = [heading.cos(), heading.sin(), 0.];
+                        let side = [-along[1], along[0], 0.];
+                        let from = add(ground, mul(along, -radius));
+                        let to = add(ground, mul(along, radius * 3.));
+                        let mut supported = true;
+                        'samples: for sample in 0..=8 {
+                            let point = add(from, mul(sub(to, from), f64::from(sample) / 8.));
+                            for lateral in [-radius, 0., radius] {
+                                let point = add(point, mul(side, lateral));
+                                if index.floor_in_range(point, &mut scratch, 0.10, 0.015).is_none() {
+                                    supported = false;
+                                    break 'samples;
+                                }
+                            }
+                        }
+                        if supported && self.connector_intrusion(
+                            &[add(from, [0., 0., 0.015]), add(to, [0., 0., 0.015])], radius * 2., radius * 2., [0.; 3],
+                        ).is_none() {
+                            return Some((add(ground, [0., 0., resting_offset]), heading));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Check the authored deployment origin using the selected biped's full
     /// standing pill. Native object occupancy still requires Forerunner.
     pub(crate) fn verify_biped_start(&self, position: V, pill: crate::maps::NativeStandingPill) -> Result<()> {

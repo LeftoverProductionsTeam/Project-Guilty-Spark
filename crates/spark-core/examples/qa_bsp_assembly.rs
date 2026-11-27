@@ -65,6 +65,28 @@ fn main() -> Result<()> {
         if report.starts.iter().any(|s| s.issue.is_some()) { std::process::exit(2); }
         return Ok(());
     }
+    if a.len() == 6 && a[1] == "--review-extraction-vehicle-parking" {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Review {
+            cache_sha256: String,
+            regions: Vec<(u16, Vec<u16>)>,
+        }
+        let cache = Path::new(&a[2]);
+        let compiled = maps::inspect_map(cache, None)?;
+        let file = Path::new(&a[3]);
+        spark_core::reject_links(file)?;
+        if fs::metadata(file)?.len() > 65536 { return spark_core::invalid("Parking review exceeds 64 KiB"); }
+        let review: Review = serde_json::from_slice(&fs::read(file)?)?;
+        if review.cache_sha256 != compiled.sha256 || review.regions.is_empty() || review.regions.len() > 64 {
+            return spark_core::invalid("Parking review does not match the compiled map or logical region limit");
+        }
+        let radius = a[4].parse().map_err(|_| spark_core::SparkError::Invalid("Enter the reviewed vehicle bound".into()))?;
+        let resting = a[5].parse().map_err(|_| spark_core::SparkError::Invalid("Enter the reviewed vehicle resting offset".into()))?;
+        let parking = spark_core::megaworld::review_extraction_vehicle_parking(cache, &compiled, &review.regions, radius, resting)?;
+        println!("{}", serde_json::json!({"cacheSha256":compiled.sha256,"parking":parking}));
+        return Ok(());
+    }
     if a.len() == 6 && a[1] == "--review-extraction-start-clearance" {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase", deny_unknown_fields)]
