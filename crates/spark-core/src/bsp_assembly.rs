@@ -2600,7 +2600,7 @@ fn generate_preserved_connector_for_slots(
         None => (intact_route_points(overlaps, plan, landing.as_ref())?, None),
     };
     if bent || !common_separation {
-        verify_intact_neighborhood((&base.mesh, &base_collision), (&donor_layout.mesh, donor_collision),
+        verify_intact_neighborhood(base.render_mesh.as_ref(), (&base.mesh, &base_collision), (&donor_layout.mesh, donor_collision),
             donor_index, stock_shift, retained_slots(), plan, &points)?;
     }
     review.tunnel_points = points[1..points.len() - 1].to_vec();
@@ -3239,11 +3239,59 @@ fn separated_bounds<const N: usize>(left: [[f64; 2]; N], right: [[f64; 2]; N], c
     left.into_iter().zip(right).any(|(a, b)| b[0] - a[1] >= clearance || a[0] - b[1] >= clearance)
 }
 
+const NEIGHBOR_CLEARANCE: f64 = 0.05;
+
+// Each plane contains every section corner, including a non-planar miter.
+// A retained triangle can cross this envelope even when none of its vertices
+// lies inside, so clip its edges against the planes before reporting a hit.
+fn passage_triangle_overlap(corners: &[V; 8], triangle: [V; 3]) -> Option<V> {
+    let center = mul(corners.iter().copied().fold([0.; 3], add), 0.125);
+    let mut polygon = triangle.to_vec();
+    let mut clipped = Vec::with_capacity(12);
+    for face in LEVEL_PASSAGE_TRIANGLES {
+        let [a, b, c] = face.map(|index| corners[index]);
+        let mut n = normal(a, b, c);
+        if dot(n, n) < 0.5 { continue; }
+        if dot(sub(center, a), n) > 0. { n = mul(n, -1.); }
+        let limit = corners.iter().map(|&point| dot(sub(point, a), n)).fold(0., f64::max) + NEIGHBOR_CLEARANCE;
+        let distance = |point| dot(sub(point, a), n) - limit;
+        clipped.clear();
+        let mut previous = *polygon.last()?;
+        let mut previous_distance = distance(previous);
+        for current in polygon.iter().copied() {
+            let current_distance = distance(current);
+            if (previous_distance <= 0.) != (current_distance <= 0.) {
+                let fraction = previous_distance / (previous_distance - current_distance);
+                clipped.push(add(previous, mul(sub(current, previous), fraction)));
+            }
+            if current_distance <= 0. { clipped.push(current); }
+            previous = current;
+            previous_distance = current_distance;
+        }
+        std::mem::swap(&mut polygon, &mut clipped);
+    }
+    (!polygon.is_empty()).then(|| mul(polygon.iter().copied().fold([0.; 3], add), 1. / polygon.len() as f64))
+}
+
+fn retained_surface_overlap(mesh: &MeshData, slot: usize, corners: &[V; 8]) -> Result<Option<V>> {
+    let part = mesh.parts.get(slot).ok_or_else(|| SparkError::Invalid("Missing retained BSP surface range".into()))?;
+    let bounds = std::array::from_fn::<_, 3, _>(|axis| corners.iter().map(|point| point[axis]).fold(
+        [f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| [lo.min(value), hi.max(value)]));
+    for ids in mesh.indices[part.index_start..part.index_start + part.index_count].chunks_exact(3) {
+        let triangle = [ids[0], ids[1], ids[2]].map(|id| vertex(mesh, id));
+        if bounds.iter().enumerate().any(|(axis, &[lo, hi])|
+            triangle.iter().all(|point| point[axis] < lo - NEIGHBOR_CLEARANCE)
+            || triangle.iter().all(|point| point[axis] > hi + NEIGHBOR_CLEARANCE)) { continue; }
+        if let Some(point) = passage_triangle_overlap(corners, triangle) { return Ok(Some(point)); }
+    }
+    Ok(None)
+}
+
 /// A region in a gap between existing BSPs can be clear on a different axis
 /// from each neighbor. Protect both render and collision bounds, then check
 /// the entire passage envelope against every nonparticipating BSP.
 fn verify_intact_neighborhood(
-    base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
+    base_render: Option<&MeshData>, base: (&MeshData, &MeshData), donor: (&MeshData, &MeshData), donor_index: usize,
     translation: V, slots: impl IntoIterator<Item = usize>, plan: &BspAssembly, points: &[V],
 ) -> Result<()> {
     let route = &plan.tunnel_points;
@@ -3265,9 +3313,11 @@ fn verify_intact_neighborhood(
     let donor_bounds = box_for(donor, donor_index, translation)?;
     let corridor = points.windows(2).zip(sides.windows(2)).map(|(path, side)| {
         let corners = passage_corners(path[0], path[1], side[0], side[1], height);
-        axes.map(|axis| corners.iter().map(|point| dot(*point, axis))
-            .fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| [lo.min(value), hi.max(value)]))
+        let bounds = axes.map(|axis| corners.iter().map(|point| dot(*point, axis))
+            .fold([f64::INFINITY, f64::NEG_INFINITY], |[lo, hi], value| [lo.min(value), hi.max(value)]));
+        (corners, bounds)
     }).collect::<Vec<_>>();
+    let mut bounds_only = None;
     for slot in slots {
         let retained = box_for(base, slot, [0.; 3])?;
         // A conforming Atlas road may span an ordinary compact seam gap.
@@ -3276,9 +3326,21 @@ fn verify_intact_neighborhood(
         if !separated_bounds(donor_bounds, retained, separation) {
             return invalid(format!("The intact donor needs {separation} units of separation from BSP {slot}"));
         }
-        if slot != plan.base_bsp_index && corridor.iter().any(|&section| !separated_bounds(retained, section, 0.05)) {
-            return invalid(format!("The proposed passage intersects the bounds of unrelated BSP {slot}"));
+        if slot == plan.base_bsp_index { continue; }
+        for (segment, (corners, bounds)) in corridor.iter().enumerate() {
+            if separated_bounds(retained, *bounds, NEIGHBOR_CLEARANCE) { continue; }
+            for (kind, mesh) in [("collision", Some(base.1)), ("render", base_render)] {
+                if let Some(mesh) = mesh {
+                    if let Some([x, y, z]) = retained_surface_overlap(mesh, slot, corners)? {
+                        return invalid(format!("Passage segment {} is within 0.05 units of {kind} geometry in unrelated BSP {slot} near ({x:.3}, {y:.3}, {z:.3})", segment + 1));
+                    }
+                }
+            }
+            bounds_only.get_or_insert((slot, segment + 1));
         }
+    }
+    if let Some((slot, segment)) = bounds_only {
+        return invalid(format!("Passage segment {segment} overlaps the bounds of unrelated BSP {slot}. Available collision and render triangles were clear. Native region occupancy still needs review."));
     }
     Ok(())
 }
@@ -4197,7 +4259,7 @@ fn verify_bound_intact_connector(
     // Apply the same neighboring-region proof to the compiled route.
     let neighbors = || (0..collision.parts.len()).filter(|slot| *slot != connector_slot && *slot != donor_slot);
     if path.len() > 2 || !intact_common_separation(&compiled.mesh, neighbors(), &compiled.mesh, donor_slot, [0.; 3], forward)? {
-        verify_intact_neighborhood((&compiled.mesh, collision), (&compiled.mesh, collision), donor_slot,
+        verify_intact_neighborhood(compiled.render_mesh.as_ref(), (&compiled.mesh, collision), (&compiled.mesh, collision), donor_slot,
             [0.; 3], neighbors(), plan, &points)?;
     }
     route.tunnel_points = [overlaps[0][0]].into_iter()
@@ -4833,7 +4895,7 @@ fn plan_from_bsp_placement(
                     return invalid("The planned passage overlaps a native donor pickup. Choose another heading or move the landing clear of the original item.");
                 }
                 if !intact_common_separation(&base.mesh,0..count,&donor.mesh,index,placed.translation,toward)? {
-                    verify_intact_neighborhood((&base.mesh,&base_mesh),(&donor.mesh,&donor_mesh),
+                    verify_intact_neighborhood(base.render_mesh.as_ref(), (&base.mesh,&base_mesh),(&donor.mesh,&donor_mesh),
                         index,placed.translation,0..count,&placed,&points)?;
                 }
                 Ok(())
@@ -5590,6 +5652,14 @@ mod tests {
         verify_intact_switch_spacing(&[independent], &retained, &fields).unwrap();
         let clear = partition_switch(1, 7, [4., 4., 0.], [DIAG, -DIAG, 0.], 2., 1.6);
         verify_intact_switch_spacing(&[clear], &retained, &fields).unwrap();
+    }
+
+    #[test]
+    fn retained_passage_envelope_detects_crossings_without_inside_vertices() {
+        let corners = passage_corners([0., 0., 0.], [10., 0., 2.], [0., 1., 0.], [0., 1., 0.], 2.);
+        assert!(passage_triangle_overlap(&corners, [[5., -4., 2.], [5., 4., 2.], [5., 4., 4.]]).is_some());
+        assert!(passage_triangle_overlap(&corners, [[7., 1.06, 2.], [5., 1.06, 2.], [5., 1.06, 4.]]).is_none());
+        assert!(passage_triangle_overlap(&corners, [[5., -4., -1.], [5., 4., -1.], [8., 4., 0.5]]).is_none());
     }
 
     #[test]
