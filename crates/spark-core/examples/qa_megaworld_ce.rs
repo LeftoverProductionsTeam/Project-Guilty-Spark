@@ -147,13 +147,31 @@ fn main()->Result<()>{
         spark_core::reject_links(Path::new(&path))?;
         Some(fs::canonicalize(path)?)
     } else { None };
-    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13 [--reviewed-forerunner <registration.json>]] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--regional-preset <surface|underground|underground-infantry>] [--donor-tags <reviewed donor tags>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
+    let road_candidates = if a.first().is_some_and(|arg| arg == "--preserved-road-candidates") {
+        if a.len() < 2 || !mcc || regional_preset.is_some() {
+            return spark_core::invalid("Preserved-road candidates require a reviewed MCC13 plan");
+        }
+        a.remove(0);
+        let path = a.remove(0);
+        spark_core::reject_links(Path::new(&path))?;
+        let mut bytes = Vec::new();
+        fs::File::open(path)?.take(32 * 1024 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > 32 * 1024 {
+            return spark_core::invalid("Preserved-road candidate input exceeds its review budget");
+        }
+        let candidates: Vec<[[f64; 3]; 2]> = serde_json::from_slice(&bytes)?;
+        if candidates.is_empty() || candidates.len() > 24 {
+            return spark_core::invalid("Review between one and 24 proposed road landings");
+        }
+        Some(candidates)
+    } else { None };
+    if a.len()!=7{return spark_core::invalid("qa_megaworld_ce [--mcc13 [--reviewed-forerunner <registration.json>]] [--partition-structure | --partition-scenario-probe | --partition-lighting-probe] [--regional-preset <surface|underground|underground-infantry>] [--donor-tags <reviewed donor tags>] [--preserved-road-candidates <points.json>] <base CE.map> <donor CE.map> <reviewed CE tags, recover, or recover-known-stock> <H1A kit> <Invader> <fresh output> <previous project, reviewed JSON receipt, auto, or terrain>");}
     let out=Path::new(&a[5]);fs::create_dir(out)?;let lib=Library::open(&out.join("library"))?;
     let (mut p,i)=lib.import_map(Path::new(&a[0]),Path::new(&a[0]).parent())?;
     let (donor,j)=lib.import_map(Path::new(&a[1]),Path::new(&a[1]).parent())?;
     let recovered = matches!(a[2].as_str(), "recover" | "recover-known-stock");
     let recipe_path = Path::new(&a[6]);
-    let reviewed = if matches!(a[6].as_str(), "auto" | "terrain") {
+    let mut reviewed = if matches!(a[6].as_str(), "auto" | "terrain") {
         None
     } else {
         let (plan, inherited_connections) = reviewed_plan(recipe_path, &mut p)?;
@@ -166,6 +184,38 @@ fn main()->Result<()>{
         plan.validate()?;
         Some(plan)
     };
+    if let Some(candidates) = road_candidates {
+        let plan = reviewed.as_mut().filter(|plan| plan.open_road && plan.preserve_donor_bsp
+            && plan.atlas_from_region_id.is_some()).ok_or_else(|| SparkError::Invalid(
+                "Candidates must retain both BSPs of a reviewed Atlas road".into()))?;
+        let cancelled = AtomicBool::new(false);
+        let mut accepted = None;
+        let material_missing = !i.tags.iter().any(|tag| tag.class == "senv"
+            && tag.path.replace('\\', "/").eq_ignore_ascii_case(&plan.tunnel_shader_path.replace('\\', "/")));
+        for (index, points) in candidates.into_iter().enumerate() {
+            plan.tunnel_points = points.to_vec();
+            if material_missing {
+                match bsp_assembly::retained_road_shader(&p, &i, plan) {
+                    Ok(shader) => plan.tunnel_shader_path = shader,
+                    Err(error) => {
+                        eprintln!("Native connector material rejected road {}: {error}", index + 1);
+                        continue;
+                    }
+                }
+            }
+            p.bsp_assembly = Some(plan.clone());
+            match bsp_assembly::generate_preserved_connector(&p, &i, &cancelled) {
+                Ok(_) => {
+                    eprintln!("Native connector preview accepted road {} at {points:?}", index + 1);
+                    project::atomic_write(&out.join("reviewed-road.json"), &serde_json::to_vec_pretty(&*plan)?, false)?;
+                    accepted = Some(points);
+                    break;
+                }
+                Err(error) => eprintln!("Native connector preview rejected road {} at {points:?}: {error}", index + 1),
+            }
+        }
+        if accepted.is_none() { return spark_core::invalid("No proposed road passed the native connector preview"); }
+    }
     // Use the existing source-bound extraction/receipts instead of copying an
     // SDK when verifying a joined pair of owner-installed original caches.
     let (tags, donor_tags) = if recovered {

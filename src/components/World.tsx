@@ -6,10 +6,10 @@ import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
 import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
 import {NATIVE_VOLUME_VIEW,volumeCenter,volumeQuaternion} from '../nativeTriggerVolume';
-import {assemblySignature, NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
+import {transformAssembly, assemblyVehicleGrade, assemblyRoutePoints, editAssemblyRoutePoints, assemblySignature, NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
 import {BSP_STRUCTURE_WITNESS, type BspStructureWitness} from '../haloWrl';
 import {WrlErrorOverlay} from './ForgeViewport';
-import type {NativeBspSwitchPreview} from '../bspAssembly';
+import type {AssemblyRouteKey, BspAssembly, NativeBspSwitchPreview} from '../bspAssembly';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
 import {NATIVE_CAMERA_VIEW,cameraPoint,nativeCameraPose} from '../nativeCutsceneCamera';
 import type {NativeCameraView} from '../nativeCutsceneCamera';
@@ -34,6 +34,7 @@ import ImmersiveMapEditor from './ImmersiveMapEditor';
 import type {ImmersiveControl} from './ImmersiveMapEditor';
 import {isChromaSubject} from '../chromaKey';
 import TransformControls from './HaloTransformControls';
+import {BspRouteGizmo} from './BspSourceHandles';
 import useEndToFloor from '../useEndToFloor';
 import type {DropBody} from '../useEndToFloor';
 import {draggedAsset} from '../assetDragRegistry';
@@ -379,6 +380,7 @@ function Scene({
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
   ownedModels,assembly,assemblyPlan,joinedPreview,additionalBounds,focusBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
+  routePoints,onRoutePoint,routeKey,routeGradeLimit,routeFailure,routePointSelection=0,onSelectRoutePoint,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -409,6 +411,8 @@ function Scene({
   ownedModels:Record<string,OwnedModelView>;
   assembly:AssemblyViewportSource|null;
   assemblyPlan:Project['bspAssembly'];
+  routePoints?:Vec3[];onRoutePoint?:(index:number,point:Vec3)=>void;routeKey?:string;
+  routeGradeLimit?:number;routeFailure?:Vec3;routePointSelection?:number;onSelectRoutePoint?:(index:number)=>void;
   joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
   focusBounds?:THREE.Box3|null;
@@ -541,12 +545,19 @@ function Scene({
         </group>;
       })()}
       {joinedPreview&&assembly&&joinedPreview.surfaces.map(surface=>{const donor=surface.source===1,view=ownedModels[forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId})];return <group key={surface.source} name="gs-joined-source" userData={{assetSurface:true}}><Mesh data={surface.mesh} greenScreen={greenScreen} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?(donor?view?.shaderTextures:shaderTextures):EMPTY_SHADER_TEXTURES} shaderMetadata={donor?view?.shaderMetadata:shaderMetadata} extraTextures={donor?view?.extraTextures:extraTextures}/></group>;})}
+      {routePoints && onRoutePoint && onSelectRoutePoint && !cinematic && !pickTarget &&
+        <BspRouteGizmo key={routeKey} points={routePoints} selected={routePointSelection} onSelect={onSelectRoutePoint} snap={snap} enabled={!fly && !cameraLocked} gradeLimit={routeGradeLimit}
+          onChange={onRoutePoint} onDrag={moving=>moving ? onSceneDragStart?.() : onSceneDragEnd?.()} />}
+      {routeFailure && !cinematic && <mesh position={routeFailure} renderOrder={1003} raycast={() => null}>
+        <sphereGeometry args={[0.35, 12, 8]} /><meshBasicMaterial color="#ff617a" depthTest={false} />
+      </mesh>}
       {!cinematic && joinedPreview?.sourcePreflight && (() => {
-        const {examples, lightingExamples} = joinedPreview.sourcePreflight;
+        const {examples, lightingExamples, facingExamples = []} = joinedPreview.sourcePreflight;
         const outline = (vertices: [Vec3, Vec3, Vec3], color: string, key: string) =>
           <Line key={key} points={[...vertices, vertices[0]]} color={color}
             raycast={() => null} lineWidth={3} depthTest={false} renderOrder={1000} />;
         return <>
+          {facingExamples.map(issue => outline(issue.vertices, '#e798ff', `facing-${issue.triangle}`))}
           {lightingExamples.map(issue => outline(issue.vertices, '#ffe280', `lighting-${issue.triangle}`))}
           {examples.map(issue => outline(issue.vertices, '#ff617a', `blocked-${issue.triangle}`))}
           {examples.flatMap(issue => issue.overlappingVertices
@@ -591,7 +602,7 @@ function Scene({
         <TransformControls
           object={group as MutableRefObject<THREE.Group>}
           mode={mode}
-          enabled={!fly&&!cameraLocked&&!transformLocked}
+          enabled={!fly&&!cameraLocked&&!transformLocked&&!routePoints}
           showX={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showY={mode!=='rotate'||!yawOnlyKinds.includes(chosen.kind)} showZ
           space={mode === 'translate' ? 'world' : 'local'}
           translationSnap={snap ? 0.5 : null}
@@ -759,7 +770,32 @@ export default function World({
   const [bspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
   const currentBspDiagnostics = bspWitness && bspWitness.sourceSha256 === project.source?.sha256 &&
     bspWitness.assemblySignature === assemblySignature(project.bspAssembly ?? null) ? bspWitness.diagnostics : null;
-  const assemblyDonor=useAssemblyDonor(project,pickTarget==='donor'&&!!pickingLanding),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
+  const [routeHandles] = useMapState(project.id, 'bsp.view.handles', false);
+  const [moveDonorHandle] = useMapState(project.id, 'bsp.view.moveDonor', false);
+  const [routePointSelection, setRoutePointSelection] = useMapState(project.id, 'bsp.view.routePoint', 0);
+  const [routeKey] = useMapState<AssemblyRouteKey>(project.id, 'bsp.route', 'primary');
+  const [routeDraft, setRouteDraft] = useMapState<BspAssembly|null>(project.id, 'bsp.draft', () => project.bspAssembly ?? null);
+  const [routeBaseline] = useMapState(project.id, 'bsp.applied', () => assemblySignature(project.bspAssembly ?? null));
+  const currentRouteDraft = routeHandles && routeBaseline === assemblySignature(project.bspAssembly ?? null) ? routeDraft : null;
+  const donorHandlePoint = moveDonorHandle ? currentRouteDraft?.tunnelPoints.at(-1) : undefined;
+  const routePoints = donorHandlePoint ? [donorHandlePoint]
+    : currentRouteDraft ? assemblyRoutePoints(currentRouteDraft, routeKey) : undefined;
+  const [routeIssue] = useMapState<{signature:string;point:Vec3}|null>(project.id, 'bsp.view.routeIssue', null);
+  const routeFailure = routeIssue?.signature && routeIssue.signature === assemblySignature(routeDraft) ? routeIssue.point : undefined;
+  const routeGradeLimit = routeKey === 'highGround' || routeKey === 'primary' && assemblyVehicleGrade(currentRouteDraft) ? 0.25 : undefined;
+  const changeRoutePoint = (index: number, point: Vec3) => {
+    if (!currentRouteDraft || !routePoints) return;
+    const signature = assemblySignature(currentRouteDraft);
+    setRouteDraft(current => {
+      if (!current || assemblySignature(current) !== signature) return current;
+      if (donorHandlePoint && point.every(axis => Number.isFinite(axis) && Math.abs(axis) <= 2048)) {
+        const position = current.translation.map((axis, i) => axis + point[i] - donorHandlePoint[i]) as Vec3;
+        return transformAssembly(current, position, current.yawDegrees);
+      }
+      return editAssemblyRoutePoints(current, routeKey, routePoints.map((old, i) => i === index ? point : old));
+    });
+  };
+  const assemblyDonor=useAssemblyDonor(project,!!currentRouteDraft||pickTarget==='donor'&&!!pickingLanding),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const joinedBaseMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===0)?.mesh;
   const joinedDonorMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===1)?.mesh;
@@ -1842,7 +1878,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked:cameraLocked||xrActive,
                     externalCameraAuthority:externalCameraAuthority||xrActive,
-                    ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
+                    routePoints,routeFailure,routeGradeLimit,routePointSelection,onSelectRoutePoint:setRoutePointSelection,onRoutePoint:changeRoutePoint,routeKey:project.id+':'+(moveDonorHandle?'donor':routeKey),ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import TransformControls from './HaloTransformControls';
 import { moveWorkshopVertices, workshopPivot } from '../bspWorkshop';
@@ -116,4 +117,48 @@ export function BspPartGizmo({
       />
     </>
   );
+}
+
+/** Manipulate draft route points in the same snapped world-space controls as brush edits. */
+export function BspRouteGizmo({ points, selected, onSelect, snap, enabled, gradeLimit, onChange, onDrag }: {
+  points: Vec3[]; selected: number; onSelect: (index: number) => void;
+  snap: boolean; enabled: boolean; gradeLimit?: number;
+  onChange: (index: number, point: Vec3) => void; onDrag: (dragging: boolean) => void;
+}) {
+  const [movingPoint, setMovingPoint] = useState<Vec3 | null>(null);
+  const group = useRef<THREE.Group>(null);
+  const moving = useRef(false);
+  const index = Math.min(selected, points.length - 1);
+  const pivot = points[index];
+  const display = movingPoint ? points.map((point, i) => i === index ? movingPoint : point) : points;
+  useEffect(() => () => { if (moving.current) onDrag(false); }, []);
+  if (!pivot) return null;
+  return <>
+    {display.slice(1).map((end, i) => {
+      const start = display[i];
+      const run = Math.hypot(end[0] - start[0], end[1] - start[1]);
+      const excessive = gradeLimit !== undefined && (run < 1e-6 || Math.abs(end[2] - start[2]) > run * gradeLimit);
+      return <Line key={i} points={[start,end]} color={excessive ? '#ff617a' : '#9cf8e2'}
+        lineWidth={excessive ? 4 : 2} depthTest={false} renderOrder={1001} raycast={() => null} />;
+    })}
+    {display.map((point, i) => <mesh key={i} position={point} renderOrder={1002}
+      onClick={event => { if (enabled && event.button === 0 && event.delta <= 5) { event.stopPropagation(); onSelect(i); }}}>
+      <sphereGeometry args={[i === index ? 0.24 : 0.18, 12, 8]} />
+      <meshBasicMaterial color={i === index ? '#fff098' : '#66ddc8'} depthTest={false} />
+    </mesh>)}
+    <group ref={group} position={pivot} />
+    <TransformControls object={group as React.RefObject<THREE.Object3D>}
+      enabled={enabled} mode='translate' space='world' translationSnap={snap ? 0.5 : null}
+      onMouseDown={() => { if (enabled) { moving.current = true; onDrag(true); } }}
+      onObjectChange={() => { if (moving.current && group.current) setMovingPoint(group.current.position.toArray() as Vec3); }}
+      onMouseUp={() => {
+        if (!moving.current || !group.current) return;
+        const point = group.current.position.toArray() as Vec3;
+        group.current.position.fromArray(pivot);
+        moving.current = false;
+        setMovingPoint(null);
+        onDrag(false);
+        if (Math.hypot(...point.map((axis, i) => axis - pivot[i])) > 1e-6) onChange(index, point);
+      }} />
+  </>;
 }

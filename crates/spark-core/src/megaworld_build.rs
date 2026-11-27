@@ -185,14 +185,18 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     let supported_base = source.cache_version == 609
         || (source.cache_version == 13 && cache.version == 13 && !project.inherited_bsp_connections.is_empty());
     let retaining = plan.separate_native_bsps && cache.version == 13
-        && crate::bsp_assembly::can_extend_partitions(project, inspection);
+        && if plan.preserve_donor_bsp {
+            crate::bsp_assembly::can_preserve_connector_parent(project, inspection, plan)
+        } else {
+            crate::bsp_assembly::can_extend_partitions(project, inspection)
+        };
     if !supported_base || plan.donor_source.cache_version != 609 || inspection.header.version != source.cache_version
         || (!retaining && inspection.mesh.parts.len() != 1) || inspection.header.scenario_type != 1
     {
         return invalid("Use a single-BSP CE multiplayer base or its eligible compiled MCC13 extension with the matching build tags. Choose a CE donor and keep multi-BSP extensions on MCC13");
     }
     if plan.preserve_donor_bsp && (!retaining || inspection.mesh.parts.len() > 14) {
-        return invalid("Preserving an intact donor requires a retained MCC13 assembly and two available BSP slots");
+        return invalid("Preserving both regions requires an MCC13 target, a retained Atlas seed or regional parent, and two available BSP slots");
     }
     if retaining && project.native_lighting.is_some() {
         return invalid("Save and compile lighting changes in the existing world before extending it");
@@ -461,7 +465,10 @@ fn build_partition_cache(
             &path, &map, plan, &project.inherited_bsp_connections, prepared.overlap, old_count,
         )?
     };
-    if old_count > 1 { verify_retained_collision(preserved_path, source, &path, &map)?; }
+    let retain_collision = old_count > 1 || prepared.intact_overlaps.is_some();
+    if retain_collision {
+        verify_retained_collision(preserved_path, source, &path, &map)?;
+    }
     let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
     if let Some(environment) = &prepared.donor_environment {
         let readback = output.join("environment-tags");
@@ -503,7 +510,7 @@ fn build_partition_cache(
         "donorEnvironmentVerified": prepared.donor_environment.is_some() || prepared.intact_sky_offset.is_some(),
         "retainedEnvironmentsVerified": prepared.intact_sky_offset.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
         "netgameFlags": native_flags, "playerStarts": native_starts,
-        "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if old_count > 1 { old_count } else { 0 }});
+        "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if retain_collision { old_count } else { 0 }});
     Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })
 }
 

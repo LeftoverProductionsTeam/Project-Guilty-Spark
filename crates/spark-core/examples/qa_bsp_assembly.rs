@@ -69,6 +69,7 @@ fn main() -> Result<()> {
         println!("{}",serde_json::json!({"cacheSha256":map.sha256,"bsp":slot,"eye":eye,"hits":hits}));
         return Ok(());
     }
+
     if a.len() >= 3 && a[1] == "--review-pickup-support" {
         for source in &a[2..] {
             let path = Path::new(source);
@@ -105,6 +106,75 @@ fn main() -> Result<()> {
                 "pickups":pickups.len(),"noClusterOwner":no_owner,"noOwnerFloorWithin64":no_floor,
                 "ownerFloorOver2Below":elevated,"regions":region_names,"examples":examples}));
         }
+        return Ok(());
+    }
+    if matches!(a.len(), 5 | 6) && a[1] == "--review-region-placement-moves" {
+        let file = Path::new(&a[2]);
+        let map = maps::inspect_map(file, None)?;
+        let regions = maps::native_bsp_placements(file, &map)?;
+        let slot: usize = a[3].parse().map_err(|_| spark_core::SparkError::Invalid("Expected a native BSP slot".into()))?;
+        let delta: [f64; 3] = serde_json::from_str(&a[4])?;
+        if slot >= regions.bsp_count || delta.iter().any(|v| !v.is_finite() || v.abs() > 1500.) {
+            return spark_core::invalid("Invalid native region or relocation");
+        }
+        let bit = 1u16 << slot;
+        let mut objects = Vec::new();
+        let mut overlapping = Vec::new();
+        for object in &map.objects {
+            let mask = object.source_offset.and_then(|offset| regions.memberships.get(&offset).copied()).unwrap_or(0);
+            if mask & bit == 0 { continue; }
+            if mask != bit {
+                overlapping.push(serde_json::json!({"id":object.id,"kind":object.kind,"ownerMask":mask,"position":object.position}));
+                continue;
+            }
+            let translated = std::array::from_fn::<_, 3, _>(|i| f64::from(object.position[i]) + delta[i]);
+            if translated.iter().any(|v| v.abs() > 1500.) {
+                return spark_core::invalid("A relocated placement exceeds native coordinate bounds");
+            }
+            objects.push(serde_json::json!({"id":object.id,"kind":object.kind,"position":object.position,"translated":translated}));
+        }
+        let mut supplemental = Vec::new();
+        if let Some(input) = a.get(5) {
+            let input = Path::new(input);
+            spark_core::reject_links(input)?;
+            if fs::metadata(input)?.len() > 1024 * 1024 { return spark_core::invalid("Supplemental native point input exceeds one MiB"); }
+            let rows: Vec<serde_json::Value> = serde_json::from_slice(&fs::read(input)?)?;
+            if rows.is_empty() || rows.len() > 1024 { return spark_core::invalid("Review up to 1024 supplemental scenario positions"); }
+            let points = rows.iter().map(|row| serde_json::from_value(row["point"].clone()))
+                .collect::<std::result::Result<Vec<[f32; 3]>, _>>()?;
+            let locations = maps::bsp_point_locations(file, &map, &points, None)?;
+            for (row, location) in rows.into_iter().zip(locations) {
+                if location.bsps.contains(&(slot as u16)) {
+                    supplemental.push(serde_json::json!({"row":row,"owners":location.bsps}));
+                }
+            }
+        }
+        println!("{}", serde_json::json!({"sourceSha256":map.sha256,"slot":slot,"delta":delta,
+            "objects":objects,"overlapping":overlapping,"supplemental":supplemental}));
+        return Ok(());
+    }
+    if matches!(a.len(), 7 | 8) && a[1] == "--verify-rebuilt-connector" {
+        let cache = Path::new(&a[2]);
+        let project = spark_core::project::load_project(Path::new(&a[3]))?;
+        let plan = project.bsp_assembly.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Expected reviewed connector plan".into()))?;
+        let overlaps = Path::new(&a[4]);
+        spark_core::reject_links(overlaps)?;
+        if fs::metadata(overlaps)?.len() > 16_384 { return spark_core::invalid("Connector readback exceeds 16 KiB"); }
+        let json: serde_json::Value = serde_json::from_slice(&fs::read(overlaps)?)?;
+        let slots = [a[5].parse(), a[6].parse()].map(|slot| slot.map_err(|_| spark_core::SparkError::Invalid("Expected physical BSP slot".into())));
+        let [connector, donor] = slots;
+        let compiled = maps::inspect_map(cache, None)?;
+        let ramps = if let Some(file) = a.get(7) {
+            let file = Path::new(file);
+            spark_core::reject_links(file)?;
+            if fs::metadata(file)?.len() > 16_384 { return spark_core::invalid("Entrance review exceeds 16 KiB"); }
+            let repairs: [bsp_assembly::ReviewedEntranceRepair; 2] = serde_json::from_slice(&fs::read(file)?)?;
+            repairs.map(|repair| repair.vehicle_ramp)
+        } else { [None; 2] };
+        let proof = bsp_assembly::verify_rebuilt_connector_collision(cache, &compiled, plan,
+            serde_json::from_value(json["overlaps"].clone())?, [connector?, donor?],
+            [json["entrance"].is_object(), json["donorEntrance"].is_object()], ramps)?;
+        println!("{}", serde_json::to_string(&proof)?);
         return Ok(());
     }
     if a.len() == 4 && a[1] == "--verify-walkthrough" {
@@ -265,18 +335,60 @@ fn main() -> Result<()> {
         }));
         return Ok(());
     }
-    if a.len() == 4 && a[1] == "--export-intact-connector" {
+    if matches!(a.len(), 4 | 6 | 7 | 8) && a[1] == "--export-intact-connector" {
         let p = spark_core::project::load_project(Path::new(&a[2]))?;
         let source = p.source.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("No preserved base map".into()))?;
         let base = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
-        let connector = bsp_assembly::generate_preserved_connector(&p, &base, &AtomicBool::new(false))?;
+        let cancel = AtomicBool::new(false);
+        let connector = if a.len() >= 6 {
+            let slot = |value: &str| value.parse::<usize>()
+                .map_err(|_| spark_core::SparkError::Invalid("Expected a native BSP slot number".into()));
+            let [connector, donor] = [slot(&a[4])?, slot(&a[5])?];
+            #[derive(serde::Deserialize)]
+            #[serde(untagged)]
+            enum RepairFile {
+                Repairs([bsp_assembly::ReviewedEntranceRepair; 2]),
+                Seals([Vec<bsp_assembly::NativeSeal>; 2]),
+            }
+            let repairs = if let Some(file) = a.get(7) {
+                let file = Path::new(file);
+                spark_core::reject_links(file)?;
+                if fs::metadata(file)?.len() > 16_384 { return spark_core::invalid("Entrance repair review exceeds 16 KiB"); }
+                match serde_json::from_slice(&fs::read(file)?)? {
+                    RepairFile::Repairs(repairs) => repairs,
+                    RepairFile::Seals(seals) => seals.map(|seals| bsp_assembly::ReviewedEntranceRepair {
+                        seals, ..Default::default()
+                    }),
+                }
+            } else { [Default::default(), Default::default()] };
+            match a.get(6).map(String::as_str) {
+                None => bsp_assembly::rebuild_preserved_connector(&p, &base, connector, donor, &cancel)?,
+                Some("--open-entrance") => bsp_assembly::rebuild_preserved_connector_with_repairs(
+                    &p, &base, connector, donor, [true, false], &repairs, &cancel)?,
+                Some("--open-entrances") => bsp_assembly::rebuild_preserved_connector_with_repairs(
+                    &p, &base, connector, donor, [true, true], &repairs, &cancel)?,
+                Some(_) => return spark_core::invalid("Expected --open-entrance or --open-entrances"),
+            }
+        } else {
+            bsp_assembly::generate_preserved_connector(&p, &base, &cancel)?
+        };
         let output = Path::new(&a[3]);
         spark_core::reject_links(output)?;
         fs::create_dir(output)?;
         fs::write(output.join("connector.jms"), bsp_assembly::export_jms(&connector.geometry)?)?;
         fs::write(output.join("connector-materials.json"), serde_json::to_vec(&connector.geometry.materials)?)?;
+        if let Some(entrance) = &connector.rebuilt_entrance {
+            fs::write(output.join("entrance.jms"), bsp_assembly::export_jms(entrance)?)?;
+            fs::write(output.join("entrance-materials.json"), serde_json::to_vec(&entrance.materials)?)?;
+        }
+        if let Some(entrance) = &connector.rebuilt_donor_entrance {
+            fs::write(output.join("donor-entrance.jms"), bsp_assembly::export_jms(entrance)?)?;
+            fs::write(output.join("donor-entrance-materials.json"), serde_json::to_vec(&entrance.materials)?)?;
+        }
         let receipt = serde_json::json!({
             "report": connector.geometry.report, "switches": connector.switches, "overlaps": connector.overlaps,
+            "entrance": connector.rebuilt_entrance.as_ref().map(|geometry| &geometry.report),
+            "donorEntrance": connector.rebuilt_donor_entrance.as_ref().map(|geometry| &geometry.report),
         });
         fs::write(output.join("connector-scenario.json"), serde_json::to_vec_pretty(&receipt)?)?;
         println!("{receipt}");

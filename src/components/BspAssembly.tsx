@@ -6,7 +6,8 @@ import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, MapInspection, OpenProject, Project, RuntimeRegistration, Vec3 } from '../types';
 import { reviewedMcc13Target, runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
-import { addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import type { AssemblyRouteKey } from '../bspAssembly';
+import { assemblyRouteIssuePoint, addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -233,7 +234,11 @@ export default function BspAssembly({
       'bsp.applied',
       assemblySignature(project.bspAssembly ?? null),
     ),
-    [routeView,setRouteView]=useMapState<'primary'|'infantry'|'highGround'|`section:${string}`>(project.id,'bsp.route','primary'),
+    [routeView,setRouteView]=useMapState<AssemblyRouteKey>(project.id,'bsp.route','primary'),
+    [,setRouteIssue] = useMapState<{signature:string;point:Vec3}|null>(project.id, 'bsp.view.routeIssue', null),
+    [showRouteHandles, setShowRouteHandles] = useMapState(project.id, 'bsp.view.handles', false),
+    [moveDonorHandle, setMoveDonorHandle] = useMapState(project.id, 'bsp.view.moveDonor', false),
+    [,setRoutePointSelection] = useMapState(project.id, 'bsp.view.routePoint', 0),
     [entrancePivot, setEntrancePivot] = useMapState(project.id, 'bsp.entrancePivot', false),
     [direction, setDirection] = useMapState(project.id, 'bsp.tunnelDirection', 0),
     [busy, setBusy] = useState(false),
@@ -242,7 +247,9 @@ export default function BspAssembly({
   const [visibleWitness, setVisibleWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
   const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
   const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
-  const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
+  const draftSignature = assemblySignature(draft);
+  const applied = draftSignature === assemblySignature(project.bspAssembly ?? null);
+  useEffect(() => { setReport(null); }, [draftSignature]);
   const currentStructureCheck = structureCheck?.key === structureKey && applied ? structureCheck : null;
   const structureActions = currentStructureCheck?.messages.length
     ? [...new Set(analyzeHaloToolLog(currentStructureCheck.messages.join('\n')).diagnostics.map(issue => issue.action))]
@@ -453,7 +460,12 @@ export default function BspAssembly({
     if(!value||!selectionMatches||busy)return;
     await perform(async current=>{
       const signature=assemblySignature(value);
-      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector ? { intactConnector: true } : {})});
+      setRouteIssue(null);
+      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector ? { intactConnector: true } : {})}).catch(cause=>{
+        const point = assemblyRouteIssuePoint(String(cause));
+        if (point && current() && latest.current.signature === signature) setRouteIssue({signature,point});
+        throw cause;
+      });
       if(current()&&latest.current.signature===signature&&latest.current.donor===value.donorProjectId&&latest.current.index===value.donorBspIndex&&latest.current.baseIndex===(value.baseBspIndex??0)){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
@@ -808,9 +820,14 @@ export default function BspAssembly({
                         latest.current.projectId === request.projectId &&
                         latest.current.signature === request.signature;
                       if (!matches()) return;
+                      setRouteIssue(null);
                       const checked = await call<AssemblyReport>('preview_bsp_assembly', {
                         projectId: project.id, includeGeometry:true,
                         nativeBspIndex: draft.separateNativeBsps ? nativeBspIndex : undefined,
+                      }).catch(cause=>{
+                        const point=assemblyRouteIssuePoint(String(cause));
+                        if(point && matches()) setRouteIssue({signature:request.signature,point});
+                        throw cause;
                       });
                       if (matches()) {setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
                     })
@@ -937,9 +954,33 @@ export default function BspAssembly({
                     onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
                 </div>
               )}
+              <div className="bsp-actions" aria-label="Edit route points">
+                <button type="button" aria-pressed={showRouteHandles && !moveDonorHandle} disabled={busy || !selectionMatches}
+                  onClick={() => {setMoveDonorHandle(false);setShowRouteHandles(!showRouteHandles || moveDonorHandle);}}>
+                  {showRouteHandles && !moveDonorHandle ? 'Hide route handles' : 'Drag route points'}
+                </button>
+                <button type="button" disabled={busy || !selectionMatches} aria-pressed={showRouteHandles && moveDonorHandle}
+                  onClick={() => {setShowRouteHandles(!showRouteHandles || !moveDonorHandle);setMoveDonorHandle(!moveDonorHandle);}}>
+                  {showRouteHandles && moveDonorHandle ? 'Hide BSP handle' : 'Move neighboring BSP'}
+                </button>
+                {!draft.terrainSeam && (!draft.separateNativeBsps || draft.preserveDonorBsp && !draft.openRoad) &&
+                  <button type="button" disabled={busy || routeDraft!.tunnelPoints.length >= 16} onClick={() => {
+                    const points = routeDraft!.tunnelPoints;
+                    const endIndex = points.length - 1;
+                    const last = points[endIndex];
+                    const before = points[endIndex - 1];
+                    const bend = last.map((axis, i) => (axis + before[i]) / 2) as Vec3;
+                    updateRoute({tunnelPoints: [...points.slice(0, endIndex), bend, last]});
+                  }}>Add bend before imported floor</button>}
+              </div>
+              {showRouteHandles && <p className="subtle">{moveDonorHandle
+  ? 'Drag the donor entrance handle to move the entire BSP and its landings. Apply after checking the gap.'
+  : 'Select a point and drag an axis. Use snap for half-unit moves. Red vehicle segments exceed a 25% grade. Preview for floor and clearance checks before Apply.'}</p>}
               <div className="bsp-waypoints">
                 {routeDraft!.tunnelPoints.map((point, i) => (
                   <div key={i}>
+                    {showRouteHandles && !moveDonorHandle && <button type="button" disabled={busy}
+                      onClick={() => setRoutePointSelection(i)}>Select {i === 0 ? "destination floor" : i === routeDraft!.tunnelPoints.length - 1 ? "imported floor" : "bend " + i}</button>}
                     {vector(
                       point,
                       (value) =>
@@ -1150,6 +1191,9 @@ export default function BspAssembly({
                         <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')}</li>
                       ))}</ul>
                     </div>
+                  )}
+                  {!!report.sourcePreflight?.facingRisks && (
+                    <p>{report.sourcePreflight.facingRisks} copied stock faces point against their vertex normals. Review the purple faces in the viewport.</p>
                   )}
                   {report.sourcePreflight?.overlapCheckIncomplete && (
                     <p>The overlap check reached its search limit. Check dense regions in smaller joins for a complete preview.</p>

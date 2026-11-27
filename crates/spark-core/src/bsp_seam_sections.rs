@@ -1,6 +1,72 @@
 //! Optional edge-selected seam sections, all rebuilt by the existing native CSG pipeline.
 use super::*;
 
+/// Collapse exactly one reviewed, short collision edge. Render and material
+/// charts are separate and are emitted from the original lining mesh.
+pub(super) fn weld_reviewed_collision_edge(
+    mesh: &mut MeshData, materials: &[AssemblyMaterial], slots: &mut Vec<usize>,
+    from: V, to: V, stock_points: &[V],
+) -> Result<()> {
+    let fail = || SparkError::Invalid("Reviewed doorway weld must match one short, generated collision edge with unchanged surface winding".into());
+    let native = |point: V| point.map(|axis| f64::from(axis as f32));
+    let [from, to] = [native(from), native(to)];
+    let delta = sub(from, to);
+    if from.iter().chain(&to).any(|axis| !axis.is_finite()) || from == to
+        || dot(delta, delta) > 0.004_f64.powi(2)
+        || stock_points.iter().any(|&point| native(point) == from)
+    {
+        return Err(fail());
+    }
+    let mut moved = BTreeSet::new();
+    let mut kept = Vec::with_capacity(mesh.indices.len());
+    let mut kept_slots = Vec::with_capacity(slots.len());
+    let mut removed = [false; 2];
+    for (ids, &slot) in mesh.indices.chunks_exact(3).zip(slots.iter()) {
+        let old = [ids[0], ids[1], ids[2]].map(|id| vertex(mesh, id));
+        if let Some(corner) = old.iter().position(|&point| point == from) {
+            let material = &materials[slot];
+            if !material.collision_only || material.flags & 1 != 0 { return Err(fail()); }
+            if old.contains(&to) {
+                let orientation = usize::from(old[(corner + 1) % 3] == to);
+                if std::mem::replace(&mut removed[orientation], true) { return Err(fail()); }
+                continue;
+            }
+            let mut next = old;
+            next[corner] = to;
+            if dot(normal(old[0], old[1], old[2]), normal(next[0], next[1], next[2])) < 0.98 {
+                return Err(fail());
+            }
+            moved.insert(ids[corner]);
+        }
+        kept.extend_from_slice(ids);
+        kept_slots.push(slot);
+    }
+    if removed != [true, true] || moved.is_empty() { return Err(fail()); }
+
+    // The two removed triangles must leave a closed, oppositely wound fan.
+    // Use position keys because native source material boundaries use aliases.
+    let mut incidence = BTreeMap::<[u64; 3], [usize; 2]>::new();
+    for ids in kept.chunks_exact(3) {
+        let pts = [ids[0], ids[1], ids[2]].map(|id| if moved.contains(&id) { to } else { vertex(mesh, id) });
+        for (a, b) in pts.into_iter().zip(pts.into_iter().cycle().skip(1)) {
+            if a == to || b == to {
+                if a == b { return Err(fail()); }
+                let other = if a == to { b } else { a };
+                let key = other.map(|axis| if axis == 0. { 0 } else { axis.to_bits() });
+                incidence.entry(key).or_default()[usize::from(a == to)] += 1;
+            }
+        }
+    }
+    if incidence.is_empty() || incidence.values().any(|&pair| pair != [1, 1]) { return Err(fail()); }
+    for id in moved {
+        let index = id as usize * 3;
+        mesh.positions[index..index + 3].copy_from_slice(&to.map(|axis| axis as f32));
+    }
+    mesh.indices = kept;
+    *slots = kept_slots;
+    Ok(())
+}
+
 /// Fill reviewed Tool openings with Halo's native seam-sealer material.
 /// Use the mesh's own edge positions and preserve the two-sided donor faces.
 pub(super) fn append_native_seals(

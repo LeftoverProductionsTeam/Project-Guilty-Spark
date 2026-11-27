@@ -160,7 +160,15 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
 /// adding interior points. Bisect its geometric edge on every adjacent face,
 /// including aliases with another material/UV, then improve coplanar diagonals.
 pub(crate) fn refine_native_needles(m: &mut MeshGL64, maximum: usize, generated_material: u64) -> crate::Result<usize> {
-    refine_generated_faces(m, maximum, generated_material, f64::INFINITY)
+    refine_generated_faces(m, maximum, generated_material, 0., f64::INFINITY)
+}
+
+/// At a stock doorway the lining includes short, constrained faces. Once a
+/// face fits in five centimeters and survives native import precision, keep
+/// its existing chart and boundary. Further subdivision cannot remove the
+/// constraint and can create vertices that collapse in Tool.
+pub(crate) fn refine_entrance_lining(m: &mut MeshGL64, maximum: usize, generated_material: u64) -> crate::Result<usize> {
+    refine_generated_faces(m, maximum, generated_material, 0.05, f64::INFINITY)
 }
 
 
@@ -338,11 +346,11 @@ fn weld_generated_edge(
 /// Keep long standalone connector charts within the native baker's working
 /// span; the collision layer is emitted from the original manifold.
 pub(crate) fn refine_connector_charts(m: &mut MeshGL64, maximum: usize) -> crate::Result<usize> {
-    refine_generated_faces(m, maximum, 0, 64.)
+    refine_generated_faces(m, maximum, 0, 0., 64.)
 }
 
 fn refine_generated_faces(
-    m: &mut MeshGL64, maximum: usize, generated_material: u64, maximum_span: f64,
+    m: &mut MeshGL64, maximum: usize, generated_material: u64, minimum_span: f64, maximum_span: f64,
 ) -> crate::Result<usize> {
     const QUALITY: f64 = 0.002;
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
@@ -354,11 +362,15 @@ fn refine_generated_faces(
         let selected = m.tri_verts.chunks_exact(3).enumerate().find_map(|(index,t)| {
             let vertices = [t[0],t[1],t[2]];
             if m.face_id[index] != generated_material { return None; }
-            let too_long = maximum_span.is_finite() && (0..3).any(|edge| {
-                let delta = sub(at(m, vertices[edge]), at(m, vertices[(edge + 1) % 3]));
-                dot(delta, delta) > maximum_span * maximum_span
-            });
-            (too_long || face(m,vertices).1 < QUALITY).then_some(vertices)
+            let points = vertices.map(|id| at(m, id));
+            let span_squared = (0..3).map(|edge| {
+                let delta = sub(points[edge], points[(edge + 1) % 3]);
+                dot(delta, delta)
+            }).fold(0., f64::max);
+            let too_short_to_split = span_squared <= minimum_span * minimum_span
+                && triangle_quality(points.map(crate::bsp_assembly::native_export_point)).1 > 0.;
+            (span_squared > maximum_span * maximum_span
+                || (!too_short_to_split && triangle_quality(points).1 < QUALITY)).then_some(vertices)
         });
         let Some(t) = selected else { return Ok(splits); };
         let initial = first_needle.get_or_insert_with(|| t.map(|id| at(m, id)));
@@ -675,6 +687,25 @@ mod tests {
         assert!(segments(17).len()>1);
         assert_eq!(segments(17),segments(29),"Distinct UV identities must share exactly the same subdivided geometric boundary");
         assert!(m.num_tri()<=7+256*2);
+    }
+
+    #[test]
+    fn short_doorway_needle_keeps_its_native_boundary_and_mapping() {
+        let points = [
+            [949.6651325310145, 137.49211140303748, -15.704373344601434],
+            [949.6638940363114, 137.49334989744364, -15.704363481684343],
+            [949.6651325310145, 137.49211140303748, -15.704370309857712],
+        ];
+        let mut mesh = MeshGL64 { num_prop: 5, tri_verts: vec![0, 1, 2], face_id: vec![15], ..Default::default() };
+        for point in points {
+            mesh.vert_properties.extend(point);
+            mesh.vert_properties.extend([point[0], point[2]]);
+        }
+        let before = mesh.vert_properties.clone();
+        assert!(face(&mesh, [0, 1, 2]).1 < 0.002);
+        assert_eq!(refine_entrance_lining(&mut mesh, 1, 15).unwrap(), 0);
+        assert_eq!(mesh.vert_properties, before);
+        assert_eq!(mesh.tri_verts, [0, 1, 2]);
     }
 
     #[test]

@@ -403,9 +403,11 @@ impl Ribbon {
         let bottom=|p:V|if sky.is_some(){p}else{[p[0],p[1],p[2]-ROAD_FILL_DEPTH]};
         let (left,right)=(*columns.start(),*columns.end());
         let last=self.rows.len()-1;
+        let atlas_landing = sky.is_some()
+            && plan.terrain_seam.as_ref().is_some_and(|seam| seam.bearing_degrees.is_some());
         let vertex=|row:usize,column:usize| {
             let mut point=self.rows[row][column];
-            if graded && (row==0 || row==last) {
+            if (graded || atlas_landing) && (row==0 || row==last) {
                 // Terminate the cut in stock air and the fill below the stock floor.
                 point[2]+=if sky.is_some(){0.05}else{-0.05};
             } else if graded && sky.is_some() {
@@ -528,6 +530,17 @@ mod tests{
             shoulder_width:8., bank_height:0., base_shader_path:"fixture/a".into(), donor_shader_path:"fixture/b".into(),
             bearing_degrees:Some(0.), grade_road:true,
         });
+        let mut atlas_plan = graded_plan.clone();
+        atlas_plan.terrain_seam.as_mut().unwrap().grade_road = false;
+        let native = ribbon.solid(&atlas_plan, [0, 1], 2).unwrap().get_mesh_gl64(-1);
+        let road_height = |x| native.vert_properties.chunks_exact(5)
+            .filter(|vertex| vertex[0] == x && vertex[1] == 0.)
+            .map(|vertex| vertex[2])
+            .min_by(f64::total_cmp)
+            .unwrap();
+        assert!((road_height(0.) - 0.05).abs() < 1e-9);
+        assert!((road_height(32.) - 0.05).abs() < 1e-9);
+        assert!(road_height(4.).abs() < 1e-9);
         let graded_mesh=ribbon.road_support(&graded_plan,[0,1]).unwrap().get_mesh_gl64(-1);
         let uv=|id:u64|&graded_mesh.vert_properties[id as usize*5+3..id as usize*5+5];
         assert!(graded_mesh.tri_verts.chunks_exact(3).all(|ids| {

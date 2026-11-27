@@ -70,6 +70,8 @@ interface AssemblySourcePreflight {
   lightingRisks: number;
   examples: AssemblySourceIssue[];
   lightingExamples: AssemblySourceIssue[];
+  facingRisks?: number;
+  facingExamples?: AssemblySourceIssue[];
 }
 
 export interface AssemblyReport {
@@ -243,6 +245,35 @@ export function makeThreeRouteSeam(plan:BspAssembly):BspAssembly {
   const next=addHighGroundRoute(addInfantryTunnel(plan));
   return {...next,tunnelWidth:Math.max(6,next.tunnelWidth),tunnelHeight:Math.max(4,next.tunnelHeight)};
 }
+export type AssemblyRouteKey = 'primary' | 'infantry' | 'highGround' | `section:${string}`;
+
+export function assemblyVehicleGrade(plan: BspAssembly | null): boolean {
+  return !!plan && (!!plan.openRoad || plan.tunnelWidth >= 6 && plan.tunnelHeight >= 4);
+}
+
+export function assemblyRouteIssuePoint(error: string): Vec3 | null {
+  const coordinate = /\bnear\s*\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i.exec(error);
+  if (!coordinate) return null;
+  const point = coordinate.slice(1,4).map(Number);
+  return point.every(value => Number.isFinite(value) && Math.abs(value) <= 2048) ? point as Vec3 : null;
+}
+
+export function assemblyRoutePoints(plan: BspAssembly, route: AssemblyRouteKey): Vec3[] | undefined {
+  if (route === 'primary') return plan.tunnelPoints;
+  if (route === 'infantry') return plan.infantryTunnel?.points;
+  if (route === 'highGround') return plan.highGround?.points;
+  return plan.sections?.find(section => `section:${section.id}` === route)?.points;
+}
+
+export function editAssemblyRoutePoints(plan: BspAssembly, route: AssemblyRouteKey, points: Vec3[]): BspAssembly {
+  if (points.length < 2 || points.length > 16 || !assemblyRoutePoints(plan, route)
+      || points.some(point => point.some(axis => !Number.isFinite(axis) || Math.abs(axis) > 2048))) return plan;
+  if (route === 'primary') return {...plan, tunnelPoints: points};
+  if (route === 'infantry' && plan.infantryTunnel) return {...plan, infantryTunnel: {...plan.infantryTunnel, points}};
+  if (route === 'highGround' && plan.highGround) return {...plan, highGround: {...plan.highGround, points}};
+  return {...plan, sections: plan.sections?.map(section => `section:${section.id}` === route ? {...section, points} : section)};
+}
+
 export function assemblyRoutes(plan:BspAssembly){
   return [{id:'primary',label:'Primary connection',points:plan.tunnelPoints,width:plan.tunnelWidth,height:plan.tunnelHeight},
     ...(plan.infantryTunnel?[{id:'infantry',label:'Infantry tunnel',...plan.infantryTunnel}]:[]),

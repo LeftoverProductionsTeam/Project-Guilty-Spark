@@ -4187,6 +4187,40 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
  await (await constructionControl(page,'button','Pick edge in this BSP')).click();await expect(page.getByRole('button',{name:'Cancel edge selection',exact:true}).first()).toBeVisible();
 });
 
+test('construction route handles drive the same draft, preview and undo transaction', async ({page}) => {
+  await mockDesktop(page); await openFixture(page);
+  await chooseTool(page,'Level editor'); await openDrawer(page,'Construction');
+  const panel = page.getByRole('region',{name:'Construction panel',exact:true});
+  const summary=panel.locator('.bsp-assembly > summary'); await revealPagedControl(summary); await summary.click();
+  await (await constructionControl(page,'button','Plan connected tunnel')).click();
+  await (await constructionControl(page,'button','Add bend before imported floor')).click();
+  await (await constructionControl(page,'button','Drag route points')).click();
+  await (await constructionControl(page,'button','Select destination floor')).click();
+  const canvas=page.locator('canvas[data-gs-gizmo]:visible');
+  await expect.poll(()=>canvas.count()).toBe(1);
+  const g=await canvas.evaluate(node=>{
+    const rect=node.getBoundingClientRect(), gizmo=JSON.parse((node as HTMLElement).dataset.gsGizmo!);
+    const x=gizmo.handles.X[0], y=gizmo.handles.X[1];
+    return {origin:gizmo.objectWorldOrigin,x:rect.x+(x+1)*rect.width/2,y:rect.y+(1-y)*rect.height/2,
+      dx:(x-gizmo.origin[0])*rect.width/2,dy:-(y-gizmo.origin[1])*rect.height/2};
+  });
+  const length=Math.hypot(g.dx,g.dy); expect(length).toBeGreaterThan(1);
+  await page.mouse.move(g.x,g.y); await page.mouse.down();
+  await page.mouse.move(g.x+g.dx/length*36,g.y+g.dy/length*36,{steps:10}); await page.mouse.up();
+  await (await constructionControl(page,'button','Preview draft & triangles')).click();
+  const preview=()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='preview_bsp_assembly').at(-1)?.args.draft?.tunnelPoints);
+  await expect.poll(async()=>(await preview())?.length).toBe(3);
+  const points=await preview(); expect(points[0][0]).not.toBe(g.origin[0]);
+  expect(points[0].slice(1)).toEqual(g.origin.slice(1));
+  await (await constructionControl(page,'button','Move neighboring BSP')).click();
+  await expect.poll(()=>canvas.getAttribute('data-gs-gizmo').then(value=>value?JSON.parse(value).objectWorldOrigin:null)).toEqual(points.at(-1));
+  await (await constructionControl(page,'button','Hide BSP handle')).click();
+  await (await constructionControl(page,'button','Apply connection')).click(); await page.keyboard.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelPoints)).toEqual(points);
+  await page.keyboard.press('Control+z');
+  await expect(panel.getByRole('button',{name:'Remove connection',exact:true,includeHidden:true})).toHaveCount(0);
+});
+
 test('Chupathingy Live Rebuild saves before building and never retargets another map',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{
