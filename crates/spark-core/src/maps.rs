@@ -2020,7 +2020,7 @@ fn placements(
     }
     Ok(rows)
 }
-#[derive(Clone,Debug)]
+#[derive(Clone,Copy,Debug)]
 pub(crate) struct CollisionFace { pub shader:Option<u32>,pub flags:u8,pub normal:[f32;3] }
 // Collision surfaces can be concave. A fan creates overlapping source faces;
 // use a bounded planar ear clipping pass when recovering editable geometry.
@@ -2470,20 +2470,33 @@ pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(Me
 pub(crate) fn collision_shell_source(path: &Path, inspection: &MapInspection) -> Result<(MeshData, Vec<CollisionFace>)> {
     read_collision_source(path, inspection, true)
 }
+/// Keep paired stock climbable sheets separate from the closed Boolean input.
+pub(crate) fn entrance_collision_source(
+    path: &Path, inspection: &MapInspection, slot: usize,
+) -> Result<(MeshData, Vec<CollisionFace>, CollisionSheets)> {
+    let (header, bytes, hash) = read_cache_snapshot(path)?;
+    if hash != inspection.sha256 { return invalid("BSP source changed after inspection"); }
+    let mut sheets = Vec::new();
+    let (mesh, faces) = collision_snapshot_recover(&header, &bytes, inspection, true, Some((slot, &mut sheets)))?;
+    Ok((mesh, faces, sheets))
+}
+
+type CollisionSheets = Vec<([u32; 3], CollisionFace)>;
+
 fn read_collision_source(path: &Path, inspection: &MapInspection, include_shell_faces: bool) -> Result<(MeshData, Vec<CollisionFace>)> {
     let (header, bytes, hash) = read_cache_snapshot(path)?;
     if hash != inspection.sha256 { return invalid("BSP source changed after inspection"); }
-    collision_snapshot_recover(&header, &bytes, inspection, include_shell_faces)
+    collision_snapshot_recover(&header, &bytes, inspection, include_shell_faces, None)
 }
 pub(crate) fn collision_snapshot(header:&MapHeader,bytes:&[u8],inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
-    collision_snapshot_recover(header, bytes, inspection, false)
+    collision_snapshot_recover(header, bytes, inspection, false, None)
 }
-fn collision_snapshot_recover(header:&MapHeader,bytes:&[u8],inspection:&MapInspection,include_shell_faces:bool)->Result<(MeshData,Vec<CollisionFace>)>{
+fn collision_snapshot_recover(header:&MapHeader,bytes:&[u8],inspection:&MapInspection,include_shell_faces:bool,sheets:Option<(usize,&mut CollisionSheets)>)->Result<(MeshData,Vec<CollisionFace>)>{
     let r=Reader(&bytes);let start=header.tag_offset as usize;let array=r.u32(start)?;
     let address=match header.version{5=>0x803a6000,6=>0x4bf10000,13=>array.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC index".into()))?,_=>0x40440000};
     let space=Space{begin:start,end:start+header.tag_size as usize,address};
     let sc=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;
-    let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces),include_shell_faces)?;Ok((mesh,faces))
+    let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces),include_shell_faces,sheets)?;Ok((mesh,faces))
 }
 /// Read the scenery entry's authored native BSP membership bitset from the
 /// cache. Collision-derived membership of the same point is a separate check.
@@ -2534,9 +2547,9 @@ pub(crate) fn verify_mcc_bsp_render_coverage(path: &Path, inspection: &MapInspec
 
 pub(crate) fn render_bsp_source(path:&Path,inspection:&MapInspection,index:usize)->Result<MeshData>{let(header,bytes,hash)=read_cache_snapshot(path)?;if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;crate::render::bsp_render_geometry_selected(&bytes,&header,scenario,Some(index))}
 fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<MeshData> {
-    collision_mesh_record(r,space,sc,tags,None,false)
+    collision_mesh_record(r,space,sc,tags,None,false,None)
 }
-fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut records:Option<&mut Vec<CollisionFace>>,include_shell_faces:bool) -> Result<MeshData> {
+fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut records:Option<&mut Vec<CollisionFace>>,include_shell_faces:bool,mut sheets:Option<(usize,&mut CollisionSheets)>) -> Result<MeshData> {
     let (bsps, count) = space.block(r, sc + 0x5a4, 32, 16)?;
     let mut mesh = MeshData {
         label: "Imported BSP collision geometry".into(),
@@ -2567,6 +2580,7 @@ fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut 
             let(planes,plane_count)=if records.is_some(){bsp_space.block(r,root+0xc,16,262144)?}else{(0,0)};
             let (surfaces, sn) = bsp_space.block(r, root + 0x3c, 12, 131072)?;
             let mut active=if records.is_some(){Some(source_active_surfaces(r,&bsp_space,root,sn)?)}else{None};
+            let native_active = active.as_ref().filter(|_| sheets.as_ref().is_some_and(|(slot, _)| *slot == i)).cloned();
             let (edges, en) = bsp_space.block(r, root + 0x48, 24, 262144)?;
             if let Some(active) = active.as_mut().filter(|_| include_shell_faces) {
                 include_connected_shell_faces(r, edges, en, active)?;
@@ -2580,6 +2594,7 @@ fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut 
                 mesh.positions
                     .extend_from_slice(&vec3(r, vertices + v * 16)?);
             }
+            let mut climbable = std::collections::BTreeMap::<_, Vec<_>>::new();
             for s in 0..sn {
                 if active.as_ref().is_some_and(|used|!used[s]){continue;}
                 let first = r.u32(surfaces + s * 12 + 4)? as usize;
@@ -2607,14 +2622,74 @@ fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut 
                 if edge != first {
                     return invalid("Collision surface did not form a bounded closed polygon");
                 }
-                let triangles=if records.is_some(){source_polygon_triangles(&poly,&mesh.positions)?}else{(1..poly.len().saturating_sub(1)).map(|v|[poly[0],poly[v],poly[v+1]]).collect()};
-                for triangle in triangles {
-                    mesh.indices.extend_from_slice(&triangle);
-                    if let Some(rows)=records.as_deref_mut(){let material=r.u16(surfaces+s*12+10)?;let shader=if material==u16::MAX{None}else{Some(*material_ids.get(material as usize).ok_or_else(||SparkError::Invalid("BSP collision material index is invalid".into()))?)};let plane=r.u32(surfaces+s*12)?;let index=(plane&0x7fffffff) as usize;if index>=plane_count{return invalid("BSP collision surface plane is invalid");}let mut normal=vec3(r,planes+index*16)?;if plane&0x80000000!=0{normal=normal.map(|v|-v);}rows.push(CollisionFace{shader,flags:r.bytes(surfaces+s*12+8,1)?[0],normal});}
+                let Some(rows) = records.as_deref_mut() else {
+                    for v in 1..poly.len().saturating_sub(1) {
+                        mesh.indices.extend([poly[0], poly[v], poly[v + 1]]);
+                    }
+                    if mesh.indices.len() > 3000000 {
+                        return invalid("Collision mesh triangle limit exceeded");
+                    }
+                    continue;
+                };
+                let at = surfaces + s * 12;
+                let material = r.u16(at + 10)?;
+                let shader = if material == u16::MAX {
+                    None
+                } else {
+                    Some(*material_ids.get(material as usize)
+                        .ok_or_else(|| SparkError::Invalid("BSP collision material index is invalid".into()))?)
+                };
+                let plane = r.u32(at)?;
+                let plane_index = (plane & 0x7fffffff) as usize;
+                if plane_index >= plane_count {
+                    return invalid("BSP collision surface plane is invalid");
+                }
+                let mut normal = vec3(r, planes + plane_index * 16)?;
+                if plane & 0x80000000 != 0 {
+                    normal = normal.map(|coordinate| -coordinate);
+                }
+                let flags = r.bytes(at + 8, 1)?[0];
+                let face = CollisionFace { shader, flags, normal };
+                let triangles = source_polygon_triangles(&poly, &mesh.positions)?;
+                if flags & 5 == 5 && native_active.as_ref().is_some_and(|used| used[s]) {
+                    // Opposing native polygons can use distinct vertex records
+                    // and triangulation diagonals. Match before comparing triangles.
+                    let mut points = poly.iter().map(|&vertex| {
+                        std::array::from_fn::<_, 3, _>(|axis| {
+                            let value = mesh.positions[vertex as usize * 3 + axis];
+                            if value == 0. { 0 } else { value.to_bits() }
+                        })
+                    }).collect::<Vec<_>>();
+                    points.sort_unstable();
+                    climbable.entry((shader, flags, points)).or_default().push((triangles, face));
+                } else {
+                    for triangle in triangles {
+                        mesh.indices.extend(triangle);
+                        rows.push(face);
+                    }
                 }
                 if mesh.indices.len() > 3000000 {
                     return invalid("Collision mesh triangle limit exceeded");
                 }
+            }
+            for mut faces in climbable.into_values() {
+                let opposing = faces.len() == 2 && faces[0].1.normal.iter().zip(faces[1].1.normal)
+                    .map(|(a, b)| a * b).sum::<f32>() < -0.999;
+                if opposing {
+                    let (triangles, face) = faces.swap_remove(0);
+                    let (_, sheets) = sheets.as_mut().unwrap();
+                    sheets.extend(triangles.into_iter().map(|triangle| (triangle, face)));
+                } else if let Some(rows) = records.as_deref_mut() {
+                    for (triangles, face) in faces {
+                        for triangle in triangles {
+                            mesh.indices.extend(triangle);
+                            rows.push(face);
+                        }
+                    }
+                }
+            }
+            if mesh.indices.len() + sheets.as_ref().map_or(0, |(_, sheets)| sheets.len() * 3) > 3000000 {
+                return invalid("Collision mesh triangle limit exceeded");
             }
         }
         let tag_id = r.u32(row + 28)?;

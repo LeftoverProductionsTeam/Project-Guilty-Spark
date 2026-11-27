@@ -3125,7 +3125,7 @@ fn rebuild_entrance_source(
     let width = f64::from(plan.tunnel_width) + 0.08;
     let height = f64::from(plan.tunnel_height) + 0.08;
     let side = mul([-forward[1], forward[0], 0.], width / 2.);
-    let (shell, faces) = maps::collision_shell_source(path, base)?;
+    let (shell, faces, climbable_sheets) = maps::entrance_collision_source(path, base, index)?;
     let mut materials = Vec::new();
     let mut projected_faces = 0;
     let source = source_solid(base, &shell, &faces, index, cut.source, cut.translation, 0., None, &mut materials, &mut projected_faces)?;
@@ -3258,6 +3258,14 @@ fn rebuild_entrance_source(
     }
     seam_sections::append_native_seals_for_source(&cut.repair.seals, cut.source, &mut collision, &mut materials, &mut slots)
         .map_err(|error| SparkError::Invalid(format!("{} entrance: {error}", if cut.source == 0 { "Parent" } else { "Donor" })))?;
+    let mut planes = enclosed_passage_planes(&brush_path, width, height)?;
+    if let Some(path) = fill_path {
+        planes.extend(enclosed_passage_planes(&path, fill_width, fill_height)?);
+    }
+    if let Some((floor, depth)) = ramp_support {
+        planes.extend(enclosed_passage_planes(&floor, width + 0.008, depth)?);
+    }
+    append_climbable_sheets(base, &cut, &shell, &climbable_sheets, &planes, &mut collision, &mut materials, &mut slots)?;
     let label = shell.parts[index].name.clone();
     let part = |count| maps::MeshPart { name: label.clone(), index_start: 0, index_count: count };
     collision.parts.push(part(collision.indices.len()));
@@ -3286,13 +3294,6 @@ fn rebuild_entrance_source(
     let mut render_slots = Vec::new();
     let omitted = append_render_faces(&gl, &materials, &mut render, &mut render_slots, None)?;
     let lining_triangles = render_slots.len();
-    let mut planes = enclosed_passage_planes(&brush_path, width, height)?;
-    if let Some(path) = fill_path {
-        planes.extend(enclosed_passage_planes(&path, fill_width, fill_height)?);
-    }
-    if let Some((floor, depth)) = ramp_support {
-        planes.extend(enclosed_passage_planes(&floor, width + 0.008, depth)?);
-    }
     append_stock_render(base, index, cut.source, cut.translation, 0., &mut render, &mut materials, &mut render_slots, &planes, true)?;
     render.parts.push(part(render.indices.len()));
     let mut mesh = collision.clone();
@@ -3345,6 +3346,60 @@ fn rebuild_entrance_source(
     };
     geometry.source_preflight()?.require_buildable()?;
     Ok(EntranceSource { geometry, collision, open_collision, render })
+}
+
+
+fn append_climbable_sheets(
+    inspection: &MapInspection, cut: &EntranceCut<'_>, shell: &MeshData,
+    sheets: &[([u32; 3], CollisionFace)], exclusions: &[PassagePlanes],
+    mesh: &mut MeshData, materials: &mut Vec<AssemblyMaterial>, slots: &mut Vec<usize>,
+) -> Result<()> {
+    let mut material_slots = BTreeMap::new();
+    for &(ids, face) in sheets {
+        let tag = face.shader.and_then(|id| inspection.tags.iter().find(|tag| tag.id == id))
+            .ok_or_else(|| SparkError::Invalid("A climbable collision sheet needs its original shader".into()))?;
+        let mut triangle = ids.map(|id| add(vertex(shell, id), cut.translation));
+        for point in triangle {
+            validate_native_bsp_point(point)?;
+        }
+        let facing = face.normal.map(f64::from);
+        if dot(triangle_area_normal(triangle), facing) < 0. {
+            triangle.swap(1, 2);
+        }
+        for polygon in exclude_passage_volume(triangle, exclusions) {
+            let anchor = crate::bsp_triangulate::clipped_render_fan(&polygon);
+            for corner in 1..polygon.len() - 1 {
+                let triangle = [0, corner, corner + 1].map(|i| polygon[(anchor + i) % polygon.len()]);
+                if !clipped_stock_face_survives(triangle, facing) {
+                    continue;
+                }
+                if slots.len() == MAX_OUTPUT_TRIANGLES {
+                    return invalid("Preserving climbable collision would exceed the BSP output triangle budget");
+                }
+                let slot = *material_slots.entry((tag.id, face.flags)).or_insert_with(|| {
+                    let slot = materials.len();
+                    materials.push(AssemblyMaterial {
+                        name: format!("gsclimb{}m{}x", &inspection.sha256[..8], slot),
+                        source: cut.source,
+                        shader_path: Some(tag.path.clone()),
+                        shader_class: Some(tag.class.clone()),
+                        flags: face.flags,
+                        collision_only: true,
+                    });
+                    slot
+                });
+                let first = (mesh.positions.len() / 3) as u32;
+                for point in triangle {
+                    mesh.positions.extend(point.map(|v| v as f32));
+                    mesh.normals.extend(facing.map(|v| v as f32));
+                    mesh.uvs.extend([0., 0.]);
+                }
+                mesh.indices.extend([first, first + 1, first + 2]);
+                slots.push(slot);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The end wall closes an independently compiled entrance BSP behind its native switch.
