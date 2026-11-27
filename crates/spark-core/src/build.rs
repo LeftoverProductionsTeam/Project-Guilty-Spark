@@ -600,6 +600,11 @@ impl Runner<'_> {
         } else {None};
         #[cfg(windows)]
         let args=extraction_args.as_deref().unwrap_or(args);
+        #[cfg(windows)]
+        let physical_cwd = executable.file_name().is_some_and(|name| name.eq_ignore_ascii_case("invader-refactor.exe"))
+            .then(|| crate::native_workspace::short_physical_directory(cwd)).flatten();
+        #[cfg(windows)]
+        let cwd = physical_cwd.as_deref().unwrap_or(cwd);
         let mut child = cmd
             .args(args)
             .current_dir(cwd)

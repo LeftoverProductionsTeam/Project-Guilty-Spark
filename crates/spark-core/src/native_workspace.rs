@@ -27,6 +27,26 @@ pub(crate) fn extraction_arguments(args: &[String], workspace: &std::path::Path,
     }).collect()
 }
 
+/// Request an existing filesystem short name. This never creates path aliases
+/// or changes the DOS device table. Only use a verified spelling of the same directory.
+#[cfg(windows)]
+pub(crate) fn short_physical_directory(workspace: &std::path::Path) -> Option<std::path::PathBuf> {
+    use std::{ffi::OsString, os::windows::ffi::{OsStrExt, OsStringExt}, path::PathBuf};
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetShortPathNameW(input: *const u16, output: *mut u16, capacity: u32) -> u32;
+    }
+    let original = workspace.canonicalize().ok()?;
+    let input = workspace.as_os_str().encode_wide().chain(Some(0)).collect::<Vec<_>>();
+    let mut buffer = vec![0; 32768];
+    let count = unsafe { GetShortPathNameW(input.as_ptr(), buffer.as_mut_ptr(), buffer.len() as u32) } as usize;
+    if count == 0 || count >= buffer.len() || count + 1 >= input.len() {
+        return None;
+    }
+    let candidate = PathBuf::from(OsString::from_wide(&buffer[..count]));
+    (candidate.is_absolute() && candidate.canonicalize().ok().as_ref() == Some(&original)).then_some(candidate)
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;

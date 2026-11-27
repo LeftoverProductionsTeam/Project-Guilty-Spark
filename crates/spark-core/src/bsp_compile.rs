@@ -74,16 +74,40 @@ fn recover_missing_roots(source:&Path,recovered:&Path,bsp:&str,scenery:&[crate::
     crate::tag_exchange::verify_source_snapshot(cache,Some(resources))?;
     crate::native_resources::review(cache,inspection,resources)?;
     let extract=find_tool(tools,"invader-extract")?;
-    for root in missing {
-        let normalized=root.replace('\\',"/");
-        let known=inspection.tags.iter().filter(|tag|{
-            let ext=match tag.class.as_str(){"sbsp"=>"scenario_structure_bsp","scen"=>"scenery",_=>return false};
-            format!("{}.{}",tag.path.replace('\\',"/"),ext).eq_ignore_ascii_case(&normalized)
-        }).count();
-        if known!=1{return invalid(format!("Requested missing donor tag is not indexed by the exact source map: {root}"));}
-        if recovered.join(safe_relative(&normalized)?).is_file(){continue;}
-        runner.run(&extract,&["-m".into(),resources.to_string_lossy().into_owned(),"-s".into(),root,"-r".into(),"-t".into(),recovered.to_string_lossy().into_owned(),cache.preserved_path.to_string_lossy().into_owned()],workspace,"extract",38)?;
+    let mut indexed = BTreeMap::<String, usize>::new();
+    for tag in &inspection.tags {
+        let ext = match tag.class.as_str() {
+            "sbsp" => "scenario_structure_bsp",
+            "scen" => "scenery",
+            _ => continue,
+        };
+        let path = format!("{}.{ext}", tag.path.replace('\\', "/")).to_ascii_lowercase();
+        *indexed.entry(path).or_default() += 1;
+    }
+    for root in &missing {
+        let key = root.replace('\\', "/").to_ascii_lowercase();
+        if indexed.get(&key) != Some(&1) {
+            return invalid(format!("Requested missing donor tag is not indexed by the exact source map: {root}"));
+        }
+    }
+    // Invader accepts repeated -s patterns and resolves their dependency closure
+    // in one pass. Bound each invocation's argument length for Windows.
+    for batch in missing.chunks(24) {
+        let mut args = vec!["-m".into(), resources.to_string_lossy().into_owned(), "-r".into(),
+            "-t".into(), recovered.to_string_lossy().into_owned()];
+        for root in batch {
+            let relative = safe_relative(root)?;
+            if !recovered.join(relative).is_file() {
+                args.extend(["-s".into(), root.clone()]);
+            }
+        }
+        if args.len() == 5 { continue; }
+        args.push(cache.preserved_path.to_string_lossy().into_owned());
+        runner.run(&extract, &args, workspace, "extract", 38)?;
         crate::tag_exchange::inventory(recovered)?;
+        for root in batch {
+            dependency_input(source, recovered, root)?;
+        }
     }
     crate::tag_exchange::verify_source_snapshot(cache,Some(resources))?;
     let(files,bytes)=crate::tag_exchange::inventory(recovered)?;
