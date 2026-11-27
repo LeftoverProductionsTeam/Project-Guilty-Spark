@@ -1057,7 +1057,10 @@ try{
       }
       expect(receipt.shapeDraft).toMatchObject({id:saved.id,vehicleMount:saved.vehicleMount});
       if(process.env.SPARK_WARTHOG_APP_BUILD!=='1')expect(receipt.shapeDraft.savedProjectSha256).toBe(projectSha256);
-      expect(receipt.mountCentimeters).toEqual(saved.vehicleMount.position.map(value=>value*100));
+      expect(receipt.mountCentimeters).toHaveLength(3);
+      for (const [axis, position] of saved.vehicleMount.position.entries()) {
+        expect(receipt.mountCentimeters[axis]).toBeCloseTo(position * 100, 9);
+      }
       expect(receipt.bladeDimensions).toEqual(dimensions);
       expect(receipt.curl).toBe(saved.curl);
       expect(receipt.sweep).toBe(saved.sweep);
