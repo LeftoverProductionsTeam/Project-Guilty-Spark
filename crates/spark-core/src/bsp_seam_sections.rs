@@ -9,6 +9,23 @@ pub(super) fn append_native_seals(
     materials: &mut Vec<AssemblyMaterial>,
     slots: &mut Vec<usize>,
 ) -> Result<()> {
+    append_native_seals_for_source(seals, 1, mesh, materials, slots)
+}
+
+pub(super) fn append_native_seals_for_source(
+    seals: &[NativeSeal],
+    source: usize,
+    mesh: &mut MeshData,
+    materials: &mut Vec<AssemblyMaterial>,
+    slots: &mut Vec<usize>,
+) -> Result<()> {
+    if seals.len() > 8 || seals.iter().any(|seal| {
+        let vertices = seal.vertices();
+        !matches!(vertices.len(), 3 | 4) || vertices.iter().flatten().any(|axis| !axis.is_finite() || axis.abs() > 2048.)
+            || matches!(seal, NativeSeal::Raised { lift, .. } if !(0.002..=0.25).contains(&lift.abs()))
+    }) {
+        return invalid("Use up to eight reviewed three- or four-point native seam closures");
+    }
     if seals.is_empty() {
         return Ok(());
     }
@@ -28,7 +45,7 @@ pub(super) fn append_native_seals(
 
     for (index, seal) in seals.iter().enumerate() {
         let missing = || SparkError::Invalid(format!(
-            "Native seal {} must follow an exact open Tool boundary beside a two-sided donor face",
+            "Native seal {} must follow an exact open Tool boundary beside a two-sided face in the selected source",
             index + 1,
         ));
         let boundary = seal.vertices();
@@ -52,7 +69,7 @@ pub(super) fn append_native_seals(
                         continue;
                     }
                     if material.flags & 1 != 0 {
-                        if material.source == 1 {
+                        if material.source == source {
                             two_sided += 1;
                         }
                     } else {
