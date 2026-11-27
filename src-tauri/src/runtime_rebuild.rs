@@ -28,6 +28,7 @@ pub(crate) struct View {
     runtime_id: runtime::RuntimeId,
     staged_map: String,
     startup_map:Option<String>,
+    vehicle_test: bool,
     required_native_features:Vec<String>,
     engine_sha256: std::collections::BTreeMap<String,String>,
     project_id: String,
@@ -148,6 +149,29 @@ fn checked_build_for(state: &AppState, project: &Project, build_id: Option<&str>
     let extraction=requirements.is_some();
     Ok((build,extraction,requirements.unwrap_or_default()))
 }
+const VEHICLE_TEST_MAP: &str = "spark_vehicle_playtest";
+
+fn checked_vehicle_build(state: &AppState, project: &Project, build_id: &str) -> Reply<BuildRecord> {
+    let build = verified_build(state, project, build_id)?;
+    if build.target != "mcc-cea" || !project.shape_draft.as_ref().is_some_and(|draft| draft.vehicle_mount.is_some()) {
+        return Err("Build the saved vehicle attachment before starting this playtest".into());
+    }
+    let receipt: serde_json::Value = serde_json::from_slice(&bounded_read(
+        &state.root.join("jobs").join(build_id).join("vehicle-attachment.json"), 1024 * 1024,
+    )?).map_err(error)?;
+    let output = build.output.as_ref().ok_or("Missing vehicle attachment output")?;
+    let inspection = maps::inspect_map(output, None).map_err(error)?;
+    if inspection.header.version != 13 || inspection.header.scenario_type != 1 || inspection.header.extended
+        || inspection.resources.iter().any(|resource| resource.required) || inspection.tags.iter().any(|tag| tag.external)
+        || build.sha256.as_deref() != Some(inspection.sha256.as_str())
+        || receipt["privateMap"]["sha256"].as_str() != Some(inspection.sha256.as_str())
+        || receipt["privateMap"]["vehicleReferencesVerified"].as_bool() != Some(true)
+    {
+        return Err("This playtest needs the verified, self-contained MCC multiplayer attachment build".into());
+    }
+    Ok(build)
+}
+
 fn copy_pin(source: &Path, target: &Path, expected: &str, total: &mut u64) -> Reply<()> {
     copy_pin_bounded(source,target,expected,total,COPY_LIMIT)
 }
@@ -195,14 +219,19 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     let library_sha=core::hex_bytes(sha2::Sha256::digest(&bytes));drop(bytes);
     let output=build.output.as_ref().ok_or("Build output is missing")?;
     let header=maps::inspect_header(output).map_err(error)?;
-    if header.version!=609 || header.scenario_type!=0{return Err("Forerunner authored playtests require validated standard CE solo output".into());}
+    let vehicle_test = build.target == "mcc-cea" && header.version == 13 && header.scenario_type == 1;
+    if !vehicle_test && (header.version != 609 || header.scenario_type != 0) {
+        return Err("Forerunner needs a validated CE solo or MCC multiplayer vehicle build".into());
+    }
+    let map = if vehicle_test { VEHICLE_TEST_MAP.into() } else { header.name.clone() };
+    let startup = if vehicle_test { None } else { runtime::forerunner_registration_startup_selector(reg, executable_sha, &map).map_err(error)? };
     let root=state.root.join("runtime-playtests").join(uuid::Uuid::new_v4().to_string());
     let store=core::storage::Store::for_output(&root).map_err(error)?;
-    let lease=store.reserve(&root,Some(&installed.data_root),RESERVATION,core::storage::Category::Staging,"Bounded Forerunner authored solo playtest").map_err(error)?;
+    let lease=store.reserve(&root,Some(&installed.data_root),RESERVATION,core::storage::Category::Staging,"Bounded Forerunner authored playtest").map_err(error)?;
     fs::create_dir_all(&root).map_err(error)?;lease.mark_owned().map_err(error)?;
     let budget=store.tool_budget(&root).map_err(error)?.ok_or("Missing playtest storage owner")?;
     let name=executable.file_name().and_then(|n|n.to_str()).ok_or("Invalid Forerunner executable name")?.to_owned();
-    let mut result=Stage{forerunner_startup:runtime::forerunner_registration_startup_selector(reg,executable_sha,&header.name).map_err(error)?,forerunner_extraction:false,root,lease:Some(lease),budget,build:build.clone(),map:header.name.clone(),ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
+    let mut result=Stage{forerunner_startup:startup,forerunner_extraction:false,root,lease:Some(lease),budget,build:build.clone(),map,ce_resource_sha256:Default::default(),executable_name:name.clone(),staged_sha256:Default::default()};
     prepare_runtime_roots(&result.root)?;let mut total=0;
     for(source,relative,sha)in[(executable.to_path_buf(),format!("engine/{name}"),executable_sha.to_owned()),(library,"engine/SDL3.dll".into(),library_sha)]{
         copy_pin(&source,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
@@ -214,8 +243,15 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
         let sha=maps::hash_file(&ui).map_err(error)?;let relative=format!("data/maps/{name}");
         copy_pin(&ui,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
     }
-    let relative=format!("data/maps_ce/{}.map",header.name);let sha=build.sha256.clone().ok_or("Build has no SHA-256")?;
-    copy_pin(output,&result.root.join(&relative),&sha,&mut total)?;result.staged_sha256.insert(relative,sha);
+    let directory = if vehicle_test { "mcc_maps" } else { "maps_ce" };
+    let relative = format!("data/{directory}/{}.map", result.map);
+    let sha = build.sha256.clone().ok_or("Build has no SHA-256")?;
+    copy_pin(output, &result.root.join(&relative), &sha, &mut total)?;
+    result.staged_sha256.insert(relative, sha);
+    if vehicle_test {
+        result.budget.check().map_err(error)?;
+        return Ok(result);
+    }
     let ce=runtime_connections::ce_resource_source(state)?;
     for name in ["bitmaps.map","sounds.map","loc.map"]{total=total.checked_add(fs::metadata(ce.join("maps").join(name)).map_err(error)?.len()).ok_or("Playtest resource size overflow")?;}
     if total>COPY_LIMIT{return Err("Private playtest inputs exceed 512 MiB; no original resource was changed".into());}
@@ -243,10 +279,18 @@ fn forerunner_command(state:&AppState,reg:&runtime::RuntimeRegistration,stage:&S
     // only this staged cache; no debug/test startup is inherited.
     for(key,value)in[("HALO_NET_ONLINE","false"),("HALO_NET_PUBLIC_LOBBY","false"),("HALO_NET_JOIN_FROM_CLIPBOARD","never"),("HALO_NET_FIREFIGHT_ENCOUNTER","false"),("HALO_CUSTOM_EDITION","true"),("HALO_CRASH_REPORTS","no"),("HALO_DISCORD_PRESENCE","off")]{command.env(key,value);}
     if stage.forerunner_extraction&&runtime::forerunner_registration_machine(reg,&original.executable_sha256).map_err(error)?!=Some(0x8664){return Err("This older Forerunner build is not reviewed for native Extraction settlement; select the current verified x64 profile".into());}
-    let startup=runtime::forerunner_registration_startup_selector(reg,&original.executable_sha256,&stage.map).map_err(error)?;
+    let vehicle_test = stage.build.target == "mcc-cea";
+    let startup = if vehicle_test { None } else {
+        runtime::forerunner_registration_startup_selector(reg, &original.executable_sha256, &stage.map).map_err(error)?
+    };
     if startup!=stage.forerunner_startup{return Err("Forerunner startup contract changed after staging; no process was launched".into());}
     apply_forerunner_startup(&mut command,startup)?;
     command.env("HALO_EXTRACTION",if stage.forerunner_extraction{"true"}else{"false"});
+    if vehicle_test {
+        command.env("HALO_MENUS", "chupathingy")
+            .env("HALO_NET_HOST_PUBLIC", "false")
+            .env("HALO_NET_ALLOW_UPNP", "false");
+    }
     if stage.forerunner_extraction {
         // A fresh private profile can otherwise use the classic menu, which has no Extraction entry.
         command.env("HALO_MENUS", "chupathingy")
@@ -407,6 +451,13 @@ fn publish(session: &Session, run: &Running) -> Reply<()> {
     view.process_id=Some(run.process.child.id()); view.compiled_build_id=run.stage.build.id.clone(); view.compiled_sha256=run.stage.build.sha256.clone().ok_or("Missing map hash")?;
     view.ce_resource_sha256=run.stage.ce_resource_sha256.clone();
     view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
+    if view.vehicle_test {
+        view.phase = "awaitingMapSelection".into();
+        view.detail = format!("In Forerunner, choose Zombies → Host Zombie Apocalypse → {}. Create a temporary profile if prompted. Spark is waiting for your in-game check.", run.stage.map);
+        view.game_build_id = None;
+        view.game_sha256 = None;
+        return Ok(());
+    }
     if view.runtime_id==runtime::RuntimeId::OpenCe{
         return publish_forerunner(&mut view,run.stage.forerunner_startup.clone(),&run.stage.map);
     }
@@ -484,7 +535,7 @@ fn drive(app: tauri::AppHandle, owner: String, reg: runtime::RuntimeRegistration
 }
 
 #[tauri::command]
-pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::WebviewWindow, project_id: String, confirmed_restart: bool, runtime_id:Option<runtime::RuntimeId>, expected_registration:Option<runtime::RuntimeRegistration>, expected_executable_sha256:Option<String>) -> Reply<View> {
+pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::WebviewWindow, project_id: String, confirmed_restart: bool, runtime_id:Option<runtime::RuntimeId>, expected_registration:Option<runtime::RuntimeRegistration>, expected_executable_sha256:Option<String>, vehicle_build_id: Option<String>) -> Reply<View> {
     let owner=window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move||{
         if !confirmed_restart { return Err("Confirm the window-owned private playtest; stopping it disposes its temporary profile and scratch".into()); }
@@ -494,7 +545,23 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let mission_extraction=project.studio.as_ref().is_some_and(|studio|studio.missions.iter().any(|beat|beat.trigger=="forerunnerExtractionSettled"));
         if mission_extraction&&runtime_id!=runtime::RuntimeId::OpenCe{return Err("This saved mission requires Forerunner native settled extraction; another engine cannot complete its objective".into());}
-        let (build,compiled_extraction,required_native_features)=if runtime_id==runtime::RuntimeId::OpenCe{checked_build_for(&state,&project,None,0)?}else{(checked_build(&state,&project,None)?,false,vec![])};
+        let vehicle_test = vehicle_build_id.is_some();
+        let (build, compiled_extraction, required_native_features) = if let Some(id) = vehicle_build_id {
+            let sha = expected_executable_sha256.as_deref().ok_or("Inspect Forerunner before starting the vehicle playtest")?;
+            if runtime_id != runtime::RuntimeId::OpenCe || mission_extraction
+                || runtime::forerunner_registration_machine(&reg, sha).map_err(error)? != Some(0x8664) {
+                return Err("The MCC vehicle playtest needs a reviewed Windows x64 Forerunner profile".into());
+            }
+            let capability = runtime_connections::query_companion_capabilities(&reg.executable, sha)?;
+            if !capability.map_targets.iter().any(|target| target.cache_version == 13) {
+                return Err("This Forerunner build does not advertise MCC13 map support".into());
+            }
+            (checked_vehicle_build(&state, &project, &id)?, false, vec![])
+        } else if runtime_id == runtime::RuntimeId::OpenCe {
+            checked_build_for(&state, &project, None, 0)?
+        } else {
+            (checked_build(&state, &project, None)?, false, vec![])
+        };
         if !required_native_features.is_empty(){
             let sha=expected_executable_sha256.as_deref().ok_or("Inspect the required Forerunner build before starting")?;
             runtime_connections::query_companion_capabilities(&reg.executable,sha)?.require_native_features(&required_native_features).map_err(error)?;
@@ -503,7 +570,7 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         // Reserve the existing owned playtest slot before staging; retain the single Chupathingy loopback-host restriction.
         let mut workbench=lock(&state.runtime_workbench)?;
         if workbench.rebuilds.values().any(|s|s.view.lock().is_ok_and(|v|!matches!(v.phase.as_str(),"stopped"|"failed"))) { return Err("Stop the existing Live Rebuild playtest before starting another; other windows keep their own work".into()); }
-        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,required_native_features,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
+        let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,vehicle_test,required_native_features,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
         let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
@@ -565,7 +632,7 @@ pub(crate) fn runtime_rebuild_stop(state: State<AppState>, window: tauri::Webvie
 mod tests {
     use super::*;
     fn session(id: &str, project: &str) -> Arc<Session> {
-        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,required_native_features:vec![],engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
+        Arc::new(Session { view:Mutex::new(View{id:id.into(),runtime_id:runtime::RuntimeId::ChupathingyCe,staged_map:String::new(),startup_map:None,vehicle_test:false,required_native_features:vec![],engine_sha256:Default::default(),project_id:project.into(),phase:"running".into(),source_fingerprint:"synthetic".into(),compiled_build_id:"old-good-build".into(),compiled_sha256:"old-good-sha".into(),game_build_id:Some("old-good-build".into()),game_sha256:Some("old-good-sha".into()),process_id:None,pending_job_id:None,detail:String::new(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()}),pending:Mutex::new(None),stopping:AtomicBool::new(false) })
     }
     #[test]fn console_reader_retains_final_fatal_bytes_and_keeps_its_original_bound(){
         let tail=Arc::new(Mutex::new(Vec::new()));let mut bytes=vec![b'x';65536];bytes.extend_from_slice(b"\nEXCEPTION halt final native diagnostic\n");

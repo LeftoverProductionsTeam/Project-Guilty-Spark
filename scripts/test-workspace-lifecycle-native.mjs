@@ -1048,6 +1048,34 @@ try{
         const artifact=await invoke(main,'open_built_map',{projectId:entry.id,buildId:build.id});
         expect(artifact.inspection.sha256).toBe(build.sha256);
         step('Built the reviewed Warthog attachment using Spark’s normal Build button and recorded the isolated native cache');
+        if (process.env.SPARK_WARTHOG_FORERUNNER_ROOT) {
+          const rootRuntime = path.resolve(process.env.SPARK_WARTHOG_FORERUNNER_ROOT);
+          const executable = path.join(rootRuntime, 'halo.exe');
+          const expectedExecutableSha256 = crypto.createHash('sha256').update(await fs.readFile(executable)).digest('hex');
+          const registration = {id:'native-vehicle-forerunner',runtimeId:'openCe',root:rootRuntime,executable,dataRoot:rootRuntime,version:'Forerunner'};
+          await invoke(main, 'register_runtime', { registration });
+          const discovery = await invoke(main, 'inspect_companion_runtime', {registrationId:registration.id,expectedExecutableSha256});
+          await invoke(main, 'register_runtime', {registration:{...registration,reviewedCompanion:{
+            executableSha256:discovery.executableSha256,dependencySha256:discovery.dependencySha256,capabilities:discovery.capabilities,
+          }}});
+          await main.evaluate(()=>window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed')));
+          const controls = main.getByRole('region',{name:'Forerunner vehicle playtest'});
+          await controls.getByRole('button',{name:'Open private vehicle test'}).click({timeout:30000});
+          await expect.poll(async()=> (await invoke(main,'runtime_rebuild_status'))?.phase,{timeout:30000}).toBe('awaitingMapSelection');
+          const session = await invoke(main,'runtime_rebuild_status');
+          expect(session.vehicleTest).toBe(true);
+          expect(session.compiledSha256).toBe(build.sha256);
+          expect(session.gameSha256).toBeNull();
+          const stages = path.join(root,'library','runtime-playtests');
+          const [ownedStage] = await fs.readdir(stages);
+          const staged = path.join(stages,ownedStage,'data','mcc_maps',session.stagedMap+'.map');
+          expect(crypto.createHash('sha256').update(await fs.readFile(staged)).digest('hex')).toBe(build.sha256);
+          expect(await fs.stat(path.join(stages,ownedStage,'data','maps_ce')).then(()=>true,()=>false)).toBe(false);
+          await controls.getByRole('button',{name:'Stop playtest'}).click();
+          await expect.poll(async()=> (await invoke(main,'runtime_rebuild_status'))?.phase,{timeout:30000}).toBe('stopped');
+          expect(await fs.stat(path.join(stages,ownedStage)).then(()=>true,()=>false)).toBe(false);
+          step('Opened and stopped the private Forerunner test using the exact new MCC vehicle cache');
+        }
       }else{
         const {stdout}=await runOwned(process.execPath,['scripts/test-warthog-plow-native.mjs',nativeMap,nativeKit,invaderDirectory],{
           timeout:120000,maxBuffer:1024**2,windowsHide:true,env:{...process.env,
