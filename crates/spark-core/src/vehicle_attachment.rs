@@ -136,14 +136,24 @@ pub fn run(
         if receipt["mapSha256"].as_str() != Some(source.sha256.as_str())
             || receipt["shapeDraft"]["id"].as_str() != Some(draft_id.as_str())
             || receipt["shapeDraft"]["savedProjectSha256"].as_str() != Some(project_sha256.as_str())
-            || receipt["shapeDraft"]["vehicleMount"] != serde_json::to_value(&draft.vehicle_mount)?
-            || cache["sha256"].as_str() != Some(output_sha256.as_str())
+        {
+            return invalid("The attachment worker did not compile the exact saved source and draft");
+        }
+        // Node writes integral coordinates as JSON integers. Review the
+        // decoded mount so 0 and 0.0 express the same authored position.
+        let compiled_mount: Option<project::VehicleMount> = serde_json::from_value(receipt["shapeDraft"]["vehicleMount"].clone())?;
+        if compiled_mount != draft.vehicle_mount {
+            return invalid("The native receipt changed the reviewed vehicle or its mounting coordinates");
+        }
+        if cache["sha256"].as_str() != Some(output_sha256.as_str())
             || cache["crcMismatch"].as_u64() != Some(0)
             || cache["vehicleReferencesVerified"].as_bool() != Some(true)
-            || cache["scenario"].as_str() != Some(inspection.scenario_path.as_str())
             || !receipt["collision"]["warnings"].as_array().is_some_and(Vec::is_empty)
         {
-            return invalid("The compiled cache or mount differs from the reviewed source");
+            return invalid("The rebuilt attachment did not pass native cache, collision or dependency readback");
+        }
+        if !cache["scenario"].as_str().is_some_and(|scenario| scenario.eq_ignore_ascii_case(&inspection.scenario_path)) {
+            return invalid("The attachment was compiled for a different scenario");
         }
         for (file, expected) in &tools.identities {
             if maps::hash_file(file)? != *expected { return invalid("An attachment build tool changed during compilation"); }

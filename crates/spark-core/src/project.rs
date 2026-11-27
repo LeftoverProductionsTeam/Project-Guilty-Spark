@@ -15,7 +15,7 @@ use uuid::Uuid;
 pub const PROJECT_VERSION: u32 = 1;
 pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 0;
 pub const MAX_AUTOMATIC_BACKUP_RETENTION: usize = 100;
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct VehicleMount {
     pub source_sha256: String,
