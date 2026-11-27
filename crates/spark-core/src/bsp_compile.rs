@@ -507,7 +507,9 @@ fn namespace_materials(
 }
 fn append_scenery(
     rows: &[crate::bsp_scenery::Placement],
-    base: &MapInspection,
+    scenario: &str,
+    base_count: usize,
+    namespace: Option<&str>,
     edit: &Path,
     runner: &Runner,
     workspace: &Path,
@@ -516,7 +518,9 @@ fn append_scenery(
     if rows.is_empty() {
         return Ok(());
     }
-    let scenario = format!("{}.scenario", base.scenario_path);
+    if rows.iter().any(|row| row.not_placed & !0x0f != 0) {
+        return invalid("Scenery placement flags exceed the native writer scope");
+    }
     let counts = runner.run(
         edit,
         &[
@@ -526,7 +530,7 @@ fn append_scenery(
             "scenery".into(),
             "-C".into(),
             "scenery_palette".into(),
-            scenario.clone(),
+            scenario.into(),
         ],
         workspace,
         "bsp-scenery-check",
@@ -541,11 +545,9 @@ fn append_scenery(
                 .map_err(|_| SparkError::Invalid("Native scenery count was not an integer".into()))
         })
         .collect::<Result<_>>()?;
-    let base_count = base.objects.iter().filter(|o| o.kind == "Scenery").count();
     if counts.len() != 2 || counts[0] != base_count || counts[0] + rows.len() > 4096 {
         return invalid("Destination scenery count differs from its preserved source or exceeds the import budget");
     }
-    let namespace = format!("gsbsp_{}_1", &runner.id[..8]);
     let mut palette = BTreeMap::new();
     for row in rows {
         if palette.contains_key(&row.tag_path) {
@@ -555,7 +557,8 @@ fn append_scenery(
         if index > 32766 {
             return invalid("Scenery palette exceeds the signed placement-index limit");
         }
-        let reference = format!("{namespace}\\{}.scenery", row.tag_path.replace('/', "\\"));
+        let stem = row.tag_path.replace('/', "\\");
+        let reference = namespace.map_or_else(|| format!("{stem}.scenery"), |namespace| format!("{namespace}\\{stem}.scenery"));
         if !tags.join(safe_relative(&reference)?).is_file() {
             return invalid("Namespaced donor scenery dependency is missing");
         }
@@ -571,7 +574,7 @@ fn append_scenery(
                 "-S".into(),
                 format!("scenery_palette[{index}].name"),
                 reference,
-                scenario.clone(),
+                scenario.into(),
             ],
             workspace,
             "bsp-scenery-palette",
@@ -607,7 +610,7 @@ fn append_scenery(
                 ((row.not_placed >> bit) & 1).to_string(),
             );
         }
-        args.push(scenario.clone());
+        args.push(scenario.into());
         runner.run(edit, &args, workspace, "bsp-scenery", 52)?;
     }
     let count = runner.run(
@@ -617,7 +620,7 @@ fn append_scenery(
             tags.to_string_lossy().into_owned(),
             "-C".into(),
             "scenery".into(),
-            scenario,
+            scenario.into(),
         ],
         workspace,
         "bsp-scenery-readback",
@@ -647,14 +650,18 @@ fn native_step(
     command.extend_from_slice(args);
     let log = runner.run(tool, &command, workspace, phase, 48)?;
     let lower = log.to_ascii_lowercase();
-    if lower.contains("### error")
-        || lower.contains("exception halt")
-        || lower.contains("exception_breakpoint")
-        || lower.contains("couldn't create")
-        || lower.contains("couldn't open")
-        || lower.contains("failed to load")
-        || lower.contains("radiosity error:")
-        || lower
+    let isolated_lighting = phase == "bsp-isolated-lightmaps";
+    let diagnostic = lower.lines().filter(|line| {
+        !isolated_lighting || !isolated_lightmaps_shell_warning(line.trim())
+    }).collect::<Vec<_>>().join("\n");
+    if diagnostic.contains("### error")
+        || diagnostic.contains("exception halt")
+        || diagnostic.contains("exception_breakpoint")
+        || diagnostic.contains("couldn't create")
+        || diagnostic.contains("couldn't open")
+        || diagnostic.contains("failed to load")
+        || diagnostic.contains("radiosity error:")
+        || diagnostic
             .lines()
             .any(|line| line.trim_start().starts_with("failed "))
     {
@@ -664,6 +671,31 @@ fn native_step(
     }
     Ok(log)
 }
+fn isolated_lightmaps_shell_warning(line: &str) -> bool {
+    // These shell assets are not inputs to radiosity. Native output is
+    // independently required before accepting an isolated lighting run.
+    const PATHS: [&str; 9] = [
+        "ui/ui_tags_loaded_all_scenario_types.tag_collection",
+        "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+        "ui/shell/bitmaps/background.bitmap",
+        "ui/shell/bitmaps/trouble_brewing.bitmap",
+        "ui/shell/strings/loading.unicode_string_list",
+        "ui/shell/main_menu/mp_map_list.unicode_string_list",
+        "sound/sfx/ui/cursor.sound",
+        "sound/sfx/ui/forward.sound",
+        "sound/sfx/ui/back.sound",
+    ];
+    if matches!(line, "failed to load ui tags not tied to any scenario"
+        | "failed to load ui tags tied to multiplayer scenarios"
+        | "failed to load ui cursor sound tag" | "failed to load ui forward sound tag"
+        | "failed to load ui back sound tag") {
+        return true;
+    }
+    line.starts_with("couldn't open ")
+        && line.rsplit_once(" tag '").and_then(|(_, name)| name.strip_suffix("'."))
+            .is_some_and(|name| PATHS.iter().any(|path| path.rsplit('/').next() == Some(name)))
+}
+
 fn restore_collision_flags(
     geometry: &AssemblyGeometry,
     edit: &Path,
@@ -881,12 +913,114 @@ fn with_native_bake_scenario<'a>(
     operation
 }
 
+fn with_isolated_connector_bake(
+    project: &Project, inspection: &MapInspection, edit: &Path, runner: &Runner,
+    workspace: &Path, bsp: &str, replacement_slot: usize,
+    mut bake: impl FnMut(&str, bool) -> Result<()>,
+) -> Result<()> {
+    let tags = workspace.join("tags");
+    let query = |tag: &str, fields: &[&str]| {
+        let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+        args.extend(fields.iter().map(|field| (*field).into()));
+        args.push(tag.into());
+        runner.run(edit, &args, workspace, "bsp-bake-scenario", 64)
+    };
+
+    let bake_ordinary = |bake: &mut dyn FnMut(&str, bool) -> Result<()>| with_native_bake_scenario(&inspection.scenario_path, edit, runner,
+        workspace, &tags, [bsp], |scenario| bake(scenario, false));
+    // Only use the isolated scenario for the explicitly filled, fully covered
+    // connector. Keep the full context when local scenario objects may light it.
+    let plan = project.bsp_assembly.as_ref().expect("retained connector plan");
+    let structure = format!("{bsp}.scenario_structure_bsp");
+    let object_can_affect_lighting = |object: &maps::SceneObject| matches!(object.kind.as_str(),
+        "Scenery" | "Light fixture" | "Machine" | "Control" | "Source model");
+    if !plan.tunnel_bake_fill {
+        return bake_ordinary(&mut bake);
+    }
+    // A compiled-map project carries its original objects in the editor scene.
+    // Only additions and edits require the full scenario at this stage.
+    let original_objects: BTreeMap<_, _> = inspection.objects.iter()
+        .filter(|object| object_can_affect_lighting(object))
+        .map(|object| (object.id.as_str(), object)).collect();
+    let edited_light_context = project.scene.iter().filter(|object| object_can_affect_lighting(object))
+        .any(|object| original_objects.get(object.id.as_str()).copied() != Some(object));
+    if edited_light_context {
+        runner.emit("bsp-bake-scenario", "Using authored scenario lighting after a scene object edit", 64, "info");
+        return bake_ordinary(&mut bake);
+    }
+    let skies = query(&structure, &["-G", "clusters[*].sky"])?;
+    if skies.trim().is_empty() || !skies.lines().all(|line| matches!(line.trim(), "-1" | "65535")) {
+        runner.emit("bsp-bake-scenario", "Using authored scenario lighting for sky-linked clusters", 64, "info");
+        return bake_ordinary(&mut bake);
+    }
+    let source = project.source.as_ref().expect("retained connector source");
+    let membership = maps::native_bsp_placements(&source.preserved_path, inspection)?;
+    let mut local_scenery = Vec::new();
+    for object in inspection.objects.iter().filter(|object| object_can_affect_lighting(object)) {
+        let Some(mask) = object.source_offset.and_then(|offset| membership.memberships.get(&offset)) else {
+            return bake_ordinary(&mut bake);
+        };
+        if mask & (1u16 << replacement_slot) == 0 {
+            continue;
+        }
+        if object.kind != "Scenery" {
+            runner.emit("bsp-bake-scenario", "Using authored scenario lighting for connector-local devices", 64, "info");
+            return bake_ordinary(&mut bake);
+        }
+        local_scenery.push(object);
+    }
+    let scenery = crate::bsp_scenery::source_rows(&source.preserved_path, inspection, local_scenery)?;
+
+    let parent = safe_relative(bsp)?.with_file_name(format!("gsbake_{}", &runner.id[..8]));
+    let tag = parent.with_extension("scenario").to_string_lossy()
+        .replace(['\\', '/'], std::path::MAIN_SEPARATOR_STR);
+    let file = tags.join(parent.with_extension("scenario"));
+    reject_links(&file)?;
+    if file.try_exists()? {
+        return invalid("The isolated bake scenario path already exists");
+    }
+    let gameplay = tags.join(safe_relative(&format!("{}.scenario", inspection.scenario_path))?);
+    let gameplay_hash = maps::hash_file(&gameplay)?;
+    let structure_file = tags.join(safe_relative(&structure)?);
+    let structure_hash = maps::hash_file(&structure_file)?;
+    let operation = (|| {
+        query(&tag, &["-N", "-S", "type", "multiplayer", "-I", "structure_bsps", "1", "end",
+            "-S", "structure_bsps[0].structure_bsp", &structure])?;
+        if query(&tag, &["-C", "structure_bsps"])?.trim() != "1"
+            || !native_reference_matches(&query(&tag, &["-G", "structure_bsps[0].structure_bsp"])?, &structure)
+        {
+            return invalid("The isolated lighting scenario did not bind exactly the reviewed connector");
+        }
+        append_scenery(&scenery, &tag, 0, None, edit, runner, workspace, &tags)?;
+        bake(&parent.to_string_lossy().replace('/', "\\"), true)?;
+        let bitmap = query(&structure, &["-G", "lightmaps_bitmap"])?;
+        let pages = query(&structure, &["-C", "lightmaps"])?;
+        let bitmap = tags.join(safe_relative(bitmap.trim())?);
+        reject_links(&bitmap)?;
+        if pages.trim().parse::<usize>().unwrap_or_default() == 0
+            || bitmap.extension().and_then(|ext| ext.to_str()) != Some("bitmap")
+            || !bitmap.is_file() || maps::hash_file(&structure_file)? == structure_hash
+        {
+            return invalid("Halo Tool did not write native connector lightmap pages and bitmap");
+        }
+        Ok(())
+    })();
+    reject_links(&file)?;
+    if file.try_exists()? {
+        fs::remove_file(&file)?;
+    }
+    if maps::hash_file(&gameplay)? != gameplay_hash {
+        return invalid("Native lighting changed the original gameplay scenario");
+    }
+    operation
+}
+
 fn bake_structure_lightmaps(
-    project: &Project, tool: &Path, runner: &Runner, workspace: &Path, scenario: &str, bsp: &str,
+    project: &Project, tool: &Path, runner: &Runner, workspace: &Path, scenario: &str, bsp: &str, isolated: bool,
 ) -> Result<()> {
     let quality = crate::native_lighting::request(project).map(|request| request.lightmap_quality()).unwrap_or(["0", "0.1"]);
     native_step(tool, runner, workspace, &["lightmaps".into(), scenario.into(), bsp.into(), quality[0].into(), quality[1].into()],
-        "bsp-lightmaps")?;
+        if isolated { "bsp-isolated-lightmaps" } else { "bsp-lightmaps" })?;
     Ok(())
 }
 
@@ -894,7 +1028,7 @@ fn bake_structure_lightmaps(
 // Restore the unmodified material before cache compilation, even on failure.
 fn bake_enclosed_connector(
     project: &Project, tool: &Path, runner: &Runner<'_>, workspace: &Path, edit: &Path,
-    scenario: &str, bsp: &str, geometry: &AssemblyGeometry,
+    scenario: &str, bsp: &str, geometry: &AssemblyGeometry, isolated: bool,
 ) -> Result<()> {
     let material = geometry.materials.first()
         .filter(|material| material.source == 0 && material.shader_class.as_deref() == Some("senv"))
@@ -915,14 +1049,14 @@ fn bake_enclosed_connector(
     let power = value.trim().parse::<f32>().ok().filter(|value| value.is_finite() && *value >= 0.)
         .ok_or_else(|| SparkError::Invalid("The connector shader power is invalid".into()))?;
     if power > 0. {
-        return bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp);
+        return bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp, isolated);
     }
     let bake = (|| {
         run(&["-S", "power", "1", "-S", "color_of_emitted_light", "1,1,1"])?;
         if run(&["-G", "power"])?.trim().parse::<f32>().ok() != Some(1.) {
             return invalid("The tunnel lighting fill did not reach the staged shader");
         }
-        bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp)
+        bake_structure_lightmaps(project, tool, runner, workspace, scenario, bsp, isolated)
     })();
     project::atomic_write(&alias, &original, false)?;
     if maps::hash_file(&alias)? != before {
@@ -1388,12 +1522,12 @@ fn prepare_retained_connector(
         }
     }
     if stage == PartitionStage::Lighting {
-        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags,
-            [bsp.as_str()], |scenario| {
+        with_isolated_connector_bake(project, inspection, &edit, runner, workspace, &bsp, slot,
+            |scenario, isolated| {
                 if plan.tunnel_bake_fill {
-                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)
+                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry, isolated)
                 } else {
-                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
+                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name, isolated)
                 }
             })?;
     }
@@ -1505,7 +1639,9 @@ pub(crate) fn prepare_partition_structure(
     } else { None };
     let pickups = if bind {
         bind_partition_scenario(inspection, &edit, runner, workspace, tags, &original_structures, &structure_tags, &switches)?;
-        append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
+        append_scenery(&scenery, &format!("{}.scenario", inspection.scenario_path),
+            inspection.objects.iter().filter(|row| row.kind == "Scenery").count(),
+            Some(&format!("gsbsp_{}_1", &runner.id[..8])), &edit, runner, workspace, tags)?;
         Some(crate::bsp_pickups::stage(
             project, inspection, plan, &donor, tools, runner, workspace, tags, cache_version, limits.pickups,
         )?)
@@ -1519,9 +1655,9 @@ pub(crate) fn prepare_partition_structure(
             built.iter().map(|(bsp, _, _)| bsp.as_str()), |scenario| {
             for (name, geometry) in &regions {
                 if plan.tunnel_bake_fill {
-                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)?;
+                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry, false)?;
                 } else {
-                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)?;
+                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name, false)?;
                 }
             }
             Ok(())
@@ -1710,11 +1846,13 @@ pub(crate) fn prepare_native_with_limits(
     {
         return invalid("Scenario did not bind exactly one rebuilt BSP");
     }
-    append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
+    append_scenery(&scenery, &format!("{}.scenario", inspection.scenario_path),
+            inspection.objects.iter().filter(|row| row.kind == "Scenery").count(),
+            Some(&format!("gsbsp_{}_1", &runner.id[..8])), &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
     apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
     with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, [bsp.as_str()], |scenario| {
-        bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
+        bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name, false)
     })?;
     if let Some(starts) = &restored_starts {
         starts.append(&inspection.scenario_path, tools, runner, workspace)?;

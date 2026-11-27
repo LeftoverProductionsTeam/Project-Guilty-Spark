@@ -69,7 +69,17 @@ pub(crate) fn plan(assembly: &BspAssembly, donor: &MapInspection) -> Result<Vec<
     if objects.len() > 512 {
         return invalid("Donor scenery exceeds the 512-placement import budget");
     }
-    let parameters = maps::scenery_parameters(&assembly.donor_source.preserved_path, donor)?;
+    source_rows(&assembly.donor_source.preserved_path, donor, objects)?.into_iter()
+        .map(|row| transformed(row, assembly)).collect()
+}
+
+pub(crate) fn source_rows(
+    source: &Path, donor: &MapInspection, objects: Vec<&maps::SceneObject>,
+) -> Result<Vec<Placement>> {
+    if objects.is_empty() {
+        return Ok(Vec::new());
+    }
+    let parameters = maps::scenery_parameters(source, donor)?;
     objects
         .into_iter()
         .map(|o| {
@@ -98,18 +108,15 @@ pub(crate) fn plan(assembly: &BspAssembly, donor: &MapInspection) -> Result<Vec<
             let &(not_placed, permutation) = parameters.get(&o.id).ok_or_else(|| {
                 SparkError::Invalid("Missing donor scenery placement settings".into())
             })?;
-            transformed(
-                Placement {
-                    source_id: o.id.clone(),
-                    tag_path: tag.path.clone(),
-                    model_path: canonical_tag_path(&model.path)?,
-                    position: o.position,
-                    rotation: o.rotation,
-                    not_placed,
-                    permutation,
-                },
-                assembly,
-            )
+            Ok(Placement {
+                source_id: o.id.clone(),
+                tag_path: tag.path.clone(),
+                model_path: canonical_tag_path(&model.path)?,
+                position: o.position,
+                rotation: o.rotation,
+                not_placed,
+                permutation,
+            })
         })
         .collect()
 }
