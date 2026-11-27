@@ -3,7 +3,7 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark source 598fcd59 for inherited connector authoring and native build integration. The browser edit/Save/Undo check passed. Native bake and playtest remain open. Spark Latest remains 356ec94f / d75b353d. No promotion for this increment.
+Latest verified revision: Spark b6009f12 screened the exact foot-tested compact connector against its compiled entrances. Spark 47aba1c6 passed the browser interior edit/Save/Undo check with the landings locked. Native bake and playtest remain open. Spark Latest remains 356ec94f / d75b353d. No promotion for this increment.
 Next action: Forerunner completes wider visual checks and normal-spawn Warthog traversal for the compact repair pair. In Spark, bake, reopen and traverse one saved in-place edit, then bring the reviewed ramp and floor entrance repairs into the same ordinary workflow.
 
 ## Acceptance
@@ -37,7 +37,7 @@ Folder prefix is `megaworld-compact-native-`. Keep f5a4ca22 / 4a095213 as the re
 
 - The previously missing Ice Fields wall passed the exact matched native view on b5178c77 / 4a7f6920 and Win64 2beae96a at tick 4350. Forerunner retained `compact-native-diagnostics/screens/window16560.bmp` at BSP 11, yaw −92°, OpenGL 800×600. Wider visual and Warthog checks remain open. Use the existing f5 camera at (928.6,183.1,-15.1), BSP 11, yaw -92°, Win64 OpenGL 800×600. The old rejected frame is `compact-corrected-route/screens/window21286.bmp` including white terrain and missing opaque walls. Keep snow/prop comparisons and ambience restoration open.
 - The Sidewinder–Timberland exposed stone seam remains unresolved. Owner screenshot `codex-clipboard-add9a910-829b-49ee-903f-9aae117ae160.png` and region attribution are retained in the owner thread; prior evidence is in 74db6049.
-- Spark commit 4e218d25 runs retained-connector geometry checks before tag staging. Exact Death Island cache d893d81c reproduces retained-BSP intrusion at (-179.31, 387.98, 1.09) and now stops before creating a staging job. The Boarding Action control separately stops at (732.50, 53.19, -17.66). Use the proven compact route or revise the obstructed approach before attempting an in-place bake.
+- Spark commit 4e218d25 runs retained-connector geometry checks before tag staging. Exact Death Island cache d893d81c reproduces retained-BSP intrusion at (-179.31, 387.98, 1.09) and now stops before creating a staging job. The Boarding Action control separately stops at (732.50, 53.19, -17.66). The exact b5178c77 source passed the in-place clearance check using its retained entrances and preserved switch volumes.
 - Construction can select and save an in-place edit to an inherited isolated connector. Preview and Build require its original landings, switch volumes and BSP slot identities. The actual editor-led native bake/reopen and traversal remain unverified. This path edits the connector alone. The entrance ramp and floor patches in b517 still use the retained native repair harness.
 - Actual two-way Warthog use and final receipt regeneration await native acceptance. Do not infer either from sampled clearance.
 
