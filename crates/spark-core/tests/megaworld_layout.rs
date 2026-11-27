@@ -113,6 +113,47 @@ fn saved_atlas_edge_reconstructs_stock_timberland_sidewinder_terrain() {
 }
 
 #[test]
+#[ignore = "requires the original CE Timberland and Blood Gulch caches"]
+fn placed_road_sweeps_the_compact_timberland_blood_gulch_band() {
+    use spark_core::{bsp_assembly, library::Library};
+    use std::{path::PathBuf, sync::atomic::AtomicBool};
+    let stock = PathBuf::from(std::env::var_os("SPARK_ATLAS_STOCK").expect("owned CE maps directory"));
+    let output = tempfile::tempdir().unwrap();
+    let library = Library::open(output.path()).unwrap();
+    let (mut base, a) = library.import_map(&stock.join("timberland.map"), Some(&stock)).unwrap();
+    let (donor, b) = library.import_map(&stock.join("bloodgulch.map"), Some(&stock)).unwrap();
+    let specs: serde_json::Value = serde_json::from_str(include_str!("../../../src/stockCompactAtlas.json")).unwrap();
+    let regions = [&a, &b].into_iter().map(|map| {
+        let spec = specs.as_array().unwrap().iter().find(|spec| spec["cacheSha256"] == map.sha256).unwrap();
+        let mut row = layout().regions.remove(0);
+        row.region_id = format!("{}:0", map.sha256);
+        row.cache_sha256 = map.sha256.clone();
+        row.map_name.clone_from(&map.header.name);
+        row.hex_slot = Some(serde_json::from_value(spec["hexSlot"].clone()).unwrap());
+        row.translation = serde_json::from_value(spec["translation"].clone()).unwrap();
+        row.yaw_degrees = spec["yawDegrees"].as_f64().unwrap();
+        for axis in 0..3 {
+            let coords = map.mesh.positions.iter().skip(axis).step_by(3).copied().map(f64::from);
+            row.minimum[axis] = coords.clone().fold(f64::INFINITY, f64::min);
+            row.maximum[axis] = coords.fold(f64::NEG_INFINITY, f64::max);
+        }
+        row
+    }).collect::<Vec<_>>();
+    base.megaworld_layout = Some(spark_core::megaworld::Layout { schema_version: 1, regions });
+    let regions = &base.megaworld_layout.as_ref().unwrap().regions;
+    let draft = bsp_assembly::plan_from_atlas(&base, &a, &donor, &b, &regions[0], &regions[1], PathBuf::new(), true).unwrap();
+    assert_eq!(draft.translation, regions[1].translation);
+    let geometry = bsp_assembly::generate(&base.source.as_ref().unwrap().preserved_path, &a, &draft, &AtomicBool::new(false)).unwrap();
+    let road = &geometry.report.route_clearance[0];
+    assert!(road.lateral_samples >= road.walk_samples * 16);
+    let preflight = geometry.source_preflight().unwrap();
+    assert_eq!(preflight.blocked_faces, 0);
+    assert!(preflight.lighting_examples.iter().any(|example| example.material.starts_with("gster")
+        && (example.center[1] + 83.6).abs() < 0.8), "Expected the native bake risk at the Blood Gulch landing");
+    println!("Compact Blood Gulch preflight checked {} center and {} lateral samples", road.walk_samples, road.lateral_samples);
+}
+
+#[test]
 fn linked_surface_and_room_reopen_without_adjacent_slots() {
     use spark_core::megaworld::SurfaceAccess;
 

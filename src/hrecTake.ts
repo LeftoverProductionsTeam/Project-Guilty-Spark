@@ -1,15 +1,19 @@
 
-import {poseShot} from './machinima';
+import { Matrix4, Vector3 } from 'three';
+import {poseShot, type CameraPose} from './machinima';
 import type {CameraShot} from './creatorStudio';
 import type {Vec3} from './types';
 
-// Forerunner HREC 1/2 wire contract. Only game/map identity and player pose
-// records enter the camera editor. Private player metadata and chat are ignored.
+// Forerunner HREC 1/2 game identity, player poses and v2 private operator
+// camera records. Other records, including chat and player metadata, are skipped.
 export const HREC_INPUT_LIMIT = 64 * 1024 ** 2;
 const DECODE_LIMIT = 192 * 1024 ** 2;
 const SAMPLE_LIMIT = 250_000;
-type Sample = {tick:number; eye:Vec3; yaw:number; pitch:number; zoom:boolean};
-export type HrecTrack = {player:number; start:number; end:number; samples:Sample[]};
+type PlayerSample = {tick:number; eye:Vec3; yaw:number; pitch:number; zoom:boolean};
+type OperatorSample = {tick:number; eye:Vec3; forward:Vec3; up:Vec3; fov:number};
+type Sample = PlayerSample | OperatorSample;
+type Track<T> = {start:number; end:number; samples:T[]};
+export type HrecTrack = ({player:number} & Track<PlayerSample>) | ({player:null} & Track<OperatorSample>);
 export type HrecTakeSource = {rate:number; mapName:string; mapSha256:string; tracks:HrecTrack[]};
 
 function requireRecording(value:unknown, message:string): asserts value {
@@ -40,9 +44,13 @@ export async function readHrecTake(input:ArrayBuffer):Promise<HrecTakeSource> {
   const file=new DataView(input);
   requireRecording(input.byteLength>=8 && input.byteLength<=HREC_INPUT_LIMIT,'invalid file size.');
   requireRecording(file.getUint32(0)===0x48524543 && [1,2].includes(file.getUint32(4,true)),'choose an HREC version 1 or 2 file.');
+  const version = file.getUint32(4,true);
   const decode=new TextDecoder('utf-8',{fatal:true});
   let rate=0,mapName='',mapSha256='',byteCount=0,sampleCount=0,lastTick=-1;
-  const snapshots=new Map<number,Sample[][]>();
+  const snapshots=new Map<number,PlayerSample[][]>();
+  const cameraSpans: Track<OperatorSample>[] = [];
+  let camera: Track<OperatorSample> | undefined;
+  let lastCameraTick = -1;
   for(let offset=8;offset<input.byteLength;){
     requireRecording(offset+9<=input.byteLength,'truncated block header.');
     const kind=file.getUint8(offset), unpacked=file.getUint32(offset+1,true), packed=file.getUint32(offset+5,true);
@@ -75,8 +83,11 @@ export async function readHrecTake(input:ArrayBuffer):Promise<HrecTakeSource> {
         rate=block.getUint16(at+4,true);
         requireRecording(rate>=15&&rate<=240,'unsupported simulation rate.');
         at+=6;
-        readText(); mapName=readText().toLowerCase(); readText();
-        requireRecording(/^[a-z0-9_ -]{1,64}$/.test(mapName)&&at===end,'invalid game map name.');
+        readText();
+        mapName=readText().toLowerCase().replace(/^(?:mcc_maps|maps_ce|maps)[/\\]/,'');
+        readText();
+        requireRecording(mapName.length>0&&mapName.length<=64&&mapName!=='.'&&mapName!=='..'
+          &&!/[\\/:\x00-\x1f\x7f-\x9f]/.test(mapName)&&at===end,'invalid game map name.');
       }else if(kind===16){
         requireRecording(length>=34,'invalid map identity.');
         at++;readText();
@@ -100,7 +111,7 @@ export async function readHrecTake(input:ArrayBuffer):Promise<HrecTakeSource> {
           if(eye.some(value=>!Number.isFinite(value)||Math.abs(value)>4094))continue;
           const yaw=block.getInt16(row+16,true)/10000,pitch=block.getInt16(row+18,true)/10000;
           if(Math.abs(yaw)>3.277||Math.abs(pitch)>1.6)continue;
-          requireRecording(++sampleCount<=SAMPLE_LIMIT,'recording has too many player samples.');
+          requireRecording(++sampleCount<=SAMPLE_LIMIT,'recording has too many camera samples.');
           let spans=snapshots.get(player);
           if(!spans){spans=[];snapshots.set(player,spans);}
           let span=spans.at(-1);
@@ -111,40 +122,87 @@ export async function readHrecTake(input:ArrayBuffer):Promise<HrecTakeSource> {
           }
           span.push({tick,eye,yaw,pitch,zoom:!!(flags&8)});
         }
+      } else if (kind===20 && version===2) {
+        requireRecording(rate>0&&(length===4||length===44), 'invalid operator camera record.');
+        const tick = block.getUint32(at,true);
+        requireRecording(tick>lastCameraTick, 'operator camera ticks are out of order.');
+        lastCameraTick = tick;
+        if (length===4) {
+          if (camera && tick-camera.end<=rate/2) camera.end = tick;
+          camera = undefined;
+        } else {
+          const vector = (offset:number):Vec3 => [0,4,8].map(axis=>block.getFloat32(at+offset+axis,true)) as Vec3;
+          const eye = vector(4), forward = vector(16), up = vector(28);
+          const radians = block.getFloat32(at+40,true);
+          const magnitude = (v:Vec3) => Math.hypot(...v);
+          requireRecording(eye.every(value=>Number.isFinite(value)&&Math.abs(value)<=4094)
+            && Math.abs(magnitude(forward)-1)<=0.02 && Math.abs(magnitude(up)-1)<=0.02
+            && Math.abs(forward.reduce((sum,value,axis)=>sum+value*up[axis],0))<=0.02
+            && radians>0 && radians<Math.PI, 'invalid operator camera pose.');
+          requireRecording(++sampleCount<=SAMPLE_LIMIT,'recording has too many camera samples.');
+          const previous = camera?.samples.at(-1);
+          if (!camera || !previous || tick-previous.tick>rate/2
+            || Math.hypot(...eye.map((value,axis)=>value-previous.eye[axis]))>8) {
+            camera = {start:tick,end:tick,samples:[]};
+            cameraSpans.push(camera);
+          }
+          camera.end = tick;
+          camera.samples.push({tick,eye,forward,up,fov:radians*180/Math.PI});
+        }
       }
       pos=end;
     }
   }
-  const tracks=[...snapshots].flatMap(([player,spans])=>spans.filter(samples=>samples.length>=2)
+  const playerTracks = [...snapshots].flatMap(([player,spans])=>spans.filter(samples=>samples.length>=2)
     .map(samples=>({player,start:samples[0].tick,end:samples.at(-1)!.tick,samples})));
-  requireRecording(tracks.length>0,'there are no continuous living player views.');
-  requireRecording(tracks.length<=256,'this recording has too many separate player takes to open at once.');
+  const tracks: HrecTrack[] = [...cameraSpans.map(span=>({...span,player:null})), ...playerTracks];
+  requireRecording(tracks.length>0, 'there are no continuous player or operator views.');
+  requireRecording(tracks.length<=256, 'this recording has too many separate camera takes to open at once.');
   return {rate,mapName,mapSha256,tracks};
+}
+
+function samplePose(sample: Sample):CameraPose {
+  const position = sample.eye;
+  if ('forward' in sample) {
+    const eye = new Vector3(...position);
+    const aim = eye.clone().add(new Vector3(...sample.forward).normalize());
+    // Match MachinimaRig's Z-up lookAt, including its vertical-view fallback.
+    const axes = new Matrix4().lookAt(eye,aim,new Vector3(0,0,1)).elements;
+    const recordedUp = new Vector3(...sample.up);
+    const right = recordedUp.x*axes[0]+recordedUp.y*axes[1]+recordedUp.z*axes[2];
+    const up = recordedUp.x*axes[4]+recordedUp.y*axes[5]+recordedUp.z*axes[6];
+    requireRecording(sample.fov>=10&&sample.fov<=140,
+      'this operator shot uses a vertical FOV outside the editor’s 10–140° lens range.');
+    return {position,lookAt:aim.toArray(),fov:sample.fov,roll:Math.atan2(-right,up)*180/Math.PI};
+  }
+  const {yaw,pitch,zoom}=sample;
+  const direction=[Math.cos(pitch)*Math.cos(yaw),Math.cos(pitch)*Math.sin(yaw),Math.sin(pitch)];
+  const lookAt=position.map((value,axis)=>value+direction[axis]) as Vec3;
+  return {position,lookAt,fov:zoom?30:70,roll:0};
 }
 
 export function hrecCameraShots(source:HrecTakeSource, trackIndex:number, title:string, limit=64):CameraShot[] {
   const track=source.tracks[trackIndex];
-  requireRecording(track&&Number.isInteger(limit)&&limit>=2&&limit<=64,'choose a player take with room for at least two camera keys.');
+  requireRecording(track&&Number.isInteger(limit)&&limit>=Math.min(track.samples.length,2)&&limit<=64,
+    'choose a take with room for its camera keys.');
   requireRecording(title.trim()&&title.length<=90&&!/[\x00-\x1f\x7f]/.test(title),'enter a take name up to 90 characters.');
   const rate=source.rate,samples=track.samples;
   // Keep a discrete cut when zoom changes. The editable take uses the existing
   // Spark keyframes and their native camera-script limits.
-  const step=Math.max(Math.ceil(rate/4),Math.ceil((track.end-track.start)/(limit-1)));
-  const selected=[samples[0]];
+  const step=Math.max(Math.ceil(rate/4),Math.ceil((samples.at(-1)!.tick-track.start)/Math.max(1,limit-1)));
+  const selected:Sample[]=[samples[0]];
   for(let i=1;i<samples.length-1&&selected.length<limit-1;i++){
     if(samples[i].tick-selected.at(-1)!.tick>=step)selected.push(samples[i]);
   }
   const tail=samples.at(-1)!;
   if(tail.tick>selected[0].tick)selected.push(tail);
   return selected.map((sample,index)=>{
-    const {eye,yaw,pitch,zoom}=sample;
-    const direction=[Math.cos(pitch)*Math.cos(yaw),Math.cos(pitch)*Math.sin(yaw),Math.sin(pitch)];
-    const aim=eye.map((value,axis)=>value+direction[axis]) as Vec3;
     const following=selected[index+1];
-    const duration=following?Math.round((following.tick-sample.tick)*1000/rate):100;
+    const boundary=following?.tick??track.end;
+    const duration=Math.round((boundary-sample.tick)*1000/rate);
     requireRecording(duration<=600000,'the selected track is too long for this camera take.');
-    return {...poseShot({position:eye,lookAt:aim,fov:zoom?30:70,roll:0},title+' · '+(index+1)),
+    return {...poseShot(samplePose(sample),title+' · '+(index+1)),
       durationMs:Math.max(100,duration),
-      easing:following&&following.zoom!==zoom?'cut':'linear'};
+      easing:following&&'zoom' in following&&'zoom' in sample&&following.zoom!==sample.zoom?'cut':'linear'};
   });
 }

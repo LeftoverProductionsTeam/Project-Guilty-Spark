@@ -316,6 +316,8 @@ pub struct RouteClearance {
     pub width: f32,
     pub clear_height: f32,
     pub walk_samples: usize,
+    #[serde(default)]
+    pub lateral_samples: usize,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -476,7 +478,13 @@ impl AssemblyGeometry {
                 let [u, v, w] = uv;
                 let uv_area = ((v[0] - u[0]) * (w[1] - u[1])
                     - (v[1] - u[1]) * (w[0] - u[0])).abs();
-                lighting_risk = twice_area / longest_edge < 0.006 && uv_area > 0. && uv_area < 1e-7;
+                let altitude = twice_area / longest_edge;
+                let shortest_edge = dot(ab, ab).min(dot(ac, ac)).min(dot(bc, bc)).sqrt();
+                // Halo Tool's terrain bake can refuse a short, skinny
+                // intersection despite valid source UVs and sealed collision.
+                let short_seam = shortest_edge <= 0.015 && altitude < 0.012
+                    && altitude / longest_edge < 0.006;
+                lighting_risk = uv_area > 0. && (short_seam || (altitude < 0.006 && uv_area < 1e-7));
                 (uv_area == 0.).then_some("terrain UVs collapse at native export precision")
             } else {
                 None
@@ -1256,15 +1264,17 @@ fn generate_end(
         // edges at the join. Restore those edges before needle refinement.
         weld_materials.extend(passage_materials.iter().copied());
     }
-    if !weld_materials.is_empty() {
+    let welded = if weld_materials.is_empty() {
+        0
+    } else {
         let stock_points = base_mesh.positions.chunks_exact(3)
             .map(|p| [p[0].into(), p[1].into(), p[2].into()])
             .chain(donor_mesh.positions.chunks_exact(3).map(|p| {
                 transform([p[0].into(), p[1].into(), p[2].into()], assembly.translation, assembly.yaw_degrees)
             }))
             .collect::<Vec<_>>();
-        crate::bsp_triangulate::weld_generated_slivers(&mut gl, &weld_materials, &stock_points);
-    }
+        crate::bsp_triangulate::weld_generated_slivers(&mut gl, &weld_materials, &stock_points)
+    };
     for material in passage_materials.iter().copied().chain(terrain_materials.into_iter().flatten()) { crate::bsp_triangulate::refine_native_needles(&mut gl, MAX_OUTPUT_TRIANGLES, material as u64)?; }
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
     // The base half does not contain the donor boundary to be sealed.
@@ -1359,6 +1369,9 @@ fn generate_end(
         "This rebuild regenerates collision, portals and lightmaps. Original per-cluster weather, sound and render-only details require review. Donor scenery is optional. Campaign actors, scripts and gameplay objects are outside this build."
     };
     let mut warnings = vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()];
+    if welded > 0 {
+        warnings.push(format!("Welded {welded} short intersection edges at the connection while keeping its stock vertices and material seams. Review the repaired join before building."));
+    }
     if retriangulated > 0 || collapsed > 0 {
         warnings.push(format!("Render repair applied to this preview. Retriangulated {retriangulated} coplanar pairs and omitted {collapsed} fragments with zero export area. Review the repaired surfaces before building."));
     }
@@ -2312,7 +2325,7 @@ pub fn generate_preserved_connector(
     let route_clearance = if plan.open_road {
         let [walk_samples, _] = checker.verify_land_bridge(&review)?;
         vec![RouteClearance { label: "Open land bridge".into(), width: plan.tunnel_width,
-            clear_height: plan.tunnel_height, walk_samples }]
+            clear_height: plan.tunnel_height, walk_samples, lateral_samples: 0 }]
     } else {
         checker.verify_return(&review)?;
         checker.verify_details(&review)?

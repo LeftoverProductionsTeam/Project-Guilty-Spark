@@ -1076,7 +1076,7 @@ export default function BspAssembly({
                     cacheTarget={(draft.separateNativeBsps && canExtend) || buildRuntime === 'mccSteam' ? 'MCC13'
                       : (buildRuntime === 'haloCustomEdition' || buildRuntime === 'chupathingyCe') ? 'CE609' : undefined} />}
                   {report.nativeGameplayBudgetError && <p>Gameplay placement budget unavailable. {report.nativeGameplayBudgetError}</p>}
-                  {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} biped samples · design width {route.width} · clear height {route.clearHeight}.</p>)}
+                  {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} center samples{route.lateralSamples ? " · "+route.lateralSamples+" across the route" : ""} · design width {route.width} · clear height {route.clearHeight}.</p>)}
                   {!!report.sourcePreflight?.lightingRisks && (
                     <div>
                       <p>{report.sourcePreflight.lightingRisks} thin terrain faces may fail native lighting.</p>

@@ -137,6 +137,26 @@ impl Index {
         }
         best
     }
+    fn biped_step_blocker(&self, start: V, end: V, scratch: &mut Vec<usize>) -> Option<Tri> {
+        for height in [0.20, 0.36, 0.52] {
+            let raised = start[2].max(end[2]) + height;
+            let from = [start[0], start[1], start[2] + height];
+            let high_from = [start[0], start[1], raised];
+            let high_to = [end[0], end[1], raised];
+            let to = [end[0], end[1], end[2] + height];
+            let sweeps = [
+                (from, high_from, from[2] < raised - 1e-10),
+                (high_from, high_to, true),
+                (high_to, to, to[2] < raised - 1e-10),
+            ];
+            for (a, b, _) in sweeps.into_iter().filter(|sweep| sweep.2) {
+                if let Some(blocker) = self.blocking_triangle(a, b, 0.18, scratch) {
+                    return Some(blocker);
+                }
+            }
+        }
+        None
+    }
     fn nearby_surface(&self,at:V,range:f64)->Option<f64>{
         let mut ids=vec![];self.root.query([at[0]-1e-5,at[1]-1e-5,at[2]-range],[at[0]+1e-5,at[1]+1e-5,at[2]+range],&mut ids);
         let mut best:Option<f64>=None;
@@ -491,10 +511,10 @@ impl RouteChecker {
     }
     pub(crate) fn verify_land_bridge(&self, bridge: &BspAssembly) -> Result<[usize; 2]> {
         bridge.validate()?;
-        let forward = self.verify_one(bridge, true)?;
+        let (forward, _) = self.verify_one(bridge, true)?;
         let mut returning = bridge.clone();
         returning.tunnel_points.reverse();
-        Ok([forward, self.verify_one(&returning, true)?])
+        Ok([forward, self.verify_one(&returning, true)?.0])
     }
     pub(crate) fn verify_details(&self, assembly: &BspAssembly) -> Result<Vec<crate::bsp_assembly::RouteClearance>> {
         self.verify_details_in_order(assembly, false)
@@ -506,21 +526,22 @@ impl RouteChecker {
             // Direction changes the sample order. The authored seam must still
             // keep its original orientation for boundary and material validation.
             if reverse { route.tunnel_points.reverse(); }
-            self.verify_one(&route, label == "High-ground route").map(|walk_samples|crate::bsp_assembly::RouteClearance {
-                label:label.into(),width:route.tunnel_width,clear_height:route.tunnel_height,walk_samples,
+            self.verify_one(&route, label == "High-ground route").map(|(walk_samples, lateral_samples)|crate::bsp_assembly::RouteClearance {
+                label:label.into(),width:route.tunnel_width,clear_height:route.tunnel_height,walk_samples,lateral_samples,
             }).map_err(|e| SparkError::Invalid(format!("{label}: {e}")))
         }).collect()
     }
-    fn verify_one(&self, assembly: &BspAssembly, strict_floor: bool) -> Result<usize> {
+    fn verify_one(&self, assembly: &BspAssembly, strict_floor: bool) -> Result<(usize, usize)> {
     let index = &self.index;
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
-    let graded_road = assembly.terrain_seam.as_ref().is_some_and(|seam| seam.grade_road);
-    let lane_fractions: Vec<f64> = if graded_road {
-        // A standing capsule can fall through a gap between the center and edge
-        // checks. Keep the graded road's interior samples within its diameter.
-        let intervals = ((f64::from(assembly.tunnel_width) - 0.45) / 0.36).ceil() as usize;
+    let placed_road = assembly.terrain_seam.as_ref().is_some_and(|seam| seam.bearing_degrees.is_some());
+    let mut lateral_samples = 0;
+    let lane_fractions: Vec<f64> = if placed_road {
+        // Sample the usable road interior as well as its edges. Round up to
+        // an odd interval count so the separately swept center adds a lane.
+        let intervals = (((f64::from(assembly.tunnel_width) - 0.45) / 0.36).ceil() as usize) | 1;
         (0..=intervals).map(|i| 2. * i as f64 / intervals as f64 - 1.).collect()
     } else {
         vec![-1., 1.]
@@ -529,9 +550,7 @@ impl RouteChecker {
     // Match the same mitered cross sections used by the ridge solid. A lane
     // sampled at a segment's perpendicular can cross onto the next graded
     // segment near a turn and compare the next ramp height to the old one.
-    let lane_distance = if assembly.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some())
-        || assembly.fit_passage_floor
-    {
+    let lane_distance = if placed_road || assembly.fit_passage_floor {
         Some(f64::from(assembly.tunnel_width)-0.45)
     } else if strict_floor && assembly.tunnel_width >= 6. {Some(3.)} else {None};
     let lane_sides = lane_distance
@@ -551,8 +570,7 @@ impl RouteChecker {
             }
             if let Some(sides) = &lane_sides {
                 let lateral = add(sides[segment], mul(sub(sides[segment + 1], sides[segment]), t));
-                // A centerline can cross a narrow triangle or hide a tear
-                // under one wheel. Review both sides at the same elevation.
+                // Evaluate each lane's floor and swept body independently.
                 for (lane,&fraction) in lane_fractions.iter().enumerate() {
                     let point = add([p[0], p[1], z], mul(lateral, fraction));
                     let Some(height)=index.floor_in_range(point,&mut scratch,0.30,0.30) else {
@@ -562,21 +580,18 @@ impl RouteChecker {
                         ));
                     };
                     if !strict_floor {
-                        // Both sides of a fitted route must provide the same
-                        // standing clearance and continuous grade as its center.
-                        let position=[point[0],point[1],height];
-                        let (prior,prior_height)=prior_lanes[lane].unwrap_or((position,height));
-                        if (prior_height-height).abs()>0.12 || [0.20,0.36,0.52].into_iter().any(|capsule|{
-                            let raised=prior_height.max(height)+capsule;
-                            !index.clear_segment([prior[0],prior[1],raised],[point[0],point[1],raised],0.18,&mut scratch)
-                        }) {
+                        let position = [point[0], point[1], height];
+                        let prior: V = prior_lanes[lane].unwrap_or(position);
+                        if (prior[2] - height).abs() > 0.12
+                            || index.biped_step_blocker(prior, position, &mut scratch).is_some() {
                             return invalid(format!(
-                                "A route side has a step or obstruction near {:.2}, {:.2}, {:.2}. Align the landing or widen the clear passage.",
-                                point[0],point[1],height,
+                                "The route has a step or obstruction off center near {:.2}, {:.2}, {:.2}. Align the landing or widen the clear passage.",
+                                point[0], point[1], height,
                             ));
                         }
-                        prior_lanes[lane]=Some((position,height));
+                        prior_lanes[lane] = Some(position);
                     }
+                    lateral_samples += 1;
                 }
             }
             if let Some((old_point, old_floor)) = previous.filter(|(_, old)| (z - old).abs() > 0.12) {
@@ -585,28 +600,15 @@ impl RouteChecker {
                     (z - old_floor).abs(), segment + 1, old_point[0], old_point[1], old_floor, p[0], p[1], z,
                 ));
             }
-            for height in [0.20, 0.36, 0.52] {
-                let (old, old_floor) = previous.unwrap_or((p, z));
-                // A permitted small step lifts the body before it advances.
-                // Check that lift, the full horizontal sweep and the descent;
-                // interpolating through a curb would reject a walkable step.
-                let raised = z.max(old_floor) + height;
-                let from = [old[0], old[1], old_floor + height];
-                let high_from = [old[0], old[1], raised];
-                let high_to = [p[0], p[1], raised];
-                let to = [p[0], p[1], z + height];
-                if (old_floor + height < raised - 1e-10 && !index.clear_segment(from, high_from, 0.18, &mut scratch))
-                    || !index.clear_segment(high_from, high_to, 0.18, &mut scratch)
-                    || (z + height < raised - 1e-10 && !index.clear_segment(high_to, to, 0.18, &mut scratch)) {
-                    let blocker=index.blocking_triangle(high_from,high_to,0.18,&mut scratch).or_else(||index.blocking_triangle(from,high_from,0.18,&mut scratch)).or_else(||index.blocking_triangle(high_to,to,0.18,&mut scratch));
-                    return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path. Blocking source triangle: {:?}", segment + 1, p[0], p[1], z,blocker));
-                }
+            let (old, old_floor) = previous.unwrap_or((p, z));
+            if let Some(blocker) = index.biped_step_blocker([old[0], old[1], old_floor], [p[0], p[1], z], &mut scratch) {
+                return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path. Blocking source triangle: {:?}", segment + 1, p[0], p[1], z, blocker));
             }
             previous = Some((p, z));
             samples += 1;
         }
     }
-    Ok(samples)
+    Ok((samples, lateral_samples))
     }
 }
 pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<usize> {
@@ -616,6 +618,34 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn placed_road_sweeps_the_band_between_center_and_edges() {
+        let mut road = plan();
+        road.tunnel_width = 6.;
+        road.tunnel_height = 4.;
+        road.open_road = true;
+        road.terrain_seam = Some(crate::bsp_assembly::TerrainSeam {
+            shoulder_width: 8., bank_height: 4.,
+            base_shader_path: "terrain/grass".into(), donor_shader_path: "terrain/sand".into(),
+            bearing_degrees: Some(0.), grade_road: false,
+        });
+        let mut mesh = MeshData {
+            positions: vec![0.,-4.,0., 10.,-4.,0., 10.,4.,0., 0.,4.,0.],
+            indices: vec![0,1,2, 0,2,3],
+            ..Default::default()
+        };
+        let report = &RouteChecker::new(&mesh).unwrap().verify_details(&road).unwrap()[0];
+        assert!(report.lateral_samples > 2 * report.walk_samples);
+
+        // A short wall between the old center and outer lanes.
+        mesh.positions.extend([5.,0.63,0., 5.,1.2,0., 5.,0.9,2.]);
+        mesh.indices.extend([4,5,6]);
+        let checker = RouteChecker::new(&mesh).unwrap();
+        for error in [checker.verify(&road).unwrap_err(), checker.verify_return(&road).unwrap_err()] {
+            assert!(error.to_string().contains("obstruction off center"), "{error}");
+        }
+    }
 
     #[test]
     fn graded_connector_checks_its_full_width_between_landings() {

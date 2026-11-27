@@ -83,7 +83,7 @@ export interface AssemblyReport {
   nativeGameplayBudgetError?: string;
   intactSwitches?: string[];
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };
-  routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number}[];
+  routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number;lateralSamples?:number}[];
   warnings: string[];
   sourcePreflight?: {
     blockedFaces: number;

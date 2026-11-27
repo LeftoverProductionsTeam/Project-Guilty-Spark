@@ -564,7 +564,7 @@ export default function MachinimaWorkspace({
                   const take=await readHrecTake(await file.arrayBuffer());
                   if(ticket!==replayEpoch.current)return;
                   const name=inspection.header.name.toLowerCase();
-                  if(take.mapName!==name||take.mapSha256&&take.mapSha256!==inspection.sha256)
+                  if(take.mapSha256 ? take.mapSha256!==inspection.sha256 : take.mapName!==name)
                     throw Error('Open the matching preserved map before importing this recording.');
                   setReplayTrack(0);
                   setReplayName(file.name.replace(/\.hrec$/i,'').slice(0,90));
@@ -574,10 +574,10 @@ export default function MachinimaWorkspace({
             {replay&&<>
               <label className="field-label">Take name<input value={replayName} maxLength={90}
                 onChange={event=>setReplayName(event.target.value)}/></label>
-              <label className="field-label">Recorded player view<select value={replayTrack}
+              <label className="field-label">Recorded view<select value={replayTrack}
                 onChange={event=>setReplayTrack(Number(event.target.value))}>
                 {replay.tracks.map((track,index)=><option key={index} value={index}>
-                  Player {track.player+1} · {((track.end-track.start)/replay.rate).toFixed(1)} s · start tick {track.start}
+                  {track.player===null ? 'Operator camera' : 'Player '+(track.player+1)} · {((track.end-track.start)/replay.rate).toFixed(1)} s · start tick {track.start}
                 </option>)}
               </select></label>
               {!replay.mapSha256 && <small>This recording identifies the map by name. Review the keys against the open map.</small>}
