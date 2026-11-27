@@ -704,8 +704,10 @@ impl RouteChecker {
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
     let placed_road = assembly.terrain_seam.as_ref().is_some_and(|seam| seam.bearing_degrees.is_some());
+    let vehicle_road = assembly.open_road && assembly.tunnel_width >= 6. && assembly.tunnel_height >= 4.;
+    let sweep_width = placed_road || vehicle_road || full_width || strict_floor;
     let mut lateral_samples = 0;
-    let lane_fractions: Vec<f64> = if placed_road || full_width {
+    let lane_fractions: Vec<f64> = if sweep_width {
         // Sample the usable road interior as well as its edges. Round up to
         // an odd interval count so the separately swept center adds a lane.
         let intervals = (((f64::from(assembly.tunnel_width) - 0.45) / 0.36).ceil() as usize) | 1;
@@ -717,9 +719,8 @@ impl RouteChecker {
     // Match the same mitered cross sections used by the ridge solid. A lane
     // sampled at a segment's perpendicular can cross onto the next graded
     // segment near a turn and compare the next ramp height to the old one.
-    let lane_distance = if placed_road || assembly.fit_passage_floor || full_width {
-        Some(f64::from(assembly.tunnel_width)-0.45)
-    } else if strict_floor && assembly.tunnel_width >= 6. {Some(3.)} else {None};
+    let lane_distance = (sweep_width || assembly.fit_passage_floor)
+        .then_some(f64::from(assembly.tunnel_width) - 0.45);
     let lane_sides = lane_distance
         .map(|width| crate::bsp_assembly::tunnel_sides(&assembly.tunnel_points, width))
         .transpose()?;
@@ -804,7 +805,7 @@ mod tests {
 
 
     #[test]
-    fn placed_road_sweeps_the_band_between_center_and_edges() {
+    fn vehicle_roads_sweep_the_band_between_center_and_edges() {
         let mut road = plan();
         road.tunnel_width = 6.;
         road.tunnel_height = 4.;
@@ -826,8 +827,11 @@ mod tests {
         mesh.positions.extend([5.,0.63,0., 5.,1.2,0., 5.,0.9,2.]);
         mesh.indices.extend([4,5,6]);
         let checker = RouteChecker::new(&mesh).unwrap();
-        for error in [checker.verify(&road).unwrap_err(), checker.verify_return(&road).unwrap_err()] {
-            assert!(error.to_string().contains("obstruction off center"), "{error}");
+        for bearing in [Some(0.), None] {
+            road.terrain_seam.as_mut().unwrap().bearing_degrees = bearing;
+            for error in [checker.verify(&road).unwrap_err(), checker.verify_return(&road).unwrap_err()] {
+                assert!(error.to_string().contains("obstruction off center"), "{error}");
+            }
         }
     }
 
@@ -1123,7 +1127,9 @@ mod tests {
         assert!(full.verify_one(&route, true).is_ok());
 
         let thin = RouteChecker::new(&corridor(2., 4.)).unwrap();
+        route.open_road = false;
         assert!(thin.verify_one(&route, false).is_ok());
+        route.open_road = true;
         assert!(thin.verify_one(&route, true).unwrap_err().to_string().contains("lateral floor support"));
         route.tunnel_points.reverse();
         assert!(thin.verify_one(&route, true).is_err());
