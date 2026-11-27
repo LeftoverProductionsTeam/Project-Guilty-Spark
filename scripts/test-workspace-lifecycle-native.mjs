@@ -929,10 +929,12 @@ try{
     const undo = editor.getByRole('button', { name: 'Undo paint', exact: true });
     await expect(undo).toBeEnabled();
     await main.screenshot({ path: path.join(root, 'native-painted-plow.png') });
-    await toggle.click();
+    await main.getByRole('button', { name: 'Close shape & paint', exact: true }).click();
     await expect(canvas).toHaveCount(0);
     await toggle.click();
     await expect(width).toHaveValue('3');
+    await expect(profile).toHaveValue('v');
+    await expect(scoop).toHaveValue('80');
     await expect(undo).toBeEnabled();
     await undo.click();
     await expect(undo).toBeDisabled();
