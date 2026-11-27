@@ -468,7 +468,7 @@ fn publish(session: &Session, run: &Running) -> Reply<()> {
     view.staged_map=run.stage.map.clone();view.engine_sha256=run.stage.staged_sha256.iter().filter(|(name,_)|name.starts_with("engine/")).map(|(name,sha)|(name.clone(),sha.clone())).collect();
     if view.vehicle_test {
         view.phase = "awaitingMapSelection".into();
-        view.detail = format!("In Forerunner, choose Zombies → Host Zombie Apocalypse → {}. Create a temporary profile if prompted. Spark is waiting for your in-game check.", run.stage.map);
+        view.detail = format!("In Forerunner, choose Zombies → Play Solo → {}. Create a temporary profile if prompted. Spark is waiting for your in-game check.", run.stage.map);
         view.game_build_id = None;
         view.game_sha256 = None;
         return Ok(());

@@ -1077,7 +1077,18 @@ try{
           for (const bank of ['bitmaps.map','sounds.map','loc.map']) {
             expect(await fs.stat(path.join(stages,ownedStage,'data','maps_ce',bank)).then(()=>true,()=>false)).toBe(false);
           }
-          await controls.getByRole('button',{name:'Stop playtest'}).click();
+          if (process.env.SPARK_WARTHOG_GAME_REVIEW === '1') {
+            console.log(JSON.stringify({vehicleGameReview:{pid:session.processId,map:session.stagedMap,sha256:build.sha256}}));
+            // Let the reviewer use the normal game menus and quit the owned engine.
+            // The deadline also covers a stalled window or unavailable input.
+            await expect.poll(async()=> {
+              const current = await invoke(main,'runtime_rebuild_status');
+              if (current?.phase === 'failed') throw Error(current.error || 'Private game exited unexpectedly');
+              return current?.phase;
+            }, {timeout:600000, intervals:[2000]}).toBe('stopped');
+          } else {
+            await controls.getByRole('button',{name:'Stop playtest'}).click();
+          }
           await expect.poll(async()=> (await invoke(main,'runtime_rebuild_status'))?.phase,{timeout:30000}).toBe('stopped');
           expect(await fs.stat(path.join(stages,ownedStage)).then(()=>true,()=>false)).toBe(false);
           step('Opened and stopped the private Forerunner test using the exact new MCC vehicle cache');

@@ -9,14 +9,15 @@ interface Session {
   compiledBuildId:string;compiledSha256:string;gameBuildId:string|null;gameSha256:string|null;
   processId:number|null;pendingJobId:string|null;detail:string;error:string|null;consoleTail:string;ceResourceSha256?:Record<string,string>;requiredNativeFeatures?:string[];
 }
-export default function RuntimeLiveRebuild({project,onSave,runtimeId='chupathingyCe',vehicleBuildId}:{project:Project|null;onSave?:()=>Promise<void>;runtimeId?:'chupathingyCe'|'openCe';vehicleBuildId?:string}) {
+export default function RuntimeLiveRebuild({project,onSave,runtimeId='chupathingyCe',vehicleBuildId}:{project:Project|null;onSave?:()=>Promise<void>;runtimeId?:'chupathingyCe'|'openCe';vehicleBuildId?:string|null}) {
   const {active}=useWorkspaceActivity(),[session,setSession]=useState<Session|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [profileEpoch,setProfileEpoch]=useState(0),[profile,setProfile]=useState<{registration:RuntimeRegistration;sha256:string}|null>(null),[profileIssue,setProfileIssue]=useState('');
-  const forerunner=runtimeId==='openCe',vehicleTest=!!vehicleBuildId;
+  const forerunner=runtimeId==='openCe',vehicleTest=vehicleBuildId!==undefined;
+  const canStart= !vehicleTest || !!vehicleBuildId;
   useEffect(()=>{const changed=()=>setProfileEpoch(value=>value+1);window.addEventListener('guilty-spark-runtime-connections-changed',changed);return()=>window.removeEventListener('guilty-spark-runtime-connections-changed',changed);},[]);
   useEffect(()=>{
     let current=true;setProfile(null);setProfileIssue('');
-    if(!native||!active||!forerunner)return;
+    if(!native||!active||!forerunner||!canStart)return;
     setProfileIssue('Checking the selected Forerunner profile…');
     void (async()=>{
       const profiles=await call<RuntimeRegistration[]>('list_runtime_registrations');
@@ -27,7 +28,7 @@ export default function RuntimeLiveRebuild({project,onSave,runtimeId='chupathing
       if(current){setProfile({registration:selected,sha256:plan.executableSha256});setProfileIssue('');}
     })().catch(problem=>{if(current)setProfileIssue(String(problem));});
     return()=>{current=false;};
-  },[active,forerunner,profileEpoch]);
+  },[active,forerunner,canStart,profileEpoch]);
   const generation=useRef(0),requesting=useRef(false),acting=useRef(false),version=useRef(0);
   useEffect(()=>{
     const epoch=++generation.current;
@@ -38,23 +39,24 @@ export default function RuntimeLiveRebuild({project,onSave,runtimeId='chupathing
     return()=>{generation.current++;clearInterval(timer);};
   },[active,project?.id,runtimeId,profileEpoch]);
   const running=!!session&&!['stopped','failed'].includes(session.phase),matching=session?.projectId===project?.id;
+  if(vehicleTest&&!canStart&&!(running&&session?.vehicleTest))return null;
   async function perform(action:'start'|'rebuild'|'stop') {
-    if(acting.current)return;
+    if(acting.current||(action==='start'&&!canStart))return;
     const epoch=generation.current;version.current++;acting.current=true;setBusy(true);setError('');
     try {
       if(action==='start'&&forerunner&&!profile)throw Error(profileIssue||'Inspect the selected Forerunner profile first.');
       if(action!=='stop'){if(!project||!onSave)throw Error('Open and save this project before starting its native playtest.');await onSave();if(epoch!==generation.current)throw Error('The workspace changed while saving. Start the playtest from its map.');}
       if(action==='stop'){await call('runtime_rebuild_stop',{sessionId:session!.id});}
-      else {const next=await call<Session>(action==='start'?'runtime_rebuild_start':'runtime_rebuild_begin',action==='start'?{projectId:project!.id,confirmedRestart:true,vehicleBuildId,...(forerunner?{runtimeId,expectedRegistration:profile!.registration,expectedExecutableSha256:profile!.sha256}:{})}:{sessionId:session!.id});if(epoch===generation.current)setSession(next);}
+      else {const next=await call<Session>(action==='start'?'runtime_rebuild_start':'runtime_rebuild_begin',action==='start'?{projectId:project!.id,confirmedRestart:true,vehicleBuildId:vehicleBuildId??undefined,...(forerunner?{runtimeId,expectedRegistration:profile!.registration,expectedExecutableSha256:profile!.sha256}:{})}:{sessionId:session!.id});if(epoch===generation.current)setSession(next);}
     } catch(problem){if(epoch===generation.current)setError(String(problem));}
     finally{acting.current=false;if(epoch===generation.current)setBusy(false);}
   }
   return <section className="runtime-rebuild-controls" aria-label={vehicleTest?'Forerunner vehicle playtest':forerunner?'Forerunner solo playtest':'Chupathingy Live Rebuild'}>
     <strong>{vehicleTest?'Test the rebuilt vehicle in Forerunner':forerunner?'Forerunner · staged solo playtest':'Chupathingy · Live Rebuild'}</strong>
-    <p className="subtle">{vehicleTest?"Starts Forerunner with a private copy of this map. Choose Zombies → Host Zombie Apocalypse in Forerunner.":forerunner?'Uses the saved project’s validated CE solo build in disposable private folders. Compatible Xbox-derived tags may supply its assets; the original Xbox cache is preserved and is not relabeled as CE. Current reviewed startup builds receive a request for the staged CE map; older reviewed builds use their native custom campaign chooser. Native map requirements are checked against the selected build before staging. Create a temporary player profile in the native menus if prompted. Stop removes this test profile. Startup requests do not confirm a loaded map; automatic reload, game revision confirmation and combat acceptance are unavailable.':'Build saved changes, then restart the private playtest. The round resets; failed builds keep the running map.'}</p>
+    <p className="subtle">{vehicleTest?"Starts Forerunner with a private copy of this map. Choose Zombies → Play Solo → Spark Vehicle Playtest.":forerunner?'Uses the saved project’s validated CE solo build in disposable private folders. Compatible Xbox-derived tags may supply its assets; the original Xbox cache is preserved and is not relabeled as CE. Current reviewed startup builds receive a request for the staged CE map; older reviewed builds use their native custom campaign chooser. Native map requirements are checked against the selected build before staging. Create a temporary player profile in the native menus if prompted. Stop removes this test profile. Startup requests do not confirm a loaded map; automatic reload, game revision confirmation and combat acceptance are unavailable.':'Build saved changes, then restart the private playtest. The round resets; failed builds keep the running map.'}</p>
     {forerunner&&profileIssue&&<p role="status">{profileIssue}</p>}
     <div className="analysis-actions">
-      <button disabled={!native||busy||running||!project||!onSave||(forerunner&&!profile)} onClick={()=>void perform('start')}><Play size={13}/>{vehicleTest?'Open private vehicle test':forerunner?'Start staged solo test':'Start compiled playtest'}</button>
+      <button disabled={!native||busy||running||!canStart||!project||!onSave||(forerunner&&!profile)} onClick={()=>void perform('start')}><Play size={13}/>{vehicleTest?'Open private vehicle test':forerunner?'Start staged solo test':'Start compiled playtest'}</button>
       {!vehicleTest&&<button disabled={!native||busy||!running||!matching||forerunner||(session?.runtimeId??'chupathingyCe')!=='chupathingyCe'||!!session?.pendingJobId} title={forerunner?'Forerunner requires Stop, a new validated build and another private test. Automatic restart is unavailable.':undefined} onClick={()=>void perform('rebuild')}><RefreshCw size={13}/>{session?.pendingJobId?'Building…':'Live Rebuild'}</button>}
       <button disabled={!native||busy||!running} onClick={()=>void perform('stop')}><Square size={13}/>Stop playtest</button>
     </div>

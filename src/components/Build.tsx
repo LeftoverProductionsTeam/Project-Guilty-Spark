@@ -146,8 +146,9 @@ export default function Build({
       <SmartEditPanel project={project} onSave={onSave} notify={message=>{void onAction(async()=>{onRefresh();return message;},message);}}/>
       <div className="build-workflow-tabs" role="tablist" aria-label="Build workflows"><button role="tab" aria-selected={view==='build'} onClick={()=>setView('build')}>Build & playtest</button><button role="tab" aria-selected={view==='portability'} onClick={()=>setView('portability')}>Portability Lab</button></div>
       {view==='portability'&&<Suspense fallback={<p role="status">Loading Portability Lab…</p>}><PortabilityLab project={project} dirty={dirty} onSave={onSave} onBuild={()=>setView('build')} onSettings={onSettings}/></Suspense>}
-      {view==='build'&&validated?.target==='mcc-cea'&&project.shapeDraft?.vehicleMount&&
-        <RuntimeLiveRebuild project={project} runtimeId="openCe" vehicleBuildId={validated.id} onSave={()=>onSave(true)}/>}
+      <RuntimeLiveRebuild project={project} runtimeId="openCe"
+        vehicleBuildId={view==='build'&&validated?.target==='mcc-cea'&&project.shapeDraft?.vehicleMount ? validated.id : null}
+        onSave={()=>onSave(true)}/>
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
       {view==='build'&&report&&!report.ready&&report.blockers.length>0&&<section className="build-next-step" aria-label="What to fix before building">
         <strong>Before you can build</strong><p>{report.blockers[0]}</p>
