@@ -4,7 +4,7 @@ Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native ga
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark a76db616 / c651df64. Windows app passed Road plow profile, curl, paint, collapse/reopen and Undo. Previous 59f954c2 / 4db2570a retains verified Blender review/apply/Undo/Redo/Save/reopen. Prior eight-size, OpenCE restart and window handoff evidence retained. Monitor patrol remains open.
-Zombie Survival: 05a4268a logged 102 failed carrier exits. The photo-based road blade has a circular face and stable paint UVs. Private MCC13 cache 901cacc5 passed CRC, paint binding, four LODs and collision contact readback on the preserved Demolisher rig. Near-coplanar warning and gameplay remain open.
+Zombie Survival: 05a4268a logged 102 failed carrier exits. Road-plow MCC13 cache 901cacc5 passed CRC, paint UV/material readback at all four LODs and hull contact readback. Forerunner deaca69b loaded it through Host Zombie Apocalypse and enabled the authored roster. Both test roots retired. Boarding, driving and the near-coplanar warning remain open.
 Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the private Zombie Survival variant and review its hull warning.
 
 ## Acceptance

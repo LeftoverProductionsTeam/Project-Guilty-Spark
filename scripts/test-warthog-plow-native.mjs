@@ -27,6 +27,8 @@ const paintSource=process.env.SPARK_WARTHOG_PAINT_PNG;
 const buildPrivate=process.env.SPARK_WARTHOG_PRIVATE_MAP==='1';
 const bladeProfile=process.env.SPARK_WARTHOG_ROAD_BLADE==='1'?'moldboard':'v';
 const [curl,sweep]=bladeProfile==='moldboard'?[80,0]:[62,30];
+const runtimePath=process.env.SPARK_WARTHOG_PLAYTEST_RUNTIME;
+if(runtimePath&&!buildPrivate)throw Error('The normal-menu playtest requires a verified private cache');
 if(buildPrivate&&(!blender||!paintSource))throw Error('Private cache proof requires both paint and collision');
 if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the installed Blender executable');
 
@@ -34,8 +36,8 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const tags=path.join(context.directory,'tags'),data=path.join(context.directory,'data');
   const stem='vehicles\\warthog\\warthog',model=stem+'.gbxmodel';
   await fs.mkdir(tags);await fs.mkdir(data);
-  const launch=async (command,args)=>{
-    const pending=promisify(execFile)(command,args,{cwd:context.directory,windowsHide:true,encoding:'utf8',maxBuffer:16*1024*1024,env:context.env,timeout:35000});
+  const launch=async (command,args,options={})=>{
+    const pending=promisify(execFile)(command,args,{cwd:context.directory,windowsHide:true,encoding:'utf8',maxBuffer:16*1024*1024,env:context.env,timeout:35000,...options});
     if(pending.child)await context.trackProcess(pending.child);
     return (await pending).stdout;
   };
@@ -48,10 +50,12 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const triangles=source=>{
     const faces=[];
     for(let at=source.triangleStart+1;at<source.rows.length;at+=3){
+      const corners=numbers(source.rows[at+2]);
       faces.push({
         region:source.regions[Number(source.rows[at])],
         material:source.materials[Number(source.rows[at+1])],
-        points:numbers(source.rows[at+2]).map(vertex=>point(source,vertex)),
+        points:corners.map(vertex=>point(source,vertex)),
+        uv:corners.map(vertex=>numbers(source.rows[source.vertexStart+6+vertex*6]).slice(0,2)),
       });
     }
     return faces;
@@ -97,12 +101,15 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   }
   const matchesTriangle=(expected,actual)=>expected.region===actual.region&&expected.material===actual.material&&
     [0,1,2].some(offset=>expected.points.every((vertex,i)=>vertex.every((value,axis)=>
-      Math.abs(value-actual.points[(i+offset)%3][axis])<.005)));
+      Math.abs(value-actual.points[(i+offset)%3][axis])<.005))&&
+      (!expected.uv||expected.uv.every((corner,i)=>corner.every((value,axis)=>
+        Math.abs(value-actual.uv[(i+offset)%3][axis])<.00005))));
   const bladeFaces=[];
   for(let at=0;at<mesh.indices.length;at+=3){
     const points=mesh.indices.slice(at,at+3).map(index=>
       mesh.positions.slice(index*3,index*3+3).map((value,axis)=>value*100+origin[axis]));
-    bladeFaces.push({region:mount.region,material:mount.material,points});
+    const uv=mesh.indices.slice(at,at+3).map(index=>mesh.uvs.slice(index*2,index*2+2));
+    bladeFaces.push({region:mount.region,material:mount.material,points,uv});
   }
   for(const detail of proof){
     const original=readRecoveredJms(await fs.readFile(path.join(base,detail.name),'utf8'));
@@ -167,7 +174,7 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   }
   if(revisedVehicle!==originalVehicle)throw Error('Vehicle variant changed fields beyond reviewed model references');
   if(await readVehicle(vehicle)!==originalVehicle)throw Error('Original extracted vehicle changed');
-  let privateMap=null;
+  let privateMap=null,privateOutput=null;
   if(buildPrivate){
     const scenario=(await run('info',['-T','scenario_path',map])).trim();
     if(!/^[-a-z0-9_ '\\]+$/i.test(scenario))throw Error('Cache has an unsupported scenario path');
@@ -204,10 +211,51 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
     }
     if((await run('edit',['-t',readback,'-G','base_map',paint.shader])).trim()!==paint.bitmap)
       throw Error('Compiled cache omitted the authored paint bitmap binding');
+    privateOutput=output;
     privateMap={sha256:await hash(output),scenario,engine,compilerSha256,crcMismatch:0,vehicleReferencesVerified:true,gameplayVerified:false};
   }
   if(await hash(map)!==originalMapHash)throw Error('Original map changed during the native proof');
   console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,paint,privateMap,proof,bladeTriangles:mesh.indices.length/3,bladeProfile,curl,sweep,bladeDimensions:dimensions,mountCentimeters:origin,
     compilerOutput:raw.slice(-250),scope:'Compiled vehicle tag readback; gameplay requires separate validation.'}));
   if(!proof.every(p=>p.after===p.expected&&p.matchedBlade===mesh.indices.length/3&&p.matchedStock===p.original&&p.checksum===stock.checksum&&p.rigIdentical&&p.markersIdentical))throw Error('H1A stock rig or blade failed exact readback');
+  if(runtimePath){
+    const runtime=path.resolve(runtimePath);
+    const ui=path.join(runtime,'maps','ui.map');
+    const executable=path.join(runtime,'halo.exe');
+    for(const file of [executable,ui])
+      if(!(await fs.lstat(file)).isFile())throw Error('Choose a physical Forerunner runtime containing halo.exe and maps/ui.map');
+    const root=path.join(context.directory,'normal-menu-playtest');
+    const directories=['maps','mcc_maps','saves','logs','cache'];
+    await Promise.all(directories.map(folder=>fs.mkdir(path.join(root,folder),{recursive:true})));
+    const name='zombie_road_plow.map';
+    await fs.copyFile(ui,path.join(root,'maps','ui.map'));
+    const localMap=path.join(root,'mcc_maps',name);
+    await fs.rename(privateOutput,localMap);
+    if(await hash(localMap)!==privateMap.sha256)throw Error('The playtest map differs from the verified native build');
+    await fs.writeFile(localMap.replace(/\.map$/,'.txt'),'Zombie Apocalypse | Road plow\n',{flag:'wx'});
+    await fs.writeFile(localMap.replace(/\.map$/,'.spark-mode.json'),JSON.stringify({
+      cacheSha256:privateMap.sha256,cacheVersion:13,fileName:name,mode:'zombieSurvival',
+      requiredNativeFeatures:[],requiredResourceBanks:[],runtimeSettings:{'network.firefight_encounter':false},
+      scenarioPath:privateMap.scenario,scenarioType:1,schemaVersion:1,
+    }),{flag:'wx'});
+    const env=Object.fromEntries(Object.entries(context.env).filter(([key])=>!key.startsWith('HALO_')));
+    Object.assign(env,{HALO_DATA_ROOT:root,HALO_SAVE_ROOT:path.join(root,'saves'),
+      HALO_LOG_ROOT:path.join(root,'logs'),HALO_CACHE_ROOT:path.join(root,'cache'),
+      HALO_DISPLAY_MODE:'windowed',HALO_WINDOW_SIZE:'960x720',HALO_MAX_FPS:'60',
+      HALO_NET_ONLINE:'0',HALO_NET_PUBLIC_LOBBY:'0',HALO_NET_ALLOW_UPNP:'0',HALO_NET_JOIN_FROM_CLIPBOARD:'0',
+      HALO_NET_ADDRESS:'127.0.0.236',HALO_NET_BROADCAST:'127.0.0.237',
+      HALO_UPDATE_ANSWER:'never',HALO_CRASH_REPORTS:'no',HALO_STATS_LOG:'1',HALO_EXIT_AFTER:'480'});
+    const runtimeSha256=await hash(executable);
+    console.log(JSON.stringify({playtest:{mapSha256:privateMap.sha256,runtimeSha256,root,mode:'normal menus'}}));
+    await launch(executable,[],{cwd:root,env,windowsHide:false,timeout:500000});
+    const debug=await fs.readFile(path.join(root,'logs','debug.txt'),'utf8').catch(error=>{
+      if(error.code==='ENOENT')return '';
+      throw error;
+    });
+    if(await hash(localMap)!==privateMap.sha256||await hash(executable)!==runtimeSha256)
+      throw Error('Private playtest map or runtime changed while running');
+    console.log(JSON.stringify({playtest:{mapSha256:privateMap.sha256,runtimeSha256,
+      matchObserved:/STATS .*mode=Slayer map=zombie_road_plow\b/i.test(debug),
+      mapLoadObserved:/mcc: loaded mcc_maps[\/]zombie_road_plow\b/i.test(debug)}}));
+  }
 },{reservationBytes:buildPrivate?1024**3:512*1024**2});
