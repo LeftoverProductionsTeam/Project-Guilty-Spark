@@ -1102,6 +1102,7 @@ pub struct PreservedConnector {
     pub rebuilt_entrance: Option<AssemblyGeometry>,
     pub rebuilt_donor_entrance: Option<AssemblyGeometry>,
     pub replacement_slots: Option<[usize; 2]>,
+    pub retained_entrance_caps: [bool; 2],
     pub switches: [PartitionSwitch; 4],
     pub overlaps: [[V; 2]; 2],
 }
@@ -2465,17 +2466,34 @@ fn generate_preserved_connector_for_slots(
             && !slots.contains(&switch.destination_bsp));
     }
     let retained_slots = || (0..count).filter(|slot| replacement.is_none_or(|slots| !slots.contains(slot)));
-    let common_separation = intact_common_separation(&base.mesh, retained_slots(), &donor.mesh, 0, plan.translation, forward)?;
+    let use_compiled_donor = replacement.is_some() && plan.rebuild_native_connector && !open_entrances[1];
+    let (donor_layout, donor_index, stock_shift) = if use_compiled_donor {
+        (base, island, [0.; 3])
+    } else {
+        (&donor, 0, plan.translation)
+    };
+    let common_separation = intact_common_separation(&base.mesh, retained_slots(), &donor_layout.mesh,
+        donor_index, stock_shift, forward)?;
 
     let (base_collision, _) = maps::collision_source(&source.preserved_path, base)?;
-    let (donor_collision, _) = maps::collision_source(&plan.donor_source.preserved_path, &donor)?;
+    let stock_collision = if use_compiled_donor { None } else {
+        Some(maps::collision_source(&plan.donor_source.preserved_path, &donor)?.0)
+    };
+    let donor_collision = stock_collision.as_ref().unwrap_or(&base_collision);
+    let mut donor_vehicles = Vec::new();
     let mut base_vehicles = crate::bsp_vehicles::edited_base_vehicles(project, base)?;
     if let Some(slots) = replacement {
         let (_, owners) = crate::bsp_audio::inspect_placement_regions(&source.preserved_path, &base.sha256,
             base_vehicles.iter().map(|row| row.position))?;
-        base_vehicles.retain(|row| owners.unique_slot(row.position).is_none_or(|slot| !slots.contains(&slot)));
+        base_vehicles.retain(|row| {
+            let owner = owners.unique_slot(row.position);
+            if use_compiled_donor && owner == Some(island) { donor_vehicles.push(row.clone()); }
+            owner.is_none_or(|slot| !slots.contains(&slot))
+        });
     }
-    let donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?;
+    if !use_compiled_donor {
+        donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?;
+    }
     let base_span = intact_span_before_vehicles(start, mul(base_forward, -1.), plan.tunnel_width, plan.tunnel_height,
         base_vehicles.iter().filter(|row| row.tag.is_some()).map(|row| row.position.map(f64::from)));
     for (&open, repair) in open_entrances.iter().zip(repairs) {
@@ -2517,10 +2535,10 @@ fn generate_preserved_connector_for_slots(
             .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?,
     };
     let donor_span = intact_span_before_vehicles(end, donor_forward, plan.tunnel_width, plan.tunnel_height,
-        donor_vehicles.iter().map(|row| add(row.position.map(f64::from), plan.translation)));
+        donor_vehicles.iter().map(|row| add(row.position.map(f64::from), stock_shift)));
     let (checker, donor_clearance_shift) = match &donor_entrance {
         Some(cut) => (crate::bsp_clearance::RouteChecker::new(&cut.collision)?, [0.; 3]),
-        None => (crate::bsp_clearance::RouteChecker::for_part(&donor_collision, 0)?, plan.translation),
+        None => (crate::bsp_clearance::RouteChecker::for_part(donor_collision, donor_index)?, stock_shift),
     };
     let donor_road = uses_atlas_road_landing(plan).then(||
         atlas_road_landing(&checker, &review, end, donor_forward, donor_clearance_shift, donor_span, true))
@@ -2553,6 +2571,23 @@ fn generate_preserved_connector_for_slots(
             for switch in pair { cap.require_switch_gap(&switch.name, &switch.geometry)?; }
         }
     }
+    let mut retained_entrance_caps = [false; 2];
+    let mut retained_closures = [None; 2];
+    if plan.rebuild_native_connector && !plan.open_road && route.len() >= 4 {
+        for (index, (apron, pair)) in [([start, route[1]], &switches[..2]),
+            ([end, route[route.len() - 2]], &switches[2..])].into_iter().enumerate()
+        {
+            if open_entrances[index] || !(3.1..=12.).contains(&horizontal_run(apron[0], apron[1]))
+                || (apron[0][2] - apron[1][2]).abs() > 0.001 {
+                continue;
+            }
+            let cap = EntranceClosure::for_apron(apron, plan);
+            if pair.iter().all(|switch| cap.require_switch_gap(&switch.name, &switch.geometry).is_ok()) {
+                retained_entrance_caps[index] = true;
+                retained_closures[index] = Some(cap);
+            }
+        }
+    }
     let landing = plan.directional_donor_landing.then(|| {
         fit_directional_landing(&checker, end, donor_forward, donor_switch, plan.tunnel_width, donor_clearance_shift)
     }).transpose()?;
@@ -2565,8 +2600,8 @@ fn generate_preserved_connector_for_slots(
         None => (intact_route_points(overlaps, plan, landing.as_ref())?, None),
     };
     if bent || !common_separation {
-        verify_intact_neighborhood((&base.mesh, &base_collision), (&donor.mesh, &donor_collision),
-            0, plan.translation, retained_slots(), plan, &points)?;
+        verify_intact_neighborhood((&base.mesh, &base_collision), (&donor_layout.mesh, donor_collision),
+            donor_index, stock_shift, retained_slots(), plan, &points)?;
     }
     review.tunnel_points = points[1..points.len() - 1].to_vec();
     review.validate()?;
@@ -2580,21 +2615,22 @@ fn generate_preserved_connector_for_slots(
             (&base_collision, base.render_mesh.as_ref(), plan.base_bsp_index),
             |cut| (&cut.open_collision, Some(&cut.render), 0),
         );
-        let (donor_mesh, donor_render) = donor_entrance.as_ref().map_or(
-            (&donor_collision, donor.render_mesh.as_ref()), |cut| (&cut.open_collision, Some(&cut.render)),
+        let (donor_mesh, donor_render, donor_mesh_index) = donor_entrance.as_ref().map_or(
+            (donor_collision, donor_layout.render_mesh.as_ref(), donor_index),
+            |cut| (&cut.open_collision, Some(&cut.render), 0),
         );
         verify_preserved_tunnel_intrusions(&points, sides.as_deref(), width, height, [
             ("Retained", Some(parent_mesh), parent_index, [0.; 3]),
-            ("Donor", Some(donor_mesh), 0, donor_clearance_shift),
+            ("Donor", Some(donor_mesh), donor_mesh_index, donor_clearance_shift),
             ("Retained render", parent_render, parent_index, [0.; 3]),
-            ("Donor render", donor_render, 0, donor_clearance_shift),
-        ], [None; 2])?;
+            ("Donor render", donor_render, donor_mesh_index, donor_clearance_shift),
+        ], retained_closures)?;
     }
     let contains = |position| shape.as_ref().map_or_else(
         || intact_connector_contains_placement(&points, forward, width, height, position),
         |shape| shape.iter().any(|face| face.contains(position, height)),
     );
-    verify_connector_vehicle_placements(plan.translation, &base_vehicles, &donor_vehicles, contains)?;
+    verify_connector_vehicle_placements(stock_shift, &base_vehicles, &donor_vehicles, contains)?;
     for (index, pickup) in maps::scenario_netgame_pickups(&plan.donor_source.preserved_path, &donor)?.into_iter().enumerate() {
         let position = add(pickup.position.map(f64::from), plan.translation);
         if contains(position) {
@@ -2720,6 +2756,7 @@ fn generate_preserved_connector_for_slots(
         rebuilt_entrance: entrance.map(|cut| cut.geometry),
         rebuilt_donor_entrance: donor_entrance.map(|cut| cut.geometry),
         replacement_slots: replacement,
+        retained_entrance_caps,
         switches,
         overlaps,
     })

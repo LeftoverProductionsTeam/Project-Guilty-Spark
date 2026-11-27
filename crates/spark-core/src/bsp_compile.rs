@@ -935,6 +935,7 @@ pub(crate) struct PreparedPartitions {
     pub intact_overlaps: Option<[[[f64; 3]; 2]; 2]>,
     pub intact_sky_offset: Option<u8>,
     pub replacement_slots: Option<[usize; 2]>,
+    pub retained_entrance_caps: [bool; 2],
     pub overlap: [[f64; 3]; 2],
     pub structure_tags: Vec<String>,
     pub scenery: Vec<crate::bsp_scenery::Placement>,
@@ -1401,10 +1402,11 @@ fn prepare_retained_connector(
     structure_tags[slot] = bsp.clone();
     let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": plan.donor_source.sha256,
         "replacementSlot": slot, "donorSlot": island, "switchesRetained": intact.switches,
+        "retainedEntranceCaps": intact.retained_entrance_caps,
         "scenarioBound": bound, "structures": [{"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
             "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": flags, "report": geometry.report}]});
     Ok(PreparedPartitions { receipt, switches: vec![], intact_overlaps: Some(intact.overlaps),
-        intact_sky_offset: None, replacement_slots: Some([slot, island]), overlap: intact.overlaps[0],
+        intact_sky_offset: None, replacement_slots: Some([slot, island]), retained_entrance_caps: intact.retained_entrance_caps, overlap: intact.overlaps[0],
         structure_tags, scenery: vec![], donor_tag, donor_environment: None, pickups: None, netgame_flags: None, player_starts: None })
 }
 
@@ -1556,7 +1558,7 @@ pub(crate) fn prepare_partition_structure(
         "retainedStructureTags": retained.len(),
         "overlap": overlap, "overlapSamples": overlap_samples, "maxFloorDelta": max_floor_delta, "intactOverlaps": intact_overlaps,
         "switches": switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, replacement_slots: None, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, replacement_slots: None, retained_entrance_caps: [false; 2], structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(

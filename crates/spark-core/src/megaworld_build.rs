@@ -475,7 +475,7 @@ fn build_partition_cache(
     let native_starts = prepared.player_starts.as_ref().map(|review| review.verify(&starts, regional, &regions)).transpose()?;
     let collision = if let Some(overlaps) = prepared.intact_overlaps {
         if let Some(slots) = prepared.replacement_slots {
-            crate::bsp_assembly::verify_rebuilt_connector_collision(&path, &map, plan, overlaps, slots, [false; 2], [None; 2])?
+            crate::bsp_assembly::verify_rebuilt_connector_collision(&path, &map, plan, overlaps, slots, prepared.retained_entrance_caps, [None; 2])?
         } else {
             crate::bsp_assembly::verify_intact_connector_collision(&path, &map, plan, overlaps, old_count)?
         }
