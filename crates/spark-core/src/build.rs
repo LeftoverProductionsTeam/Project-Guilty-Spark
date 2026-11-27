@@ -582,20 +582,21 @@ impl Runner<'_> {
         );
         let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
         #[cfg(windows)]
+        let invader_extraction = executable.file_name().is_some_and(|name| name.eq_ignore_ascii_case("invader-extract.exe"));
+        #[cfg(windows)]
         let relative_native_paths = executable.file_name().is_some_and(|s|{
             let name=s.to_string_lossy();
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
                 || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"|"tag-renaming"|"xbox-model-references"))
                 || (name.eq_ignore_ascii_case("invader-convert.exe")&&phase=="xbox-model-to-pc")
-                || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
                 || (name.eq_ignore_ascii_case("invader-build.exe") && phase=="compile-ce")
                 || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"|"bsp-scenery-model"|"bsp-scenery-model-check"|"model-adaptation-readback"))
                 || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"dependencies"|"asset-dependencies"|"tag-renaming"|"bsp-dependencies"))
                 || (matches!(phase,"recovery-readback"|"recovery-dependencies"|"recovery-data") && ["invader-edit.exe","invader-dependency.exe","invader-recover.exe"].contains(&name.as_ref()))
         });
         #[cfg(windows)]
-        let extraction_args = if relative_native_paths && matches!(phase,"compile-ce"|"bsp-dependencies"|"bsp-scenery-model"|"bsp-scenery-model-check"|"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data"|"xbox-model-to-pc"|"xbox-model-references"|"model-adaptation-readback") {
-            Some(crate::native_workspace::extraction_arguments(args,cwd)?)
+        let extraction_args = if invader_extraction || (relative_native_paths && matches!(phase,"compile-ce"|"bsp-dependencies"|"bsp-scenery-model"|"bsp-scenery-model-check"|"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data"|"xbox-model-to-pc"|"xbox-model-references"|"model-adaptation-readback")) {
+            Some(crate::native_workspace::extraction_arguments(args,cwd,invader_extraction)?)
         } else {None};
         #[cfg(windows)]
         let args=extraction_args.as_deref().unwrap_or(args);

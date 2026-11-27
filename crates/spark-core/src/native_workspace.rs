@@ -1,15 +1,25 @@
 //! Relative paths for legacy native tools running inside an owned physical project directory.
 
 #[cfg(windows)]
-pub(crate) fn extraction_arguments(args: &[String], workspace: &std::path::Path) -> crate::Result<Vec<String>> {
+pub(crate) fn extraction_arguments(args: &[String], workspace: &std::path::Path, extended_tags: bool) -> crate::Result<Vec<String>> {
     use std::path::Path;
     crate::reject_links(workspace)?;
     let root = workspace.canonicalize()?;
-    args.iter().map(|arg| {
+    args.iter().enumerate().map(|(index, arg)| {
         let path = Path::new(arg);
-        if !path.is_absolute() { return Ok(arg.clone()); }
-        let resolved = path.canonicalize()?;
+        let tags = extended_tags && index.checked_sub(1).is_some_and(|prior|
+            matches!(args[prior].as_str(), "-t" | "--tags"));
+        let resolved = if path.is_absolute() {
+            path.canonicalize()?
+        } else if tags {
+            root.join(path).canonicalize()?
+        } else {
+            return Ok(arg.clone());
+        };
         Ok(match resolved.strip_prefix(&root) {
+            // Invader extraction uses the Windows file API for each tag.
+            // An extended physical root preserves paths beyond MAX_PATH.
+            Ok(_) if tags => resolved.to_string_lossy().into_owned(),
             Ok(relative) if relative.as_os_str().is_empty() => ".".into(),
             Ok(relative) => relative.to_string_lossy().into_owned(),
             Err(_) => arg.clone(),
@@ -33,8 +43,13 @@ mod tests {
         let args = vec!["-t".into(), root.join("tags").display().to_string(),
             "-m".into(), external.display().to_string(), "-O".into(),
             input.display().to_string(), root.display().to_string()];
-        let actual = extraction_arguments(&args, &root).unwrap();
+        let actual = extraction_arguments(&args, &root, false).unwrap();
         assert_eq!(actual, ["-t", "tags", "-m", &args[3], "-O", "original input.map", "."]);
         assert_eq!(std::fs::read(root.join(&actual[5])).unwrap(), b"source");
+        let extraction = extraction_arguments(&args, &root, true).unwrap();
+        assert_eq!(extraction[1], root.join("tags").canonicalize().unwrap().to_string_lossy());
+        assert_eq!(&extraction[2..], &actual[2..]);
+        let relative = extraction_arguments(&["--tags".into(), "tags".into()], &root, true).unwrap();
+        assert_eq!(relative[1], extraction[1]);
     }
 }
