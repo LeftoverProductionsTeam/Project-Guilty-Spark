@@ -559,13 +559,26 @@ impl Runner<'_> {
         phase: &str,
         progress: u8,
     ) -> Result<String> {
+        self.run_managed(executable, args, cwd, phase, progress, None)
+    }
+    pub(crate) fn run_managed(
+        &self,
+        executable: &Path,
+        args: &[String],
+        cwd: &Path,
+        phase: &str,
+        progress: u8,
+        store: Option<&crate::storage::Store>,
+    ) -> Result<String> {
         if self.cancel.load(Ordering::Relaxed) {
             return invalid("Build cancelled");
         }
         // The parent reserves a concrete budget before staging. Watch that
         // owned output, never a stock SDK/installation. Safety exhaustion is
         // an emergency rejection, distinct from ordinary deferred cancellation.
-        let budget=crate::storage::Store::existing_for_output(&cwd.join("tool-budget"))?.map(|store|store.tool_budget(cwd)).transpose()?.flatten();
+        let budget=if let Some(store)=store { store.tool_budget(cwd)? } else {
+            crate::storage::Store::existing_for_output(&cwd.join("tool-budget"))?.map(|store|store.tool_budget(cwd)).transpose()?.flatten()
+        };
         if let Some(budget)=&budget{budget.check()?;}
         self.emit(
             phase,

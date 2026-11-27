@@ -82,9 +82,12 @@ pub fn run(
         .ok_or_else(|| missing("Apply and save a reviewed vehicle mount before building"))?;
     let runner = Runner { id, project: &project.id, cancel, event };
     let bytes = fs::metadata(&source.preserved_path)?.len();
-    let work = jobs.join(format!("vehicle-stage-{id}"));
+    // Halo Tool opens nested classic tag paths through a legacy file API.
+    // Use a short physical scratch path while charging the normal app ledger.
+    let suffix = id.get(..12).ok_or_else(|| missing("Invalid attachment job identity"))?;
+    let work = std::env::temp_dir().join(format!("gs-va-{suffix}"));
     let out = jobs.join(id);
-    let store = Store::for_output(&work)?;
+    let store = Store::for_output(&out)?;
     let lease = store.reserve(&work, Some(&source.preserved_path), 6 * bytes + 96 * MIB, Category::Staging, "Vehicle attachment native work")?;
     fs::create_dir_all(&work)?;
     lease.mark_owned()?;
@@ -119,7 +122,7 @@ pub fn run(
             args.push(physical_arg(path)?);
         }
         terminal = false;
-        let result = runner.run(&tools.node, &args, &work, "vehicle-attachment", 25)?;
+        let result = runner.run_managed(&tools.node, &args, &work, "vehicle-attachment", 25, Some(&store))?;
         let line = result.lines().rev().find_map(|line| line.strip_prefix("SPARK_ATTACHMENT "))
             .ok_or_else(|| missing("The attachment worker did not return a verified completion"))?;
         terminal = true;
@@ -151,7 +154,8 @@ pub fn run(
         final_lease.mark_owned()?;
         let scenario = crate::safe_relative(&inspection.scenario_path)?;
         let output = out.join(scenario.file_name().ok_or_else(|| missing("Invalid MCC scenario name"))?).with_extension("map");
-        fs::rename(built, &output)?;
+        fs::copy(built, &output)?;
+        if maps::hash_file(&output)? != output_sha256 { return invalid("Copied attachment cache differs from the verified output"); }
         let record = BuildRecord {
             id: id.into(), timestamp: chrono::Utc::now().to_rfc3339(), status: "validated".into(),
             target: "mcc-cea".into(), output: Some(output), sha256: Some(output_sha256),
@@ -163,7 +167,11 @@ pub fn run(
         final_lease.finish(true, Some(record.project_fingerprint.clone()))?;
         Ok(record)
     })();
-    if terminal { lease.finish_disposable()?; }
+    if terminal {
+        if let Err(problem) = lease.finish_disposable() {
+            runner.emit("storage", format!("Attachment scratch retained for verified cleanup: {problem}"), 98, "warning");
+        }
+    }
     if let Ok(record) = &result { runner.emit("validated", &record.message, 100, "success"); }
     result
 }
