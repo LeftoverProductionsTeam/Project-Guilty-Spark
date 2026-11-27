@@ -36,8 +36,35 @@ interface NativeBspTransitions {
   transitions: {triggerIndex: number; triggerName: string; sourceBsp: number; destinationBsp: number; arrivalMarker?: number; geometry?: NativeVolumeGeometry}[];
 }
 
-function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBsp}: {projectId: string; sourceSha256: string; partCount: number; onViewBsp: (slot:number) => void}) {
+interface RegionalTransferReport {
+  cacheSha256: string;
+  loadedMap: string;
+  matchedLoads: number;
+  transfers: number;
+  rejections: number;
+  unresolvedRecords: number;
+  recent: {result: string; tick: number; playerSlot: number; switchIndex: number; volumeIndex: number;
+    sourceBsp: number; destinationBsp: number; position: Vec3; rootDatum: string; definitionDatum: string; blockerDatum: string|null}[];
+}
+
+function NativeBspTransitionReport({projectId, sourceSha256, partCount, mcc, onViewBsp}: {projectId: string; sourceSha256: string; partCount: number; mcc: boolean; onViewBsp: (slot:number) => void}) {
   const [report, setReport] = useState<NativeBspTransitions | null>(null);
+  const [transferReport, setTransferReport] = useState<RegionalTransferReport|null>(null);
+  const [reviewingTransfers, setReviewingTransfers] = useState(false);
+  const [transferError, setTransferError] = useState('');
+  async function reviewTransfers() {
+    setReviewingTransfers(true);
+    setTransferError('');
+    try {
+      const result = await call<RegionalTransferReport|null>('review_regional_transfer_log', {projectId, sourceSha256});
+      if (!result) return;
+      if (result.cacheSha256 !== sourceSha256) throw Error('The transfer review belongs to another map.');
+      setTransferReport(result);
+    } catch (issue) {
+      setTransferReport(null);
+      setTransferError(String(issue));
+    } finally { setReviewingTransfers(false); }
+  }
   const [, setPreview] = useMapState<NativeBspSwitchPreview | null>(projectId, NATIVE_BSP_SWITCH_PREVIEW, () => null);
   function viewBsp(slot: number) { setPreview(null); onViewBsp(slot); }
   const [sourceFilter, setSourceFilter] = useState(-1);
@@ -60,6 +87,24 @@ function NativeBspTransitionReport({projectId, sourceSha256, partCount, onViewBs
     <p>Review the switch volumes compiled into this map. BSP indices start at 0. The switch changes the active BSP for the whole scenario. Independent regional simulation needs runtime support.</p>
     <button type="button" disabled={!native || busy} onClick={() => void inspectTransitions()}>{busy ? "Reading native scenario…" : "Inspect native BSP transitions"}</button>
     {error && <p role="alert" className="bsp-error">{error}</p>}
+    {mcc && <details>
+      <summary>Forerunner transfer log</summary>
+      <p>Choose the exact staged map and its paired debug log. Spark matches the cache hash, loaded map name, and native switch rows. The log itself does not record a cache hash.</p>
+      <button type="button" disabled={!native || reviewingTransfers} onClick={()=>void reviewTransfers()}>
+        {reviewingTransfers ? 'Reading the paired log…' : 'Review staged map and log'}
+      </button>
+      {transferError && <p role="alert" className="bsp-error">{transferError}</p>}
+      {transferReport && <>
+        <p><strong>{transferReport.loadedMap}</strong> · {transferReport.cacheSha256.slice(0,12)} · {transferReport.matchedLoads} matching loads</p>
+        <p>{transferReport.transfers} transfers · {transferReport.rejections} rejected · {transferReport.unresolvedRecords} unresolved</p>
+        <ol aria-label="Recent regional transfers">{transferReport.recent.map((row,index)=><li key={index}>
+          <strong>BSP {row.sourceBsp} → BSP {row.destinationBsp}</strong> · {row.result} · tick {row.tick} · player {row.playerSlot}<br/>
+          Switch {row.switchIndex} · volume {row.volumeIndex} · position {row.position.map(axis=>axis.toFixed(3)).join(' / ')}
+          {row.blockerDatum && <> · blocker <code>{row.blockerDatum}</code></>}
+          <button type="button" disabled={row.sourceBsp>=partCount} onClick={()=>viewBsp(row.sourceBsp)}>View transfer source BSP {row.sourceBsp}</button>
+        </li>)}</ol>
+      </>}
+    </details>}
     {report && <details open>
       <summary>{report.bspCount} BSPs · {report.transitions.length} compiled switches</summary>
       {report.extractionHubIssue && <p role="alert" className="bsp-error">{report.extractionHubIssue}</p>}
@@ -548,7 +593,7 @@ export default function BspAssembly({
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} project={project} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
-          {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
+          {nativePartitioned && <NativeBspTransitionReport key={project.id+':'+sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} mcc={inspection?.header.version===13} onViewBsp={setViewedBsp}/>}
           {nativePartitioned && native && inherited.some(plan => plan.preserveDonorBsp) && (
             <details className="bsp-help">
               <summary>Edit a compiled connector</summary>

@@ -3,6 +3,15 @@ use spark_core::{bsp_assembly, library::Library, maps, Result};
 use std::{fs, path::Path, sync::atomic::AtomicBool};
 fn main() -> Result<()> {
     let mut a: Vec<_> = std::env::args().collect();
+    if let [_, mode, cache, log] = a.as_slice() {
+        if mode == "--review-regional-log" {
+            let (cache, log) = (Path::new(cache), Path::new(log));
+            let map = maps::inspect_map(cache, cache.parent())?;
+            let report = maps::review_regional_transfer_log(cache, &map, cache, log)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            return Ok(());
+        }
+    }
     let plan_only = a.get(1).is_some_and(|arg| arg == "--plan-only");
     if plan_only { a.remove(1); }
     let direction = if a.get(1).is_some_and(|arg| arg == "--direction") {

@@ -7877,6 +7877,41 @@ test('End grounds a pickup on the visible BSP instead of another region above it
   await expect(z).toHaveValue('8');
 });
 
+test('Forerunner transfer review presents paired native switch observations', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, {a: base} = w.__sparkMock.projects;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    base.project.source.cacheVersion = base.inspection.header.version = 13;
+    const indexCount = base.inspection.mesh.indices.length;
+    base.inspection.mesh.parts = ['Base', 'Neighbor'].map(name=>({name,indexStart:0,indexCount}));
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command !== 'review_regional_transfer_log') return invoke(command, args);
+      w.__regionalLogReviewArgs = args;
+      return {
+        cacheSha256: base.inspection.sha256, loadedMap: 'mcc_maps/test', matchedLoads: 1,
+        transfers: 1, rejections: 1, unresolvedRecords: 0,
+        recent: [{result:'blocked_destination',tick:42,playerSlot:0,switchIndex:2,volumeIndex:3,sourceBsp:1,destinationBsp:0,
+          position:[1,2,3],rootDatum:'e6a00431',definitionDatum:'e7e0066c',blockerDatum:'e7e0033d'}],
+      };
+    };
+  });
+  await openFixture(page); await chooseTool(page, 'Level editor');
+  const panel = page.getByRole('region',{name:'Construction panel',exact:true});
+  if (!await panel.isVisible()) await openDrawer(page,'Construction');
+  const summary = panel.locator('.bsp-assembly > summary');
+  await revealPagedControl(summary); await summary.click();
+  const details = panel.getByText('Forerunner transfer log',{exact:true});
+  await revealPagedControl(details); await details.click();
+  await (await constructionControl(page,'button','Review staged map and log')).click();
+  const observed = panel.getByRole('list',{name:'Recent regional transfers',exact:true,includeHidden:true});
+  await expect(observed).toContainText('BSP 1 → BSP 0 · blocked_destination · tick 42 · player 0');
+  await expect(observed).toContainText('e7e0033d');
+  expect(await page.evaluate(() => (window as any).__regionalLogReviewArgs)).toMatchObject({projectId:'a',sourceSha256:await page.evaluate(()=> (window as any).__sparkMock.projects.a.inspection.sha256)});
+  await (await constructionControl(page,'button','View transfer source BSP 1')).click();
+  await expect(page.getByRole('combobox',{name:'Visible BSP',exact:true})).toHaveValue('1');
+});
+
 test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {
   await mockDesktop(page);
   await page.evaluate(async () => {

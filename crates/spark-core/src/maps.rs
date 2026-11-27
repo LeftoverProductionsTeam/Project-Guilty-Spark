@@ -7,7 +7,7 @@ pub use scenario_logic_readback::scenario_gameplay_merge_budget;
 pub(crate) use scenario_logic_readback::{mcc13_sky_reference_count, native_item_collections, netgame_equipment_limit, netgame_equipment_read_limit, scenario_netgame_flags, scenario_netgame_pickups,
     NativeItemCollection, NativeNetgameFlag, NativeNetgamePickup, CLASSIC_NETGAME_FLAG_LIMIT, MCC13_REGIONAL_FLAG_LIMIT, NETGAME_EQUIPMENT_LIMIT};
 pub(crate) use scenario_logic_readback::{scenario_vehicles, NativeVehicle, player_start_limit, player_start_read_limit, scenario_region_starts, NativeRegionStart, NATIVE_SPAWN_TYPES, PLAYER_START_LIMIT};
-pub use scenario_logic_readback::{native_bsp_switch_name, scenario_bsp_tag_paths, scenario_bsp_transitions, NativeBspTransition, NativeBspTransitions, scenario_recording_readback, NativeScenarioRecording};
+pub use scenario_logic_readback::{review_regional_transfer_log, RegionalTransferReport, native_bsp_switch_name, scenario_bsp_tag_paths, scenario_bsp_transitions, NativeBspTransition, NativeBspTransitions, scenario_recording_readback, NativeScenarioRecording};
 pub use scenario_logic_readback::{scenario_placement_readback,scenario_weapon_readback,scenario_faction_body_readback,ScenarioLogicWeapon,scenario_command_readback,scenario_volume_readback,scenario_camera_readback,NativeCameraPoint,scenario_flag_readback,NativeCutsceneFlag,scenario_named_object_readback,NativeNamedObject,scenario_global_readback,NativeScriptGlobal,scenario_logic_readback,ScenarioLogicReadback,ScenarioLogicName,ScenarioLogicDevice,ScenarioLogicGroup,ScenarioLogicVolume,ScenarioLogicVolumeGeometry};
 use crate::{binary::Reader, invalid, Result, SparkError};
 use serde::{Deserialize, Serialize};

@@ -686,6 +686,25 @@ async fn inspect_native_bsp_transitions(
 }
 
 #[tauri::command]
+async fn review_regional_transfer_log(
+    app: tauri::AppHandle, project_id: String, source_sha256: String,
+) -> Reply<Option<maps::RegionalTransferReport>> {
+    let Some(cache) = rfd::AsyncFileDialog::new().set_title("Choose the exact staged MCC map")
+        .add_filter("Halo map", &["map"]).pick_file().await else { return Ok(None); };
+    let Some(log) = rfd::AsyncFileDialog::new().set_title("Choose the paired Forerunner debug log")
+        .add_filter("Forerunner log", &["txt", "log"]).pick_file().await else { return Ok(None); };
+    let (cache, log) = (cache.path().to_owned(), log.path().to_owned());
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Open a compiled MCC13 source map")?;
+        if source.sha256 != source_sha256 { return Err("The selected map changed during log review.".into()); }
+        let map = inspect(&state, &project)?;
+        maps::review_regional_transfer_log(&source.preserved_path, &map, &cache, &log).map(Some).map_err(error)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
 async fn inspect_native_bsp_placements(
     app: tauri::AppHandle, project_id: String, source_sha256: String,
 ) -> Reply<maps::NativeBspPlacements> {
@@ -3874,6 +3893,7 @@ pub fn run() {
             preview_bsp_assembly,
             check_bsp_assembly_structure,
             inspect_native_bsp_transitions,
+            review_regional_transfer_log,
             inspect_native_bsp_placements,
             open_bsp_assembly_donor,
             workspace_windows::claim_project_document,

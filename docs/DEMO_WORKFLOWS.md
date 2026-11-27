@@ -10,6 +10,8 @@ Open **Level editor → Construction → BSP Assembly**. Plan a route or open yo
 
 Run **Preview draft & triangles** to see the draft and inspect clearance or facing warnings. **Apply connection** creates an Undo step and **Save** persists it. For native output, use the existing **Build settings → Build & check playtest** with matching tools and source tags. The interaction has passed browser testing. On an eligible compiled MCC13 project, open **Edit a compiled connector** and select the inherited route. **Add bend before imported floor** creates an editable interior point and preserves the straight approaches. The landing coordinates, approach points, and switch dimensions stay fixed. Spark’s in-place build targets the connector’s existing slot. This path still needs an end-to-end desktop bake and traversal check.
 
+With a compiled MCC13 project open, expand **Forerunner transfer log** in **Native BSP transitions**. Choose the staged cache actually used for the run and its paired debug log. Spark checks the cache hash, logged map name and native switch rows, then shows the recorded crossings, rejection reasons and blocking object IDs. Use **View transfer source BSP** to inspect the reported region.
+
 ## Make your own named rooms and hallway
 
 1. **Map library → Create a map → Custom blank → Level editor → BSP Workshop**. Choose **Start with one room**, or inspect **Two rooms + corridor + ramp** in a separate source project. Loading that example replaces its source geometry as one Undo step.

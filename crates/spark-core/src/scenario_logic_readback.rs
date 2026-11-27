@@ -578,6 +578,136 @@ pub fn scenario_bsp_transitions(path: &Path, map: &MapInspection) -> Result<Nati
     })
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegionalTransferObservation {
+    pub result: String,
+    pub tick: u32,
+    pub player_slot: u16,
+    pub switch_index: usize,
+    pub volume_index: usize,
+    pub source_bsp: usize,
+    pub destination_bsp: usize,
+    pub position: [f32; 3],
+    pub root_datum: String,
+    pub definition_datum: String,
+    pub blocker_datum: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegionalTransferReport {
+    pub cache_sha256: String,
+    pub loaded_map: String,
+    pub matched_loads: usize,
+    pub transfers: usize,
+    pub rejections: usize,
+    pub unresolved_records: usize,
+    pub recent: Vec<RegionalTransferObservation>,
+}
+
+fn parse_regional_transfer(line: &str) -> Option<RegionalTransferObservation> {
+    let (_, record) = line.split_once("regional transfer: ")?;
+    let mut fields = record.split_whitespace();
+    let mut next = |key: &str| fields.next()?.strip_prefix(key);
+    let result = next("result=")?;
+    if result.is_empty() || result.len() > 64 || !result.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') {
+        return None;
+    }
+    let tick = next("tick=")?.parse().ok()?;
+    let player_slot = next("player=")?.parse().ok()?;
+    let switch_index = next("switch=")?.parse().ok()?;
+    let volume_index = next("volume=")?.parse().ok()?;
+    let source_bsp = next("from=")?.parse().ok()?;
+    let destination_bsp = next("to=")?.parse().ok()?;
+    let mut xyz = next("xyz=")?.split(',');
+    let position = [xyz.next()?.parse::<f32>().ok()?, xyz.next()?.parse().ok()?, xyz.next()?.parse().ok()?];
+    if xyz.next().is_some() || !position.iter().all(|axis| axis.is_finite()) {
+        return None;
+    }
+    let datum = |text: &str| (text.len() == 8 && text.bytes().all(|b| b.is_ascii_hexdigit())).then(|| text.to_ascii_lowercase());
+    let root_datum = datum(next("root=")?)?;
+    let definition_datum = datum(next("definition=")?)?;
+    let blocker = datum(next("blocker=")?)?;
+    if fields.next().is_some() { return None; }
+    Some(RegionalTransferObservation {
+        result: result.into(), tick, player_slot, switch_index, volume_index, source_bsp, destination_bsp, position,
+        root_datum, definition_datum, blocker_datum: (blocker != "ffffffff").then_some(blocker),
+    })
+}
+
+fn read_regional_transfer_log(
+    reader: impl std::io::BufRead, name: &str, native: &NativeBspTransitions,
+) -> Result<RegionalTransferReport> {
+    use std::io::{BufRead, Read};
+    const MAX_BYTES: u64 = 128 * 1024 * 1024;
+    const MAX_LINE: usize = 64 * 1024;
+    const MAX_RECENT: usize = 16;
+    let expected = format!("mcc_maps/{name}");
+    let mut report = RegionalTransferReport {
+        cache_sha256: native.cache_sha256.clone(), loaded_map: expected.clone(), matched_loads: 0,
+        transfers: 0, rejections: 0, unresolved_records: 0, recent: Vec::new(),
+    };
+    let mut stream = reader.take(MAX_BYTES + 1);
+    let mut buffer = Vec::new();
+    let mut current = false;
+    let mut recent = std::collections::VecDeque::new();
+    loop {
+        buffer.clear();
+        let size = (&mut stream).take((MAX_LINE + 1) as u64).read_until(b'\n', &mut buffer)?;
+        if size == 0 { break; }
+        if size > MAX_LINE || stream.limit() == 0 {
+            return invalid("Forerunner log exceeds the 128 MiB file or 64 KiB line limit");
+        }
+        let Ok(line) = std::str::from_utf8(&buffer) else { continue; };
+        if let Some((_, loaded)) = line.split_once("mcc: loaded ") {
+            current = loaded.split_once(" (").is_some_and(|(loaded, _)|
+                loaded.replace('\\', "/").eq_ignore_ascii_case(&expected));
+            if current { report.matched_loads += 1; }
+        } else if current && line.contains("regional transfer: ") {
+            let observation = parse_regional_transfer(line).filter(|row|
+                native.transitions.get(row.switch_index).is_some_and(|switch|
+                    switch.trigger_index == row.volume_index && switch.source_bsp == row.source_bsp
+                    && switch.destination_bsp == row.destination_bsp && switch.arrival_marker.is_none()));
+            if let Some(row) = observation {
+                if row.result == "transferred" { report.transfers += 1; } else { report.rejections += 1; }
+                if recent.len() == MAX_RECENT { recent.pop_front(); }
+                recent.push_back(row);
+            } else {
+                report.unresolved_records += 1;
+            }
+        }
+    }
+    if report.matched_loads == 0 {
+        return invalid("The log does not record loading this staged MCC map name");
+    }
+    report.recent = recent.into();
+    Ok(report)
+}
+
+/// Review a creator-selected cache and log as a pair. The log identifies the
+/// loaded name and switch rows, while the separately selected cache supplies
+/// the hash. The log format does not attest to the loaded bytes.
+pub fn review_regional_transfer_log(
+    preserved_cache: &Path, map: &MapInspection, staged_cache: &Path, log: &Path,
+) -> Result<RegionalTransferReport> {
+    if map.header.version != 13 {
+        return invalid("Forerunner regional log review requires a compiled MCC13 map");
+    }
+    for file in [preserved_cache, staged_cache, log] { crate::reject_links(file)?; }
+    if !staged_cache.is_file() || !log.is_file() || staged_cache.extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("map")) {
+        return invalid("Choose the staged .map and its Forerunner debug log");
+    }
+    if crate::maps::hash_file(preserved_cache)? != map.sha256 || crate::maps::hash_file(staged_cache)? != map.sha256 {
+        return invalid("The staged map bytes must match the open project’s compiled cache");
+    }
+    let name = staged_cache.file_stem().and_then(|part| part.to_str())
+        .filter(|name| !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-'))
+        .ok_or_else(|| SparkError::Invalid("The staged map has no supported native filename".into()))?;
+    let transitions = scenario_bsp_transitions(preserved_cache, map)?;
+    read_regional_transfer_log(std::io::BufReader::new(std::fs::File::open(log)?), name, &transitions)
+}
+
 fn oriented_volume_geometry(r: &Reader, at: usize) -> Result<Option<ScenarioLogicVolumeGeometry>> {
     if r.u16(at)? != 1 { return Ok(None); }
     Ok(Some(ScenarioLogicVolumeGeometry {
@@ -743,6 +873,29 @@ fn parse_placements(r:&Reader,space:&Space,sc:usize,tags:&[Tag],all_vehicles:boo
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn regional_log_review_binds_each_observation_to_its_load_and_switch() {
+        let native = NativeBspTransitions {
+            cache_sha256: "a".repeat(64), bsp_count: 2, bsp_tag_paths: vec![],
+            transitions: vec![NativeBspTransition {
+                trigger_index: 4, trigger_name: "bsp0,1".into(), source_bsp: 0, destination_bsp: 1,
+                arrival_marker: None, geometry: None,
+            }],
+        };
+        let transfer = "chupathingyce: regional transfer: result=transferred tick=42 player=0 switch=0 volume=4 from=0 to=1 xyz=-12.500,2.100,3.000 root=e6a00431 definition=e7e0066c blocker=ffffffff";
+        let failed = transfer.replace("result=transferred", "result=blocked_destination")
+            .replace("blocker=ffffffff", "blocker=e7e0033d");
+        let unrelated = transfer.replace("volume=4", "volume=9");
+        let log = format!("{transfer}\nclock mcc: loaded mcc_maps\\test (12 tags, 400 bytes of runtime tags)\n{transfer}\n{failed}\n{unrelated}\nclock mcc: loaded mcc_maps\\other (1 tags, 4 bytes of runtime tags)\n{transfer}\n");
+        let result = read_regional_transfer_log(log.as_bytes(), "test", &native).unwrap();
+        assert_eq!((result.matched_loads, result.transfers, result.rejections, result.unresolved_records), (1, 1, 1, 1));
+        assert_eq!(result.recent[0].position, [-12.5, 2.1, 3.]);
+        assert_eq!(result.recent[0].blocker_datum, None);
+        assert_eq!(result.recent[1].blocker_datum.as_deref(), Some("e7e0033d"));
+        assert!(read_regional_transfer_log(transfer.as_bytes(), "test", &native).is_err());
+        assert!(parse_regional_transfer(&transfer.replace("-12.500", "NaN")).is_none());
+    }
+
     #[test]
     fn native_trigger_membership_excludes_faces_of_rotated_volume() {
         let volume = super::ScenarioLogicVolumeGeometry {
