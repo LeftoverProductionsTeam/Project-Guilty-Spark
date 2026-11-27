@@ -7994,6 +7994,7 @@ test('failed native BSP build links only its own geometry to Level Editor', asyn
     const w = window as any;
     w.__sparkMock.projects.a.project.bspAssembly = await w.__TAURI_INTERNALS__.invoke(
       'plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
+    w.__sparkMock.projects.a.project.scene = [{ id: 'diagnostic-start', name: 'Player start', kind: 'Player spawn', position: [100, 100, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true }];
   });
   await openFixture(page);
   await chooseTool(page, 'Build & playtest');
@@ -8016,6 +8017,10 @@ test('failed native BSP build links only its own geometry to Level Editor', asyn
   await expect(review).toBeVisible();
   await review.click();
   await expect(page.getByLabel('Viewport object count')).toBeVisible();
+  await expect(page.getByLabel('View from player start')).toHaveValue('');
+  const canvas = page.getByTestId('viewport').locator('canvas');
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+    JSON.parse(element.dataset.gsCameraPose ?? '{}').target)).toEqual([1, 1, 0.5]);
 });
 
 test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {

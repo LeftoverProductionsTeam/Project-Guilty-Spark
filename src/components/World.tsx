@@ -7,7 +7,7 @@ import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
 import {NATIVE_VOLUME_VIEW,volumeCenter,volumeQuaternion} from '../nativeTriggerVolume';
 import {transformAssembly, assemblyVehicleGrade, assemblyRoutePoints, editAssemblyRoutePoints, assemblySignature, NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
-import {BSP_STRUCTURE_WITNESS, type BspStructureWitness} from '../haloWrl';
+import {BSP_STRUCTURE_WITNESS, type BspStructureWitness, type WrlDiagnostics} from '../haloWrl';
 import {WrlErrorOverlay} from './ForgeViewport';
 import type {AssemblyRouteKey, BspAssembly, NativeBspSwitchPreview} from '../bspAssembly';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
@@ -767,7 +767,7 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
-  const [bspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
+  const [bspWitness, setBspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
   const currentBspDiagnostics = bspWitness && bspWitness.sourceSha256 === project.source?.sha256 &&
     bspWitness.assemblySignature === assemblySignature(project.bspAssembly ?? null) ? bspWitness.diagnostics : null;
   const [routeHandles] = useMapState(project.id, 'bsp.view.handles', false);
@@ -886,6 +886,20 @@ export default function World({
   useEffect(()=>{if(nativeDeviceReady&&nativeDevice?.focus&&!cinematic&&!externalCameraAuthority&&!cameraLocked){setNativeCommand(v=>v?.active?{...v,active:false}:v);setNativeVolume(null);setNativeAiStart(null);setNativeCamera(null);setFly(false);setPlayerView(false);setLocalSelected(deviceObjectId(nativeDevice.original));setModeState('translate');setFrame(n=>n+1);}},[nativeDevice?.focus,nativeDeviceReady,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   useEffect(()=>{if(!nativeCommand?.active||!nativeCommand.focus||cinematic||externalCameraAuthority||cameraLocked)return;setNativeDevice(v=>v?.active?{...v,active:false}:v);setNativeAiStart(null);setNativeCamera(null);setNativeVolume(null);setFly(false);setPlayerView(false);setLocalSelected(null);setModeState('translate');},[nativeCommand?.focus,nativeCommand?.active,project.id,cinematic,externalCameraAuthority,cameraLocked]);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
+  const [framedDiagnostics, setFramedDiagnostics] = useState<{diagnostics: WrlDiagnostics; frame: number} | null>(null);
+  const diagnosticBounds = useMemo(() => {
+    if (!framedDiagnostics || framedDiagnostics.diagnostics !== currentBspDiagnostics || framedDiagnostics.frame !== frame) return null;
+    const {min, max} = framedDiagnostics.diagnostics.bounds;
+    return new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max));
+  }, [framedDiagnostics, currentBspDiagnostics, frame]);
+  useEffect(() => {
+    if (!bspWitness?.frameRequested || !currentBspDiagnostics || cinematic || cameraLocked || externalCameraAuthority) return;
+    setBspWitness(witness => witness === bspWitness ? { ...witness, frameRequested: false } : witness);
+    setFramedDiagnostics({ diagnostics: currentBspDiagnostics, frame: frame + 1 });
+    setFly(false);
+    setPlayerView(false);
+    setFrame(frame + 1);
+  }, [bspWitness, currentBspDiagnostics, cinematic, cameraLocked, externalCameraAuthority, frame, setBspWitness, setFly, setPlayerView]);
   const [startId,setStartId]=useMapState(project.id,'world.start','');
   const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
   const sourceSha=inspection?.sha256;
@@ -1882,7 +1896,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked:cameraLocked||xrActive,
                     externalCameraAuthority:externalCameraAuthority||xrActive,
-                    routePoints,routeFailure,routeGradeLimit,routeFixedEnds:!!currentRouteDraft?.rebuildNativeConnector&&routeKey==='primary',routePointSelection,onSelectRoutePoint:setRoutePointSelection,onRoutePoint:changeRoutePoint,routeKey:project.id+':'+(moveDonorHandle?'donor':routeKey),ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
+                    routePoints,routeFailure,routeGradeLimit,routeFixedEnds:!!currentRouteDraft?.rebuildNativeConnector&&routeKey==='primary',routePointSelection,onSelectRoutePoint:setRoutePointSelection,onRoutePoint:changeRoutePoint,routeKey:project.id+':'+(moveDonorHandle?'donor':routeKey),ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:diagnosticBounds ?? switchPose?.bounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}

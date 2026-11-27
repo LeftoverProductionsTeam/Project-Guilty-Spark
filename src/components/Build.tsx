@@ -118,7 +118,7 @@ export default function Build({
   const targetName=ceTarget?(target!.runtimeId==='chupathingyCe'?'Chupathingy':'Custom Edition'):'MCC';
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
-  const [witness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
+  const [witness, setWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
   const canReviewGeometry = last?.phase === 'failed' && witness?.jobId === last.jobId
     && !!project.bspAssembly && witness.sourceSha256 === project.source?.sha256
     && witness.assemblySignature === assemblySignature(project.bspAssembly);
@@ -158,9 +158,12 @@ export default function Build({
         vehicleBuildId={view==='build'&&validated?.target==='mcc-cea'&&project.shapeDraft?.vehicleMount ? validated.id : null}
         onSave={()=>onSave(true)}/>
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
-      {view==='build'&&canReviewGeometry&&<section className="build-next-step" aria-label="Native structure failure">
+      {view==='build'&&canReviewGeometry&&<section className="build-next-step" aria-label="Native geometry failure">
         <strong>Halo Tool found a geometry problem</strong>
-        <button type="button" onClick={onReviewGeometry}>Show affected geometry in Level Editor</button>
+        <button type="button" onClick={() => {
+          if (witness) setWitness({ ...witness, frameRequested: true });
+          onReviewGeometry();
+        }}>Show affected geometry in Level Editor</button>
       </section>}
       {view==='build'&&report&&!report.ready&&report.blockers.length>0&&<section className="build-next-step" aria-label="What to fix before building">
         <strong>Before you can build</strong><p>{report.blockers[0]}</p>

@@ -19,7 +19,7 @@ export interface WrlDiagnostics {
   notes: string[];
 }
 export const BSP_STRUCTURE_WITNESS = 'world.bsp-structure-witness';
-export interface BspStructureWitness { sourceSha256: string; assemblySignature: string; diagnostics: WrlDiagnostics; jobId?: string }
+export interface BspStructureWitness { sourceSha256: string; assemblySignature: string; diagnostics: WrlDiagnostics; jobId?: string; frameRequested?: boolean }
 
 const MAX_FILE = 2 * 1024 * 1024;
 const MAX_REGIONS = 2048;
