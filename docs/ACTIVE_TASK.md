@@ -3,9 +3,9 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b. Previous fb126341 / e6cab303.
+Latest verified revision: Spark 4f28d8f8 / bf4c156e includes the curved Box plow. Previous 42c19e04 / d0135aaa. Earlier 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependencies and road-plow collision. Exact 61f8d17b appeared in Forerunner’s Zombies chooser. Windows blocked Host before map load. Latest guides users to Play Solo and keeps Stop available after edits.
-Next action: Bake the regenerated Ice Fields entrance and verify stock wall facing. Reviewed source b43883d8 clears continuous BSP 6 occupancy and matches all four switches. Recover the lost Carousel ramp parameters and bake that slot separately. f5a4ca22, 919fbcce and fd7a49fa survive. b5178c77 is missing. Drive the Spark plow independently.
+Next action: Bake Ice Fields source b43883d8 with the existing verified H1A lighting dependency closure. Native structure compiled with exact recovered f5 lining aliases and stock sky. Lighting needs H1A rasterizer globals. Keep b5178c77 missing, f5a4ca22 as floor control, and recover the Carousel ramp separately. Drive the plow independently.
 
 ## Acceptance
 
