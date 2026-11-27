@@ -4,8 +4,8 @@ Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native ga
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 59f954c2 / 4db2570a. Windows shape/paint and Blender review/apply/Undo/Redo/Save/reopen passed. A second Blender save leaves accepted bytes intact. Continuous brush export passed. Previous 17e00308 / 723b6cd9. Native window handoff, eight-size Games & tools and OpenCE restart evidence retained. Monitor patrol and native Warthog deployment remain open.
-Zombie Survival: On zombie_carrier_compare (05a4268a), Forerunner logged 102 failed seat exits; individual screenshot actors unverified. Halo Tool preserved all stock faces and 880 blade faces per body LOD, 26 markers, checksum 4180762708, and stock cutoffs for the Demolisher render variant. Collision, paint shader and playtest remain open.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently preserve the Demolisher collision rig and add blade collision.
+Zombie Survival: On zombie_carrier_compare (05a4268a), Forerunner logged 102 failed seat exits; individual screenshot actors unverified. Halo Tool preserved all stock faces and 880 blade faces per body LOD, 26 markers, checksum 4180762708, and stock cutoffs for the Demolisher render variant. Combined collider retained 17 non-hull nodes, three permutations and damage fields; blade contacts read back. Near-coplanar warning, paint shader and gameplay remain open.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently inspect the Demolisher collision warning, bind paint, and build a private playable variant.
 
 ## Acceptance
 

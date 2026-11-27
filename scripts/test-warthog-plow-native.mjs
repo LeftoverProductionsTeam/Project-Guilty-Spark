@@ -1,5 +1,6 @@
 // Bounded native render proof against an explicitly selected local Warthog cache.
 import {withDevelopmentWorkspace} from './native-qa-storage.mjs';
+import {buildNativeRigidPartCollision} from './native-rigid-part-collision.mjs';
 import {plowMesh} from '../src/plowMesh.ts';
 import {attachRigidPartToRecoveredJms,normalizeRecoveredJmsChecksum,readRecoveredJms} from '../src/haloRiggedJms.ts';
 import fs from 'node:fs/promises';
@@ -20,6 +21,8 @@ const hash=async file=>{
   return digest.digest('hex');
 };
 const originalMapHash=await hash(map);
+const blender=process.env.SPARK_WARTHOG_BLENDER;
+if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the installed Blender executable');
 
 await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const tags=path.join(context.directory,'tags'),data=path.join(context.directory,'data');
@@ -51,7 +54,9 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const hullPoints=triangles(stock).filter(face=>face.region==='hull').flatMap(face=>face.points);
   const points=hullPoints;
   const front=Math.max(...points.map(p=>p[0])),width=Math.max(...points.map(p=>p[1]))-Math.min(...points.map(p=>p[1])),bottom=Math.min(...points.map(p=>p[2]));
-  const mesh=plowMesh([.22,Math.min(width*1.1/100,2.5),.65],62,30,'v');
+  const bladeWidth=Math.min(width*1.1/100,2.5);
+  const dimensions=[.22,bladeWidth,.65];
+  const mesh=plowMesh(dimensions,62,30,'v');
   const origin=[front+15,0,bottom+5],proof=[];
   const mount={node:'frame hull',region:'hull',material:'warthog hull',position:origin.map(x=>x/100)};
   for(const name of await fs.readdir(base)){
@@ -123,16 +128,34 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const originalVehicle=await readVehicle(vehicle);
   const originalModel=(await run('edit',['-t',tags,'-G','model',vehicle])).trim();
   if(originalModel!==model)throw Error('This vehicle does not use the expected Warthog render model');
-  await run('edit',['-t',tags,'-S','model',candidate,'-O',variant,vehicle]);
-  const modelLine=/^model \([^(\r\n]+\)[ \t]+dependency[ \t]*$/m;
-  const revisedVehicle=await readVehicle(variant);
-  const modelMatch=revisedVehicle.match(modelLine);
-  if(!modelMatch?.[0].includes(candidate) || revisedVehicle.replace(modelLine,originalVehicle.match(modelLine)?.[0]??'')!==originalVehicle) {
-    throw Error('The disposable vehicle variant changed fields beyond its render model reference');
+  let collision=null;
+  if(blender){
+    const sourceCollision=(await run('edit',['-t',tags,'-G','collision_model',vehicle])).trim();
+    if(!/^[a-z0-9_ -]+(?:\\[a-z0-9_ -]+)+\.model_collision_geometry$/i.test(sourceCollision))
+      throw Error('The selected vehicle has no supported collision tag');
+    await run('extract',['-G','-t',tags,'-s',sourceCollision,map]);
+    const contactWidth=bladeWidth*.42;
+    collision=await buildNativeRigidPartCollision({
+      context,tags,data,run,launch,compiler:kit,blender,originalTag:sourceCollision,source:stock,
+      blade:plowMesh(dimensions,62,30,'v','collision'),mount:{...mount,material:'metal'},
+      contactSamples:[[0,0],[contactWidth,0],[-contactWidth,0]],
+    });
   }
+  const references=[['model',candidate]];
+  if(collision)references.push(['collision_model',collision.tag]);
+  await run('edit',['-t',tags,...references.flatMap(([field,tag])=>['-S',field,tag]),'-O',variant,vehicle]);
+  let revisedVehicle=await readVehicle(variant);
+  for(const [field,tag] of references){
+    const verified=(await run('edit',['-t',tags,'-G',field,variant])).trim();
+    const dependency=new RegExp('^'+field+' \\([^\\r\\n]+$','m');
+    const before=originalVehicle.match(dependency);
+    if(verified!==tag||!before||!dependency.test(revisedVehicle))throw Error('Missing compiled vehicle reference: '+field);
+    revisedVehicle=revisedVehicle.replace(dependency,before[0]);
+  }
+  if(revisedVehicle!==originalVehicle)throw Error('Vehicle variant changed fields beyond reviewed model references');
   if(await readVehicle(vehicle)!==originalVehicle)throw Error('Original extracted vehicle changed');
   if(await hash(map)!==originalMapHash)throw Error('Original map changed during the native proof');
-  console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,proof,bladeTriangles:mesh.indices.length/3,mountCentimeters:origin,
-    compilerOutput:raw.slice(-250),scope:'Compiled render model only; collision and gameplay require separate validation.'}));
+  console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,proof,bladeTriangles:mesh.indices.length/3,bladeDimensions:dimensions,mountCentimeters:origin,
+    compilerOutput:raw.slice(-250),scope:'Compiled vehicle tag readback; gameplay requires separate validation.'}));
   if(!proof.every(p=>p.after===p.expected&&p.matchedBlade===mesh.indices.length/3&&p.matchedStock===p.original&&p.checksum===stock.checksum&&p.rigIdentical&&p.markersIdentical))throw Error('H1A stock rig or blade failed exact readback');
 },{reservationBytes:512*1024**2});

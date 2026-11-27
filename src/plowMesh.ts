@@ -2,8 +2,10 @@ import type { MeshData, Vec3 } from './types';
 
 export type PlowProfile = 'rounded' | 'v';
 
-export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile): MeshData {
-  const columns = 16, rows = 12;
+export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile,
+  detail: 'render' | 'collision' = 'render'): MeshData {
+  const columns = detail === 'collision' ? 8 : 16;
+  const rows = detail === 'collision' ? 4 : 12;
   const mesh: MeshData = { positions: [], indices: [], uvs: [], label: 'Plow blade', source: 'Spark shape' };
   const rake = Math.min(depth, height * 0.7);
   const scoopDepth = height * 0.65 * scoop / 100;
