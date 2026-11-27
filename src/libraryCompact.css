@@ -237,3 +237,8 @@
 .multi-map-batch fieldset select { max-width: min(45rem, 100%); }
 .multi-map-batch .batch-map-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
 .multi-map-batch li { overflow-wrap: anywhere; }
+
+.multi-map-batch .batch-count { margin-inline-start: .5rem; color: var(--muted); font-size: .85em; font-weight: normal; }
+.multi-map-batch .batch-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; margin-block: .45rem; }
+.multi-map-batch .batch-map-list { max-height: 9rem; overflow: auto; padding-inline: .35rem; }
+.multi-map-batch .batch-map-list[hidden] { display: none; }

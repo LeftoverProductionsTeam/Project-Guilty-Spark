@@ -254,7 +254,7 @@ export default function App() {
     return()=>window.removeEventListener('gs:return-panel-to-origin',returning);
   },[]);
   const [newTitle, setNewTitle] = useState('Untitled workshop');
-  const [dragging, setDragging] = useState(false);
+  const [dragging, setDragging] = useState<'batch' | 'files' | null>(null);
   const [mapImportStatus, setMapImportStatus] = useState<string>();
   const mapImports = useRef<Promise<void>>(Promise.resolve());
   const [help, setHelp] = useState(false);
@@ -343,7 +343,7 @@ export default function App() {
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
     setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceNavigation.current++;workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
   },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId),route=>mapWorkspaces.includes(route.workspace)?captureWorkflowPlace(route,documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current):route);
-  const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.map(d=>d.id)},ready&&initialDocumentReady,()=>documentsRef.current.documents.flatMap(document=>{
+  const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.filter(d=>!d.queuedTitle).map(d=>d.id)},ready&&initialDocumentReady,()=>documentsRef.current.documents.flatMap(document=>{
     const project=document.history.current;if(!project)return [];
     const place=captureWorkflowPlace({workspace:workspaceRef.current,projectId:project.id,settingsTab},project).place;
     return place?[{project:project.id,...place}]:[];
@@ -782,16 +782,18 @@ export default function App() {
     );
     unsubs.push(
       getCurrentWindow().onDragDropEvent(({ payload }) => {
-        if (payload.type === 'enter' || payload.type === 'over') setDragging(true);
-        else if (payload.type === 'leave') setDragging(false);
+        if (payload.type === 'enter' || payload.type === 'over') {
+          const hit = document.elementFromPoint(payload.position.x / window.devicePixelRatio, payload.position.y / window.devicePixelRatio);
+          setDragging(hit?.closest('[data-batch-source-drop]') ? 'batch' : 'files');
+        } else if (payload.type === 'leave') setDragging(null);
         else if (payload.type === 'drop') {
-          setDragging(false);
+          setDragging(null);
           const animations=payload.paths.filter(path=>/\.(jma|jmm|jmo|jmr|jmt|jmz|fbx|model_animations)$/i.test(path));
           const assets=payload.paths.filter(path=>/\.(obj|wav|ogg)$/i.test(path));
           const containsMap = payload.paths.some(path => /\.(map|yelo|gsproject|zip)$/i.test(path));
           if(assets.length&&!containsMap){if(assets.length!==payload.paths.length){notice('Drop maps/animations and custom assets separately.','info');return;}if(assets.length>16){notice('Import at most 16 custom files per drop.','error');return;}const event=new CustomEvent('guilty-spark-asset-file-drop',{cancelable:true,detail:{paths:assets,x:payload.position.x/window.devicePixelRatio,y:payload.position.y/window.devicePixelRatio}});window.dispatchEvent(event);if(!event.defaultPrevented)void importDroppedAssets(assets);}
           else if(animations.length&&!containsMap)void importAnimations(animations);
-          else {
+          else if (containsMap) {
             const event = new CustomEvent('guilty-spark-map-source-drop', {
               cancelable: true,
               detail: { paths: payload.paths, x: payload.position.x / window.devicePixelRatio, y: payload.position.y / window.devicePixelRatio },
@@ -910,21 +912,32 @@ export default function App() {
       const { projects: imported, libraryProjectIds = [], failures } = report;
       const count = imported.length + libraryProjectIds.length;
       let first = imported[0];
-      if (!first && destination && libraryProjectIds.length) {
-        first = await call<OpenProject>('open_project', { id: libraryProjectIds[0] });
+      if (libraryProjectIds.length) {
+        const snapshot = await refresh();
+        const entries = new Map(snapshot?.entries.map(entry => [entry.id, entry]));
+        dispatchDocument({type:'queue',entries:libraryProjectIds.flatMap(id=>entries.has(id)?[entries.get(id)!]:[])});
+        const existing = documentsRef.current.documents.find(d=>d.id===libraryProjectIds[0] && d.history.current);
+        if (existing) {
+          selectMap(existing.id, destination);
+        } else {
+          try {
+            first = await call<OpenProject>('open_project', { id: libraryProjectIds[0] });
+          } catch (error) {
+            notice('Maps are in your tabs. The first map could not be opened: '+String(error), 'error');
+            return;
+          }
+        }
       }
       for (const open of imported.length ? imported : first ? [first] : []) {
-        if (!documentsRef.current.documents.some(d => d.id === open.project.id)) await load(open, undefined, false);
+        if (!documentsRef.current.documents.some(d => d.id === open.project.id && d.history.current)) await load(open, undefined, false);
       }
       if (first) {
         dispatchDocument({type:'select',id:first.project.id});
         setWorkspace(destination && first.project.source ? destination : first.project.quickForge ? 'quickforge' : first.inspection?.header.scenarioType===2 ? 'tags' : first.inspection?.mesh.positions.length ? 'world' : 'tags');
-      } else if (libraryProjectIds.length) {
-        setWorkspace('library');
       }
-      if (count) await refresh();
+      if (imported.length) await refresh();
       const summary = count ? count + ' project' + (count === 1 ? '' : 's') +
-        (libraryProjectIds.length ? ' available in the Map Library.' : failures.length ? ' opened.' : ' imported. Source data preserved.') : '';
+        (libraryProjectIds.length ? ' added to tabs. Maps load when selected.' : failures.length ? ' opened.' : ' imported. Source data preserved.') : '';
       if (failures.length) {
         const failureDetails = failures.map(failure => failure.path.split(/[\\/]/).pop() + ': ' + failure.message).join('\n');
         notice((summary ? summary+' ' : '') + failures.length + ' file' + (failures.length === 1 ? '' : 's')+
@@ -977,7 +990,7 @@ export default function App() {
   }
   async function openProject(id: string, stayInWorkspace?: Workspace) {
     const requestedNavigation=workspaceNavigation.current;
-    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){selectMap(id,stayInWorkspace);return true;}
+    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing?.history.current){selectMap(id,stayInWorkspace);return true;}
     setBusy(true);
     try {
       const prior=historyRef.current;
@@ -1008,6 +1021,7 @@ export default function App() {
   }
   function selectMap(id:string,targetWorkspace?:Workspace){
     const map=documentsRef.current.documents.find(d=>d.id===id);
+    if(map?.queuedTitle){void openProject(id,targetWorkspace);return;}
     if(!map?.history.current){notice('This map is no longer open. Choose File → Open saved project… to reopen it.');return;}
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     window.dispatchEvent(new Event('gs:save-viewport-context'));
@@ -1062,6 +1076,9 @@ export default function App() {
   }
   async function closeMap(id:string,separateWindow:boolean|'main'=false,another=false){
     if(closingDocuments.current.has(id))return false;
+    if(!separateWindow&&documentsRef.current.documents.some(d=>d.id===id&&d.queuedTitle)){
+      dispatchDocument({type:'close',id});return true;
+    }
     const readOnly=native&&windowWritersRef.current[id]===false;
     if(readOnly&&separateWindow==='main')return false;
     const handoffWorkspace=separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,
@@ -1093,7 +1110,7 @@ export default function App() {
       await windowHistories.current.release(id);
       const state=documentsRef.current;
       if(state.activeId===id){
-        const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];
+        const next=activeDocument(documentReducer(state,{type:'close',id}));
         setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');
       }
       dispatchDocument({type:'close',id});return true;
@@ -1482,6 +1499,7 @@ export default function App() {
             setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');
           }}
           onMccTools={()=>{setDependencyRuntime('mccSteam');openDependencySetup();}}
+          onBatchSources={entries=>dispatchDocument({type:'queue',entries})}
           onNew={() => setCreateModal(true)}
           onNewMap={() => setCreateModal('multiplayer')}
           onFindMaps={() => setWorkspace('map-finder')}
@@ -1522,7 +1540,7 @@ export default function App() {
     const active=inLevelEditor&&id===(current?.id??'new');
     return <RetainedLevelView key={id} id={id} active={active} graphicsResident={warm.has(id)} renderGraphics={!requestedPanel(location.search,workspace)}>
       <Suspense fallback={<div className="loading">Opening level editor…</div>}>
-        <LevelEditorWorkspace defaultRuntime={data.settings.preferredHalo??undefined} entries={data.entries} onBuild={()=>setWorkspace('build')} project={project} inspection={map?.inspection??null} assetMeshes={map?.meshes??{}} intent={active?workspace as 'world'|'quickforge'|'live':'world'} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')} onDirector={()=>void openRecordingDirector()}
+        <LevelEditorWorkspace defaultRuntime={data.settings.preferredHalo??undefined} entries={data.entries} onBuild={()=>setWorkspace('build')} project={project} inspection={map?.inspection??null} assetMeshes={map?.meshes??{}} intent={active?workspace as 'world'|'quickforge'|'live':'world'} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')}
           source={sourceView(map)} newMap={forgeView(null)} notify={notice} onBeforeResources={persist=>save(persist===true,project?.id)} onResourcesConnected={applyResourceMetadata}
           onOpenMap={async()=>{await save(false,project?.id);const opened=await call<OpenProject>('live_mcc_import_map');await load(opened);await refresh();}}/>
       </Suspense>
@@ -2097,10 +2115,8 @@ export default function App() {
           )}
           {toast && <Toast {...toast} onClose={() => setToast(null)} />}
           {dragging && (
-            <div className="drag-overlay">
-              <UploadGlyph />
-              <h2>Bring a world into your workbench.</h2>
-              <p>Drop Halo .map files, ZIP archives or .gsproject descriptors to import.</p>
+            <div className="file-drop-hint" data-drop-area={dragging}>
+              {dragging === 'batch' ? 'Release to add batch source maps' : 'Release to open maps or import supported files'}
             </div>
           )}
           {showFinder && !help && !createModal && (
@@ -2244,12 +2260,5 @@ export default function App() {
       </div>
       <div className="gs-window-tint" aria-hidden="true" />
     </>
-  );
-}
-function UploadGlyph() {
-  return (
-    <div className="empty-icon">
-      <FolderOpen size={36} />
-    </div>
   );
 }

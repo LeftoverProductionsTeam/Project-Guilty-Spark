@@ -9,7 +9,7 @@ type Edit = { before: number; after: number; kind: string; unit: string; sourceS
 type Preview = { rows: { projectId: string; edit: Edit | null; problem: string | null }[]; reviewSha256: string | null; recoverable: boolean };
 type Outcome = { batchId: string; published: boolean; recoverable: boolean; problem: string | null; rows: { projectId: string; status: string; detail: string; output: string | null; sha256: string | null }[] };
 
-export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entries: LibraryEntry[]; onOpenMccTools: () => void }) {
+export default function MultiMapBatchEditing({ entries, onOpenMccTools, onOpenTabs }: { entries: LibraryEntry[]; onOpenMccTools: () => void; onOpenTabs: (entries: LibraryEntry[]) => void }) {
   const [importedMaps, setImportedMaps] = useState<LibraryEntry[]>([]);
   const mapsById = new Map(entries.map(entry => [entry.id, entry]));
   for (const entry of importedMaps) {
@@ -19,6 +19,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
   const supportsBatch = (entry: LibraryEntry) => (entry.version === 609 || entry.version === 13) && !entry.sessionOnly;
   const savedMaps = maps.filter(supportsBatch);
   const [selected, setSelected] = useState<string[]>([]);
+  const [showSaved, setShowSaved] = useState(true);
   const ids = selected.filter((id) => savedMaps.some((entry) => entry.id === id));
   const [mapQuery, setMapQuery] = useState('');
   const [query, setQuery] = useState('');
@@ -74,29 +75,29 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
 
   return (
     <details className="panel multi-map-batch">
-      <summary>Multi Map Batch Editing</summary>
-      <p>Choose maps, review one shared numeric tag edit and build separate MCC map files.</p>
+      <summary>Multi Map Batch Editing <span className="batch-count">{ids.length} selected</span></summary>
       {!native ? <p>Batch review and compilation are available in the desktop app.</p> : (
         <>
-          <button type="button" disabled={pending || Boolean(job)} onClick={() => {
-            setPreview(undefined);
-            setProblem('');
-            onOpenMccTools();
-          }}>MCC editing tools</button>
+
           <fieldset disabled={pending || Boolean(job)}>
             <legend>1. Source maps · {ids.length} selected</legend>
-            <MapSourceDrop disabled={pending || Boolean(job)} onImported={rows => {
+            <MapSourceDrop batch disabled={pending || Boolean(job)} onImported={rows => {
+              onOpenTabs(rows);
               const eligible = rows.filter(supportsBatch);
               const combined = [...new Set([...ids, ...eligible.map(entry => entry.id)])];
               setImportedMaps(old => [...new Map([...old, ...rows].map(entry => [entry.id, entry])).values()]);
               select(combined.slice(0, 32));
               const excluded = rows.length - eligible.length;
               return [
-                excluded ? excluded + ' imported source(s) are outside the supported CE609 and MCC13 batch formats.' : '',
+                rows.length + ' added to tabs. ' + eligible.length + ' eligible for batch editing.',
+                excluded ? excluded + ' can be inspected in tabs. Batch editing requires saved Custom Edition (609) or MCC (13) maps.' : '',
                 combined.length > 32 ? 'The first 32 maps are selected. Clear other selections to include the remaining maps.' : '',
               ].filter(Boolean).join(' ');
             }} />
-            <label>Find saved maps <input value={mapQuery} onChange={(event) => setMapQuery(event.target.value)} /></label>
+            <div className="batch-toolbar">
+            <button type="button" aria-expanded={showSaved} aria-controls="batch-saved-maps" onClick={() => setShowSaved(open=>!open)}>Saved maps</button>
+            {showSaved && <>
+            <input aria-label="Find saved maps" placeholder="Find saved maps" value={mapQuery} onChange={(event) => setMapQuery(event.target.value)} />
             <button type="button" disabled={!additions.length || ids.length >= 32} onClick={() => select([...ids, ...additions].slice(0, 32))}>
               Add visible maps
             </button>
@@ -104,9 +105,11 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
               Select saved solo maps
             </button>
             <button type="button" disabled={!ids.length} onClick={() => select([])}>Clear selection</button>
+            </>}
+            </div>
             {ids.length === 32 && <p role="status">32-map limit reached. Clear a selection to add another map.</p>}
             {ids.length < 2 && <p>Select at least two saved CE609 or MCC13 maps.</p>}
-            <div className="batch-map-list">
+            <div className="batch-map-list" id="batch-saved-maps" hidden={!showSaved}>
               {filtered.map((entry) => (
                 <label key={entry.id}>
                   <input type="checkbox" checked={ids.includes(entry.id)} disabled={ids.length >= 32 && !ids.includes(entry.id)} onChange={(event) => select(event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))} />
@@ -116,7 +119,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
               {!filtered.length && <p>No matching saved maps.</p>}
             </div>
           </fieldset>
-          <fieldset disabled={ids.length < 2 || pending || Boolean(job)}>
+          {ids.length >= 2 && <fieldset disabled={pending || Boolean(job)}>
             <legend>2. Shared numeric tag edit</legend>
             <form onSubmit={(event) => {
               event.preventDefault();
@@ -166,9 +169,11 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools }: { entr
                 onClick={() => review(compatible)}>Review {compatible.length} compatible maps</button>
             )}
           </fieldset>
+          }
           {preview && (
             <fieldset>
               <legend>3. Review and build</legend>
+              <button type="button" disabled={pending || Boolean(job)} onClick={onOpenMccTools}>MCC editing tools</button>
               <ul aria-label="Per-map review">
                 {preview.rows.map(({ projectId, edit, problem: issue }) => (
                   <li key={projectId}><strong>{title(projectId)}</strong>{edit

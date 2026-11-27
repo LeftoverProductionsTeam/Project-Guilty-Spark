@@ -215,3 +215,23 @@
 .gs-director-stage .gs-texture-setup {
   display: none;
 }
+
+.gs-director-window > :is(header, nav), .gs-director-cameras {
+  gap: .35rem;
+  padding: .28rem .55rem;
+}
+.gs-director-window :is(button, select) { min-height: 27px; padding: .22rem .48rem; }
+.gs-director-options > summary { cursor: pointer; padding: .28rem .45rem; }
+.gs-director-options > .gs-director-settings {
+  position: absolute;
+  z-index: 109;
+  inset: 100% .5rem auto;
+  border: 1px solid #345061;
+  border-radius: .35rem;
+  box-shadow: 0 8px 24px #0007;
+}
+.gs-director-window > nav { position: relative; }
+.gs-director-options .gs-director-output-menu { left: 0; right: auto; }
+@media (max-width: 900px) {
+  .gs-director-options .gs-director-output-menu { position: fixed; inset: 8rem .7rem auto; width: auto; max-height: 65vh; overflow: auto; }
+}

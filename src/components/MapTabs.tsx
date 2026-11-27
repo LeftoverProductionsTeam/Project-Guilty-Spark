@@ -41,7 +41,7 @@ export default function MapTabs({
     const next=pinned.includes(id)?pinned.filter(value=>value!==id):[...pinned,id];setPinned(next);
     onReorder?.([...state.documents.filter(d=>next.includes(d.id)),...state.documents.filter(d=>!next.includes(d.id))].map(d=>d.id));
   };
-  const matches=state.documents.filter(d=>`${d.history.current?.title} ${d.history.current?.source?.engine??'QuickForge'}`.toLowerCase().includes(query.toLowerCase()));
+  const matches=state.documents.filter(d=>`${(d.history.current?.title ?? d.queuedTitle)} ${d.history.current?.source?.engine??'QuickForge'}`.toLowerCase().includes(query.toLowerCase()));
   useEffect(()=>{
     const outside=(event:PointerEvent)=>{if(menu.current?.open&&!menu.current.contains(event.target as Node))menu.current.open=false;if(contextRoot.current&&!contextRoot.current.contains(event.target as Node))setContext(null);};
     const key=(event:KeyboardEvent)=>{if(event.key==='Escape')setContext(null);};
@@ -56,7 +56,7 @@ export default function MapTabs({
   const requestWindow=async(id:string,at?:{x:number;y:number})=>{
     if(disabled||transferring.current)return;const document=state.documents.find(doc=>doc.id===id);if(!document)return;
     transferring.current=true;resetPointer();if(feedbackTimer.current)clearTimeout(feedbackTimer.current);
-    const bounds=tabs.current?.getBoundingClientRect(),location=at??point(bounds?.left??0,bounds?.bottom??32),title=document.history.current?.title??'Untitled map';
+    const bounds=tabs.current?.getBoundingClientRect(),location=at??point(bounds?.left??0,bounds?.bottom??32),title=document.history.current?.title??document.queuedTitle??'Untitled map';
     setFeedback({id,title,...location,phase:'transferring'});
     let ok=false;try{ok=await onWindow(id);}catch{ok=false;}finally{transferring.current=false;}
     // The original tab stays until the existing native handoff acknowledges.
@@ -114,13 +114,13 @@ export default function MapTabs({
         <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
           <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
           <PagedSurface name="map-switcher" label="Open maps" maxHeight={360}><div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
-            <button role="menuitemradio" aria-label={d.history.current?.title} title={'Switch to '+d.history.current?.title+' in this window; keep unsaved edits and history.'} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
+            <button role="menuitemradio" aria-label={(d.history.current?.title ?? d.queuedTitle)} title={'Switch to '+(d.history.current?.title ?? d.queuedTitle)+' in this window; keep unsaved edits and history.'} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
               if(menu.current)menu.current.open=false;
               if(state.activeId===d.id)requestAnimationFrame(()=>tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
               else pendingFocus.current=d.id;
               onSelect(d.id);
-            }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
-            <button aria-label={'Move '+d.history.current?.title+' to another window'} title={isReadOnly(d.id)?'Move this read-only view to a separate window':'Move this map and its history to a separate window'} disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
+            }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{(d.history.current?.title ?? d.queuedTitle)}</strong><small>{d.history.current?.source?.engine??(d.queuedTitle?'Loads on selection':'QuickForge source')}</small></button>
+            <button aria-label={'Move '+(d.history.current?.title ?? d.queuedTitle)+' to another window'} title={isReadOnly(d.id)?'Move this read-only view to a separate window':'Move this map and its history to a separate window'} disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
           </div>)}</div></PagedSurface>
           {!matches.length&&<p role="status">No open maps match.</p>}
           <button className="gs-map-open-saved" role="menuitem" disabled={disabled} title="Browse all saved projects without closing the maps already open" onClick={()=>{if(menu.current)menu.current.open=false;onOpenSaved();}}>Open saved project…</button>
@@ -131,17 +131,17 @@ export default function MapTabs({
           <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} hidden={condensed&&d.id!==state.activeId} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
             <button
               role="tab"
-              aria-label={d.history.current?.title??'Untitled map'}
+              aria-label={(d.history.current?.title ?? d.queuedTitle)??'Untitled map'}
               aria-description={d.history.dirty?'Unsaved changes':undefined}
               aria-selected={d.id === state.activeId}
-              tabIndex={d.id === state.activeId ? 0 : -1}
+              tabIndex={d.id === (state.activeId ?? state.documents[0]?.id) ? 0 : -1}
               disabled={disabled}
               onClick={() => {if(suppressClick.current===d.id){suppressClick.current=null;return;}onSelect(d.id);}}
               onPointerDown={event=>{if(event.button!==0||disabled||transferring.current)return;suppressClick.current=null;if(feedbackTimer.current)clearTimeout(feedbackTimer.current);setFeedback(null);drag.current={id:d.id,pointer:event.pointerId,x:event.clientX,y:event.clientY,element:event.currentTarget};event.currentTarget.setPointerCapture(event.pointerId);}}
               onPointerMove={event=>{const origin=drag.current,strip=tabs.current?.getBoundingClientRect();if(!origin||origin.pointer!==event.pointerId||!strip)return;
                 if(Math.hypot(event.clientX-origin.x,event.clientY-origin.y)<6)return;
                 const ready=shouldDetachTab(origin,{x:event.clientX,y:event.clientY},strip),tab=event.currentTarget.closest<HTMLElement>('.map-tab');tab?.setAttribute('data-dragging','true');tab?.toggleAttribute('data-detaching',ready);
-                setFeedback({id:d.id,title:d.history.current?.title??'Untitled map',...point(event.clientX,event.clientY),phase:ready?'ready':'dragging'});}}
+                setFeedback({id:d.id,title:(d.history.current?.title ?? d.queuedTitle)??'Untitled map',...point(event.clientX,event.clientY),phase:ready?'ready':'dragging'});}}
               onPointerUp={event=>{const origin=resetPointer(),strip=tabs.current?.getBoundingClientRect();
                 if(origin&&strip&&origin.pointer===event.pointerId&&!disabled){
                   if(shouldDetachTab(origin,{x:event.clientX,y:event.clientY},strip)){suppressClick.current=d.id;void requestWindow(d.id,point(event.clientX,event.clientY));}
@@ -176,16 +176,16 @@ export default function MapTabs({
                 pendingFocus.current=state.documents[n].id;
                 onSelect(state.documents[n].id);
               }}
-              title={`${d.history.current?.title} · ${d.history.current?.source?.engine??'QuickForge source'} · ${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
+              title={`${(d.history.current?.title ?? d.queuedTitle)} · ${d.history.current?.source?.engine??'QuickForge source'} · ${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
             >
               {d.history.dirty && <span aria-label="Unsaved changes">● </span>}
               {pinned.includes(d.id)&&<Pin size={10} aria-label="Pinned tab"/>}
-              <span className="map-tab-title">{d.history.current?.title}</span>
+              <span className="map-tab-title">{(d.history.current?.title ?? d.queuedTitle)}</span>
             </button>
             <button
               className="map-tab-action"
               title={isReadOnly(d.id)?'Close this read-only view':'Close map; choose Save, Discard or Cancel for unsaved changes'}
-              aria-label={'Close map ' + d.history.current?.title}
+              aria-label={'Close map ' + (d.history.current?.title ?? d.queuedTitle)}
               disabled={disabled}
               onClick={() => onClose(d.id)}
             >

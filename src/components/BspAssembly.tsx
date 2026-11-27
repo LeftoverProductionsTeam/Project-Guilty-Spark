@@ -391,7 +391,7 @@ export default function BspAssembly({
       await onSave();if(!matches())return;
       const plan=await call<Plan>('plan_bsp_assembly',{projectId:project.id,donorProjectId:donor,donorBspIndex:index,baseBspIndex:canExtend?baseIndex:undefined,terrainSeam,...(!terrainSeam&&direction!==0?{directionDegrees:direction}:{}),
         ...(!terrainSeam&&canExtend&&baseParts.length<=14&&regionalPreset?{regionalPreset}:{})});
-      if(matches()){setDraft(plan);setRouteView('primary');setReport(null);}
+      if(matches()){setDraft(plan);setRouteView('primary');setMoveDonorHandle(false);setShowRouteHandles(true);setReport(null);}
     });
   }
   const projectRef=useRef(project);
@@ -445,7 +445,7 @@ export default function BspAssembly({
         donorBspIndex:to.bspIndex,atlasConnection:[from.regionId,to.regionId],terrainSeam});
       if(!matches())return;
       setDonor(entry.id);setIndex(to.bspIndex);setBaseIndex(plan.baseBspIndex??0);
-      setDraft(plan);setRouteView('primary');setReport(null);
+      setDraft(plan);setRouteView('primary');setMoveDonorHandle(false);setShowRouteHandles(true);setReport(null);
     });
   }
   const placedLayout=project.megaworldLayout;
@@ -526,6 +526,15 @@ export default function BspAssembly({
       if(current()&&latest.current.signature===signature&&latest.current.donor===value.donorProjectId&&latest.current.index===value.donorBspIndex&&latest.current.baseIndex===(value.baseBspIndex??0)){setReport(checked);if(checked.viewport)window.dispatchEvent(new CustomEvent('gs:bsp-source-preview',{detail:checked.viewport}));}
     });
   }
+  const [previewRequest, setPreviewRequest] = useMapState<string|null>(project.id, 'bsp.view.previewRequest', null);
+  useEffect(() => {
+    if (!previewRequest || !active || !native || !open || busy || !selectionMatches) return;
+    const timer = setTimeout(() => {
+      setPreviewRequest(null);
+      if (latest.current.signature === previewRequest) void previewDraft();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [previewRequest, draftSignature, active, open, busy, selectionMatches]);
   async function checkNativeStructure() {
     if (!draft || !applied || !selectionMatches || busy) return;
     const key = structureKey;
@@ -602,7 +611,7 @@ export default function BspAssembly({
       {open && (
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
-          {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
+          {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. You can move connection points here. To edit mesh vertices, open an editable source map in BSP Workshop and choose Vertex.</p>}
           <MegaworldAtlas projectId={project.id} project={project} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} allowTerrainSeam={!nativePartitioned} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={project.id+':'+sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} mcc={inspection?.header.version===13} onViewBsp={setViewedBsp}/>}
           {nativePartitioned && native && inherited.some(plan => plan.preserveDonorBsp) && (
@@ -813,6 +822,7 @@ export default function BspAssembly({
                   {draft.highGround&&<option value="highGround">High-ground route</option>}
                 {(draft.sections??[]).map(section=><option key={section.id} value={`section:${section.id}`}>{section.name}</option>)}
                 </select></label>
+                <details className="bsp-precision bsp-route-options"><summary>More route options</summary><div className="bsp-actions">
                 <button disabled={busy||!!draft.infantryTunnel} onClick={()=>{try{update(addInfantryTunnel(draft));setRouteView('infantry');}catch(error){setError(String(error));}}}>Add infantry tunnel</button>
                 <button disabled={busy||!!draft.highGround} onClick={()=>{try{update(addHighGroundRoute(draft));setRouteView('highGround');}catch(error){setError(String(error));}}}>Add high-ground route</button>
                 <button disabled={busy||!!draft.infantryTunnel&&!!draft.highGround&&draft.tunnelWidth>=6&&draft.tunnelHeight>=4} onClick={()=>{try{update(makeThreeRouteSeam(draft));setRouteView('primary');}catch(error){setError(String(error));}}}>Make three-route seam</button>
@@ -822,9 +832,10 @@ export default function BspAssembly({
                 </button>
                 {routeKey&&<button disabled={busy} onClick={()=>{update({[routeKey]:undefined});setRouteView('primary');}}>Remove {infantry?'infantry tunnel':'high-ground route'}</button>}
                 {selectedSection&&<button disabled={busy} onClick={()=>{update({sections:draft.sections!.filter(section=>section.id!==selectedSection.id)});setRouteView('primary');}}>Remove seam section</button>}
+                </div></details>
                 {!routeKey&&<label><input type="checkbox" aria-label="Open-sky road" checked={routeDraft!.openRoad??false} disabled={busy} onChange={e=>updateRoute({openRoad:e.target.checked,archSegments:undefined,...(e.target.checked?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}/> Open sky above road</label>}
               </div>
-              <p className="subtle" aria-label="Seam route requirements">Player cave: {draft.infantryTunnel?'drafted':'missing'} · Warthog route: {draft.tunnelWidth>=6&&draft.tunnelHeight>=4?'design width set':'widen the primary passage'} · Canyon tops: {draft.highGround?'drafted':'missing'}. Drafts are not gameplay acceptance.</p>
+              <p className="gs-sr-only" aria-label="Seam route requirements">Player cave: {draft.infantryTunnel?'drafted':'missing'} · Warthog route: {draft.tunnelWidth>=6&&draft.tunnelHeight>=4?'design width set':'widen the primary passage'} · Canyon tops: {draft.highGround?'drafted':'missing'}. Drafts are not gameplay acceptance.</p>
               {ridge&&<div className="bsp-actions">
                 <button disabled={busy||!selectionMatches} onClick={()=>{setViewedBsp(draft.baseBspIndex??0);armEdge('base','ridge');}}>Pick ridge start on this BSP</button>
                 <button disabled={busy||!selectionMatches} onClick={()=>armEdge('donor','ridge')}>Pick ridge end on donor BSP</button>
@@ -836,7 +847,7 @@ export default function BspAssembly({
                 }catch(error){setError(String(error));}}}>Fill terrain to ridge</button>}
                 <small>A six-unit ridge also checks both sides of the deck for missing collision floor. Drive the compiled route to verify handling.</small>
               </div>}
-              <p className="subtle">{ridge?'Pick both canyon-top floors, then use bends to shape ramps and overlooks.':infantry?'Keep both cave entrances on the original ground.':'Choose an enclosed passage or an open canyon road.'}</p>
+
               </>}
               {!draft.separateNativeBsps && <details className="bsp-edge-controls"><summary>Edge stitching{draft.sections?.length ? ` · ${draft.sections.length}` : ""}</summary>
                 <div className="bsp-actions">
@@ -877,10 +888,30 @@ export default function BspAssembly({
                 <li data-done={applied && selectionMatches}>3 · Apply</li>
                 <li>4 · Build &amp; test in Halo</li>
               </ol>
-              <p>
-                Position <strong>{draft.donorTitle}</strong> relative to this map. Coordinates use Halo world
-                units; Z is up. Moving the section also moves its tunnel mouth.
-              </p>
+              <p className="subtle">Pick both floors, then drag the route points or add a bend. Preview clearance before applying.</p>
+              {!editingRetained && !ridge && (!draft.separateNativeBsps || canExtend && baseParts.length <= 14) && (
+                <div className="bsp-actions" aria-label="Pick connection landings">
+                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'base'}
+                    onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
+                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'donor'}
+                    onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
+                </div>
+              )}
+              <div className="bsp-actions" aria-label="Edit route points">
+                <button type="button" aria-pressed={showRouteHandles && !moveDonorHandle} disabled={busy || !selectionMatches}
+                  onClick={() => {setMoveDonorHandle(false);setShowRouteHandles(!showRouteHandles || moveDonorHandle);}}>
+                  {showRouteHandles && !moveDonorHandle ? 'Hide route handles' : 'Drag route points'}
+                </button>
+                <button type="button" disabled={busy || !selectionMatches || editingRetained} aria-pressed={showRouteHandles && moveDonorHandle}
+                  onClick={() => {setShowRouteHandles(!showRouteHandles || !moveDonorHandle);setMoveDonorHandle(!moveDonorHandle);}}>
+                  {showRouteHandles && moveDonorHandle ? 'Hide BSP handle' : 'Move neighboring BSP'}
+                </button>
+                {!draft.terrainSeam && (!draft.separateNativeBsps || draft.preserveDonorBsp && !draft.openRoad) &&
+                  <button type="button" disabled={busy || routeDraft!.tunnelPoints.length >= 16} onClick={addRouteBend}>Add bend before imported floor</button>}
+              </div>
+              {showRouteHandles && <p className="subtle">{moveDonorHandle
+  ? 'Drag the donor entrance handle to move the entire BSP and its landings. Apply after checking the gap.'
+  : 'Select a point and drag an axis. Use snap for half-unit moves. Red vehicle segments exceed a 25% grade. Preview for floor and clearance checks before Apply.'}</p>}
               {selectedSection&&<label className="bsp-section-name">Section name<input aria-label="Seam section name" maxLength={60} value={selectedSection.name} onChange={e=>update({sections:draft.sections!.map(section=>section.id===selectedSection.id?{...section,name:e.target.value}:section)})}/></label>}
               {(!draft.terrainSeam || !!selectedSection) && !routeKey && (
                 <label>Opening <select aria-label="Seam opening shape"
@@ -904,7 +935,7 @@ export default function BspAssembly({
                 <label>Head clearance <output>{routeDraft!.tunnelHeight.toFixed(1)}</output><input type="range" aria-label="Seam preview height" disabled={lockedRouteShape} min={minRouteHeight} max={16} step={.1} value={routeDraft!.tunnelHeight} onChange={e=>updateRoute({tunnelHeight:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
                 {routeDraft!.archSegments&&<label>Arch facets <output>{routeDraft!.archSegments}</output><input type="range" aria-label="Seam arch facets" min={2} max={12} step={1} value={routeDraft!.archSegments} onChange={e=>updateRoute({archSegments:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>}
                 <button disabled={busy||!native||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
-                <span>Release a slider or adjust it with the arrow, Home/End or Page Up/Down keys to rebuild the exact preview and triangle count. Apply keeps it as one undoable source edit; native compilation is still required.</span>
+
               </div>
               <div className="bsp-actions bsp-build-actions" aria-label="Connection actions">
                 <button
@@ -1056,29 +1087,7 @@ export default function BspAssembly({
                 the section transform; matching editable tags are required. Donor weapons, vehicles,
                 objectives, scripts and named-object bindings are separate.
               </p>
-              {!editingRetained && !ridge && (!draft.separateNativeBsps || canExtend && baseParts.length <= 14) && (
-                <div className="bsp-actions" aria-label="Pick connection landings">
-                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'base'}
-                    onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
-                  <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'donor'}
-                    onClick={() => armEdge('donor', 'connector')}>Pick donor landing</button>
-                </div>
-              )}
-              <div className="bsp-actions" aria-label="Edit route points">
-                <button type="button" aria-pressed={showRouteHandles && !moveDonorHandle} disabled={busy || !selectionMatches}
-                  onClick={() => {setMoveDonorHandle(false);setShowRouteHandles(!showRouteHandles || moveDonorHandle);}}>
-                  {showRouteHandles && !moveDonorHandle ? 'Hide route handles' : 'Drag route points'}
-                </button>
-                <button type="button" disabled={busy || !selectionMatches || editingRetained} aria-pressed={showRouteHandles && moveDonorHandle}
-                  onClick={() => {setShowRouteHandles(!showRouteHandles || !moveDonorHandle);setMoveDonorHandle(!moveDonorHandle);}}>
-                  {showRouteHandles && moveDonorHandle ? 'Hide BSP handle' : 'Move neighboring BSP'}
-                </button>
-                {!draft.terrainSeam && (!draft.separateNativeBsps || draft.preserveDonorBsp && !draft.openRoad) &&
-                  <button type="button" disabled={busy || routeDraft!.tunnelPoints.length >= 16} onClick={addRouteBend}>Add bend before imported floor</button>}
-              </div>
-              {showRouteHandles && <p className="subtle">{moveDonorHandle
-  ? 'Drag the donor entrance handle to move the entire BSP and its landings. Apply after checking the gap.'
-  : 'Select a point and drag an axis. Use snap for half-unit moves. Red vehicle segments exceed a 25% grade. Preview for floor and clearance checks before Apply.'}</p>}
+              <details className="bsp-precision"><summary>Point coordinates</summary>
               <div className="bsp-waypoints">
                 {routeDraft!.tunnelPoints.map((point, i) => {
                   const fixed = editingRetained && routeView === 'primary' && retainedConnectorAnchor(routeDraft!.tunnelPoints.length, i);
@@ -1106,6 +1115,7 @@ export default function BspAssembly({
                   </div>;
                 })}
               </div>
+              </details>
               <div className="bsp-settings">
                 <label>
                   Donor editable tags

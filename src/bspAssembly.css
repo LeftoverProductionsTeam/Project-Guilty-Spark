@@ -142,3 +142,11 @@
 .bsp-build-actions { margin-block: 6px 9px; }
 .bsp-help { margin-block: 5px; color: var(--muted); }
 .bsp-help p { margin-block: 4px; }
+
+.bsp-assembly .bsp-actions,.bsp-assembly .bsp-settings { gap: .3rem; margin-block: .3rem; }
+.bsp-assembly :is(button,select,input:not([type="range"],[type="checkbox"])) { padding: .27rem .45rem; border-radius: .35rem; min-height: 26px; }
+.bsp-assembly-body > .subtle { margin-block: .3rem; }
+.bsp-draft-heading { gap: .3rem .55rem; }
+.bsp-precision > summary, .atlas-source-inventory > summary { cursor: pointer; padding-block: .24rem; font-size: .78rem; }
+.bsp-build-actions > button:first-child:not(:disabled) { border-color: var(--accent); }
+.atlas-source-inventory .atlas-list { max-height: 10rem; overflow: auto; }

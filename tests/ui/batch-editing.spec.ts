@@ -24,6 +24,7 @@ test('batch review builds only the compatible maps explicitly reviewed', async (
           installation: { libraries: [], diagnostics: [], halo1Installed: false },
           dataDirectory: 'Fixture', inboxDirectory: 'Fixture', diagnostics: [], logs: [],
         };
+        if (command === 'import_map_sources') return { entries: [entries[0], entries[1], {...map('xbox','Legacy Xbox'),engine:'Halo Xbox',version:5}], failures: [] };
         if (command === 'search_batch_fields') {
           w.batchCalls.push({ command, ids: args.ids });
           return {
@@ -57,7 +58,7 @@ test('batch review builds only the compatible maps explicitly reviewed', async (
   });
   await page.goto('/');
   await chooseTool(page, 'Map library');
-  await page.getByText('Multi Map Batch Editing', { exact: true }).click();
+  await page.locator('.multi-map-batch > summary').click();
   await page.getByRole('button', { name: 'Select saved solo maps' }).click();
   await page.getByRole('button', { name: 'Find fields and check selected maps' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Alpha · Save this map' })).toBeVisible();
@@ -82,4 +83,17 @@ test('batch review builds only the compatible maps explicitly reviewed', async (
     { command: 'preview_numeric_batch', ids: ['b', 'c'] },
     { command: 'build_numeric_batch', ids: ['b', 'c'], reviewSha256: 'b'.repeat(64) },
   ]);
+  const target = page.getByText('Drop map files here', {exact:true});
+  await target.scrollIntoViewIfNeeded();
+  const bounds = (await target.boundingBox())!;
+  const consumed = await page.evaluate(({x,y}) => !window.dispatchEvent(new CustomEvent('guilty-spark-map-source-drop', {
+    cancelable:true, detail:{paths:['alpha.map','bravo.map','legacy.map'],x,y},
+  })), {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2});
+  expect(consumed).toBe(true);
+  await expect(page.getByRole('status').filter({hasText:'3 added to tabs. 2 eligible'})).toBeVisible();
+  await expect(page.getByRole('tab',{name:'Legacy Xbox', includeHidden:true})).toHaveCount(1);
+  await expect(page.getByRole('checkbox',{name:'Alpha · cache 13'})).toBeChecked();
+  await expect(page.getByRole('checkbox',{name:'Bravo · cache 13'})).toBeChecked();
+  await expect(page.getByRole('checkbox',{name:/Legacy Xbox/})).toHaveCount(0);
+
 });

@@ -34,6 +34,7 @@ export default function Library({
   onRuntime,
   onForerunner,
   onMccTools,
+  onBatchSources,
   onWorkspace,
   busy,
 }: {
@@ -48,6 +49,7 @@ export default function Library({
   onRuntime: (id: RuntimeId) => void;
   onForerunner: () => void;
   onMccTools: () => void;
+  onBatchSources: (entries: LibraryEntry[]) => void;
   onWorkspace: (workspace:Workspace) => void;
   busy: boolean;
 }) {
@@ -164,7 +166,7 @@ export default function Library({
           </button>
         </div>
       </div>
-      <MultiMapBatchEditing entries={data.entries} onOpenMccTools={onMccTools} />
+      <MultiMapBatchEditing entries={data.entries} onOpenMccTools={onMccTools} onOpenTabs={onBatchSources} />
       {entries.length ? (
         <div className="map-grid">
           {entries.map((entry) => {

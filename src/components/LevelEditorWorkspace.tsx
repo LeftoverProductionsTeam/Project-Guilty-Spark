@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { Layers3, Plus, Radio } from 'lucide-react';
 import LiveEditor from './LiveEditor';
 import BspAssembly from './BspAssembly';
-import{WorkspacePanel}from'./WorkspacePanels';
-import {useMapState} from '../mapSession';
+import { useRevealWorkspacePanel, WorkspacePanel } from './WorkspacePanels';
+import {useMapState, writeMapSession} from '../mapSession';
 import type { Project, MapInspection, MeshData, OpenProject } from '../types';
 import {useEditorAudio} from './EditorAudio';
 
@@ -25,7 +25,7 @@ export default function LevelEditorWorkspace({
   onSourceEdit,
   entries,
   onBuild,
-  onImportMap,onContinue,onDirector,
+  onImportMap,onContinue,
   defaultRuntime,
 }: {
   project: Project | null;
@@ -42,13 +42,13 @@ export default function LevelEditorWorkspace({
   entries:import('../types').LibraryEntry[];
   onBuild:()=>void;
   onImportMap:()=>void;onContinue:(id:string)=>void;
-  onDirector:()=>void;
   defaultRuntime?:import('../types').RuntimeId;
 }) {
   const [target, setTarget] = useMapState<'auto' | 'source' | 'live'>(project?.id??'new-map','level.target',intent === 'live' ? 'live' : 'auto');
   const [creating,setCreating]=useMapState(project?.id??'new-map','level.creating',false);
   const [live, setLive] = useState(false);
   const audio=useEditorAudio();
+  const revealPanel=useRevealWorkspacePanel();
   useEffect(()=>{audio?.setLive(live);return()=>audio?.setLive(false);},[audio,live]);
   useEffect(() => {
     if (intent === 'live') {
@@ -64,7 +64,6 @@ export default function LevelEditorWorkspace({
       <header className="level-editor-context">
         {live ? <Radio size={17} /> : <Layers3 size={17} />}
         <strong>LEVEL EDITOR</strong>
-        {valid&&<button className="small-button" onClick={onDirector}>Recording Director ↗</button>}
         <span role="status">
           {live
             ? 'Live Halo session'
@@ -74,6 +73,10 @@ export default function LevelEditorWorkspace({
                 ? `Source map · ${inspection?.header.engine??'Halo'}`
                 : 'New map'}
         </span>
+        {project?.source && !project.quickForge && !live && !creating && <button className="small-button" onClick={() => {
+          writeMapSession(project.id, 'bsp.open', true);
+          revealPanel('construction');
+        }}>BSP Connections</button>}
         <label>
           Editing target
           <select

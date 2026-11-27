@@ -8,8 +8,9 @@ interface MapSourceImport {
   failures: { path: string; message: string }[];
 }
 
-export default function MapSourceDrop({ single = false, disabled, onImported, viewport }: {
+export default function MapSourceDrop({ single = false, disabled, onImported, viewport, batch }: {
   single?: boolean;
+  batch?: boolean;
   disabled?: boolean;
   viewport?: { projectId: string; sourceSlot?: number; reveal: () => void };
   onImported: (entries: LibraryEntry[], sourceSlot?: number) => string | void;
@@ -48,7 +49,7 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
     mounted.current = true;
     function drop(event: Event) {
       const detail = (event as CustomEvent<{ paths: string[]; x: number; y: number }>).detail;
-      if (event.defaultPrevented || !detail) return;
+      if (event.defaultPrevented || !detail?.paths.some(path => /\.(map|yelo)$/i.test(path))) return;
       const hit = document.elementFromPoint(detail.x, detail.y);
       const viewport = current.current.viewport;
       const overViewport = viewport && hit?.closest('[data-bsp-donor-target]')?.getAttribute('data-bsp-donor-target') === viewport.projectId
@@ -70,7 +71,7 @@ export default function MapSourceDrop({ single = false, disabled, onImported, vi
   }, [importSources]);
 
   if (!native) return null;
-  return <div ref={target} className="map-source-drop" title={single ? 'Drop multiple maps to add them to the donor menu. Choose one for each connection.' : 'Drop a selection of maps to add them to the library.'}>
+  return <div ref={target} className="map-source-drop" data-batch-source-drop={batch || undefined} title={single ? 'Drop multiple maps to add them to the donor menu. Choose one for each connection.' : 'Drop maps to open tabs and add compatible maps to the batch.'}>
     <span>{single ? 'Drop donor maps here' : 'Drop map files here'}</span>
     <button type="button" disabled={disabled || busy} onClick={() => void importSources()}>{busy ? 'Importing…' : single ? 'Browse for donor map' : 'Browse for map files'}</button>
     {message && <p role="status">{message}</p>}

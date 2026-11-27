@@ -3674,7 +3674,7 @@ test('Atlas plans all19 original sources with one-action transforms, overlap rev
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.megaworldLayout?.regions[0]?.translation[0])).toBe(125);
  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect(x).toHaveValue('0');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.megaworldLayout?.regions[0]?.translation[0])).toBe(0);
  await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');await expect(x).toHaveValue('125');
- const yaw=await pagedControl(page,'spinbutton','Atlas region Yaw',layout);await yaw.fill('37');await yaw.press('Tab');await (await pagedControl(page,'button','Hex cluster draft',layout)).click();await expect(layout).toContainText('0 overlapping bounds');await page.keyboard.press('Control+s');
+ const yaw=await pagedControl(page,'spinbutton','Atlas region Yaw',layout);await yaw.fill('37');await yaw.press('Tab');await (await pagedControl(page,'button','Hex cluster draft',layout)).click();await expect(layout).toContainText('0 bounding-box overlaps');await page.keyboard.press('Control+s');
  expect(await page.evaluate(()=>(window as any).__sparkMock.saved.megaworldLayout.regions.length)).toBe(19);expect(await page.evaluate(()=>(window as any).__sparkMock.atlasSources.every((r:any)=>r.translation.every((n:number)=>n===0)&&r.yawDegrees===0))).toBe(true);
  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
  await expect(page.getByLabel('Saved region layout',{exact:true}).getByLabel('Planned Atlas region',{exact:true}).locator('option')).toHaveCount(19);
@@ -4094,7 +4094,11 @@ test('three-route Construction controls use one reachable scrolling drawer',asyn
 
 
 async function constructionControl(page:Page,role:'button'|'spinbutton'|'checkbox'|'combobox',name:string){
- const control=page.getByRole('region',{name:'Construction panel',exact:true}).getByRole(role,{name,exact:true,includeHidden:true});await revealPagedControl(control);return control;
+ const panel=page.getByRole('region',{name:'Construction panel',exact:true});
+ const control=panel.getByRole(role,{name,exact:true,includeHidden:true});
+ const precision=control.locator('xpath=ancestor::details[contains(@class,"bsp-precision") and not(@open)]/summary');
+ if(await precision.count()){await revealPagedControl(precision);await precision.click();}
+ await revealPagedControl(control);return control;
 }
 
 test('corner Monitor has silhouette feedback without a square frame and leaves File close by',async({page})=>{
@@ -4189,12 +4193,12 @@ test('edge-section sliders preview an unsaved arch with an exact reported budget
 
 test('construction route handles drive the same draft, preview and undo transaction', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
-  await chooseTool(page,'Level editor'); await openDrawer(page,'Construction');
+  await chooseTool(page,'Level editor');
+  await page.getByRole('button',{name:'BSP Connections',exact:true}).click();
   const panel = page.getByRole('region',{name:'Construction panel',exact:true});
-  const summary=panel.locator('.bsp-assembly > summary'); await revealPagedControl(summary); await summary.click();
   await (await constructionControl(page,'button','Plan connected tunnel')).click();
   await (await constructionControl(page,'button','Add bend before imported floor')).click();
-  await (await constructionControl(page,'button','Drag route points')).click();
+  await expect(await constructionControl(page,'button','Hide route handles')).toHaveAttribute('aria-pressed','true');
   await (await constructionControl(page,'button','Select destination floor')).click();
   const canvas=page.locator('canvas[data-gs-gizmo]:visible');
   await expect.poll(()=>canvas.count()).toBe(1);
@@ -4207,7 +4211,6 @@ test('construction route handles drive the same draft, preview and undo transact
   const length=Math.hypot(g.dx,g.dy); expect(length).toBeGreaterThan(1);
   await page.mouse.move(g.x,g.y); await page.mouse.down();
   await page.mouse.move(g.x+g.dx/length*36,g.y+g.dy/length*36,{steps:10}); await page.mouse.up();
-  await (await constructionControl(page,'button','Preview draft & triangles')).click();
   const preview=()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='preview_bsp_assembly').at(-1)?.args.draft?.tunnelPoints);
   await expect.poll(async()=>(await preview())?.length).toBe(3);
   const points=await preview(); expect(points[0][0]).not.toBe(g.origin[0]);

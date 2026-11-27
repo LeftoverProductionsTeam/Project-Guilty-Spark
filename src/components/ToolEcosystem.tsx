@@ -188,6 +188,7 @@ export default function ToolEcosystem({
       : ['sapien', 'guerilla', 'tagTest', 'invaderEditor', 'baboon'].includes(tool.id);
     const installed=assessment.executableFound||!!row.userLauncher?.available||!!row.externalCompanion?.available;
     const Icon=/blender|foundry|reclaimer/i.test(tool.id)?Box:/sapien|osoyoos/i.test(tool.id)?Layers3:/build|haloTool/i.test(tool.id)?Hammer:/tag|baboon|guerilla|mozzarilla|invaderEditor/i.test(tool.id)?Tags:/extract|assembly|refinery/i.test(tool.id)?FileCode2:Wrench;
+    const hasOpenTagSource = !!project?.source && (tool.handler === 'editTags' || tool.id === 'invaderEditor');
     return (
       <article className="gs-tool-card" key={tool.id} data-tool-id={tool.id}>
         <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong><HelpTip label={`When to use ${tool.label}`} help={`${tool.workflow?.whenToUse??tool.purpose} ${tool.workflow?.sourceDirectory??tool.caveat}`}/></header>
@@ -198,6 +199,7 @@ export default function ToolEcosystem({
           {tool.purpose}
         </p>
         {!!tool.runtimes?.length&&<small className="gs-tool-editions" title={tool.runtimes.join(', ')}>{tool.runtimes.map(id=>({mccSteam:'MCC H1',haloCustomEdition:'CE',openCe:'OpenCE',chupathingyCe:'Chupa'}[id]??id)).join(' · ')}</small>}
+        {hasOpenTagSource && <button className="gs-tool-use" onClick={()=>onOpenWorkspace('tags')}>Edit open map in Spark</button>}
         {assessment.canUseWorkflow&&tool.id!=='baboon'&&tool.integration!=='externalCompanion'&&<button className="gs-tool-use" onClick={()=>open(tool)} disabled={busy}>Use with Current Project</button>}
         {(assessment.executableFound || row.userLauncher?.available) &&
           desktop &&
@@ -226,7 +228,7 @@ export default function ToolEcosystem({
                   .finally(() => setBusy(false));
               }}
             >
-              {compact ? 'Launch' : `Launch ${tool.label}`}
+              {projectId && tool.id !== 'tagTest' ? 'Launch standalone' : compact ? 'Launch' : `Launch ${tool.label}`}
             </button>
           )}
         {compact&&desktop&&!installed&&tool.integration!=='externalCompanion'&&<button disabled={busy} onClick={()=>locate(tool)}>Locate {tool.label}</button>}
@@ -254,6 +256,7 @@ export default function ToolEcosystem({
           Get {tool.label}
         </ExternalBrowserLink>}
         {(!compact || !assessment.canUseWorkflow) && <p className="subtle">{assessment.detail}</p>}
+        {hasOpenTagSource && <p className="subtle">Standalone tools edit files on disk. For supported external editing, save the project, build working tags, then review saved changes in Spark.</p>}
         {tool.integration === 'externalCompanion' && (
           <>
             <div className="button-row">
@@ -368,7 +371,7 @@ export default function ToolEcosystem({
       {message && <Notice tone="info">{message}</Notice>}
       {report?.sourceIssue && (
         <Notice tone="info">
-          {report.sourceIssue} Compiled maps remain available in Spark’s integrated editors.
+          {report.sourceIssue}. To edit the open draft now, use Spark’s integrated editors.
         </Notice>
       )}
       {report && (

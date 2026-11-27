@@ -786,14 +786,18 @@ export default function World({
   const changeRoutePoint = (index: number, point: Vec3) => {
     if (!currentRouteDraft || !routePoints) return;
     const signature = assemblySignature(currentRouteDraft);
-    setRouteDraft(current => {
-      if (!current || assemblySignature(current) !== signature) return current;
-      if (donorHandlePoint && point.every(axis => Number.isFinite(axis) && Math.abs(axis) <= 2048)) {
-        const position = current.translation.map((axis, i) => axis + point[i] - donorHandlePoint[i]) as Vec3;
-        return transformAssembly(current, position, current.yawDegrees);
-      }
-      return editAssemblyRoutePoints(current, routeKey, routePoints.map((old, i) => i === index ? point : old));
-    });
+    const latest = readMapSession<BspAssembly|null>(project.id, 'bsp.draft', null);
+    if (!latest || assemblySignature(latest) !== signature) return;
+    let next: BspAssembly;
+    if (donorHandlePoint) {
+      if (!point.every(axis => Number.isFinite(axis) && Math.abs(axis) <= 2048)) return;
+      const position = latest.translation.map((axis, i) => axis + point[i] - donorHandlePoint[i]) as Vec3;
+      next = transformAssembly(latest, position, latest.yawDegrees);
+    } else {
+      next = editAssemblyRoutePoints(latest, routeKey, routePoints.map((old, i) => i === index ? point : old));
+    }
+    setRouteDraft(next);
+    writeMapSession(project.id, 'bsp.view.previewRequest', assemblySignature(next));
   };
   const assemblyDonor=useAssemblyDonor(project,!!currentRouteDraft||pickTarget==='donor'&&!!pickingLanding),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);

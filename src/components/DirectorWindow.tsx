@@ -474,7 +474,7 @@ export default function DirectorWindow({
           <strong>Recording Director · {opened?.project.title ?? 'Loading map'}</strong>
           <button onClick={onPopout}>Pop out Director ↗</button>
           <button onClick={onClose}>Camera tracks &amp; actors</button>
-          <button onClick={() => setClean(true)}>Hide interface</button>
+          <button title="Press Esc to bring the controls back" onClick={() => setClean(true)}>Hide interface</button>
         </header>
       )}
       {!clean && !embedded && (
@@ -494,7 +494,7 @@ export default function DirectorWindow({
               </option>
             ))}
           </select>
-          <button onClick={() => setClean(true)}>Hide interface</button>
+          <button title="Press Esc to bring the controls back" onClick={() => setClean(true)}>Hide interface</button>
         </header>
       )}
       {!clean && (
@@ -512,13 +512,6 @@ export default function DirectorWindow({
               <option disabled>Connected Cinematic Camera · requires an engine spectator adapter</option>
             </select>
           </label>
-          <span>
-            {mode === 'editor'
-              ? linked && live
-                ? 'Spark render · linked live object transforms · static poses'
-                : 'Independent Spark camera · editor assets'
-              : 'Actual selected game feed · uses the game’s camera'}
-          </span>
           {mode === 'editor' && (
             <label>
               <input
@@ -529,7 +522,7 @@ export default function DirectorWindow({
                   if (!e.target.checked) setLive(null);
                 }}
               />
-              Link connected Halo objects (read only)
+              Link live objects
             </label>
           )}
           {mode === 'capture' && (
@@ -596,13 +589,9 @@ export default function DirectorWindow({
               {finishingSound ? 'Finishing sound…' : 'Finish sound & save'}
             </button>
           )}
-          <output aria-live="polite">
-            {recording} · {elapsed.toFixed(1)}s
-          </output>
-        </nav>
-      )}
-      {!clean && (
-        <div className="gs-director-settings">
+          <details className="gs-director-options">
+            <summary>Recording settings</summary>
+            <div className="gs-director-settings">
           <label>
             Frame rate
             <select
@@ -732,11 +721,12 @@ export default function DirectorWindow({
               </small>
             </div>
           </details>
-          <span>
-            Hide the interface with the button above; press Esc to restore it. OBS can capture this window
-            directly. An independent engine spectator feed is not implemented for MCC.
-          </span>
-        </div>
+            </div>
+          </details>
+          <output aria-live="polite">
+            {recording === 'idle' ? 'Ready' : recording + ' · ' + elapsed.toFixed(1) + 's'}
+          </output>
+        </nav>
       )}
       <div className="gs-director-stage">
         {mode === 'capture' ? (

@@ -9,6 +9,8 @@ export interface MapDocument {
   meshes: Record<string, MeshData>;
   /** Saved native metadata invalidates only this document's tool reports. */
   savedRevision?: number;
+  /** Imported map tab whose native inspection has yet to be opened. */
+  queuedTitle?: string;
 }
 export interface MapDocuments {
   activeId: string | null;
@@ -20,6 +22,7 @@ export type DocumentAction =
   | { type: 'open'; open: OpenProject; activate?: boolean }
   | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
   | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
+  | { type: 'queue'; entries: { id: string; title: string }[] }
   | { type: 'select'; id: string }
   | { type:'reorder';ids:string[] }
   | { type: 'close'; id: string }
@@ -66,6 +69,16 @@ function inspectionUnchanged(previous:MapInspection|null|undefined,incoming:MapI
     JSON.stringify([source.resourceDirectory,source.resourceSha256,source.audioResources,incoming.diagnostics,incoming.resources]);
 }
 export function documentReducer(state: MapDocuments, action: DocumentAction): MapDocuments {
+  if (action.type === 'queue') {
+    const seen = new Set(state.documents.map(document => document.id));
+    const documents = [...state.documents];
+    for (const { id, title } of action.entries) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      documents.push({ id, queuedTitle: title, inspection: null, meshes: {}, history: { ...initialHistory, limit: state.limit } });
+    }
+    return { ...state, documents };
+  }
   if(action.type==='reorder'){
     if(action.ids.length!==state.documents.length||new Set(action.ids).size!==action.ids.length||action.ids.some(id=>!state.documents.some(d=>d.id===id)))return state;
     if(action.ids.every((id,index)=>state.documents[index].id===id))return state;
@@ -114,17 +127,18 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     };
   }
   if (action.type === 'select')
-    return state.documents.some((d) => d.id === action.id) ? { ...state, activeId: action.id } : state;
+    return state.documents.some((d) => d.id === action.id && !d.queuedTitle) ? { ...state, activeId: action.id } : state;
   if (action.type === 'close') {
     const index = state.documents.findIndex((d) => d.id === action.id);
     if (index < 0) return state;
     const documents = state.documents.filter((d) => d.id !== action.id);
+    const next = [...documents.slice(index), ...documents.slice(0, index).reverse()].find(d => !d.queuedTitle);
     return {
       ...state,
       documents,
       activeId:
         state.activeId === action.id
-          ? (documents[Math.min(index, documents.length - 1)]?.id ?? null)
+          ? (next?.id ?? null)
           : state.activeId,
     };
   }
