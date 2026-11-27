@@ -52,7 +52,7 @@ export function prepareDesktopArguments(input, config, { owned = false } = {}) {
   if (['build', 'dev'].includes(args[0])) args.push('--config', config);
   return { args: [...args, ...cargo], exportTo };
 }
-async function validateAndPromote(context, releaseDir, verifyMonitor) {
+async function validateAndPromote(context, releaseDir, verification) {
   const destination = path.join(context.directory, 'playtest-candidate');
   const smoke = path.join(context.directory, 'playtest-startup');
   const executable = path.join(destination, 'GuiltySpark.exe');
@@ -61,9 +61,12 @@ async function validateAndPromote(context, releaseDir, verifyMonitor) {
   await runDevelopmentCommand(process.execPath, [
     'scripts/release/smoke-windows.mjs', executable, exported.sourceCommit, smoke,
   ], context);
-  if (verifyMonitor) await runDevelopmentCommand(process.execPath, [
+  if (verification === '--verify-monitor') await runDevelopmentCommand(process.execPath, [
     'scripts/test-native-monitor-portrait.mjs', executable, path.join(context.directory, 'playtest-monitor'),
   ], context);
+  if (verification === '--verify-shape-paint') await runDevelopmentCommand(process.execPath, [
+    'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-shape-paint'),
+  ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_LAUNCH_ONLY: '1', SPARK_LIFECYCLE_SHAPE_PAINT: '1' } });
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
   if (git('rev-parse', 'HEAD') !== exported.sourceCommit || git('status', '--porcelain'))
     throw Error('Candidate source changed during native validation');
@@ -87,9 +90,9 @@ async function main() {
       const config = JSON.stringify(embeddedFrontendConfig(context.env.SPARK_FRONTEND_DIST));
       const request = process.argv.slice(2);
       const playtest = request[0] === 'playtest';
-      const verifyMonitor = request[1] === '--verify-monitor';
-      if (playtest && (process.platform !== 'win32' || request.length !== (verifyMonitor ? 2 : 1)))
-        throw Error('Use desktop playtest [--verify-monitor] on Windows');
+      const verification = request[1];
+      if (playtest && (process.platform !== 'win32' || request.length > 2 || ![undefined, '--verify-monitor', '--verify-shape-paint'].includes(verification)))
+        throw Error('Use desktop playtest [--verify-monitor | --verify-shape-paint] on Windows');
       const { args, exportTo } = prepareDesktopArguments(playtest ? ['build', '--no-bundle'] : request, config, {
         owned: Boolean(process.env.SPARK_BUILD_WORKSPACE),
       });
@@ -99,7 +102,7 @@ async function main() {
         context,
       );
       if (playtest)
-        console.log(JSON.stringify({ promoted: await validateAndPromote(context, path.join(context.env.CARGO_TARGET_DIR, 'release'), verifyMonitor) }));
+        console.log(JSON.stringify({ promoted: await validateAndPromote(context, path.join(context.env.CARGO_TARGET_DIR, 'release'), verification) }));
       if (exportTo)
         console.log(
           JSON.stringify({

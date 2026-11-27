@@ -15,17 +15,55 @@ const paintHistoryLimit = 8;
 const shapeLabels = { plow: 'Plow blade', box: 'Box', wedge: 'Wedge' } as const;
 type Shape = keyof typeof shapeLabels;
 
-function shapeMesh(shape: Shape, dimensions: Vec3): MeshData {
+type PlowProfile = 'rounded' | 'v';
+
+function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile): MeshData {
+  const columns = 16, rows = 12;
+  const mesh: MeshData = { positions: [], indices: [], uvs: [], label: shapeLabels.plow, source: 'Spark shape' };
+  const rake = Math.min(depth, height * 0.7);
+  const scoopDepth = height * 0.65 * scoop / 100;
+  const wingDepth = width * 0.33 * wrap / 100;
+  const position = (side: number, across: number, up: number): Vec3 => {
+    const center = 2 * across - 1;
+    const wing = profile === 'v' ? Math.abs(center) : center * center;
+    return [side * depth / 2 + rake * up - 4 * scoopDepth * up * (1 - up) - wingDepth * wing,
+      width * (across - 0.5), height * up];
+  };
+  // Separate UV islands for the front, back and edges. Step counts match on
+  // their shared boundaries, so welding by position gives a closed solid.
+  function surface(tile: number, uSteps: number, vSteps: number, reversed: boolean,
+    sample: (u: number, v: number) => Vec3) {
+    const stride = uSteps + 1;
+    const first = mesh.positions.length / 3;
+    for (let j = 0; j <= vSteps; j++) {
+      for (let i = 0; i <= uSteps; i++) {
+        const u = i / uSteps, v = j / vSteps;
+        mesh.positions.push(...sample(u, v));
+        mesh.uvs!.push((tile % 3 + 0.04 + u * 0.92) / 3, (Math.floor(tile / 3) + 0.04 + v * 0.92) / 2);
+        if (i === uSteps || j === vSteps) continue;
+        const a = first + j * stride + i;
+        const b = a + 1, c = a + stride, d = c + 1;
+        mesh.indices.push(...(reversed ? [a, c, b, b, c, d] : [a, b, c, b, d, c]));
+      }
+    }
+  }
+  surface(0, columns, rows, false, (u, v) => position(1, u, v));
+  surface(1, columns, rows, true, (u, v) => position(-1, u, v));
+  surface(2, columns, 1, true, (u, v) => position(2 * v - 1, u, 1));
+  surface(3, columns, 1, false, (u, v) => position(2 * v - 1, u, 0));
+  surface(4, 1, rows, false, (u, v) => position(2 * u - 1, 0, v));
+  surface(5, 1, rows, true, (u, v) => position(2 * u - 1, 1, v));
+  mesh.parts = [{ name: 'plow_steel', indexStart: 0, indexCount: mesh.indices.length }];
+  return mesh;
+}
+
+function shapeMesh(shape: Exclude<Shape, 'plow'>, dimensions: Vec3): MeshData {
   const [depth, width, height] = dimensions;
   const low: Vec3 = [-depth / 2, -width / 2, 0];
   const high: Vec3 = [depth / 2, width / 2, height];
-  const material = shape === 'plow' ? 'plow_steel' : 'painted_part';
+  const material = 'painted_part';
   const brush = shape === 'wedge' ? rampBrush('part', low, high, material) : boxBrush('part', 'solid', low, high, material);
-  if (shape === 'plow') {
-    // Keep the blade a closed solid. Tilt both top corners by the same amount.
-    const rake = Math.min(depth, height * 0.7);
-    brush.vertices = brush.vertices.map(vertex => [vertex[0] + (vertex[2] > 0 ? rake : 0), vertex[1], vertex[2]]);
-  }
+
   const mesh: MeshData = { positions: [], indices: [], uvs: [], source: 'Spark shape', label: shapeLabels[shape] };
   const padding = 0.025;
   brush.faces.forEach((face, index) => {
@@ -95,6 +133,9 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
   const activity = useWorkspaceActivity();
   const [shape, setShape] = useState<Shape | 'selected'>('plow');
   const [size, setSize] = useState<Vec3>([0.22, 2.5, 0.72]);
+  const [scoop, setScoop] = useState(62);
+  const [wrap, setWrap] = useState(30);
+  const [profile, setProfile] = useState<PlowProfile>('rounded');
   const [painting, setPainting] = useState(false);
   const [color, setColor] = useState('#701b17');
   const [radius, setRadius] = useState(18);
@@ -103,7 +144,10 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
   const selectedHasUv = !!selectedMesh?.uvs && selectedMesh.uvs.length * 3 === selectedMesh.positions.length * 2 &&
     selectedMesh.uvs.every(value => Number.isFinite(value) && value >= 0 && value <= 1);
   const form = shape === 'selected' && !selectedHasUv ? 'plow' : shape;
-  const mesh = useMemo(() => form === 'selected' ? selectedMesh! : shapeMesh(form, size), [form, selectedMesh, size]);
+  const mesh = useMemo(() => {
+    if (form === 'selected') return selectedMesh!;
+    return form === 'plow' ? plowMesh(size, scoop, wrap, profile) : shapeMesh(form, size);
+  }, [form, selectedMesh, size, scoop, wrap, profile]);
   const canvas = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = atlasSize;
@@ -177,6 +221,17 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
           <NumberField label={label} value={size[axis]} min={0.05} max={32} step={0.05}
             onCommit={value => setSize(previous => previous.map((old, index) => index === axis ? value : old) as Vec3)} />
         </label>)}
+      </div>}
+      {form === 'plow' && <div className="asset-part-dimensions">
+        <label>Blade profile <select value={profile} onChange={event => setProfile(event.target.value as PlowProfile)}>
+          <option value="rounded">Rounded</option><option value="v">V-plow</option>
+        </select></label>
+        <label>Scoop (%)
+          <NumberField label="Scoop (%)" value={scoop} min={0} max={100} step={1} onCommit={setScoop} />
+        </label>
+        <label>Wrap (%)
+          <NumberField label="Wrap (%)" value={wrap} min={0} max={100} step={1} onCommit={setWrap} />
+        </label>
       </div>}
       <div className="button-row">
         <button type="button" aria-pressed={!painting} onClick={() => setPainting(false)}>Orbit</button>

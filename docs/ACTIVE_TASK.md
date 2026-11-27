@@ -3,7 +3,7 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest: Spark dc925df9 / a7532192 passed native Windows startup, pointer follow with animation paused and reduced motion, and Cortana playback. Previous is 3fcd45f9 / 58e4b8ce. Focused UI checks cover map drops, batch review, BSP route edits, Atlas save/reopen and runtime selection. The game maps remain separate. New Asset Workshop shape and paint work needs its own release and native vehicle integration.
+Latest: Spark 35f23772 / 706aff6c adds Shape & Paint. Previous dc925df9 / a7532192 passed native startup, paused/reduced-motion Monitor pointer follow, and Cortana playback. Games & tools passed native Windows control reachability at eight window sizes (800×600 to 5120×1440) and 125% UI scale. The new curved/V plow exports a closed painted solid. Native Warthog rig/collision and Monitor patrol remain open. Gameplay maps are separate.
 Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Continue entrance checks and independent creator work. Retained fd7a49fa is available in Spark’s sealed handoff.
 
 ## Acceptance

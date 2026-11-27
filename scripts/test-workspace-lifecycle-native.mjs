@@ -903,6 +903,42 @@ try{
     await nativeProjectSwitching({page:main,root,invoke,report,step,openProject,inspector,x,setX,state,acknowledged,pages,nextPage,baseline:process.env.SPARK_PROJECT_SWITCH_BASELINE==='1',restart:async()=>{for(const page of pages().reverse())if(!page.isClosed())await close(page,'save');await waitForQaExit(child);await browser.close();await launchNative();return main;}});
   }
   if(process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'){if(!launchOnly)throw Error('Responsive layout acceptance uses the existing launch-only fixture');const {nativeResponsiveLayout}=await import('./native-responsive-layout.mjs');await nativeResponsiveLayout({page:main,root,invoke,report,step,baseline:process.env.SPARK_LIFECYCLE_LAYOUT_BASELINE==='1'});}
+  if (process.env.SPARK_LIFECYCLE_SHAPE_PAINT === '1') {
+    if (!launchOnly) throw Error('Shape and paint acceptance uses the isolated launch-only fixture');
+    await createMultiplayerMap(main, 'Native shape and paint', 'haloCustomEdition');
+    await chooseTool(main, 'Asset workshop');
+    const toggle = main.getByRole('button', { name: 'Shape & paint', exact: true, includeHidden: true });
+    await revealPagedControl(toggle);
+    await toggle.click();
+    const editor = main.getByRole('region', { name: 'Shape and paint' });
+    const mesh = editor.getByRole('combobox', { name: 'Mesh' });
+    await expect(mesh).toHaveValue('plow');
+    const profile = editor.getByRole('combobox', { name: 'Blade profile', exact: true });
+    await profile.selectOption('v');
+    const scoop = editor.getByRole('spinbutton', { name: 'Scoop (%)', exact: true });
+    await scoop.fill('80');
+    await scoop.press('Tab');
+    const width = editor.getByRole('spinbutton', { name: 'Width', exact: true });
+    await width.fill('3');
+    await width.press('Tab');
+    await editor.getByRole('button', { name: 'Paint mesh', exact: true }).click();
+    const canvas = editor.locator('canvas');
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    await main.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    const undo = editor.getByRole('button', { name: 'Undo paint', exact: true });
+    await expect(undo).toBeEnabled();
+    await main.screenshot({ path: path.join(root, 'native-painted-plow.png') });
+    await toggle.click();
+    await expect(canvas).toHaveCount(0);
+    await toggle.click();
+    await expect(width).toHaveValue('3');
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await expect(undo).toBeDisabled();
+    report.shapePaint = { shape: 'plow', width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true };
+    step('Shaped and painted the plow with the Windows app, hid the tool and undid the retained stroke', report.shapePaint);
+  }
   if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){
     if(!launchOnly)throw Error('Setup flavor acceptance uses the existing launch-only fixture');
     const {nativeOpenCeFlavorSetup}=await import('./native-responsive-layout.mjs');await nativeOpenCeFlavorSetup({page:main,root,invoke,report,step});

@@ -8087,7 +8087,7 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.translation)).toEqual([80,0,-20]);
 });
 
-test('Asset Workshop shapes a plow, paints it, and exports the source and texture', async ({page}) => {
+test('Asset Workshop shapes a curved plow, paints it, and exports the source and texture', async ({page}) => {
   await mockDesktop(page);
   await openFixture(page);
   await chooseTool(page, 'Asset workshop');
@@ -8096,13 +8096,31 @@ test('Asset Workshop shapes a plow, paints it, and exports the source and textur
   await open.click();
   const editor = page.getByRole('region',{name:'Shape and paint'});
   await expect(editor.getByRole('combobox',{name:'Mesh'})).toHaveValue('plow');
+  await editor.getByRole('combobox',{name:'Blade profile',exact:true}).selectOption('v');
   const width=editor.getByRole('spinbutton',{name:'Width',exact:true});
   await width.fill('3');
   await width.press('Tab');
   const [obj] = await Promise.all([page.waitForEvent('download'),editor.getByRole('button',{name:'Export OBJ',exact:true}).click()]);
   expect(obj.suggestedFilename()).toBe('plow_steel.obj');
   const text = await readFile((await obj.path())!,'utf8');
-  expect(text.split('\n').filter(line=>line.startsWith('f '))).toHaveLength(12);
+  const rows=text.split('\n');
+  const vertices=rows.filter(row=>row.startsWith('v ')).map(row=>row.slice(2));
+  const faces=rows.filter(row=>row.startsWith('f '));
+  expect(faces.length).toBeGreaterThan(100);
+  const edgeUses=new Map<string,number[]>();
+  for (const face of faces) {
+    const corners=face.slice(2).split(' ').map(value=>vertices[Number(value.split('/')[0])-1]);
+    for (let i=0;i<3;i++) {
+      const a=corners[i],b=corners[(i+1)%3];
+      const edge=[a,b].sort().join('|');
+      edgeUses.set(edge,[...(edgeUses.get(edge)??[]),a<b?1:-1]);
+    }
+  }
+  expect([...edgeUses.values()].every(uses=>uses.length===2&&uses[0]===-uses[1])).toBe(true);
+  const points=vertices.map(row=>row.split(' ').map(Number));
+  const front=(y:number,z:number)=>Math.max(...points.filter(point=>point[1]===y&&point[2]===z).map(point=>point[0]));
+  expect(front(0,0.36)).toBeLessThan((front(0,0)+front(0,0.72))/2-0.2);
+  expect(front(0,0.36)).toBeGreaterThan(front(1.5,0.36)+0.2);
   expect(text).toMatch(/usemtl part_plow_steel/);
   await editor.getByRole('button',{name:'Paint mesh',exact:true}).click();
   const canvas=editor.locator('canvas');
