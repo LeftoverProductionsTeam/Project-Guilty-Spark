@@ -767,7 +767,7 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
-  const [bspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
+  const [bspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
   const currentBspDiagnostics = bspWitness && bspWitness.sourceSha256 === project.source?.sha256 &&
     bspWitness.assemblySignature === assemblySignature(project.bspAssembly ?? null) ? bspWitness.diagnostics : null;
   const [routeHandles] = useMapState(project.id, 'bsp.view.handles', false);

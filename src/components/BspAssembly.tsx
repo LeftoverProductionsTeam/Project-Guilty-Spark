@@ -296,7 +296,7 @@ export default function BspAssembly({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
-  const [visibleWitness, setVisibleWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
+  const [visibleWitness, setVisibleWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
   const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
   const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
   const draftSignature = assemblySignature(draft);

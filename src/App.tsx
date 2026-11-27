@@ -756,6 +756,7 @@ export default function App() {
             if (diagnostics.segments.length || diagnostics.faces.length) {
               writeMapSession<BspStructureWitness>(payload.projectId, BSP_STRUCTURE_WITNESS, {
                 sourceSha256: witness.sourceSha256,
+                jobId: payload.jobId,
                 assemblySignature: assemblySignature(witness.assembly),
                 diagnostics,
               });
@@ -1693,6 +1694,7 @@ export default function App() {
             key={current.id}
             edit={edit}
             onSave={persist=>save(persist===true,current.id)}
+            onReviewGeometry={() => setWorkspace('quickforge')}
             onOpenCompiled={buildId=>void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});rememberCompiledSource(current.id,buildId,opened.project);await load(opened);await refresh();setWorkspace('quickforge');},'Compiled map preserved and opened in its own Level Editor tab.')}
             project={current}
             data={data}

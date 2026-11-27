@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createLatestRefresh } from '../latestRefresh';
+import { assemblySignature } from '../bspAssembly';
+import { BSP_STRUCTURE_WITNESS, type BspStructureWitness } from '../haloWrl';
 import {
   ArrowRight,
   Check,
@@ -38,6 +40,7 @@ export default function Build({
   onRefresh,
   onResources,
   onOpenCompiled,
+  onReviewGeometry,
   onSave,
   edit,
 }: {
@@ -53,6 +56,7 @@ export default function Build({
   onRefresh: () => void;
   onResources: () => void;
   onOpenCompiled: (buildId:string) => void;
+  onReviewGeometry: () => void;
   onSave:(persist?:boolean)=>Promise<void>;
   edit:(project:Project,description:string)=>void;
 }) {
@@ -114,6 +118,10 @@ export default function Build({
   const targetName=ceTarget?(target!.runtimeId==='chupathingyCe'?'Chupathingy':'Custom Edition'):'MCC';
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
+  const [witness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, () => null);
+  const canReviewGeometry = last?.phase === 'failed' && witness?.jobId === last.jobId
+    && !!project.bspAssembly && witness.sourceSha256 === project.source?.sha256
+    && witness.assemblySignature === assemblySignature(project.bspAssembly);
   const validated = dirty || checking
     ? undefined
     : ceTarget ? project.builds.find(b=>b.status==='validated'&&['gbx-custom','ce-existing'].includes(b.target)&&b.id===readiness?.currentValidatedBuildId) : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
@@ -150,6 +158,10 @@ export default function Build({
         vehicleBuildId={view==='build'&&validated?.target==='mcc-cea'&&project.shapeDraft?.vehicleMount ? validated.id : null}
         onSave={()=>onSave(true)}/>
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
+      {view==='build'&&canReviewGeometry&&<section className="build-next-step" aria-label="Native structure failure">
+        <strong>Halo Tool found a geometry problem</strong>
+        <button type="button" onClick={onReviewGeometry}>Show affected geometry in Level Editor</button>
+      </section>}
       {view==='build'&&report&&!report.ready&&report.blockers.length>0&&<section className="build-next-step" aria-label="What to fix before building">
         <strong>Before you can build</strong><p>{report.blockers[0]}</p>
         <button onClick={()=>setReportOpen(true)}>Show all {report.blockers.length} checks</button>

@@ -7988,6 +7988,36 @@ test('creator converts an Atlas seam draft to a road that retains both BSPs', as
   expect(await page.evaluate(() => (window as any).__atlasRoadPreview?.draft.terrainSeam)).toBeUndefined();
 });
 
+test('failed native BSP build links only its own geometry to Level Editor', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(async () => {
+    const w = window as any;
+    w.__sparkMock.projects.a.project.bspAssembly = await w.__TAURI_INTERNALS__.invoke(
+      'plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
+  });
+  await openFixture(page);
+  await chooseTool(page, 'Build & playtest');
+  const review = page.getByRole('button', { name: 'Show affected geometry in Level Editor' });
+  await expect(review).toHaveCount(0);
+  const text = await (await import('node:fs/promises')).readFile('tests/fixtures/synthetic_halo1_tool_errors.wrl', 'utf8');
+  await page.evaluate(async text => {
+    const mock = (window as any).__sparkMock;
+    const project = mock.projects.a.project;
+    const base = { projectId: 'a', timestamp: new Date().toISOString() };
+    await mock.emit('spark:job', { ...base, jobId: 'geometry', progress: 90, severity: 'info', phase: 'bsp-structure-witness',
+      message: JSON.stringify({ sourceSha256: project.source.sha256, assembly: project.bspAssembly, text }) });
+    await mock.emit('spark:job', { ...base, jobId: 'different-job', progress: 100, severity: 'error', phase: 'failed', message: 'A separate build failed' });
+  }, text);
+  await expect(review).toHaveCount(0);
+  await page.evaluate(async () => {
+    await (window as any).__sparkMock.emit('spark:job', { projectId: 'a', jobId: 'geometry', progress: 100,
+      severity: 'error', phase: 'failed', message: 'Collision build failed', timestamp: new Date().toISOString() });
+  });
+  await expect(review).toBeVisible();
+  await review.click();
+  await expect(page.getByLabel('Viewport object count')).toBeVisible();
+});
+
 test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {
   await mockDesktop(page);
   await page.evaluate(async () => {
