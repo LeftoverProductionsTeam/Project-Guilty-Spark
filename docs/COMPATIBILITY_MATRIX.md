@@ -6,10 +6,10 @@
 
 | Workflow | Verified status | Remaining gate |
 | --- | --- | --- |
-| Forerunner Latest MCC13 ground Extraction | Released map `fcfe9d44`; normal-menu gameplay and ground banking accepted | Compact terrain and the full regional pool package remain separate |
+| Forerunner Latest MCC13 ground Extraction | Installed Win64 `2757225e` with released map `fcfe9d44`; normal-menu gameplay and ground banking accepted | Compact terrain and the full regional pool package remain separate |
 | Compact Ice Fields and Carousel `b5178c77 / 4a7f6920` | Private Win64 `2beae96a` normal-menu load. Matched Ice Fields view at BSP 11 recovered opaque walls. Continuous normal-input foot round trip passed via the new Carousel ramp | Wider visuals, Warthog round trip and final pooled cache |
 | Spark Construction route handles and in-place MCC13 connector edits | Browser workflow exercises drag, Preview, Apply, Save and Undo; inherited connector selection and Save/Undo passed separately in source `598fcd59` | Desktop reopen, actual native bake and runtime traversal require workflow acceptance. In-place entrance repair remains separate |
-| Forerunner `playtest.regional_transition_log.v1` | Advertised on private Win64 `2beae96a`. Use the existing staged native log and match the cache identity before interpreting indices | This is an optional diagnostic, with no map-receipt requirement or independent gameplay guarantee |
+| Forerunner `playtest.regional_transition_log.v1` | Advertised on private Win64 `2beae96a`. Spark source `0751058f` adds BSP inspector review. The native reader matched six recorded transfers against `b5178c77`. The inspector passed a browser test with mocked desktop IPC | Desktop dialog acceptance and Spark Latest delivery remain open. The log has no cache digest and adds no receipt requirement |
 
 See the [active checkpoint](ACTIVE_TASK.md) for exact artifacts. The existing Forerunner Spark integration contract defines the runtime diagnostic fields.
 
