@@ -1067,7 +1067,9 @@ try{
           expect(session.compiledSha256).toBe(build.sha256);
           expect(session.gameSha256).toBeNull();
           const stages = path.join(root,'library','runtime-playtests');
-          const [ownedStage] = await fs.readdir(stages);
+          const candidates = (await fs.readdir(stages, {withFileTypes:true})).filter(entry=>entry.isDirectory());
+          expect(candidates).toHaveLength(1);
+          const ownedStage = candidates[0].name;
           const staged = path.join(stages,ownedStage,'data','mcc_maps',session.stagedMap+'.map');
           expect(crypto.createHash('sha256').update(await fs.readFile(staged)).digest('hex')).toBe(build.sha256);
           expect(await fs.stat(path.join(stages,ownedStage,'data','maps_ce')).then(()=>true,()=>false)).toBe(false);
