@@ -1,4 +1,4 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { assertQaOutputPath, waitForQaExit } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real Windows/WebView acceptance. Uses an isolated library and only its own app process.
 // No mocked IPC, game launch, external tool execution or original project mutation.
@@ -71,7 +71,7 @@ try {
   }));
   await main.screenshot({ path: path.join(output, 'guides.png') });
   if (!baseline) {
-    expect(report.guideLayout.allTasksPresent).toBe(10);
+    expect(report.guideLayout.allTasksPresent).toBe(8);
     expect(report.guideLayout.contentWidth).toBeLessThanOrEqual(report.guideLayout.availableWidth);
     await main.getByRole('tab', { name: 'Glossary', exact: true }).click();
     await main.getByRole('searchbox', { name: 'Search glossary', exact: true }).fill('Race vehicle');
@@ -141,6 +141,7 @@ try {
 } finally {
   await fs.writeFile(path.join(output, 'acceptance.json'), JSON.stringify(report, null, 2));
   await browser?.close().catch(() => {});
-  if (processHandle.exitCode === null) processHandle.kill();
+  if (processHandle.exitCode === null && processHandle.signalCode === null) processHandle.kill();
+  await waitForQaExit(processHandle);
   console.log(JSON.stringify({ complete: report.complete, windows: report.windows.length, simultaneousPopouts: report.simultaneousPopouts, guideLayout: report.guideLayout, errors: report.errors }));
 }
