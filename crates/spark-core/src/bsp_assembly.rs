@@ -1455,11 +1455,14 @@ fn generate_end(
     portal_count += append_exact_portals(
         &exact_sky_portals, &mut mesh, &mut materials, &mut triangle_materials,
     )?;
-    let discarded_sky_faces = if terrain_ribbon.is_some() && partition.is_none() {
-        discard_isolated_sky_triangles(&mut mesh, &materials, &mut triangle_materials)
-    } else {
-        0
-    };
+    let (discarded_sky_faces, discarded_collision_folds) =
+        if terrain_ribbon.is_some() && partition.is_none() {
+            let sky = discard_isolated_sky_triangles(&mut mesh, &materials, &mut triangle_materials);
+            let folds = discard_covered_collision_folds(&mut mesh, &materials, &mut triangle_materials);
+            (sky, folds)
+        } else {
+            (0, 0)
+        };
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
@@ -1472,6 +1475,9 @@ fn generate_end(
     let mut warnings = vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()];
     if discarded_sky_faces > 0 {
         warnings.push(format!("Removed {discarded_sky_faces} isolated sky triangles from the native terrain shell. The surrounding stock surfaces were retained."));
+    }
+    if discarded_collision_folds > 0 {
+        warnings.push(format!("Removed {discarded_collision_folds} doubled collision faces already covered by the same two-sided material."));
     }
     if welded > 0 {
         warnings.push(format!("Welded {welded} short intersection edges at the connection while keeping its stock vertices and material seams. Review the repaired join before building."));
@@ -1794,6 +1800,90 @@ fn discard_isolated_sky_triangles(
         (material.name == "+sky" && edges(triangle).iter().all(|edge| sky_edges[edge] == (1, 1)))
             .then_some(index)
     }).collect();
+    discard_export_faces(mesh, slots, &omitted)
+}
+
+fn discard_covered_collision_folds(
+    mesh: &mut MeshData,
+    materials: &[AssemblyMaterial],
+    slots: &mut Vec<usize>,
+) -> usize {
+    // A Boolean join can fold a two-sided stock collision surface back over
+    // itself. Only discard a wedge if two retained same-material triangles
+    // already cover it. The render layer and its original UVs stay intact.
+    const MAX_PLANE_DISTANCE: f64 = 0.000008;
+    type Key = [u64; 3];
+    let point = |id| native_export_point(vertex(mesh, id));
+    let key = |p: V| p.map(|value| if value == 0. { 0 } else { value.to_bits() });
+    let edge = |a, b| {
+        let mut pair = [key(a), key(b)];
+        pair.sort_unstable();
+        pair
+    };
+    let points = |face| {
+        let [a, b, c] = <[u32; 3]>::try_from(&mesh.indices[face * 3..face * 3 + 3]).unwrap();
+        [point(a), point(b), point(c)]
+    };
+    let candidates = slots.iter().enumerate().filter_map(|(face, &slot)| {
+        let material = &materials[slot];
+        (material.collision_only && material.shader_path.is_some() && material.flags & 1 != 0)
+            .then_some(face)
+    }).collect::<Vec<_>>();
+    let mut neighbors = BTreeMap::<[Key; 2], Vec<usize>>::new();
+    for &face in &candidates {
+        let [a, b, c] = points(face);
+        for pair in [edge(a,b), edge(b,c), edge(c,a)] {
+            neighbors.entry(pair).or_default().push(face);
+        }
+    }
+    let mut omitted = BTreeSet::new();
+    let mut covering_faces = BTreeSet::new();
+    for face in candidates {
+        if covering_faces.contains(&face) {
+            continue;
+        }
+        let wedge = points(face);
+        let neighbor = |a, b| {
+            let hits = neighbors.get(&edge(a, b))?;
+            let &[first, second] = hits.as_slice() else { return None };
+            let other = if first == face { second } else { first };
+            (slots[other] == slots[face] && !omitted.contains(&other)).then_some(other)
+        };
+        for i in 0..3 {
+            let [d, b, a] = [wedge[i], wedge[(i+1)%3], wedge[(i+2)%3]];
+            let (Some(left), Some(right)) = (neighbor(a, d), neighbor(d, b)) else { continue };
+            if left == right {
+                continue;
+            }
+            let tip = |face, end| points(face).into_iter().find(|&p| key(p) != key(d) && key(p) != key(end));
+            let (Some(c), Some(other_tip)) = (tip(left, a), tip(right, b)) else { continue };
+            if key(c) != key(other_tip) || key(c) == key(a) || key(c) == key(b) {
+                continue;
+            }
+            let plane = normal(a, b, c);
+            if dot(plane, sub(d, a)).abs() > MAX_PLANE_DISTANCE
+                || dot(triangle_area_normal(wedge), triangle_area_normal(points(left))) >= 0.
+                || dot(triangle_area_normal(wedge), triangle_area_normal(points(right))) >= 0.
+            {
+                continue;
+            }
+            let opposite_sides = |start, end, p, q| {
+                let side = |v| dot(plane, cross(sub(end, start), sub(v, start)));
+                side(p) * side(q) < 0.
+            };
+            // Crossing diagonals prove a convex covering fan, including its
+            // lower wedge. A merely adjacent or concave pair is ineligible.
+            if opposite_sides(a, b, c, d) && opposite_sides(c, d, a, b) {
+                covering_faces.extend([left, right]);
+                omitted.insert(face);
+                break;
+            }
+        }
+    }
+    discard_export_faces(mesh, slots, &omitted)
+}
+
+fn discard_export_faces(mesh: &mut MeshData, slots: &mut Vec<usize>, omitted: &BTreeSet<usize>) -> usize {
     if omitted.is_empty() {
         return 0;
     }
@@ -5473,6 +5563,41 @@ pub fn export_jms(geometry: &AssemblyGeometry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_collision_discards_only_a_fully_covered_same_material_wedge() {
+        let points = [
+            [-1., 0., 0.], [0., -0.1, 0.000001], [1., 0., 0.], [0., 1., 0.],
+        ];
+        let wedge = [0, 1, 2];
+        let fan = [0, 3, 1, 1, 3, 2];
+        let source = MeshData {
+            positions: points.into_iter().flatten().collect(),
+            indices: [wedge.as_slice(), fan.as_slice(), wedge.as_slice()].concat(),
+            parts: vec![maps::MeshPart { name: "Donor join".into(), index_start: 0, index_count: 12 }],
+            ..Default::default()
+        };
+        let collision = AssemblyMaterial {
+            name: "donor".into(), source: 1, shader_path: Some("donor".into()),
+            shader_class: Some("senv".into()), flags: 1, collision_only: true,
+        };
+        let render = AssemblyMaterial { collision_only: false, ..collision.clone() };
+        let boundary = AssemblyMaterial { name: "boundary".into(), ..collision.clone() };
+        let mut mesh = source.clone();
+        let mut slots = vec![0, 0, 0, 1];
+        assert_eq!(discard_covered_collision_folds(&mut mesh, &[collision.clone(), render.clone()], &mut slots), 1);
+        assert_eq!(slots, [0, 0, 1]);
+        assert_eq!(mesh.indices, [fan.as_slice(), wedge.as_slice()].concat());
+        assert_eq!(mesh.parts[0].index_count, 9);
+
+        let mut different_shader = source.clone();
+        let mut material_boundary = vec![0, 0, 2, 1];
+        assert_eq!(discard_covered_collision_folds(&mut different_shader,
+            &[collision.clone(), render.clone(), boundary], &mut material_boundary), 0);
+        let mut distinct_plane = source;
+        distinct_plane.positions[5] = 0.002;
+        assert_eq!(discard_covered_collision_folds(&mut distinct_plane, &[collision, render], &mut vec![0, 0, 0, 1]), 0);
+    }
 
     #[test]
     fn retained_leaf_must_keep_four_independent_native_switches() {

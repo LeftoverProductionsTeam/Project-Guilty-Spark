@@ -1153,8 +1153,21 @@ fn bake_structure_lightmaps(
     project: &Project, tool: &Path, runner: &Runner, workspace: &Path, scenario: &str, bsp: &str, isolated: bool,
 ) -> Result<()> {
     let quality = crate::native_lighting::request(project).map(|request| request.lightmap_quality()).unwrap_or(["0", "0.1"]);
-    native_step(tool, runner, workspace, &["lightmaps".into(), scenario.into(), bsp.into(), quality[0].into(), quality[1].into()],
-        if isolated { "bsp-isolated-lightmaps" } else { "bsp-lightmaps" })?;
+    let result = native_step(tool, runner, workspace,
+        &["lightmaps".into(), scenario.into(), bsp.into(), quality[0].into(), quality[1].into()],
+        if isolated { "bsp-isolated-lightmaps" } else { "bsp-lightmaps" });
+    if let Err(error) = result {
+        // Halo Tool puts the bake witness at the game root, with the scenario
+        // and structure names rather than a path from the log.
+        if let (Some(scenario), Some(bsp)) = (scenario.rsplit(['\\', '/']).next(), bsp.rsplit(['\\', '/']).next()) {
+            if let Ok(relative) = safe_relative(&format!("{scenario}_{bsp}_lightmaps_errors.wrl")) {
+                if let Some(payload) = structure_witness(&workspace.join(relative)) {
+                    runner.emit("bsp-structure-witness", payload, 90, "info");
+                }
+            }
+        }
+        return Err(error);
+    }
     Ok(())
 }
 
