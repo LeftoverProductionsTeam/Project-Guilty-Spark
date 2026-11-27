@@ -3945,9 +3945,10 @@ test('three-route seam is one source edit with retained route controls and per-r
  await chooseTool(page,'Features & workflows');await chooseTool(page,'Level editor');await revealPagedControl(route);await expect(route).toHaveValue('highGround');await revealPagedControl(width);await expect(width).toHaveValue('4.5');
  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
    const result=await invoke(command,args);if(command!=='preview_bsp_assembly')return result;
-   return {...result,routeClearance:[{label:'Primary connection',width:6,clearHeight:4,walkSamples:14},{label:'Infantry tunnel',width:2,clearHeight:1.6,walkSamples:14},{label:'High-ground route',width:4.5,clearHeight:8,walkSamples:14}]};
+   return {...result,sourcePreflight:{blockedFaces:1,lightingRisks:0,lightingExamples:[],examples:[{triangle:19,overlapsTriangle:12,material:'collision',center:[2,3,4],reason:'coplanar collision faces overlap'}]},routeClearance:[{label:'Primary connection',width:6,clearHeight:4,walkSamples:14},{label:'Infantry tunnel',width:2,clearHeight:1.6,walkSamples:14},{label:'High-ground route',width:4.5,clearHeight:8,walkSamples:14}]};
  };});
  await click('Preview joined seam & clearance');await expect(panel).toContainText('High-ground route: 14 biped samples');
+ await expect(panel.getByRole('alert').filter({hasText:'Native build blocked'})).toContainText('coplanar collision faces overlap with triangle 12');
  expect((await page.evaluate(()=>(window as any).__sparkMock.saved)).source).toEqual(saved.source);
  await click('Build & playtest connection');await expect(page.getByRole('tab',{name:'Build & playtest',exact:true})).toBeVisible();
 });

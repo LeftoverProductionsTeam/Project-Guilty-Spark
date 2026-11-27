@@ -59,6 +59,7 @@ interface AssemblySourceIssue {
   material: string;
   center: [number, number, number];
   reason: string;
+  overlapsTriangle?: number;
 }
 
 export interface AssemblyReport {
@@ -86,6 +87,7 @@ export interface AssemblyReport {
   warnings: string[];
   sourcePreflight?: {
     blockedFaces: number;
+    overlapCheckIncomplete?: boolean;
     lightingRisks: number;
     examples: AssemblySourceIssue[];
     lightingExamples: AssemblySourceIssue[];

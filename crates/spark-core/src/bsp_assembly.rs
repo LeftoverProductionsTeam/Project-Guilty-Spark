@@ -3,6 +3,7 @@
 //! are recovered separately. This is a derived geometry rebuild, not a campaign
 //! script/AI, cluster-property or baked-lightmap transplant.
 use crate::{
+    bsp_clearance::{clip_connector_face, TriangleBounds},
     invalid,
     maps::{self, CollisionFace, MapInspection, MeshData},
     project::{Project, Source},
@@ -339,6 +340,8 @@ pub struct AssemblySourceIssue {
     pub material: String,
     pub center: V,
     pub reason: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overlaps_triangle: Option<usize>,
 }
 
 #[derive(Default, Serialize)]
@@ -346,6 +349,7 @@ pub struct AssemblySourceIssue {
 pub struct AssemblySourcePreflight {
     pub blocked_faces: usize,
     pub lighting_risks: usize,
+    pub overlap_check_incomplete: bool,
     pub lighting_examples: Vec<AssemblySourceIssue>,
     pub examples: Vec<AssemblySourceIssue>,
 }
@@ -353,10 +357,11 @@ pub struct AssemblySourcePreflight {
 impl AssemblySourcePreflight {
     pub(crate) fn require_buildable(&self) -> Result<()> {
         if let Some(issue) = self.examples.first() {
+            let other = issue.overlaps_triangle.map_or_else(String::new, |id| format!(" with triangle {id}"));
             return invalid(format!(
-                "Join BSP source preflight found {} blocked faces. Triangle {} ({}) at ({:.3}, {:.3}, {:.3}): {}. Inspect the connection preview and adjust the join before building.",
+                "Join BSP source preflight found {} blocked faces. Triangle {} ({}) at ({:.3}, {:.3}, {:.3}): {}{}. Inspect the connection preview and adjust the join before building.",
                 self.blocked_faces, issue.triangle, issue.material,
-                issue.center[0], issue.center[1], issue.center[2], issue.reason
+                issue.center[0], issue.center[1], issue.center[2], issue.reason, other
             ));
         }
         Ok(())
@@ -370,6 +375,35 @@ pub struct AssemblyGeometry {
     pub exact_sky_portals: Vec<Vec<V>>,
     pub report: AssemblyReport,
 }
+// The test runs on positions rounded to JMS precision. A shared edge or vertex
+// has zero intersection area, even when the faces have opposite winding.
+const PREFLIGHT_PLANE_EPSILON: f64 = 2.0e-8;
+const PREFLIGHT_OVERLAP_BUDGET: usize = 4_000_000;
+
+fn coplanar_overlap(face: [V; 3], normal: V, other: [V; 3], other_normal: V,
+    polygon: &mut Vec<V>, clipped: &mut Vec<V>) -> bool {
+    if dot(normal, other_normal).abs() < 1. - 1e-12
+        || other.iter().any(|&p| dot(normal, sub(p, face[0])).abs() > PREFLIGHT_PLANE_EPSILON)
+        || face.iter().any(|&p| dot(other_normal, sub(p, other[0])).abs() > PREFLIGHT_PLANE_EPSILON)
+    {
+        return false;
+    }
+    polygon.clear();
+    polygon.extend(other);
+    for edge in 0..3 {
+        let start = face[edge];
+        let inward = cross(normal, sub(face[(edge + 1) % 3], start));
+        clip_connector_face(polygon, clipped, |p| dot(inward, sub(p, start)));
+    }
+    let Some((&first, rest)) = polygon.split_first() else { return false; };
+    let double_area: f64 = rest.windows(2)
+        .map(|edge| dot(normal, cross(sub(edge[0], first), sub(edge[1], first))))
+        .sum();
+    let perimeter: f64 = polygon.iter().zip(polygon.iter().cycle().skip(1))
+        .map(|(&a, &b)| { let edge = sub(a, b); dot(edge, edge).sqrt() }).sum();
+    double_area.abs() > perimeter * PREFLIGHT_PLANE_EPSILON
+}
+
 impl AssemblyGeometry {
     /// Check the precision passed to Tool, before namespace extraction or compilation.
     /// Collision and render layers can intentionally cover the same footprint.
@@ -388,7 +422,9 @@ impl AssemblyGeometry {
         }
 
         let mut report = AssemblySourcePreflight::default();
-        let mut collision_faces = std::collections::BTreeSet::new();
+        let mut collision_faces = BTreeSet::new();
+        let mut overlap_faces = Vec::new();
+        let mut overlap_sources = Vec::new();
         for (triangle, (ids, &slot)) in mesh.indices.chunks_exact(3)
             .zip(&self.triangle_materials).enumerate()
         {
@@ -413,18 +449,20 @@ impl AssemblyGeometry {
                 })
             });
 
+            let solid = material.collision_only || material.name == "+sky";
+            let terrain = material.name.starts_with("gster") && material.shader_path.is_some();
             let mut lighting_risk = false;
             let reason = if uv.iter().flatten().any(|value| !value.is_finite()) {
                 Some("a UV coordinate is invalid")
             } else if twice_area == 0. {
                 Some("triangle collapses at native export precision")
-            } else if material.collision_only || material.name == "+sky" {
+            } else if solid {
                 let mut footprint = points.map(|point| {
                     point.map(|coordinate| (coordinate * 1e8).round() as i64)
                 });
                 footprint.sort_unstable();
                 (!collision_faces.insert(footprint)).then_some("coincident coplanar collision faces")
-            } else if material.name.starts_with("gster") && material.shader_path.is_some() {
+            } else if terrain {
                 // The west-valley lightmapper rejected a shallow terrain sliver while
                 // accepting larger charts with the same stock texture scale. Limit
                 // this guard to newly authored terrain and require both conditions.
@@ -437,6 +475,10 @@ impl AssemblyGeometry {
             } else {
                 None
             };
+            if reason.is_none() && (solid || terrain) {
+                overlap_faces.push(points);
+                overlap_sources.push((triangle, solid, mul(area_normal, 1. / twice_area)));
+            }
             if lighting_risk {
                 report.lighting_risks += 1;
                 if report.lighting_examples.len() < 8 {
@@ -444,6 +486,7 @@ impl AssemblyGeometry {
                         triangle, material: material.name.clone(),
                         center: mul(add(add(a, b), c), 1. / 3.),
                         reason: "thin terrain chart may fail native lighting",
+                        overlaps_triangle: None,
                     });
                 }
             }
@@ -452,8 +495,44 @@ impl AssemblyGeometry {
                 if report.examples.len() < 8 {
                     report.examples.push(AssemblySourceIssue {
                         triangle, material: material.name.clone(),
-                        center: mul(add(add(a, b), c), 1. / 3.), reason,
+                        center: mul(add(add(a, b), c), 1. / 3.), reason, overlaps_triangle: None,
                     });
+                }
+            }
+        }
+        // Stock render, portal and collision layers can deliberately coincide.
+        // Compare solid faces with solid faces, and new terrain with new terrain.
+        if overlap_faces.len() > 1 {
+            let bounds = TriangleBounds::build(&overlap_faces, (0..overlap_faces.len()).collect());
+            let mut budget = PREFLIGHT_OVERLAP_BUDGET;
+            let (mut nearby, mut polygon, mut clipped) =
+                (Vec::new(), Vec::with_capacity(6), Vec::with_capacity(6));
+            for (index, &face) in overlap_faces.iter().enumerate().skip(1) {
+                let (triangle, solid, normal) = overlap_sources[index];
+                nearby.clear();
+                let low = std::array::from_fn(|k| face[0][k].min(face[1][k]).min(face[2][k]) - PREFLIGHT_PLANE_EPSILON);
+                let high = std::array::from_fn(|k| face[0][k].max(face[1][k]).max(face[2][k]) + PREFLIGHT_PLANE_EPSILON);
+                bounds.query(low, high, &mut nearby);
+                let Some(remaining) = budget.checked_sub(nearby.len()) else {
+                    report.overlap_check_incomplete = true;
+                    break;
+                };
+                budget = remaining;
+                if let Some(&other) = nearby.iter().find(|&&other| {
+                    other < index && overlap_sources[other].1 == solid &&
+                        coplanar_overlap(face, normal, overlap_faces[other], overlap_sources[other].2,
+                            &mut polygon, &mut clipped)
+                }) {
+                    report.blocked_faces += 1;
+                    if report.examples.len() < 8 {
+                        let [a, b, c] = face;
+                        report.examples.push(AssemblySourceIssue {
+                            triangle, material: self.materials[self.triangle_materials[triangle]].name.clone(),
+                            center: mul(add(add(a, b), c), 1. / 3.),
+                            reason: if solid { "coplanar collision faces overlap" } else { "coplanar terrain faces overlap" },
+                            overlaps_triangle: Some(overlap_sources[other].0),
+                        });
+                    }
                 }
             }
         }
@@ -3756,6 +3835,35 @@ mod tests {
         geometry.mesh.indices.truncate(9);
         geometry.triangle_materials.truncate(3);
         geometry.source_preflight().unwrap().require_buildable().unwrap();
+
+        // Vertical faces, a reversed-winding partial overlap, a shared edge,
+        // and a nearby parallel face beyond the export precision tolerance.
+        geometry.mesh.positions = vec![
+            0., 0., 0., 0., 4., 0., 0., 0., 4., 0., 0., -4.,
+            0., 2., 0., 0., 6., 0., 0., 2., 4.,
+            0.001, 0., 0., 0.001, 4., 0., 0.001, 0., 4.,
+        ];
+        geometry.mesh.normals = vec![0.; 30];
+        geometry.mesh.uvs = vec![0.; 20];
+        geometry.mesh.indices = vec![0, 1, 2, 1, 0, 3, 4, 6, 5, 7, 8, 9, 0, 1, 2, 0, 1, 2];
+        geometry.triangle_materials = vec![0, 0, 0, 0, 1, 2];
+        let report = geometry.source_preflight().unwrap();
+        assert_eq!(report.blocked_faces, 1);
+        assert_eq!(report.examples[0].triangle, 2);
+        assert_eq!(report.examples[0].overlaps_triangle, Some(0));
+        assert!(report.require_buildable().unwrap_err().to_string().contains("with triangle 0"));
+    }
+
+    #[test]
+    fn join_preflight_only_counts_positive_area_face_intersections() {
+        let face = [[0., 0., 0.], [4., 0., 0.], [0., 4., 0.]];
+        let normal = [0., 0., 1.];
+        let (mut polygon, mut clipped) = (Vec::new(), Vec::new());
+        let mut overlaps = |other| coplanar_overlap(face, normal, other, normal, &mut polygon, &mut clipped);
+        assert!(overlaps([[1., 1., 0.], [2., 1., 0.], [1., 2., 0.]]));
+        assert!(!overlaps([[4., 0., 0.], [5., 0., 0.], [4., 1., 0.]]));
+        // Bounding boxes overlap but the diagonal half-planes are disjoint.
+        assert!(!overlaps([[2.1, 2.1, 0.], [4., 2.1, 0.], [2.1, 4., 0.]]));
     }
 
     #[test]

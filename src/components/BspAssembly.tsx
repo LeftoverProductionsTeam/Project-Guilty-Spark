@@ -1085,11 +1085,14 @@ export default function BspAssembly({
                       ))}</ul>
                     </div>
                   )}
+                  {report.sourcePreflight?.overlapCheckIncomplete && (
+                    <p>The overlap check reached its search limit. Check dense regions in smaller joins for a complete preview.</p>
+                  )}
                   {report.sourcePreflight && report.sourcePreflight.blockedFaces > 0 ? (
                     <div role="alert">
                       <p>Native build blocked by {report.sourcePreflight.blockedFaces} source faces. Adjust the join and check the preview again.</p>
                       <ul>{report.sourcePreflight.examples.map(issue => (
-                        <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')} · {issue.reason}</li>
+                        <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')} · {issue.reason}{issue.overlapsTriangle !== undefined ? ` with triangle ${issue.overlapsTriangle}` : ''}</li>
                       ))}</ul>
                     </div>
                   ) : <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>}

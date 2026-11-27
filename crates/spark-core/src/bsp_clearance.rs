@@ -22,14 +22,14 @@ fn cross(a: V, b: V) -> V {
         a[0] * b[1] - a[1] * b[0],
     ]
 }
-struct Node {
+pub(crate) struct TriangleBounds {
     low: V,
     high: V,
-    children: Option<Box<(Node, Node)>>,
+    children: Option<Box<(TriangleBounds, TriangleBounds)>>,
     ids: Vec<usize>,
 }
-impl Node {
-    fn build(triangles: &[Tri], mut ids: Vec<usize>) -> Self {
+impl TriangleBounds {
+    pub(crate) fn build(triangles: &[Tri], mut ids: Vec<usize>) -> Self {
         let mut low = [f64::INFINITY; 3];
         let mut high = [f64::NEG_INFINITY; 3];
         for id in &ids {
@@ -64,7 +64,7 @@ impl Node {
         )));
         node
     }
-    fn query(&self, low: V, high: V, out: &mut Vec<usize>) {
+    pub(crate) fn query(&self, low: V, high: V, out: &mut Vec<usize>) {
         if (0..3).any(|k| self.high[k] < low[k] || self.low[k] > high[k]) {
             return;
         }
@@ -79,7 +79,7 @@ impl Node {
 struct Index {
     triangles: Vec<Tri>,
     planes: Vec<(V, f64)>,
-    root: Node,
+    root: TriangleBounds,
 }
 impl Index {
     fn new(mesh: &MeshData, indices: &[u32]) -> Result<Self> {
@@ -104,7 +104,7 @@ impl Index {
                 })
             })
             .collect();
-        let root = Node::build(&triangles, (0..triangles.len()).collect());
+        let root = TriangleBounds::build(&triangles, (0..triangles.len()).collect());
         let planes = triangles.iter().map(|p| { let n = cross(sub(p[1],p[0]),sub(p[2],p[0])); (n,dot(n,n)) }).collect();
         Ok(Self { triangles, planes, root })
     }
