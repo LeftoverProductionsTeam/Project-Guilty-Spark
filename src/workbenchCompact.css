@@ -580,3 +580,17 @@ html[data-gs-reduced-motion=true] .gs-spark-emblem{transition:none;}@media(prefe
 .application .learning-guide ol > li { max-width: 100ch; margin-block: .45rem; padding-inline-start: .22rem; }
 .application .learning-guide-picker { position: sticky; top: 0; }
 @media(max-width: 600px){.application .learning-guide-picker{position: static;}}
+
+.asset-part-editor {
+  display:grid; grid-template-columns:minmax(0,1.25fr) minmax(15rem,.75fr); gap:.6rem;
+  padding:.65rem; border:1px solid var(--line); border-radius:.65rem; background:var(--panel);
+}
+.asset-part-viewport { height: clamp(190px,34vh,350px); border-radius:.45rem; overflow:hidden; }
+.asset-part-controls,.asset-part-controls > label { display:grid; align-content:start; gap:.4rem; }
+.asset-part-controls .button-row { display:flex; flex-wrap:wrap; gap:.35rem; }
+.asset-part-dimensions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.3rem; }
+.asset-part-dimensions input { width:100%; min-width:0; }
+.asset-part-controls button[aria-pressed="true"] { border-color:var(--accent); }
+@media(max-width:650px){.asset-part-editor{grid-template-columns:1fr;}}
+
+.asset-part-editor[hidden] { display: none; }

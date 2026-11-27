@@ -8086,3 +8086,35 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await page.keyboard.press('Control+s');
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.translation)).toEqual([80,0,-20]);
 });
+
+test('Asset Workshop shapes a plow, paints it, and exports the source and texture', async ({page}) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  await chooseTool(page, 'Asset workshop');
+  const open = page.getByRole('button',{name:'Shape & paint',exact:true,includeHidden:true});
+  await revealPagedControl(open);
+  await open.click();
+  const editor = page.getByRole('region',{name:'Shape and paint'});
+  await expect(editor.getByRole('combobox',{name:'Mesh'})).toHaveValue('plow');
+  const width=editor.getByRole('spinbutton',{name:'Width',exact:true});
+  await width.fill('3');
+  await width.press('Tab');
+  const [obj] = await Promise.all([page.waitForEvent('download'),editor.getByRole('button',{name:'Export OBJ',exact:true}).click()]);
+  expect(obj.suggestedFilename()).toBe('plow_steel.obj');
+  const text = await readFile((await obj.path())!,'utf8');
+  expect(text.split('\n').filter(line=>line.startsWith('f '))).toHaveLength(12);
+  expect(text).toMatch(/usemtl part_plow_steel/);
+  await editor.getByRole('button',{name:'Paint mesh',exact:true}).click();
+  const canvas=editor.locator('canvas');
+  await expect(canvas).toBeVisible();
+  const rect=(await canvas.boundingBox())!;
+  await page.mouse.click(rect.x+rect.width/2,rect.y+rect.height/2);
+  await expect(editor.getByRole('button',{name:'Undo paint',exact:true})).toBeEnabled();
+  const [png] = await Promise.all([page.waitForEvent('download'),editor.getByRole('button',{name:'Export paint PNG',exact:true}).click()]);
+  expect(png.suggestedFilename()).toBe('plow_steel.png');
+  const pixels=await readFile((await png.path())!);
+  expect(pixels.readUInt32BE(16)).toBe(512);
+  expect(pixels.readUInt32BE(20)).toBe(512);
+  await editor.getByRole('button',{name:'Undo paint',exact:true}).click();
+  await expect(editor.getByRole('button',{name:'Undo paint',exact:true})).toBeDisabled();
+});

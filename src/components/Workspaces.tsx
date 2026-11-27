@@ -5,6 +5,7 @@ import NativeTagOperations from './NativeTagOperations';
 import SourceRecovery from './SourceRecovery';
 import {useMapState} from '../mapSession';
 import GeometryToolHandoff from './GeometryToolHandoff';
+import MeshPartEditor from './MeshPartEditor';
 import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -81,6 +82,7 @@ export function Assets({
 }) {
   const activity=useWorkspaceActivity();
   const modelAssets=project.assets.filter(asset=>asset.kind==='obj');
+  const [partOpen,setPartOpen]=useState<boolean|null>(null);
   const [chosen, setChosen] = useState<string | null>(modelAssets[0]?.id ?? null);
   const [exchangeFeedback, setExchangeFeedback] = useState('');
   const [movingAssetId,setMovingAssetId] = useState('');
@@ -124,6 +126,7 @@ export function Assets({
         description="Ingest and inspect your own geometry in a persistent local workspace."
         actions={
           <>
+            <button onClick={()=>setPartOpen(open=>!open)} aria-expanded={partOpen===true}>{partOpen?'Close shape & paint':'Shape & paint'}</button>
             <button onClick={onWorld}>
               <Box size={15} />
               Place in scene
@@ -139,6 +142,7 @@ export function Assets({
         OBJ import now preserves vertex normals, UV seams and material-group boundaries in the preview mesh.
         QuickForge/Workshop can build closed OBJ meshes as native static scenery: place the model, assign its Halo materials in the Custom model drawer, then Build & check playtest. External MTL textures, rigging and glTF are not imported. Add WAV/OGG sounds through the Level editor’s Asset library.
       </Notice>
+      {partOpen!==null && <MeshPartEditor selectedMesh={mesh} visible={partOpen}/> }
       {modelAssets.length ? (
         <div className="asset-layout">
           <div className="surface asset-list">
