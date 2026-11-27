@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { call } from '../api';
-import { compareProjects } from '../compare';
+import { compareProjects, type ComparedField } from '../compare';
 import type { LibraryEntry, OpenProject } from '../types';
 import { useMapState } from '../mapSession';
 import { Empty, Notice, Pill } from './ui';
@@ -9,16 +9,24 @@ import { WorkspacePanel } from './WorkspacePanels';
 
 export default function Compare({
   entries,
+  openMaps,
   currentId,
   dirty,
   onSave,
+  onApplyField,
 }: {
-  entries: LibraryEntry[];
+  entries: Pick<LibraryEntry, 'id' | 'title' | 'version'>[];
+  openMaps: Pick<LibraryEntry, 'id' | 'title' | 'version'>[];
   currentId?: string;
   dirty: boolean;
   onSave: () => Promise<void>;
+  onApplyField: (field: ComparedField, label: string) => boolean;
 }) {
-  const maps = useMemo(() => entries.filter((entry) => entry.version !== null), [entries]);
+  const maps = useMemo(() => {
+    const maps = new Map(entries.filter(entry => entry.version !== null).map(entry => [entry.id, entry]));
+    for (const entry of openMaps) if (entry.version !== null && !maps.has(entry.id)) maps.set(entry.id, entry);
+    return [...maps.values()];
+  }, [entries, openMaps]);
   const scope = currentId ?? 'global';
   const [leftId, setLeftId] = useMapState(
     scope,
@@ -32,6 +40,7 @@ export default function Compare({
   );
   const [pair, setPair] = useState<[OpenProject, OpenProject] | null>(null);
   const [error, setError] = useState('');
+  const [applied, setApplied] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useMapState(scope, 'compare.saved', false);
   const [epoch, setEpoch] = useState(0);
@@ -249,6 +258,7 @@ export default function Compare({
           )}
           {leftId === rightId && <Notice tone="info">Both selectors refer to the same project.</Notice>}
           {error && <Notice>{error}</Notice>}
+          {applied && <p role="status" className="compare-purpose">{applied}</p>}
           {loading && (
             <div className="loading" role="status">
               Reading preserved maps…
@@ -334,6 +344,18 @@ export default function Compare({
                       </div>
                     </div>
                     {row.detail && <p>{row.detail}</p>}
+                    {row.fieldTransfer && row.fieldTransfer.projectId === currentId && (
+                      <button type="button" onClick={() => {
+                        try {
+                          setError('');
+                          if (onApplyField(row.fieldTransfer!, row.property)) setApplied(row.property + ' applied. Undo is available in this map.');
+                        } catch (problem) {
+                          setError(String(problem));
+                        }
+                      }}>
+                        Apply this value to the Before map
+                      </button>
+                    )}
                     <small className="difference-category">{row.category}</small>
                   </details>
                 ))}

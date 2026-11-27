@@ -26,7 +26,7 @@ export interface ExternalRevision {
   opened: OpenProject;
   deduplicated: boolean;
 }
-export type ExternalRevisionMode = 'replaceClean' | 'openSeparate';
+export type ExternalRevisionMode = 'replaceClean' | 'openSeparate' | 'review';
 
 /** Dirty=false also includes saved authoring, so it cannot be the only gate. */
 export function hasSourceBoundEdits(project: Project, inspection: MapInspection | null): boolean {
@@ -162,25 +162,25 @@ export class ExternalMapSyncController {
       this.finish();
     }
   }
-  async accept(report: ExternalWatchReport): Promise<void> {
+  async accept(report: ExternalWatchReport, review = false): Promise<void> {
     if (!this.active || !report.candidate) return;
     if (this.running) {
       await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
-      return this.accept(report);
+      return this.accept(report, review);
     }
     const source = this.callbacks.documents().find((d) => d.project.id === report.projectId)?.project
       .source?.sha256;
     if (!source) return;
     this.running = true;
     try {
-      await this.acceptInternal(report, source, true);
+      await this.acceptInternal(report, source, true, review);
     } catch (error) {
       if (this.current(report.projectId, source)) this.callbacks.error(report.projectId, String(error));
     } finally {
       this.finish();
     }
   }
-  private async acceptInternal(report: ExternalWatchReport, source: string, explicit: boolean) {
+  private async acceptInternal(report: ExternalWatchReport, source: string, explicit: boolean, review = false) {
     if (!report.candidate || !this.current(report.projectId, source)) return;
     const revision = await this.bridge.import(report.watchId, report.candidate.sha256);
     const latest = this.current(report.projectId, source);
@@ -199,7 +199,7 @@ export class ExternalMapSyncController {
     await this.callbacks.revision(
       report.projectId,
       revision.opened,
-      separate ? 'openSeparate' : 'replaceClean',
+      review ? 'review' : separate ? 'openSeparate' : 'replaceClean',
       revision.watchedPath,
     );
     if (this.active)

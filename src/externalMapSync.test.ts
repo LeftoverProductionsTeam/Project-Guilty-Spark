@@ -149,6 +149,12 @@ describe('external map revision monitoring', () => {
     expect(value.get()[0].project.tagEdits).toHaveLength(1);
     value.controller.dispose();
   });
+  it('opens a preserved candidate for explicit review', async () => {
+    const value = setup();
+    await value.controller.accept(report(), true);
+    expect(value.revision.mock.calls[0][2]).toBe('review');
+    value.controller.dispose();
+  });
   it('downgrades an in-flight clean adoption when the user edits before import returns', async () => {
     const pending = deferred<ExternalRevision>(),
       value = setup({ import: vi.fn(() => pending.promise) });

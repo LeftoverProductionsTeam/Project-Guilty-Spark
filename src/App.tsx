@@ -96,6 +96,7 @@ import MapTabs from './components/MapTabs';
 import RuntimeDock from './components/RuntimeDock';
 import {EditorAudioProvider,EditorSoundControls} from './components/EditorAudio';
 import ExternalMapSync from './components/ExternalMapSync';
+import {applyComparedField} from './compare';
 import {hasSourceBoundEdits} from './externalMapSync';
 import SettingsPanel from './components/SettingsPanel';
 const StorageSettings=lazy(()=>import('./components/StorageSettings'));
@@ -660,7 +661,7 @@ export default function App() {
     if(open.inspection)dispatchDocument({type:'resources',project:open.project,inspection:open.inspection});
     setEpoch(value=>value+1);
   },[]);
-  const adoptExternalRevision=useCallback(async(previousId:string,opened:OpenProject,mode:'replaceClean'|'openSeparate')=>{
+  const adoptExternalRevision=useCallback(async(previousId:string,opened:OpenProject,mode:'replaceClean'|'openSeparate'|'review')=>{
     if (documentsRef.current.activeId===previousId && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur(); await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
     }
@@ -679,7 +680,7 @@ export default function App() {
     const replace=mode==='replaceClean'&&!previous.history.dirty&&!hasSourceBoundEdits(previous.history.current,previous.inspection);
     window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:previousId}));
     if (!documentsRef.current.documents.some(d=>d.id===opened.project.id)) copyMapViewSession(previousId,opened.project.id,previous.inspection,opened.inspection);
-    dispatchDocument({type:'external-revision',previousId,open:opened,replaceClean:replace});
+    dispatchDocument({type:'external-revision',previousId,open:opened,replaceClean:replace,keepActive:mode==='review'});
     if (replace) {
       // React applies the reducer's final dirty/source checks before ownership is
       // released. A late edit can retain the old document as a separate tab.
@@ -688,7 +689,16 @@ export default function App() {
     }
     if (documentsRef.current.activeId===previousId && workspaceRef.current==='live') setWorkspace('world');
     await refresh();
-    notice(replace?'External save detected. Map and tags refreshed; the previous source revision is preserved.':'External save opened separately. Existing Spark edits remain in their original map tab.','info');
+    if (mode === 'review') {
+      writeMapSession(previousId, 'compare.before', previousId);
+      writeMapSession(previousId, 'compare.after', opened.project.id);
+      writeMapSession(previousId, 'compare.status', 'auto');
+      writeMapSession(previousId, 'compare.category', 'all');
+      writeMapSession(previousId, 'compare.query', '');
+      writeMapSession(previousId, 'compare.page', 0);
+      if (documentsRef.current.activeId === previousId) setWorkspace('compare');
+    }
+    notice(mode==='review'?'External save is ready to compare. Choose a reviewed value to apply to the Before map.':replace?'External save detected. Map and tags refreshed; the previous source revision is preserved.':'External save opened separately. Existing Spark edits remain in their original map tab.','info');
   },[refresh,notice]);
   useEffect(() => {
     if (!native) return;
@@ -1647,7 +1657,19 @@ export default function App() {
       );
     if (workspace === 'compare')
       return (
-        <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
+        <Compare entries={data.entries}
+          openMaps={documents.documents.flatMap(({history}) => history.current?.source
+            ? [{id:history.current.id,title:history.current.title,version:history.current.source.cacheVersion}]
+            : [])} currentId={current?.id} dirty={history.dirty} onSave={() => save()}
+          onApplyField={(change, label) => {
+            const current = documentsRef.current.documents.find(document => document.id === change.projectId);
+            if (!current?.history.current || !current.inspection || documentsRef.current.activeId !== change.projectId)
+              throw Error('Activate the Before map to apply this value.');
+            if (busy || activeJob || projectMutationPending(change.projectId))
+              throw Error('Wait for the current operation before applying the reviewed value.');
+            const revised = applyComparedField(current.history.current, current.inspection, change);
+            return edit(revised, 'Apply compared value for ' + label);
+          }} />
       );
     if (workspace === 'runtimes')
       return <Runtimes project={current} dirty={history.dirty} onSave={() => save(true)} settings={data.settings} onSettings={openDependencySetup} onSetupFlavor={openCommunityFlavorSetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;

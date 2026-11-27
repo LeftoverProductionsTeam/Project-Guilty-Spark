@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareProjects, tagIdentity } from './compare';
+import { applyComparedField, compareProjects, tagIdentity } from './compare';
 import type { OpenProject, Tag } from './types';
 
 function source(): OpenProject {
@@ -195,5 +195,48 @@ describe('semantic variant comparison', () => {
     const after=structuredClone(before);after.project.tagRenames=[{sourceTagId:1,path:'custom/my pistol'}];
     expect(compareProjects(before,after).rows.some(row=>row.property==='Custom tag path')).toBe(false);
     expect(compareProjects(before,after,true).rows).toContainEqual(expect.objectContaining({property:'Custom tag path',before:'weapons/pistol',after:'custom/my pistol',status:'changed'}));
+  });
+});
+
+describe('reviewed value transfer', () => {
+  function paired() {
+    const before = source(), after = source();
+    for (const [index, map] of [before, after].entries()) {
+      const id = 'map-' + index;
+      map.project.id = id;
+      map.project.source = { originalPath: id + '.map', preservedPath: id + '/source.map',
+        sha256: id, cacheVersion: 7, engine: 'Synthetic', scenarioPath: 'levels/test' };
+      map.inspection!.sha256 = id;
+    }
+    before.inspection!.tags = [
+      weapon(1, 2), tag(2, 'projectiles/old', 'proj'), tag(3, 'projectiles/replacement', 'proj'),
+    ];
+    after.inspection!.tags = [
+      weapon(101, 103), tag(102, 'projectiles/old', 'proj'), tag(103, 'projectiles/replacement', 'proj'),
+    ];
+    after.inspection!.tags[0].fields[0].value = 17;
+    return { before, after };
+  }
+  it('applies decoded values and remaps reference identities to destination tag IDs', () => {
+    const {before, after} = paired();
+    const rows = compareProjects(before, after).rows;
+    const field = rows.find(row => row.property === 'Velocity')!.fieldTransfer!;
+    const reference = rows.find(row => row.property === 'Projectile')!.fieldTransfer!;
+    const numeric = applyComparedField(before.project, before.inspection!, field);
+    const revised = applyComparedField(numeric, before.inspection!, reference);
+    expect(before.project.tagEdits).toEqual([]);
+    expect(revised.tagEdits).toEqual([
+      { tagId: 1, fieldKey: 'velocity', value: 17 },
+      { tagId: 1, fieldKey: 'projectile', value: 3 },
+    ]);
+    expect(() => applyComparedField(numeric, before.inspection!, field)).toThrow(/since the review/);
+    expect(() => applyComparedField(after.project, after.inspection!, field)).toThrow(/destination map changed/);
+  });
+  it('keeps incompatible values and ambiguous reference targets available for inspection only', () => {
+    const {before, after} = paired();
+    before.inspection!.tags.push(tag(4, 'projectiles/replacement', 'proj'));
+    expect(compareProjects(before, after).rows.find(row => row.property === 'Projectile')?.fieldTransfer).toBeUndefined();
+    after.project.source!.cacheVersion = 13;
+    expect(compareProjects(before, after).rows.some(row => row.fieldTransfer)).toBe(false);
   });
 });

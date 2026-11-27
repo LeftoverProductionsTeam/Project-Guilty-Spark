@@ -1,5 +1,5 @@
-import { effectiveReferenceId, fieldValue } from './editor';
-import type { MapInspection, OpenProject, Project, SceneObject, Tag } from './types';
+import { effectiveReferenceId, fieldValue, setTagValue } from './editor';
+import type { MapInspection, OpenProject, Project, SceneObject, Tag, TagField } from './types';
 
 export type DifferenceStatus = 'added' | 'removed' | 'changed' | 'unknown';
 export interface Difference {
@@ -11,7 +11,36 @@ export interface Difference {
   before: string;
   after: string;
   detail?: string;
+  fieldTransfer?: ComparedField;
 }
+export interface ComparedField {
+  projectId: string;
+  sourceSha256: string;
+  tagId: number;
+  tagKey: string;
+  fieldKey: string;
+  kind: TagField['kind'];
+  before: number;
+  after: number;
+}
+
+export function applyComparedField(project: Project, inspection: MapInspection, change: ComparedField): Project {
+  if (project.id !== change.projectId || project.source?.sha256 !== change.sourceSha256 ||
+    inspection.sha256 !== change.sourceSha256)
+    throw Error('The destination map changed. Compare the current source again.');
+  const tags = inspection.tags.filter(tag => tagIdentity(tag) === change.tagKey);
+  const tag = tags[0];
+  const field = tag?.fields.find(item => item.key === change.fieldKey && item.kind === change.kind);
+  if (tags.length !== 1 || tag.id !== change.tagId || !field || tag.external)
+    throw Error('This field is no longer available in the destination map.');
+  if (fieldValue(project, tag, field) !== change.before)
+    throw Error('This value changed in Spark since the review. Refresh the comparison with saved edits included.');
+  if (field.kind === 'reference' &&
+    !inspection.tags.some(target => target.id === change.after && target.class === field.targetClass))
+    throw Error('The referenced tag is unavailable in the destination map.');
+  return setTagValue(project, tag, field, change.after);
+}
+
 export interface Comparison {
   rows: Difference[];
   matchedTags: number;
@@ -127,6 +156,7 @@ export function compareProjects(
     after: unknown,
     status: DifferenceStatus = 'changed',
     detail?: string,
+    fieldTransfer?: ComparedField,
   ) => {
     if (status === 'changed' && equal(before, after) && !detail) return;
     rows.push({
@@ -138,6 +168,7 @@ export function compareProjects(
       before: display(before),
       after: display(after),
       detail,
+      ...(fieldTransfer && { fieldTransfer }),
     });
   };
   const leftTags = new Map(left.inspection?.tags.map((tag) => [tag.id, tag]) ?? []);
@@ -203,6 +234,8 @@ export function compareProjects(
       }
       let v1: number | string = includeSavedEdits ? fieldValue(left.project, l, one) : one.value;
       let v2: number | string = includeSavedEdits ? fieldValue(right.project, r, two) : two.value;
+      const beforeValue = v1 as number;
+      let destinationValue: number | undefined = v2 as number;
       if (one.kind === 'reference') {
         if (!leftTags.has(v1) || !rightTags.has(v2)) {
           add(
@@ -218,8 +251,23 @@ export function compareProjects(
         }
         v1 = referenceIdentity(v1, leftTags);
         v2 = referenceIdentity(v2, rightTags);
+        const targets = a.get(v2);
+        destinationValue = one.targetClass && one.targetClass === two.targetClass
+          && b.get(v2)?.length === 1 && targets?.length === 1 && targets[0].class === one.targetClass
+          ? targets[0].id : undefined;
       }
-      add(category, subject, one.label, v1, v2);
+      const source = left.project.source;
+      const transfer = source && source.sha256 === left.inspection.sha256 &&
+        source.cacheVersion === right.project.source?.cacheVersion &&
+        right.project.source.sha256 === right.inspection.sha256 &&
+        !l.external && !r.external && one.unit === two.unit &&
+        v1 !== v2 && destinationValue !== undefined && Number.isFinite(destinationValue) &&
+        destinationValue >= one.min && destinationValue <= one.max &&
+        (one.kind === 'f32' || Number.isInteger(destinationValue))
+        ? { projectId: left.project.id, sourceSha256: source.sha256, tagId: l.id,
+            tagKey: key, fieldKey, kind: one.kind, before: beforeValue, after: destinationValue }
+        : undefined;
+      add(category, subject, one.label, v1, v2, 'changed', undefined, transfer);
     }
     // References are keyed by their schema label/occurrence, not cache byte offsets.
     const refs = (tag: Tag, project: Project, tags: Map<number, Tag>) => {

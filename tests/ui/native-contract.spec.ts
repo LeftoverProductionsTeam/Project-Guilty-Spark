@@ -1622,14 +1622,14 @@ test('an MCC invitation check explains the missing foreign protocol bridge and n
   await expect(page.locator('input[aria-label="Game invitation"]')).toHaveValue('');
 });
 
-async function prepareExternalRevision(page:Page){await page.evaluate(()=>{
+async function prepareExternalRevision(page:Page,matchesSource=true){await page.evaluate((matchesSource)=>{
   const w=window as any,m=w.__sparkMock;const opened=structuredClone(m.projects.a);opened.project.id='d';opened.project.title='Synthetic external revision';opened.project.source.sha256='d'.repeat(64);opened.inspection.sha256='d'.repeat(64);opened.inspection.tags[0].fields[0].value=33;m.projects.d=opened;
   const original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
-    if(command==='external_map_watch_poll'&&args.watchId==='a'&&m.changedExternal)return {watchId:'a',projectId:'a',path:'C:/synthetic/external.map',status:'changed',candidate:{sha256:'d'.repeat(64),cacheVersion:7,scenarioPath:'levels/test',matchesSource:true,fileSize:100},message:'Synthetic external save ready'};
+    if(command==='external_map_watch_poll'&&args.watchId==='a'&&m.changedExternal)return {watchId:'a',projectId:'a',path:'C:/synthetic/external.map',status:'changed',candidate:{sha256:'d'.repeat(64),cacheVersion:7,scenarioPath:'levels/test',matchesSource,fileSize:100},message:'Synthetic external save ready'};
     if(command==='external_map_change_import'){m.changedExternal=false;return {previousProjectId:'a',watchedPath:'C:/synthetic/external.map',opened:structuredClone(m.projects.d),deduplicated:false};}
     return original(command,args);
   };
-});await openDrawer(page,'Changes');}
+},matchesSource);await openDrawer(page,'Changes');}
 test('external saves refresh a clean map and retain its tag view without changing another open map',async({page})=>{
   await mockDesktop(page);await openFixture(page);await prepareExternalRevision(page);
   await expect(page.getByLabel('External map changes')).toContainText('1 map monitored');
@@ -1647,6 +1647,28 @@ test('external saves preserve a Spark tag draft and open the changed map separat
   await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toHaveCount(0);
   await page.getByRole('button',{name:'Open changed map and keep Spark edits',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toBeVisible();
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();await chooseTool(page,"Tag editor");await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
+});
+
+test('external save review applies a decoded value to the original tab and supports Undo',async({page})=>{
+  await mockDesktop(page);
+  await openFixture(page);
+  await prepareExternalRevision(page,false);
+  const before=await page.getByRole('spinbutton').first().inputValue();
+  await expect(page.getByLabel('External map changes')).toContainText('1 map monitored');
+  await page.evaluate(()=>{(window as any).__sparkMock.changedExternal=true;});
+  await page.getByRole('button',{name:'Scan now',exact:true}).click();
+  await page.getByRole('button',{name:'Review tag changes',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Compare maps',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Baseline map')).toHaveValue('a');
+  await expect(page.getByLabel('Candidate map')).toHaveValue('d');
+  await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toHaveAttribute('aria-selected','true');
+  await page.locator('.difference-row.diff-changed summary').first().click();
+  await page.getByRole('button',{name:'Apply this value to the Before map',exact:true}).click();
+  await expect(page.getByText(/applied. Undo is available in this map./)).toBeVisible();
+  await chooseTool(page,'Tag editor');
+  await expect(page.getByRole('spinbutton').first()).toHaveValue('33');
+  await page.keyboard.press('Control+z');
+  await expect(page.getByRole('spinbutton').first()).toHaveValue(before);
 });
 
 test('in-app downloads open all imported maps and retain an already open edited draft',async({page})=>{

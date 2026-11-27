@@ -198,6 +198,16 @@ export default function ExternalMapSync({
                   ? 'Opening external save…'
                   : 'Open changed map and keep Spark edits'}
               </button>
+              <button disabled={accepting !== null} onClick={async () => {
+                setAccepting(report.projectId);
+                try {
+                  await controller.current?.accept(report, true);
+                } finally {
+                  setAccepting(null);
+                }
+              }}>
+                Review tag changes
+              </button>
             </>
           )}
         </Notice>

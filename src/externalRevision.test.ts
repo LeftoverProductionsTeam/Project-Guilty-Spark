@@ -47,6 +47,15 @@ describe('external cache revision adoption', () => {
     expect(state.documents.map((d) => d.id)).toEqual(['new', 'other']);
     expect(state.activeId).toBe('other');
   });
+  it('keeps the original active when opening an external save for comparison', () => {
+    let state = documentReducer(emptyMapDocuments(100), { type: 'open', open: revision('old', 'old-sha') });
+    state = documentReducer(state, {
+      type: 'external-revision', previousId: 'old', open: revision('new', 'new-sha'),
+      replaceClean: false, keepActive: true,
+    });
+    expect(state.activeId).toBe('old');
+    expect(state.documents.map(document => document.id)).toEqual(['old', 'new']);
+  });
   it('retains both unsaved and saved source edits when an adoption became stale', () => {
     for (const dirty of [true, false]) {
       const old = revision('old', 'old-sha');

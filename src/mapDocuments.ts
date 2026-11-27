@@ -20,7 +20,7 @@ export interface MapDocuments {
 export type DocumentAction =
   | { type:'window-history';id:string;history:HistoryState }
   | { type: 'open'; open: OpenProject; activate?: boolean }
-  | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
+  | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean; keepActive?: boolean }
   | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
   | { type: 'queue'; entries: { id: string; title: string }[] }
   | { type: 'select'; id: string }
@@ -96,7 +96,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     const next = existing ?? {id: incoming.id, inspection: action.open.inspection, meshes: {}, history: historyReducer({...initialHistory, limit: state.limit}, {type:'load',project:incoming})};
     let documents = replace ? state.documents.filter(document => document.id !== previous.id) : state.documents;
     if (!existing) documents = replace ? state.documents.flatMap(document => document.id === previous.id ? [next] : [document]) : [...documents, next];
-    return {...state, documents, activeId: state.activeId === previous.id ? incoming.id : state.activeId};
+    return {...state, documents, activeId: !action.keepActive && state.activeId === previous.id ? incoming.id : state.activeId};
   }
   if(action.type==='resources'){
     const source=action.project.source;
