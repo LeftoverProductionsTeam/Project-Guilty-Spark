@@ -5,7 +5,7 @@ Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b. Previous fb126341 / e6cab303.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependencies and road-plow collision. Exact 61f8d17b appeared in Forerunner’s Zombies chooser. Windows blocked Host before map load. Latest guides users to Play Solo and keeps Stop available after edits.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Drive the private Spark-built road blade and verify contact. V-plow collision and Monitor patrol remain open.
+Next action: Compare actual BSP 6 surfaces with the unchanged compact route before revising its conservative bounds check. The replay recovered 4/7-unit approaches; f5a4ca22, 919fbcce and fd7a49fa survive in the reviewed replay folder. b5178c77 is missing. Drive the private Spark plow independently.
 
 ## Acceptance
 
@@ -19,7 +19,7 @@ Next action: Locate a surviving exact b5178c77/bake copy and package with the ve
 - Spark browser validation at 967300f7 exercised actual viewport drag, Preview, Apply, Save and Undo with mocked desktop IPC. Tunnel, cave and ridge routes use the same draft-point editor. The neighboring BSP handle translates the donor and its landings together. Preview marks grades and native clearance error locations and shows copied stock facing disagreements as purple advisories. The shared native BSP preflight runs before structure compilation.
 - Exact private b5178c77 / 4a7f6920 on Win64 2beae96a passed a continuous normal-input foot loop through native slots 11→10→3→10→11 at ticks 25858, 28746, 31201 and 34320. The same Elite returned at full vitality via the new Carousel ramp. Forerunner verified the regional transition log and Ice Fields opacity along the sampled route. Warthog and wider rendering remain open.
 - Carousel infantry return passed on 919fbcce via teleporter 334→335. Vehicle return remains open.
-- Sealed full-world Extraction content remains independent in `D:/Project Forerunner/build/regional-pressure-profile/megaworld-19-pools-native-fd7a49fa`, pair fd7a49fa / 868a8adf and readback 3ce3b0da. Forerunner e8fb86f2e records the completed UNSC LAN deployment, field pickup and bank on that exact map with Covenant guest alive in BSP 11. It is not the compact geometry candidate.
+- Sealed full-world Extraction content survives in the reviewed replay folder, pair fd7a49fa / 868a8adf and readback 3ce3b0da. Forerunner e8fb86f2e records the completed UNSC LAN deployment, field pickup and bank on that exact map with Covenant guest alive in BSP 11. It is not the compact geometry candidate.
 - Previous compiler, asset, Machinima, and gameplay evidence is retained in 74db6049:docs/ACTIVE_TASK.md and the existing records it links. V3 governs current work.
 
 ## Changed work
