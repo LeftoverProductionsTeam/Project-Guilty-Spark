@@ -30,3 +30,7 @@
 .gs-setup-mod-folder code {flex:1;min-width:0;overflow-wrap:anywhere;font-size:11px;}
 .gs-setup-mod-folder small {display:block;color:var(--muted);line-height:1.4;}
 .gs-setup-mod-folder button {flex:none;}
+
+.gs-halo-choices { grid-template-columns: repeat(auto-fit,minmax(min(100%,15rem),1fr)); }
+.gs-halo-choices > button, .gs-halo-flavors-card > button { gap: .28rem; padding: .55rem .65rem; }
+.gs-halo-choices .gs-halo-card-heading { gap: .45rem; }

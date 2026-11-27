@@ -51,9 +51,10 @@ try{
  const pauseHome=home.getByRole('button',{name:'Pause showcase animation',exact:true});
  if(await pauseHome.isVisible())await pauseHome.click();
  await page.emulateMedia({reducedMotion:'reduce'});
- const priorYaw=Number((await pose()).yaw);
- await page.mouse.move(box.x+box.width*.12, center[1]);
- await expect.poll(async()=>Math.abs(Number((await pose()).yaw)-priorYaw)).toBeGreaterThan(.25);
+ await page.mouse.move(box.x+box.width*.2,center[1]);
+ await expect.poll(async()=>Number((await pose()).yaw)).toBeLessThan(-1.25);
+ await page.mouse.move(box.x+box.width*.8,center[1]);
+ await expect.poll(async()=>Number((await pose()).yaw)).toBeGreaterThan(-.6);
  await page.emulateMedia({reducedMotion:'no-preference'});
  const playHome=home.getByRole('button',{name:'Play showcase animation',exact:true});
  if(await playHome.isVisible())await playHome.click();

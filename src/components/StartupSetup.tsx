@@ -60,28 +60,34 @@ export default function StartupSetup({
 }) {
   const connections = useRuntimeConnections(data);
   const [choice, setChoice] = useState<RuntimeId>(data.settings.preferredHalo ?? PREFERRED_RUNTIME),
+    [forerunnerChoice, setForerunnerChoice] = useState<boolean|null>(null),
     [step, setStep] = useState(data.settings.onboardingCompleted ? 2 : data.settings.preferredHalo ? 1 : 0),
     [draft, setDraft] = useState(data.settings),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const selectedRuntime = connections.reports.find(item => item.id === choice);
-  const selectedCandidate = connections.detected.find(item => item.runtimeId === choice);
   const [modDirectory, setModDirectory] = useState(data.settings.modDirectory ?? '');
   const [choosingMods, setChoosingMods] = useState(false);
   const [modError, setModError] = useState('');
   const flavorIntent=useRef(0);
   const flavorProfiles=connections.profiles.filter(profile=>profile.runtimeId==='openCe');
   const flavorProfile=flavorProfiles.find(profile=>profile.id===connections.reports.find(report=>report.id==='openCe')?.installation?.registrationId)??flavorProfiles[0];
-  const selectedHaloName=choice==='openCe'&&flavorProfile?runtimeProfileName(flavorProfile):halos.find(halo=>halo.id===choice)?.name;
+  const forerunnerProfile=flavorProfiles.find(profile=>runtimeProfileName(profile)==='Forerunner');
+  const forerunnerCandidate=connections.detected.find(candidate=>candidate.runtimeId==='openCe'&&candidate.version==='Forerunner');
+  const forerunnerInstallation=connections.reports.find(report=>report.id==='openCe')?.installation;
+  const isForerunnerActive=forerunnerInstallation?.validation==='pass'&&!!forerunnerProfile&&forerunnerInstallation.registrationId===forerunnerProfile.id;
+  const selectingForerunner=choice==='openCe'&&(forerunnerChoice??isForerunnerActive);
+  const selectedCandidate=selectingForerunner?forerunnerCandidate:connections.detected.find(item=>item.runtimeId===choice&&item.version!=='Forerunner');
+  const selectedHaloName=selectingForerunner?'Forerunner':choice==='openCe'&&flavorProfile?runtimeProfileName(flavorProfile):halos.find(halo=>halo.id===choice)?.name;
   async function selectFlavor(key:string) {
     const intent=++flavorIntent.current;
-    if(key.startsWith('setup:')){setChoice('openCe');onSetupFlavor(key.slice(6) as OpenCeFlavor);return;}
+    if(key.startsWith('setup:')){setChoice('openCe');setForerunnerChoice(key==='setup:forerunner');onSetupFlavor(key.slice(6) as OpenCeFlavor);return;}
     const profile=flavorProfiles.find(profile=>'profile:'+profile.id===key);if(!profile)return;
     setBusy(true);setError('');
     try{
       await call('activate_runtime_registration',{registrationId:profile.id});
       window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
-      if(mounted.current&&intent===flavorIntent.current)setChoice('openCe');
+      if(mounted.current&&intent===flavorIntent.current){setChoice('openCe');setForerunnerChoice(runtimeProfileName(profile)==='Forerunner');}
     }catch(problem){if(mounted.current&&intent===flavorIntent.current)setError(String(problem));}
     finally{if(mounted.current)setBusy(false);}
   }
@@ -157,31 +163,32 @@ export default function StartupSetup({
           <div className="gs-halo-choices" role="group" aria-label="Your Halo edition">
             {primaryRuntimes.map(id => halos.find(h => h.id === id)!).map((h) => {
               const installed = connections.reports.find(item => item.id === h.id)?.installation;
-              const candidate = connections.detected.find(item => item.runtimeId === h.id);
-              const connected = installed?.validation === 'pass';
+              const candidate = connections.detected.find(item => item.runtimeId === h.id && item.version!=='Forerunner');
+              const connected = installed?.validation === 'pass' && !(h.id==='openCe'&&isForerunnerActive);
+              const picked=choice===h.id&&!selectingForerunner;
               const status = connected ? 'Connected' : candidate ? (candidate.contentReady ? 'Detected' : 'Needs content') : connections.checking ? 'Checking…' : 'Not connected';
               const RuntimeIcon = h.icon;
               const card = (
               <button
                 key={h.id}
-                className={choice === h.id ? 'selected' : ''}
-                aria-pressed={choice === h.id}
+                className={picked ? 'selected' : ''}
+                aria-pressed={picked}
                 data-connected={connected}
                 title={installed?.root ?? candidate?.root ?? h.description}
-                onClick={() => {flavorIntent.current++;setChoice(h.id);}}
+                onClick={() => {flavorIntent.current++;setChoice(h.id);setForerunnerChoice(false);}}
               >
                 <span className="gs-halo-card-heading">
                   <span className="gs-halo-emblem" aria-hidden="true"><RuntimeIcon size={25} strokeWidth={1.6} /></span>
                   <strong>{h.name}</strong>
-                  {choice === h.id && <Check className="gs-halo-selected" size={15} aria-hidden="true" />}
+                  {picked && <Check className="gs-halo-selected" size={15} aria-hidden="true" />}
                 </span>
                 <small className="gs-halo-description">{h.description}</small>
                 <span className="gs-halo-best-for"><b>Best for</b> {h.bestFor}</span>
-                <span className="gs-halo-offers" aria-label="Runtime features">{h.offers.map(offer => <span key={offer}>{offer}</span>)}</span>
+
                 <span className="gs-halo-status" data-ready={connected || !!candidate?.contentReady}><i aria-hidden="true" />{status}</span>
               </button>
               );
-              return h.id==='openCe'?<div key={h.id} className={'gs-halo-flavors-card'+(choice===h.id?' selected':'')} data-connected={connected}>
+              return h.id==='openCe'?<div key={h.id} className={'gs-halo-flavors-card'+(picked?' selected':'')} data-connected={connected}>
                 {card}
                 <label className="gs-setup-flavor"><span>OpenCE flavor</span>
                   <select aria-label="Setup OpenCE flavor" disabled={busy} value={flavorProfile?'profile:'+flavorProfile.id:''} onChange={event=>void selectFlavor(event.target.value)}>
@@ -213,11 +220,11 @@ export default function StartupSetup({
             prefilled. Connect them now or keep the editor available and configure them later.
           </p>
           <div className="analysis-actions gs-setup-connection" aria-label="Selected runtime connection">
-            <span>{selectedRuntime?.installation?.validation === 'pass' ? 'Connected · installation verified' : selectedCandidate ? selectedCandidate.detail : 'Connect your game separately from its editing tools.'}</span>
+            <span>{(selectingForerunner?isForerunnerActive:selectedRuntime?.installation?.validation==='pass') ? 'Connected · installation verified' : selectedCandidate ? selectedCandidate.detail : 'Connect your game separately from its editing tools.'}</span>
             {selectedCandidate && <button disabled={!!connections.connecting} onClick={() => void connections.connect(selectedCandidate)}>
               {connections.connecting ? 'Connecting…' : 'Connect detected game'}
             </button>}
-            <button onClick={() => navigate('runtimes')}>Runtime setup</button>
+            <button onClick={() => selectingForerunner ? onSetupFlavor('forerunner') : navigate('runtimes')}>{selectingForerunner?'Forerunner setup':'Runtime setup'}</button>
           </div>
           <details className="gs-setup-mod-folder">
             <summary>Mods &amp; exported maps · optional</summary>

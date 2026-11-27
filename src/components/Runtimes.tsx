@@ -175,7 +175,6 @@ export default function Runtimes({
       </div>
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
       {(tab==='servers'||tab==='choose')&&<PlayAndServers project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSettings={onSettings} onHost={()=>setTab('hosting')} onFriends={()=>setTab('friends')}/>}
-      {tab==='choose'&&<p className="subtle">Choose your Halo, then Host, Join or Collaborate. Game hosting and shared source editing use separate connections.</p>}
       {tab==='collaborate'&&<section className="analysis-card online-collaborate" aria-label="Collaborate on source">
         <h2>SparkLink · create together</h2>
         <p>Share editable source, native tags and BSP brushes using a private LAN/VPN invitation. Each creator keeps a separate project copy, camera and recoverable edits.</p>
