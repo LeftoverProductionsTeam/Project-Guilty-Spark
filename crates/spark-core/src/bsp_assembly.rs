@@ -2339,6 +2339,9 @@ pub fn generate_preserved_connector(
     let level_span = [points[0], *points.last().unwrap()];
     let chart_points = if points.iter().all(|point| point[2] == points[0][2]) { &level_span[..] } else { &points[..] };
     let mut render = if bent { collision_source } else { connector_charts(chart_points, side, height, sky) };
+    // The structural caps close this BSP beyond the switch footprints. Adjacent
+    // BSPs can draw at the same time, so a visible cap would wall off a mouth.
+    open_connector_render_ends(&mut render, &points, sides.as_deref(), side);
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
     let collapsed = append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
@@ -2572,6 +2575,29 @@ fn joined_passage_solid(points: &[V], sides: &[V], height: f64, sky: Option<usiz
     }
     let mut solids = points.windows(2).zip(sides.windows(2))
         .map(|(pair, side)| passage_solid(pair[0], pair[1], side[0], side[1], height, 0, sky));
+fn open_connector_render_ends(mesh: &mut MeshGL64, points: &[V], sides: Option<&[V]>, side: V) {
+    let end = points.len() - 1;
+    let planes = [0, end].map(|index| {
+        let across = sides.map_or(side, |sides| sides[index]);
+        let width = across[0].hypot(across[1]);
+        let outward = [across[1] / width, -across[0] / width, 0.];
+        (points[index], outward)
+    });
+    let triangles = std::mem::take(&mut mesh.tri_verts);
+    let ids = std::mem::take(&mut mesh.face_id);
+    for (triangle, material) in triangles.chunks_exact(3).zip(ids) {
+        let cap = planes.iter().any(|&(point, axis)| triangle.iter().all(|&vertex| {
+            let at = vertex as usize * mesh.num_prop as usize;
+            let position = [mesh.vert_properties[at], mesh.vert_properties[at + 1], mesh.vert_properties[at + 2]];
+            dot(sub(position, point), axis).abs() <= 0.0001
+        }));
+        if !cap {
+            mesh.tri_verts.extend_from_slice(triangle);
+            mesh.face_id.push(material);
+        }
+    }
+}
+
     let mut body = solids.next().unwrap()?;
     for solid in solids {
         if cancel.load(Ordering::Relaxed) { return invalid("BSP connector generation cancelled"); }
@@ -4250,6 +4276,29 @@ mod tests {
             let n=cross(sub(p[1],p[0]),sub(p[2],p[0]));assert!(dot(n,n)>0.);
             assert!(materials[slot].collision_only);volume+=dot(p[0],cross(p[1],p[2]))/6.;
         }
+    #[test]
+    fn intact_connector_caps_close_collision_without_rendering_mouth_walls() {
+        let points = [[0., 0., 0.], [9., 0., 0.], [16., 7., 0.]];
+        let cancel = AtomicBool::new(false);
+        let side = [0., 1., 0.];
+        let straight = &points[..2];
+        let body = intact_connector_solid(straight, side, 2., None, &cancel).unwrap();
+        let mut render = connector_charts(straight, side, 2., None);
+        assert_eq!(body.get_mesh_gl64(-1).num_tri(), 12);
+        open_connector_render_ends(&mut render, straight, None, side);
+        assert_eq!(render.num_tri(), 8);
+        assert_eq!(render.face_id.len(), render.num_tri());
+
+        let sides = tunnel_sides(&points, 2.).unwrap();
+        let bent = joined_passage_solid(&points, &sides, 2., None, &cancel).unwrap();
+        let collision = bent.get_mesh_gl64(-1);
+        let mut render = bent.get_mesh_gl64(-1);
+        open_connector_render_ends(&mut render, &points, Some(&sides), side);
+        assert_eq!(render.num_tri() + 4, collision.num_tri());
+        assert_eq!(render.face_id.len(), render.num_tri());
+        assert!(bent.volume() > 0.);
+    }
+
         assert!((volume.abs()-body.volume()).abs()<1e-3);
         }
     }
