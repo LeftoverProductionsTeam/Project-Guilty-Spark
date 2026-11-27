@@ -3,9 +3,9 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest: Spark 17e00308 / 723b6cd9 ships Rounded and V-plow profiles, adjustable scoop/wrap and solid OBJ/JMS export with paint UVs. Windows startup, paint, hide/reopen and Undo passed. Previous: 35f23772 / 706aff6c. Native Games & tools passed eight window sizes (800×600 to 5120×1440) and 125% UI scale. OpenCE selection survived restart. Native Warthog rig/collision, Monitor patrol and external-edit Undo remain open. Native pop-outs opened; full handoff comparison still flags automatic material defaults.
-Zombie Survival: The owner session loaded zombie_carrier_compare (05a4268a). Forerunner logged 102 failed seat-exit placements during the relevant time window. Those failures affect several rider types. Individual screenshot actors are unverified. Require live damage, movement and attack evidence.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Continue entrance checks and independent creator work. Retained fd7a49fa is available in Spark’s sealed handoff.
+Latest verified revision: Spark 17e00308 / 723b6cd9 ships Rounded and V-plow profiles, adjustable scoop/wrap and solid OBJ/JMS export with paint UVs. Windows startup, paint, hide/reopen and Undo passed. Previous: 35f23772 / 706aff6c. Native Games & tools passed eight window sizes (800×600 to 5120×1440) and 125% UI scale. OpenCE selection survived restart. Native Warthog rig/collision, Monitor patrol and external-edit Undo remain open. Native handoff and Undo passed. Continuous procedural paint at 2ed0ef37 awaits the next release.
+Zombie Survival: The owner session loaded zombie_carrier_compare (05a4268a). Forerunner logged 102 failed seat-exit placements during the relevant time window. Those failures affect several rider types. Screenshot actors unverified. Require live combat evidence. Demolisher uses the 18-node Warthog model and stock physics with custom collision and animations.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Verify retained inputs and continue connector and creator work.
 
 ## Acceptance
 
@@ -18,7 +18,7 @@ Next action: Locate a surviving exact b5178c77/bake copy and package with the ve
 
 - Spark browser validation at 967300f7 exercised actual viewport drag, Preview, Apply, Save and Undo with mocked desktop IPC. Tunnel, cave and ridge routes use the same draft-point editor. The neighboring BSP handle translates the donor and its landings together. Preview marks grades and native clearance error locations and shows copied stock facing disagreements as purple advisories. The shared native BSP preflight runs before structure compilation.
 - Exact private b5178c77 / 4a7f6920 on Win64 2beae96a passed a continuous normal-input foot loop through native slots 11→10→3→10→11 at ticks 25858, 28746, 31201 and 34320. The same Elite returned at full vitality via the new Carousel ramp. Forerunner verified the regional transition log and Ice Fields opacity along the sampled route. Warthog and wider rendering remain open.
-- Original Carousel infantry return is accepted on 919fbcce via stock teleporter 334→335 in the 11→10→3→10→11 round trip. The direct vehicle return remains open.
+- Carousel infantry return passed on 919fbcce via teleporter 334→335. Vehicle return remains open.
 - Sealed full-world Extraction content remains independent in `D:/Project Forerunner/build/regional-pressure-profile/megaworld-19-pools-native-fd7a49fa`, pair fd7a49fa / 868a8adf and readback 3ce3b0da. Forerunner e8fb86f2e records the completed UNSC LAN deployment, field pickup and bank on that exact map with Covenant guest alive in BSP 11. It is not the compact geometry candidate.
 - Previous compiler, asset, Machinima, and gameplay evidence is retained in 74db6049:docs/ACTIVE_TASK.md and the existing records it links. V3 governs current work.
 

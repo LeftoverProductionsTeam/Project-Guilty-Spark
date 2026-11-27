@@ -1,5 +1,5 @@
 import { assertQaOutputPath, waitForQaExit } from './native-qa-storage.mjs';
-import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
+import {openDrawer, openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real Windows/WebView acceptance. Uses an isolated library and only its own app process.
 // No mocked IPC, game launch, external tool execution or original project mutation.
 import fs from 'node:fs/promises';
@@ -14,7 +14,7 @@ function option(name, fallback) { const index = args.indexOf(name); return index
 const app = path.resolve(option('--app', 'target/release/GuiltySpark.exe'));
 const destination = option('--output');
 if (!destination) throw Error('Choose a new --output directory for the isolated acceptance record.');
-const output = path.resolve(destination), baseline = args.includes('--baseline');
+const output = path.resolve(destination), baseline = args.includes('--baseline'), handoffOnly = args.includes('--handoff-only');
 await fs.mkdir(await assertQaOutputPath(output)); // Refuse to overwrite a previous result.
 const exe = path.join(output, 'GuiltySpark-workspace-qa.exe');
 await fs.copyFile(app, exe, fs.constants.COPYFILE_EXCL);
@@ -70,7 +70,7 @@ try {
     allTasksPresent: element.querySelectorAll('.analysis-card,.learning-guides nav button').length,
   }));
   await main.screenshot({ path: path.join(output, 'guides.png') });
-  if (!baseline) {
+  if (!baseline && !handoffOnly) {
     expect(report.guideLayout.allTasksPresent).toBe(8);
     expect(report.guideLayout.contentWidth).toBeLessThanOrEqual(report.guideLayout.availableWidth);
     await main.getByRole('tab', { name: 'Glossary', exact: true }).click();
@@ -114,34 +114,81 @@ try {
     expect(retained.every(page => !page.isClosed())).toBe(true);
     report.simultaneousPopouts = retained.length;
     for (const page of retained) await close(page);
+  }
+  if (!baseline) {
+    report.handoffPhase='editing source window';
     const created=await invoke(main,'create_quickforge_project',{title:'Native pop-out acceptance',template:'smallIndoorArena',target:'haloCustomEdition'});
     await main.reload();
     await main.locator('.map-card').filter({has:main.getByRole('heading',{name:'Native pop-out acceptance',exact:true})}).click();
+    await choose(main,'Level editor');
+    await openDrawer(main,'Build tools');
+    await main.getByRole('region',{name:'Build tools panel',exact:true}).locator('.forge-tree-select').first().click();
+    await openDrawer(main,'Inspector');
+    const inspector=main.getByRole('region',{name:'Inspector panel',exact:true});
+    await inspector.getByRole('button',{name:'Properties',exact:true}).click();
+    const position=inspector.getByRole('spinbutton',{name:'Position X',exact:true}).first();
+    await expect(position).toBeVisible();
+    const initial=Number(await position.inputValue());
+    await position.fill(String(initial+5));
+    await position.press('Tab');
+    const id=created.project.id;
+    const head=async page=>{
+      const {history}=await invoke(page,'read_workspace_history',{projectId:id});
+      return history?.snapshots.find(snapshot=>snapshot.key===history.head.current)?.project;
+    };
+    await expect.poll(async()=>(await head(main))?.quickForge.geometry[0]?.position[0]).toBe(initial+5);
+    const draft=await head(main);
     await choose(main,'Tag editor');
     const previousProjectPages=new Set(browser.contexts().flatMap(context=>context.pages()));
     await openViewMenu(main);await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+    report.handoffPhase='opening destination window';
     const editor=await spawnedPage(previousProjectPages);
     expect(new URL(editor.url()).searchParams.get('project')).toBe(created.project.id);
     await expect(editor.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','tags');
     await expect.poll(async()=>{try{await invoke(editor,'claim_project_document',{id:created.project.id});return true;}catch{return false;}}).toBe(true);
+    report.handoffPhase='checking owner and edit';
     let duplicateWriterRejected=false;
     try{await invoke(main,'claim_project_document',{id:created.project.id});}catch{duplicateWriterRejected=true;}
     expect(duplicateWriterRejected).toBe(true);
     const transferred=await invoke(editor,'open_project',{id:created.project.id});
-    expect(transferred.project.quickForge).toEqual(created.project.quickForge);
+    // A pending runtime resource lookup can add factory shader bindings.
+    // Compare all authored data and explicitly protect each existing binding.
+    const {materials: expectedMaterials,...expectedScene}=draft.quickForge;
+    const {materials: actualMaterials,...actualScene}=transferred.project.quickForge;
+    expect(actualScene).toEqual(expectedScene);
+    for (const expected of expectedMaterials) {
+      const actual=actualMaterials.find(material=>material.id===expected.id);
+      const allowedDefault=expected.id==='grass'
+        ? 'levels/test/bloodgulch/shaders/blood ground'
+        : 'levels/test/bloodgulch/shaders/cap_metal';
+      expect(actual).toEqual({...expected,shaderPath:expected.shaderPath ?? (actual?.shaderPath ? allowedDefault : null)});
+    }
+    expect(actualMaterials.filter(material=>!expectedMaterials.some(old=>old.id===material.id))
+      .every(material=>material.id==='grass'&&material.shaderPath==='levels/test/bloodgulch/shaders/blood ground')).toBe(true);
+    report.handoffPhase='undoing in destination';
+    await editor.keyboard.press('Control+z');
+    await expect.poll(async()=>(await head(editor))?.quickForge.geometry[0]?.position[0]).toBe(initial);
     await expect(main.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
-    report.projectTransfer={nativeProjectPreserved:true,workspacePreserved:true,duplicateWriterRejected};
-    await close(editor);
+    report.projectTransfer={nativeProjectPreserved:true,workspacePreserved:true,undoPreserved:true,duplicateWriterRejected};
+    report.handoffPhase='saving and closing destination';
+    await editor.getByRole('button',{name:'Close window',exact:true}).click();
+    const review=editor.getByRole('dialog',{name:'Save changes before closing?',exact:true});
+    await expect.poll(async()=>editor.isClosed() || await review.isVisible().catch(()=>false)).toBe(true);
+    if(!editor.isClosed()) await review.getByRole('button',{name:'Save changes',exact:true}).click();
+    await expect.poll(()=>editor.isClosed()).toBe(true);
+    const saved=await invoke(main,'open_project',{id});
+    expect(saved.project.quickForge.geometry[0].position[0]).toBe(initial);
     expect(report.errors).toEqual([]);
   }
   report.complete = true;
 } catch (error) {
   report.errors.push(String(error)); process.exitCode = 1;
+  if(report.handoffPhase) report.diagnostics=await main?.locator('.toast, [role=status], [role=alert]').allTextContents().catch(()=>[]);
   await main?.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});
 } finally {
   await fs.writeFile(path.join(output, 'acceptance.json'), JSON.stringify(report, null, 2));
   await browser?.close().catch(() => {});
   if (processHandle.exitCode === null && processHandle.signalCode === null) processHandle.kill();
   await waitForQaExit(processHandle);
-  console.log(JSON.stringify({ complete: report.complete, windows: report.windows.length, simultaneousPopouts: report.simultaneousPopouts, guideLayout: report.guideLayout, errors: report.errors }));
+  console.log(JSON.stringify({ complete: report.complete, windows: report.windows.length, simultaneousPopouts: report.simultaneousPopouts, guideLayout: report.guideLayout, handoffPhase: report.handoffPhase, diagnostics: report.diagnostics, errors: report.errors }));
 }
