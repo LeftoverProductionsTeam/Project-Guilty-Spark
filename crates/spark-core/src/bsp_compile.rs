@@ -107,6 +107,7 @@ fn namespace_materials(
     destination: &Path,
     recovery: Option<(&project::Source,&MapInspection)>,
     extra_roots: &[String],
+    preserve_shader_paths: bool,
 ) -> Result<NamespacedDependencies> {
     if source.as_os_str().is_empty() || !source.is_dir() {
         return invalid(
@@ -366,7 +367,22 @@ fn namespace_materials(
             let original = format!("{namespace}\\{}.{}", path.replace('/', "\\"), ext);
             let alias = format!("{namespace}\\materials\\{}.{}", m.name, ext);
             let original_file = working.join(safe_relative(&original)?);
-            if !original_file.is_file() {
+            if preserve_shader_paths && original_file.is_file() {
+                // A structure check has no published scenario references to migrate. Keep
+                // the namespaced dependency graph intact and give Tool a JMS shader alias.
+                let alias_file = working.join(safe_relative(&alias)?);
+                crate::reject_links(&original_file)?;
+                crate::reject_links(&alias_file)?;
+                if alias_file.exists() {
+                    return invalid("BSP shader alias collides with an existing dependency");
+                }
+                fs::create_dir_all(alias_file.parent().unwrap())?;
+                let expected = maps::hash_file(&original_file)?;
+                fs::copy(&original_file, &alias_file)?;
+                if maps::hash_file(&alias_file)? != expected {
+                    return invalid("BSP shader alias differs from its namespaced source");
+                }
+            } else if !original_file.is_file() {
                 // Repeated material flags can share a shader but need distinct JMS aliases.
                 let previous = geometry
                     .materials
@@ -1324,16 +1340,17 @@ pub(crate) fn prepare_partition_structure(
     if original_structures.len() != inspection.mesh.parts.len() {
         return invalid("A native source BSP is missing from its collision inspection");
     }
+    let preserve_shader_paths = stage == PartitionStage::StructureCheck;
     let mut retained = Vec::new();
     if let Some(base) = &base_geometry {
-        namespace_materials(base_tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None, &[])?;
+        namespace_materials(base_tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None, &[], preserve_shader_paths)?;
     } else {
         for bsp in &original_structures {
             let file = base_tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
             let sha = maps::hash_file(&file)?;
             retained.push((file, sha));
         }
-        namespace_materials(base_tags, &original_structures[plan.base_bsp_index], 0, &added_geometry, &[], tools, runner, workspace, tags, None, &[])?;
+        namespace_materials(base_tags, &original_structures[plan.base_bsp_index], 0, &added_geometry, &[], tools, runner, workspace, tags, None, &[], preserve_shader_paths)?;
     }
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
     let donor_source_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;
@@ -1342,7 +1359,7 @@ pub(crate) fn prepare_partition_structure(
     let (donor_root, skies) = extracted.as_ref().map_or(
         (plan.donor_tags_directory.as_path(), &[][..]), |(root, skies)| (root.as_path(), skies.as_slice()));
     namespace_materials(donor_root, &donor_source_bsp, 1, &added_geometry, &scenery,
-        tools, runner, workspace, tags, Some((&plan.donor_source, &donor)), skies)?;
+        tools, runner, workspace, tags, Some((&plan.donor_source, &donor)), skies, preserve_shader_paths)?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let edit = find_tool(tools, "invader-edit")?;
     let donor_name = if base_geometry.is_some() { "donor".into() } else { format!("region_{}", original_structures.len()) };
@@ -1523,6 +1540,7 @@ pub(crate) fn prepare_native_with_limits(
         tags,
         None,
         &[],
+        false,
     )?;
     let donor_hashes = namespace_materials(
         &assembly.donor_tags_directory,
@@ -1536,6 +1554,7 @@ pub(crate) fn prepare_native_with_limits(
         tags,
         Some((&assembly.donor_source,&donor)),
         &[],
+        false,
     )?;
     let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
     let name = "connected";
