@@ -2250,8 +2250,8 @@ pub fn generate_preserved_connector(
     let donor_vehicles = maps::scenario_vehicles(&plan.donor_source.preserved_path, &donor)?;
     let base_span = intact_span_before_vehicles(start, mul(base_forward, -1.), plan.tunnel_width, plan.tunnel_height,
         base_vehicles.iter().filter(|row| row.tag.is_some()).map(|row| row.position.map(f64::from)));
-    let checker = crate::bsp_clearance::RouteChecker::for_part(&base_collision, plan.base_bsp_index)?;
-    let base_landing = choose_intact_landing_bounded(&checker, &mut review, start, [0.; 3], base_forward, base_span)
+    let base_checker = crate::bsp_clearance::RouteChecker::for_part(&base_collision, plan.base_bsp_index)?;
+    let base_landing = choose_intact_landing_bounded(&base_checker, &mut review, start, [0.; 3], base_forward, base_span)
         .map_err(|error| SparkError::Invalid(format!("Retained connector landing: {error}")))?;
     let donor_span = intact_span_before_vehicles(end, donor_forward, plan.tunnel_width, plan.tunnel_height,
         donor_vehicles.iter().map(|row| add(row.position.map(f64::from), plan.translation)));
@@ -2334,11 +2334,23 @@ pub fn generate_preserved_connector(
     }
     review.tunnel_points.insert(0, overlaps[0][0]);
     review.tunnel_points.push(landing.as_ref().map_or(overlaps[1][1], |ramp| ramp.point(overlaps[1][1])));
+    let donor_checker = checker;
     let checker = crate::bsp_clearance::RouteChecker::new(&mesh)?;
     let route_clearance = if plan.open_road {
         let [walk_samples, _] = checker.verify_land_bridge(&review)?;
         vec![RouteClearance { label: "Open land bridge".into(), width: plan.tunnel_width,
             clear_height: plan.tunnel_height, walk_samples, lateral_samples: 0 }]
+    } else if plan.tunnel_width >= 6. {
+        let corridor = checker.verify_wide_passage(&review, &review.tunnel_points, "Wide tunnel")?;
+        let approach = |label, support: &crate::bsp_clearance::RouteChecker, points: [V; 2], shift| {
+            let points = points.map(|point| sub(point, shift));
+            support.verify_wide_passage(&review, &points, label)
+        };
+        vec![
+            corridor,
+            approach("Parent landing", &base_checker, overlaps[0], [0.; 3])?,
+            approach("Donor landing", &donor_checker, overlaps[1], plan.translation)?,
+        ]
     } else {
         checker.verify_return(&review)?;
         checker.verify_details(&review)?
@@ -2844,13 +2856,22 @@ pub(crate) fn verify_intact_connector_collision(
     route.directional_donor_landing = false;
     route.base_bsp_index = 0;
     let mut samples = Vec::with_capacity(2);
+    let mut wide_lateral_samples = Vec::new();
     let mut max_delta: f64 = 0.;
     let donor_slot = original_count + 1;
     for (slot, overlap) in [plan.base_bsp_index, donor_slot].into_iter().zip(overlaps) {
         let region = crate::bsp_clearance::RouteChecker::for_part(&collision, slot)?;
         route.tunnel_points = overlap.to_vec();
-        let both = if plan.open_road { region.verify_land_bridge(&route)? }
-            else { [region.verify(&route)?, region.verify_return(&route)?] };
+        let both = if plan.open_road {
+            region.verify_land_bridge(&route)?
+        } else if plan.tunnel_width >= 6. {
+            let label = if slot == donor_slot { "Compiled donor landing" } else { "Compiled parent landing" };
+            let clearance = region.verify_wide_passage(&route, &route.tunnel_points, label)?;
+            wide_lateral_samples.push(clearance.lateral_samples);
+            [clearance.walk_samples; 2]
+        } else {
+            [region.verify(&route)?, region.verify_return(&route)?]
+        };
         samples.push(both);
         if slot == donor_slot && plan.directional_donor_landing { continue; }
         let original = region.floor_profile(overlap)?;
@@ -2895,10 +2916,18 @@ pub(crate) fn verify_intact_connector_collision(
     route.tunnel_points = [overlaps[0][0]].into_iter()
         .chain(points[1..points.len() - 1].iter().copied())
         .chain([landing.as_ref().map_or(overlaps[1][1], |ramp| ramp.point(overlaps[1][1]))]).collect();
-    let corridor = if plan.open_road { connector.verify_land_bridge(&route)? }
-        else { [connector.verify(&route)?, connector.verify_return(&route)?] };
+    let corridor = if plan.open_road {
+        connector.verify_land_bridge(&route)?
+    } else if plan.tunnel_width >= 6. {
+        let clearance = connector.verify_wide_passage(&route, &route.tunnel_points, "Compiled wide tunnel")?;
+        wide_lateral_samples.push(clearance.lateral_samples);
+        [clearance.walk_samples; 2]
+    } else {
+        [connector.verify(&route)?, connector.verify_return(&route)?]
+    };
     Ok(serde_json::json!({
         "connectorSamples": corridor, "landingSamples": samples, "maxFloorDelta": max_delta,
+        "wideLateralSamples": wide_lateral_samples,
         "directionalDonorLanding": directional_review,
         "bspCollisionTriangles": collision.parts.iter().map(|part| part.index_count / 3).collect::<Vec<_>>(),
     }))

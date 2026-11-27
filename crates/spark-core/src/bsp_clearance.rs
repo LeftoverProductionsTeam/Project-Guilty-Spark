@@ -600,14 +600,34 @@ impl RouteChecker {
             }).map_err(|e| SparkError::Invalid(format!("{label}: {e}")))
         }).collect()
     }
+    pub(crate) fn verify_wide_passage(
+        &self, assembly: &BspAssembly, points: &[V], label: &str,
+    ) -> Result<crate::bsp_assembly::RouteClearance> {
+        let mut route = assembly.clone();
+        route.tunnel_points = points.to_vec();
+        let check = |route: &BspAssembly| self.verify_one_with_width(route, false, true)
+            .map_err(|error| SparkError::Invalid(format!("{label}: {error}")));
+        let (walk_samples, lateral_samples) = check(&route)?;
+        route.tunnel_points.reverse();
+        check(&route)?;
+        Ok(crate::bsp_assembly::RouteClearance {
+            label: label.into(), width: route.tunnel_width, clear_height: route.tunnel_height,
+            walk_samples, lateral_samples,
+        })
+    }
+
     fn verify_one(&self, assembly: &BspAssembly, strict_floor: bool) -> Result<(usize, usize)> {
+        self.verify_one_with_width(assembly, strict_floor, false)
+    }
+
+    fn verify_one_with_width(&self, assembly: &BspAssembly, strict_floor: bool, full_width: bool) -> Result<(usize, usize)> {
     let index = &self.index;
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<(V, f64)> = None;
     let placed_road = assembly.terrain_seam.as_ref().is_some_and(|seam| seam.bearing_degrees.is_some());
     let mut lateral_samples = 0;
-    let lane_fractions: Vec<f64> = if placed_road {
+    let lane_fractions: Vec<f64> = if placed_road || full_width {
         // Sample the usable road interior as well as its edges. Round up to
         // an odd interval count so the separately swept center adds a lane.
         let intervals = (((f64::from(assembly.tunnel_width) - 0.45) / 0.36).ceil() as usize) | 1;
@@ -619,7 +639,7 @@ impl RouteChecker {
     // Match the same mitered cross sections used by the ridge solid. A lane
     // sampled at a segment's perpendicular can cross onto the next graded
     // segment near a turn and compare the next ramp height to the old one.
-    let lane_distance = if placed_road || assembly.fit_passage_floor {
+    let lane_distance = if placed_road || assembly.fit_passage_floor || full_width {
         Some(f64::from(assembly.tunnel_width)-0.45)
     } else if strict_floor && assembly.tunnel_width >= 6. {Some(3.)} else {None};
     let lane_sides = lane_distance
@@ -687,6 +707,23 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wide_enclosed_passage_checks_the_connector_and_local_landings_off_center() {
+        let mut route = plan();
+        route.tunnel_width = 6.;
+        route.tunnel_height = 4.;
+        let mut mesh = corridor(6., 4.);
+        let inner = [[2.,0.,0.],[8.,0.,0.]];
+        let clear = RouteChecker::new(&mesh).unwrap().verify_wide_passage(&route, &inner, "Donor landing").unwrap();
+        assert!(clear.lateral_samples > 2 * clear.walk_samples);
+        quad(&mut mesh, [[5., 1.0, 0.], [5., 1.6, 0.], [5., 1.6, 1.6], [5., 1.0, 1.6]]);
+        let checker = RouteChecker::new(&mesh).unwrap();
+        checker.verify_one(&route, false).unwrap();
+        assert!(checker.verify_wide_passage(&route, &inner, "Donor landing")
+            .unwrap_err().to_string().contains("Donor landing:"));
+    }
+
 
     #[test]
     fn placed_road_sweeps_the_band_between_center_and_edges() {
