@@ -73,6 +73,9 @@ pub struct BspAssembly {
     pub separate_native_bsps: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub preserve_donor_bsp: bool,
+    /// Rebuild the inherited connector in place with its original switch volumes.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub rebuild_native_connector: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub restore_donor_sky_portals: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -169,6 +172,13 @@ impl NativeSeal {
 fn is_false(value: &bool) -> bool { !*value }
 fn is_zero_index(value: &usize) -> bool { *value == 0 }
 impl BspAssembly {
+    pub fn matches_inherited_connector(&self, prior: &Self) -> bool {
+        prior.preserve_donor_bsp && prior.base_bsp_index == self.base_bsp_index
+            && prior.donor_source.sha256 == self.donor_source.sha256
+            && prior.donor_bsp_index == self.donor_bsp_index && prior.translation == self.translation
+            && prior.yaw_degrees == self.yaw_degrees
+    }
+
     pub fn validate(&self) -> Result<()> {
         if let Some(origin) = &self.atlas_origin {
             crate::megaworld::Layout { schema_version: 1, regions: vec![origin.clone()], extraction: Default::default() }.validate()?;
@@ -177,6 +187,9 @@ impl BspAssembly {
             || (!self.separate_native_bsps && self.base_bsp_index != 0) || self.donor_title.len() > 256
         {
             return invalid("Unsupported BSP assembly");
+        }
+        if self.rebuild_native_connector && (!self.separate_native_bsps || !self.preserve_donor_bsp) {
+            return invalid("Replacing a compiled connector requires the preserved BSP layout");
         }
         uuid::Uuid::parse_str(&self.donor_project_id)
             .map_err(|_| SparkError::Invalid("Invalid donor project identity".into()))?;
@@ -1088,6 +1101,7 @@ pub struct PreservedConnector {
     pub geometry: AssemblyGeometry,
     pub rebuilt_entrance: Option<AssemblyGeometry>,
     pub rebuilt_donor_entrance: Option<AssemblyGeometry>,
+    pub replacement_slots: Option<[usize; 2]>,
     pub switches: [PartitionSwitch; 4],
     pub overlaps: [[V; 2]; 2],
 }
@@ -2317,6 +2331,60 @@ pub fn generate_preserved_connector(
 
 /// Rebuild a leaf connector in its existing physical slots. The caller still
 /// owns the staged native structures and the donor's scenario placements.
+/// Resolve a unique inherited leaf from the source cache. Select by topology
+/// and donor tag identity rather than assuming that it occupies the last slots.
+pub fn inherited_connector_slots(project: &Project, base: &MapInspection) -> Result<[usize; 2]> {
+    let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Select an inherited connector".into()))?;
+    let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing compiled connector source".into()))?;
+    let mut inherited = project.inherited_bsp_connections.iter().enumerate()
+        .filter(|(_, prior)| plan.matches_inherited_connector(prior));
+    let prior_index = inherited.next().map(|(index, _)| index);
+    if source.sha256 != base.sha256 || base.header.version != 13 || base.header.scenario_type != 1
+        || !plan.rebuild_native_connector || prior_index.is_none() || inherited.next().is_some()
+    {
+        return invalid("Select an inherited MCC13 connector and keep its two stock BSP placements");
+    }
+    let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
+    if donor.sha256 != plan.donor_source.sha256 { return invalid("The original connector donor has changed"); }
+    let donor_paths = maps::scenario_bsp_tag_paths(&plan.donor_source.preserved_path, &donor)?;
+    let donor_path = donor_paths.get(plan.donor_bsp_index).ok_or_else(|| SparkError::Invalid("Missing original donor BSP".into()))?;
+    let suffix = format!("\\{}", donor_path.replace('/', "\\").to_ascii_lowercase());
+    let native = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
+    // A retained entrance may already have a rebuilt tag at the same slot.
+    // The complete saved connection order can prove that identity independently of its name.
+    let recorded_island = atlas_native_slot(&project.inherited_bsp_connections, native.bsp_count, prior_index).ok();
+    let mut slots = None;
+    for (island, path) in native.bsp_tag_paths.iter().enumerate() {
+        if Some(island) != recorded_island && !path.replace('/', "\\").to_ascii_lowercase().ends_with(&suffix) { continue; }
+        for connector in 0..native.bsp_count {
+            if review_leaf_switches(plan.base_bsp_index, [connector, island], native.bsp_count, &native.transitions)
+                && slots.replace([connector, island]).is_some()
+            {
+                return invalid("More than one inherited connector matches these source BSPs");
+            }
+        }
+    }
+    slots.ok_or_else(|| SparkError::Invalid("This inherited connection is no longer an isolated four-switch leaf".into()))
+}
+
+pub fn generate_editor_connector(project: &Project, base: &MapInspection, cancel: &AtomicBool) -> Result<PreservedConnector> {
+    if !project.bsp_assembly.as_ref().is_some_and(|plan| plan.rebuild_native_connector) {
+        return generate_preserved_connector(project, base, cancel);
+    }
+    let [connector, donor] = inherited_connector_slots(project, base)?;
+    let generated = rebuild_preserved_connector(project, base, connector, donor, cancel)?;
+    let source = project.source.as_ref().unwrap();
+    let native = maps::scenario_bsp_transitions(&source.preserved_path, base)?;
+    for switch in &generated.switches {
+        if !native.transitions.iter().any(|row| row.trigger_name == switch.name && row.geometry.as_ref().is_some_and(
+            |geometry| crate::native_operations::volume_geometry_close(geometry, &switch.geometry))) {
+            return invalid(format!("Retained switch {} must stay in place near ({:.3}, {:.3}, {:.3}). Keep both landings fixed and edit the middle of the connector.",
+                switch.name, switch.geometry.corner[0], switch.geometry.corner[1], switch.geometry.corner[2]));
+        }
+    }
+    Ok(generated)
+}
+
 pub fn rebuild_preserved_connector(
     project: &Project, base: &MapInspection, connector_slot: usize, donor_slot: usize, cancel: &AtomicBool,
 ) -> Result<PreservedConnector> {
@@ -2374,6 +2442,7 @@ fn generate_preserved_connector_for_slots(
     let mut review = plan.clone();
     review.separate_native_bsps = false;
     review.preserve_donor_bsp = false;
+    review.rebuild_native_connector = false;
     review.tunnel_bake_fill = false;
     review.directional_donor_landing = false;
     review.base_bsp_index = 0;
@@ -2386,7 +2455,10 @@ fn generate_preserved_connector_for_slots(
         let donor_suffix = format!("\\{}", donor_tags[0]).replace('/', "\\").to_ascii_lowercase();
         let same_donor = prior.bsp_tag_paths.get(island).is_some_and(|tag|
             tag.replace('/', "\\").to_ascii_lowercase().ends_with(&donor_suffix));
-        if !same_donor || !review_leaf_switches(plan.base_bsp_index, slots, count, &retained_switches) {
+        let recorded_donor = plan.rebuild_native_connector && project.inherited_bsp_connections.iter().enumerate()
+            .find(|(_, prior)| plan.matches_inherited_connector(prior))
+            .and_then(|(index, _)| atlas_native_slot(&project.inherited_bsp_connections, count, Some(index)).ok()) == Some(island);
+        if (!same_donor && !recorded_donor) || !review_leaf_switches(plan.base_bsp_index, slots, count, &retained_switches) {
             return invalid("Replacement slots must be the existing four-switch leaf and its original donor BSP");
         }
         retained_switches.retain(|switch| !slots.contains(&switch.source_bsp)
@@ -2647,6 +2719,7 @@ fn generate_preserved_connector_for_slots(
         geometry: AssemblyGeometry { mesh, materials, triangle_materials, exact_sky_portals: Vec::new(), report },
         rebuilt_entrance: entrance.map(|cut| cut.geometry),
         rebuilt_donor_entrance: donor_entrance.map(|cut| cut.geometry),
+        replacement_slots: replacement,
         switches,
         overlaps,
     })
@@ -4353,7 +4426,16 @@ pub fn verify_atlas_plan(project: &Project, base: &MapInspection, plan: &BspAsse
         SparkError::Invalid("Restore the saved Atlas for this native connection".into()))?;
     let to_id = format!("{}:{}", plan.donor_source.sha256, plan.donor_bsp_index);
     let (from, to) = layout.connection(from_id, &to_id)?;
-    let (origin, _, _, base_index) = atlas_base_frame(project, base, from, to)?;
+    let (origin, base_index) = if plan.rebuild_native_connector {
+        let prior = project.inherited_bsp_connections.iter().find(|prior| plan.matches_inherited_connector(prior))
+            .ok_or_else(|| SparkError::Invalid("Missing inherited Atlas connector".into()))?;
+        let origin = prior.atlas_origin.as_ref().filter(|_| prior.atlas_from_region_id == plan.atlas_from_region_id)
+            .ok_or_else(|| SparkError::Invalid("The replacement must preserve the inherited Atlas frame".into()))?;
+        (origin, prior.base_bsp_index)
+    } else {
+        let (origin, _, _, base_index) = atlas_base_frame(project, base, from, to)?;
+        (origin, base_index)
+    };
     let (translation, yaw) = atlas_transform(origin, to);
     let yaw_delta = (plan.yaw_degrees - yaw + 180.).rem_euclid(360.) - 180.;
     if plan.atlas_origin.as_ref() != Some(origin) || plan.base_bsp_index != base_index
@@ -4543,6 +4625,7 @@ fn plan_from_bsp_placement(
         base_bsp_index: base_index,
         separate_native_bsps: retaining,
         preserve_donor_bsp: false,
+        rebuild_native_connector: false,
         tunnel_bake_fill: false,
         directional_donor_landing: false,
         fit_passage_floor: false,
@@ -5050,6 +5133,22 @@ pub fn export_jms(geometry: &AssemblyGeometry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retained_leaf_must_keep_four_independent_native_switches() {
+        let mut rows = [(0, 3), (3, 0), (3, 1), (1, 3)].into_iter().enumerate().map(|(index, (from, to))| {
+            let switch = partition_switch(from, to, [0.; 3], [1., 0., 0.], 6., 4.);
+            maps::NativeBspTransition { trigger_index: index, trigger_name: switch.name,
+                source_bsp: from, destination_bsp: to, arrival_marker: None, geometry: Some(switch.geometry) }
+        }).collect::<Vec<_>>();
+        assert!(review_leaf_switches(0, [3, 1], 5, &rows));
+        assert!(!review_leaf_switches(0, [1, 3], 5, &rows));
+        rows[2].arrival_marker = Some(1);
+        assert!(!review_leaf_switches(0, [3, 1], 5, &rows));
+        rows[2].arrival_marker = None;
+        rows[2].trigger_index = rows[0].trigger_index;
+        assert!(!review_leaf_switches(0, [3, 1], 5, &rows));
+    }
 
     #[test]
     fn join_preflight_distinguishes_collision_overlaps_from_render_and_portals() {

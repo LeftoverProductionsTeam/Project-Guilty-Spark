@@ -287,14 +287,18 @@ impl Project {
         if let Some(controls)=&self.gameplay_controls{controls.validate()?;}
         if let Some(layout)=&self.megaworld_layout{layout.validate()?;}
         if !self.inherited_bsp_connections.is_empty() {
-            let total = self.inherited_bsp_connections.len() + usize::from(self.bsp_assembly.is_some());
+            let total = self.inherited_bsp_connections.len()
+                + usize::from(self.bsp_assembly.as_ref().is_some_and(|plan| !plan.rebuild_native_connector));
             if total > crate::bsp_assembly::MAX_COMPILED_CONNECTIONS
                 || self.source.as_ref().is_none_or(|source| !matches!(source.cache_version, 609 | 13))
                 || self.quick_forge.is_some()
             {
                 return invalid("Inherited connections require a preserved CE609 or MCC13 world within the native route limit");
             }
-            for route in &self.inherited_bsp_connections { route.validate()?; }
+            for route in &self.inherited_bsp_connections {
+                route.validate()?;
+                if route.rebuild_native_connector { return invalid("Only the active BSP connection can request an in-place rebuild"); }
+            }
         }
         if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
         if let Some(features)=&self.render_features{features.validate()?;}

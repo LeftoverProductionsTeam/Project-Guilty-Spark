@@ -248,6 +248,7 @@ export default function BspAssembly({
   const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
   const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
   const draftSignature = assemblySignature(draft);
+  const editingRetained = !!draft?.rebuildNativeConnector;
   const applied = draftSignature === assemblySignature(project.bspAssembly ?? null);
   useEffect(() => { setReport(null); }, [draftSignature]);
   const currentStructureCheck = structureCheck?.key === structureKey && applied ? structureCheck : null;
@@ -530,7 +531,22 @@ export default function BspAssembly({
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} project={project} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} onViewBsp={setViewedBsp}/>}
-          {(!nativePartitioned || canExtend) && <>
+          {nativePartitioned && native && inherited.some(plan => plan.preserveDonorBsp) && (
+            <details className="bsp-help">
+              <summary>Edit a compiled connector</summary>
+              <p>Select an inherited route. Its end landings and native switches must stay fixed.</p>
+              {inherited.map((plan, index) => plan.preserveDonorBsp && (
+                <button key={index} type="button" disabled={busy}
+                  onClick={() => {
+                    setDraft({...plan, rebuildNativeConnector: true});
+                    setDonor(plan.donorProjectId); setIndex(plan.donorBspIndex);
+                    setBaseIndex(plan.baseBspIndex ?? 0); setViewedBsp(plan.baseBspIndex ?? 0);
+                    setRouteView('primary'); setMoveDonorHandle(false); setReport(null); setError('');
+                  }}>Edit {plan.donorTitle} connector</button>
+              ))}
+            </details>
+          )}
+          {(!nativePartitioned || canExtend || editingRetained) && <>
           <details className="bsp-help">
             <summary>Connection help</summary>
             {canExtend ? <p>Use a walkable entrance and build for MCC13 to keep existing BSP slots and switches.</p>
@@ -600,7 +616,7 @@ export default function BspAssembly({
                 disabled={busy}
               >
                 <option value="">Choose an imported map</option>
-                {project.bspAssembly&&!candidates.some(entry=>entry.id===project.bspAssembly!.donorProjectId)&&<option value={project.bspAssembly.donorProjectId}>{project.bspAssembly.donorTitle} · saved source</option>}
+                {draft&&!candidates.some(entry=>entry.id===draft.donorProjectId)&&<option value={draft.donorProjectId}>{draft.donorTitle} · saved source</option>}
                 {candidates.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.title}
@@ -804,7 +820,7 @@ export default function BspAssembly({
                 <button
                   disabled={busy || applied || !selectionMatches}
                   onClick={() =>
-                    onEdit({ ...project, bspAssembly: draft }, draft.terrainSeam?'Join adjacent native terrain':'Connect imported BSP with a tunnel')
+                    onEdit({ ...project, bspAssembly: draft }, editingRetained ? 'Edit inherited native connector' : draft.terrainSeam?'Join adjacent native terrain':'Connect imported BSP with a tunnel')
                   }
                 >
                   Apply connection
@@ -959,7 +975,7 @@ export default function BspAssembly({
                   onClick={() => {setMoveDonorHandle(false);setShowRouteHandles(!showRouteHandles || moveDonorHandle);}}>
                   {showRouteHandles && !moveDonorHandle ? 'Hide route handles' : 'Drag route points'}
                 </button>
-                <button type="button" disabled={busy || !selectionMatches} aria-pressed={showRouteHandles && moveDonorHandle}
+                <button type="button" disabled={busy || !selectionMatches || editingRetained} aria-pressed={showRouteHandles && moveDonorHandle}
                   onClick={() => {setShowRouteHandles(!showRouteHandles || !moveDonorHandle);setMoveDonorHandle(!moveDonorHandle);}}>
                   {showRouteHandles && moveDonorHandle ? 'Hide BSP handle' : 'Move neighboring BSP'}
                 </button>

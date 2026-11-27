@@ -888,6 +888,7 @@ mod tests {
             base_bsp_index: 0,
             separate_native_bsps: false,
             preserve_donor_bsp: false,
+            rebuild_native_connector: false,
             tunnel_bake_fill: false,
             directional_donor_landing: false,
             fit_passage_floor: false,

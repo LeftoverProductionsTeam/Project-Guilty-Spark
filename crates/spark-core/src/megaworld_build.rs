@@ -186,7 +186,7 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
         || (source.cache_version == 13 && cache.version == 13 && !project.inherited_bsp_connections.is_empty());
     let retaining = plan.separate_native_bsps && cache.version == 13
         && if plan.preserve_donor_bsp {
-            crate::bsp_assembly::can_preserve_connector_parent(project, inspection, plan)
+            plan.rebuild_native_connector || crate::bsp_assembly::can_preserve_connector_parent(project, inspection, plan)
         } else {
             crate::bsp_assembly::can_extend_partitions(project, inspection)
         };
@@ -195,7 +195,10 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     {
         return invalid("Use a single-BSP CE multiplayer base or its eligible compiled MCC13 extension with the matching build tags. Choose a CE donor and keep multi-BSP extensions on MCC13");
     }
-    if plan.preserve_donor_bsp && (!retaining || inspection.mesh.parts.len() > 14) {
+    if plan.rebuild_native_connector {
+        crate::bsp_assembly::inherited_connector_slots(project, inspection)?;
+    }
+    if plan.preserve_donor_bsp && (!retaining || (!plan.rebuild_native_connector && inspection.mesh.parts.len() > 14)) {
         return invalid("Preserving both regions requires an MCC13 target, a retained Atlas seed or regional parent, and two available BSP slots");
     }
     if retaining && project.native_lighting.is_some() {
@@ -383,7 +386,7 @@ fn build_partition_cache(
     let existing = maps::scenario_volume_readback(preserved_path, source)?;
     let old_switches = maps::scenario_bsp_transitions(preserved_path, source)?.transitions;
     let old_count = source.mesh.parts.len();
-    let expected_count = old_count + if prepared.intact_overlaps.is_some() { 2 } else { 1 };
+    let expected_count = old_count + if prepared.replacement_slots.is_some() { 0 } else if prepared.intact_overlaps.is_some() { 2 } else { 1 };
     let compiler = build::tool_path(tools, "invader-build").unwrap();
     let info = build::tool_path(tools, "invader-info").unwrap();
     let name = source.scenario_path.rsplit(['\\', '/']).next().ok_or_else(|| SparkError::Invalid("Missing scenario filename".into()))?;
@@ -459,15 +462,26 @@ fn build_partition_cache(
     let native_flags = prepared.netgame_flags.as_ref().map(|review| review.verify(&flags, regional, &regions)).transpose()?;
     let native_starts = prepared.player_starts.as_ref().map(|review| review.verify(&starts, regional, &regions)).transpose()?;
     let collision = if let Some(overlaps) = prepared.intact_overlaps {
-        crate::bsp_assembly::verify_intact_connector_collision(&path, &map, plan, overlaps, old_count)?
+        if let Some(slots) = prepared.replacement_slots {
+            crate::bsp_assembly::verify_rebuilt_connector_collision(&path, &map, plan, overlaps, slots, [false; 2], [None; 2])?
+        } else {
+            crate::bsp_assembly::verify_intact_connector_collision(&path, &map, plan, overlaps, old_count)?
+        }
     } else {
         crate::bsp_assembly::verify_bound_partition_collision(
             &path, &map, plan, &project.inherited_bsp_connections, prepared.overlap, old_count,
         )?
     };
     let retain_collision = old_count > 1 || prepared.intact_overlaps.is_some();
+    let replaced_slot = prepared.replacement_slots.map(|slots| slots[0]);
     if retain_collision {
-        verify_retained_collision(preserved_path, source, &path, &map)?;
+        verify_retained_collision(preserved_path, source, &path, &map, replaced_slot)?;
+    }
+    if let Some(slot) = replaced_slot {
+        let original = crate::bsp_audio::inspect(preserved_path, &source.sha256)?;
+        for (index, (before, after)) in original.bsps.iter().zip(&world.bsps).enumerate() {
+            if index != slot { crate::bsp_audio::verify_intact_region(before, after, [0.; 3], "", 0)?; }
+        }
     }
     let memory = maps::verify_resident_tag_window(&path, &map, target.tag_base, target.tag_capacity)?;
     if let Some(environment) = &prepared.donor_environment {
@@ -510,11 +524,11 @@ fn build_partition_cache(
         "donorEnvironmentVerified": prepared.donor_environment.is_some() || prepared.intact_sky_offset.is_some(),
         "retainedEnvironmentsVerified": prepared.intact_sky_offset.is_some(), "donorPickupsInRegion": donor_pickups_in_region,
         "netgameFlags": native_flags, "playerStarts": native_starts,
-        "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if retain_collision { old_count } else { 0 }});
+        "pickupRowCount": prepared.pickups.as_ref().map(|items| items.total_count()), "retainedBspCollisionVerified": if retain_collision { old_count - usize::from(replaced_slot.is_some()) } else { 0 }});
     Ok(PartitionCache { path, sha256: map.sha256, resident_bytes: memory.resident_bytes, receipt })
 }
 
-fn verify_retained_collision(source_path: &Path, source: &MapInspection, output_path: &Path, output: &MapInspection) -> Result<()> {
+fn verify_retained_collision(source_path: &Path, source: &MapInspection, output_path: &Path, output: &MapInspection, replaced_slot: Option<usize>) -> Result<()> {
     let (before, before_faces) = maps::collision_source(source_path, source)?;
     let (after, after_faces) = maps::collision_source(output_path, output)?;
     let before_tags: std::collections::HashMap<_, _> = source.tags.iter()
@@ -522,6 +536,7 @@ fn verify_retained_collision(source_path: &Path, source: &MapInspection, output_
     let after_tags: std::collections::HashMap<_, _> = output.tags.iter()
         .map(|tag| (tag.id, (&tag.class, &tag.path))).collect();
     for (slot, (old, new)) in before.parts.iter().zip(&after.parts).enumerate() {
+        if Some(slot) == replaced_slot { continue; }
         let old_range = old.index_start..old.index_start + old.index_count;
         let new_range = new.index_start..new.index_start + new.index_count;
         if old.index_count != new.index_count

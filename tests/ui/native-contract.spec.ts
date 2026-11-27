@@ -4221,6 +4221,40 @@ test('construction route handles drive the same draft, preview and undo transact
   await expect(panel.getByRole('button',{name:'Remove connection',exact:true,includeHidden:true})).toHaveCount(0);
 });
 
+test('an inherited connector can be applied and saved as an in-place native edit', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(async () => {
+    const w = window as any, {a: base} = w.__sparkMock.projects;
+    base.project.source.cacheVersion = base.inspection.header.version = 13;
+    base.inspection.mesh.parts = ['Base', 'Connector', 'Island'].map(name => ({
+      name, indexStart: 0, indexCount: base.inspection.mesh.indices.length,
+    }));
+    const plan = await w.__TAURI_INTERNALS__.invoke('plan_bsp_assembly', {
+      projectId: 'a', donorProjectId: 'b', donorBspIndex: 0,
+    });
+    base.project.inheritedBspConnections = [{...plan, donorTitle: 'Test island', separateNativeBsps: true, preserveDonorBsp: true}];
+  });
+  await openFixture(page); await chooseTool(page, 'Level editor');
+  const panel = page.getByRole('region', {name: 'Construction panel', exact: true});
+  if (!await panel.isVisible()) await openDrawer(page, 'Construction');
+  const summary = panel.locator('.bsp-assembly > summary');
+  await revealPagedControl(summary); await summary.click();
+  const existing = panel.getByText('Edit a compiled connector', {exact: true});
+  await revealPagedControl(existing); await existing.click();
+  await (await constructionControl(page, 'button', 'Edit Test island connector')).click();
+  await (await constructionControl(page, 'button', 'Add bend before imported floor')).click();
+  await (await constructionControl(page, 'button', 'Apply connection')).click();
+  await page.keyboard.press('Control+s');
+  const saved = () => page.evaluate(() => (window as any).__sparkMock.saved);
+  await expect.poll(async () => (await saved())?.bspAssembly?.rebuildNativeConnector).toBe(true);
+  const project = await saved();
+  expect(project.bspAssembly.tunnelPoints).toEqual([[0,0,0],[10,0,0],[20,0,0]]);
+  expect(project.inheritedBspConnections).toHaveLength(1);
+  expect(project.inheritedBspConnections[0].rebuildNativeConnector).toBeUndefined();
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.staged?.bspAssembly ?? null)).toBeNull();
+});
+
 test('Chupathingy Live Rebuild saves before building and never retargets another map',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{

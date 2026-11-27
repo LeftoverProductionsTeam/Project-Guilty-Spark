@@ -476,7 +476,14 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
                         plan.atlas_origin = core::bsp_assembly::legacy_atlas_origin(parent, layout, &plan);
                     }
                 }
-                project.inherited_bsp_connections.push(plan);
+                if plan.rebuild_native_connector {
+                    let matches = project.inherited_bsp_connections.iter_mut().filter(|prior| plan.matches_inherited_connector(prior)).collect::<Vec<_>>();
+                    let [prior] = matches.try_into().map_err(|_| "The rebuilt route must replace exactly one inherited connector")?;
+                    plan.rebuild_native_connector = false;
+                    *prior = plan;
+                } else {
+                    project.inherited_bsp_connections.push(plan);
+                }
             }
             if project.megaworld_layout.is_none() {
                 project.megaworld_layout.clone_from(&source.megaworld_layout);
@@ -718,8 +725,10 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         let cancel = AtomicBool::new(false);
         let preserve_donor = intact_connector.unwrap_or(false) || p.bsp_assembly.as_ref().is_some_and(|plan| plan.preserve_donor_bsp);
         let mut intact_switches = None;
+        let mut replacement_slot = None;
         let (geometry, partition_report) = if preserve_donor {
-            let connector = core::bsp_assembly::generate_preserved_connector(&p, &i, &cancel).map_err(error)?;
+            let connector = core::bsp_assembly::generate_editor_connector(&p, &i, &cancel).map_err(error)?;
+            replacement_slot = connector.replacement_slots.map(|slots| slots[0]);
             intact_switches = Some(connector.switches.map(|transition| transition.name));
             (connector.geometry, None)
         } else if p.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
@@ -754,7 +763,10 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
                     }
                 }
             }
-            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor,"sourcePreflight":result["sourcePreflight"].clone(),"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor && replacement_slot.is_none(),"sourcePreflight":result["sourcePreflight"].clone(),"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+        }
+        if let (Some(slot), Some(viewport)) = (replacement_slot, result.get_mut("viewport")) {
+            viewport["replacementSlot"] = slot.into();
         }
         Ok(result)
     }).await.map_err(error)?

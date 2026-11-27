@@ -8,11 +8,30 @@ export function resolveBspMesh(
   inspection: MapInspection | null,
   mode: ViewMode,
   bspIndex: number,
+  omitBspIndex?: number,
 ): MeshData | null {
   if (!inspection) return null;
   const render = inspection.renderMesh?.indices.length ? inspection.renderMesh : null;
   const original = mode === 'collision' ? inspection.mesh : render ?? inspection.mesh;
   if (!original.indices.length || !original.positions.length) return null;
+  if (bspIndex === omitBspIndex) return null;
+  if (bspIndex < 0 && omitBspIndex !== undefined) {
+    const omitted = original.parts?.[omitBspIndex];
+    if (!omitted) return original;
+    const start = omitted.indexStart, end = start + omitted.indexCount;
+    const materialRanges = original.materialRanges?.flatMap(range => {
+      const last = range.indexStart + range.indexCount;
+      const before = Math.min(last, start) - range.indexStart;
+      const afterStart = Math.max(range.indexStart, end);
+      return [
+        ...(before > 0 ? [{...range, indexCount: before}] : []),
+        ...(last > afterStart ? [{...range, indexStart: afterStart - omitted.indexCount, indexCount: last - afterStart}] : []),
+      ];
+    });
+    return {...original, indices: original.indices.slice(0, start).concat(original.indices.slice(end)), materialRanges,
+      parts: original.parts!.map((part, index) => index === omitBspIndex ? {...part, indexCount: 0}
+        : {...part, indexStart: part.indexStart >= end ? part.indexStart - omitted.indexCount : part.indexStart})};
+  }
   if (bspIndex < 0 || !original.parts?.length) return original;
   const part = original.parts[bspIndex];
   if (!part) return original;

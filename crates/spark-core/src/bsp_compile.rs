@@ -934,6 +934,7 @@ pub(crate) struct PreparedPartitions {
     pub switches: Vec<bsp_assembly::PartitionSwitch>,
     pub intact_overlaps: Option<[[[f64; 3]; 2]; 2]>,
     pub intact_sky_offset: Option<u8>,
+    pub replacement_slots: Option<[usize; 2]>,
     pub overlap: [[f64; 3]; 2],
     pub structure_tags: Vec<String>,
     pub scenery: Vec<crate::bsp_scenery::Placement>,
@@ -1330,6 +1331,84 @@ fn apply_outdoor_stock_skies(
 
 /// Stage each native structure. Only the explicit scenario probe binds the
 /// pair and appends the reviewed switches to the owned scenario copy.
+fn prepare_retained_connector(
+    project: &Project, inspection: &MapInspection, tools: &Toolchain,
+    runner: &Runner, workspace: &Path, tags: &Path, base_tags: &Path, stage: PartitionStage,
+) -> Result<PreparedPartitions> {
+    let plan = project.bsp_assembly.as_ref().unwrap();
+    let source = project.source.as_ref().unwrap();
+    let intact = bsp_assembly::generate_editor_connector(project, inspection, runner.cancel)?;
+    let [slot, island] = intact.replacement_slots.ok_or_else(|| SparkError::Invalid("Missing reviewed connector slots".into()))?;
+    let geometry = &intact.geometry;
+    geometry.source_preflight()?.require_buildable()?;
+    let mut structure_tags = maps::scenario_bsp_tag_paths(&source.preserved_path, inspection)?;
+    let donor_tag = format!("{}.scenario_structure_bsp", structure_tags[island]);
+    let structure_check = stage == PartitionStage::StructureCheck;
+    let retained = if structure_check { Vec::new() } else {
+        structure_tags.iter().enumerate().filter(|(index, _)| *index != slot).map(|(_, path)| {
+            let file = tags.join(safe_relative(&format!("{path}.scenario_structure_bsp"))?);
+            let hash = maps::hash_file(&file)?;
+            Ok((file, hash))
+        }).collect::<Result<Vec<_>>>()?
+    };
+    namespace_materials(base_tags, &structure_tags[plan.base_bsp_index], 0, geometry,
+        &[], tools, runner, workspace, tags, None, &[], structure_check)?;
+    if geometry.materials.iter().any(|material| material.source == 1 && material.shader_path.is_some()) {
+        let donor = maps::inspect_map(&plan.donor_source.preserved_path, plan.donor_source.resource_directory.as_deref())?;
+        let donor_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;
+        let (donor_tags, _) = extract_intact_donor(plan, &donor, &donor_bsp, tools, runner, workspace)?;
+        namespace_materials(&donor_tags, &donor_bsp, 1, geometry,
+            &[], tools, runner, workspace, tags, Some((&plan.donor_source, &donor)), &[], structure_check)?;
+    }
+    let parent = format!("levels\\spark\\assembly_{}", &project.id[..8]);
+    let name = "retained_connector";
+    let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("Missing H1A tool".into()))?;
+    let (bsp, jms, compiled) = compile_structure(&tool, runner, workspace, tags, &parent, name, geometry)?;
+    let edit = find_tool(tools, "invader-edit")?;
+    let bound = matches!(stage, PartitionStage::Collision | PartitionStage::Lighting);
+    if bound {
+        let scenario = format!("{}.scenario", inspection.scenario_path);
+        let key = format!("structure_bsps[{slot}].structure_bsp");
+        let invoke = |fields: &[String]| {
+            let mut args = vec!["-t".into(), tags.to_string_lossy().into_owned()];
+            args.extend_from_slice(fields);
+            args.push(scenario.clone());
+            runner.run(&edit, &args, workspace, "partition-scenario", 58)
+        };
+        let old_tag = format!("{}.scenario_structure_bsp", structure_tags[slot]);
+        let new_tag = format!("{bsp}.scenario_structure_bsp");
+        if !native_reference_matches(&invoke(&["-G".into(), key.clone()])?, &old_tag) {
+            return invalid("Editable scenario no longer has the reviewed connector in its native slot");
+        }
+        invoke(&["-S".into(), key.clone(), new_tag.clone()])?;
+        if !native_reference_matches(&invoke(&["-G".into(), key])?, &new_tag) {
+            return invalid("Editable scenario did not retain the replacement connector in its native slot");
+        }
+    }
+    if stage == PartitionStage::Lighting {
+        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags,
+            [bsp.as_str()], |scenario| {
+                if plan.tunnel_bake_fill {
+                    bake_enclosed_connector(project, &tool, runner, workspace, &edit, scenario, name, geometry)
+                } else {
+                    bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name)
+                }
+            })?;
+    }
+    let flags = restore_collision_flags(geometry, &edit, runner, workspace, tags, &bsp)?;
+    for (file, hash) in &retained {
+        if maps::hash_file(file)? != *hash { return invalid("Connector rebuild changed a retained BSP tag"); }
+    }
+    structure_tags[slot] = bsp.clone();
+    let receipt = serde_json::json!({"schemaVersion": 1, "baseSha256": inspection.sha256, "donorSha256": plan.donor_source.sha256,
+        "replacementSlot": slot, "donorSlot": island, "switchesRetained": intact.switches,
+        "scenarioBound": bound, "structures": [{"name": name, "nativeTag": bsp, "jmsSha256": maps::hash_file(&jms)?,
+            "bspSha256": maps::hash_file(&compiled)?, "restoredCollisionSurfaces": flags, "report": geometry.report}]});
+    Ok(PreparedPartitions { receipt, switches: vec![], intact_overlaps: Some(intact.overlaps),
+        intact_sky_offset: None, replacement_slots: Some([slot, island]), overlap: intact.overlaps[0],
+        structure_tags, scenery: vec![], donor_tag, donor_environment: None, pickups: None, netgame_flags: None, player_starts: None })
+}
+
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
     runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32, limits: crate::megaworld_build::GameplayLimits,
@@ -1342,6 +1421,9 @@ pub(crate) fn prepare_partition_structure(
     };
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
+    if plan.rebuild_native_connector {
+        return prepare_retained_connector(project, inspection, tools, runner, workspace, tags, base_tags, stage);
+    }
     let (base_geometry, added_geometry, switches, overlap, overlap_samples, max_floor_delta, intact_overlaps) =
         if plan.preserve_donor_bsp {
             let intact = bsp_assembly::generate_preserved_connector(project, inspection, runner.cancel)?;
@@ -1473,7 +1555,7 @@ pub(crate) fn prepare_partition_structure(
         "retainedStructureTags": retained.len(),
         "overlap": overlap, "overlapSamples": overlap_samples, "maxFloorDelta": max_floor_delta, "intactOverlaps": intact_overlaps,
         "switches": switches, "structures": structures, "scenarioBound": bind, "donorScenery": scenery.len()});
-    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
+    Ok(PreparedPartitions { receipt, switches, overlap, intact_overlaps, intact_sky_offset, replacement_slots: None, structure_tags, scenery, donor_tag, donor_environment, pickups, netgame_flags, player_starts })
 }
 
 pub fn prepare_native(

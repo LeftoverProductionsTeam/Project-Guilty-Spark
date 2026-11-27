@@ -533,7 +533,7 @@ function Scene({
         </group>
       ) : null}
       {(!joinedPreview || joinedPreview.retainsBase)&&!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
-      {assembly&&assemblyPlan&&(()=>{
+      {assembly&&assemblyPlan&&!assemblyPlan.rebuildNativeConnector&&(()=>{
         const plan=assemblyPlan,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         const terrain = viewMode === 'collision'
           ? resolveBspMesh(source.inspection, 'collision', plan.donorBspIndex)
@@ -1432,8 +1432,8 @@ export default function World({
     setTextureFailures([]);
   }, [inspection?.sha256, project.id, textureScope]);
   const previewMesh = useMemo(
-    () => resolveBspMesh(inspection, viewMode, bsp),
-    [inspection, viewMode, bsp],
+    () => resolveBspMesh(inspection, viewMode, bsp, assemblyDonor.preview?.replacementSlot),
+    [inspection, viewMode, bsp, assemblyDonor.preview?.replacementSlot],
   );
   const materials = useMemo(() => shaderLegend(previewMesh), [previewMesh]);
   const availableLightmapPages = useMemo(() => inspectLightmapPages(previewMesh), [previewMesh]);
