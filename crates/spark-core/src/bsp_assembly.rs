@@ -499,6 +499,7 @@ impl AssemblyGeometry {
         let mut collision_faces = BTreeSet::new();
         let mut overlap_faces = Vec::new();
         let mut overlap_sources = Vec::new();
+        let mut lighting_examples = Vec::new();
         for (triangle, (ids, &slot)) in mesh.indices.chunks_exact(3)
             .zip(&self.triangle_materials).enumerate()
         {
@@ -522,7 +523,9 @@ impl AssemblyGeometry {
 
             let solid = material.collision_only || material.name == "+sky";
             let terrain = material.name.starts_with("gster") && material.shader_path.is_some();
-            let mut lighting_risk = false;
+            let entrance = material.shader_class.as_deref() == Some("senv") && material.flags & 1 == 0
+                && (material.name.starts_with("gsstock") || material.name.starts_with("gsmouth"));
+            let mut lighting_risk = None;
             let reason = if uv.iter().flatten().any(|value| !value.is_finite()) {
                 Some("a UV coordinate is invalid")
             } else if twice_area == 0. {
@@ -533,22 +536,21 @@ impl AssemblyGeometry {
                 });
                 footprint.sort_unstable();
                 (!collision_faces.insert(footprint)).then_some("coincident coplanar collision faces")
-            } else if terrain {
-                // The west-valley lightmapper rejected a shallow terrain sliver while
-                // accepting larger charts with the same stock texture scale. Limit
-                // this guard to newly authored terrain and require both conditions.
+            } else if terrain || entrance {
+                // Tool can reject thin clipped areas even when their collision and
+                // source texture UVs are valid. Stock render charts stay advisory.
                 let longest_edge = dot(ab, ab).max(dot(ac, ac)).max(dot(bc, bc)).sqrt();
                 let [u, v, w] = uv;
                 let uv_area = ((v[0] - u[0]) * (w[1] - u[1])
                     - (v[1] - u[1]) * (w[0] - u[0])).abs();
                 let altitude = twice_area / longest_edge;
                 let shortest_edge = dot(ab, ab).min(dot(ac, ac)).min(dot(bc, bc)).sqrt();
-                // Halo Tool's terrain bake can refuse a short, skinny
-                // intersection despite valid source UVs and sealed collision.
                 let short_seam = shortest_edge <= 0.015 && altitude < 0.012
                     && altitude / longest_edge < 0.006;
-                lighting_risk = uv_area > 0. && (short_seam || (altitude < 0.006 && uv_area < 1e-7));
-                (uv_area == 0.).then_some("terrain UVs collapse at native export precision")
+                let narrow = short_seam || (altitude < 0.006 && uv_area < 1e-7)
+                    || (entrance && altitude < 0.001 && altitude / longest_edge < 0.01);
+                lighting_risk = (uv_area > 0. && narrow).then_some(altitude);
+                (terrain && uv_area == 0.).then_some("terrain UVs collapse at native export precision")
             } else {
                 None
             };
@@ -575,17 +577,19 @@ impl AssemblyGeometry {
                 overlap_faces.push(points);
                 overlap_sources.push((triangle, solid, mul(area_normal, 1. / twice_area)));
             }
-            if lighting_risk {
+            if let Some(altitude) = lighting_risk {
                 report.lighting_risks += 1;
-                if report.lighting_examples.len() < 8 {
-                    report.lighting_examples.push(AssemblySourceIssue {
+                let position = lighting_examples.partition_point(|(previous, _)| *previous <= altitude);
+                if position < 8 {
+                    lighting_examples.insert(position, (altitude, AssemblySourceIssue {
                         triangle, material: material.name.clone(),
                         center: mul(add(add(a, b), c), 1. / 3.),
                         vertices: points,
-                        reason: "thin terrain chart may fail native lighting",
+                        reason: "thin render chart may fail native lighting",
                         overlapping_vertices: None,
                         overlaps_triangle: None,
-                    });
+                    }));
+                    lighting_examples.truncate(8);
                 }
             }
             if let Some(reason) = reason {
@@ -599,6 +603,7 @@ impl AssemblyGeometry {
                 }
             }
         }
+        report.lighting_examples = lighting_examples.into_iter().map(|(_, issue)| issue).collect();
         // Stock render, portal and collision layers can deliberately coincide.
         // Compare solid faces with solid faces, and new terrain with new terrain.
         if overlap_faces.len() > 1 {
@@ -5411,6 +5416,15 @@ mod tests {
         assert_eq!(report.blocked_faces, 2);
         assert_eq!(report.lighting_risks, 1);
         assert_eq!(report.lighting_examples[0].triangle, 4);
+        geometry.materials[3].name = "gsstock_carousel".into();
+        geometry.materials[3].shader_class = Some("senv".into());
+        let stock = geometry.source_preflight().unwrap();
+        assert_eq!(stock.lighting_risks, 1);
+        assert_eq!(stock.lighting_examples[0].triangle, 4);
+        geometry.mesh.uvs[7] = 0.;
+        let stock = geometry.source_preflight().unwrap();
+        assert_eq!(stock.blocked_faces, 2, "Only the existing terrain guard rejects collapsed UVs");
+        assert_eq!(stock.lighting_risks, 0);
         geometry.mesh.uvs[7] = 0.001;
         geometry.mesh.indices.truncate(9);
         geometry.triangle_materials.truncate(3);

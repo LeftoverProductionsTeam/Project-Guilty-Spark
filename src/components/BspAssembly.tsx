@@ -1302,7 +1302,7 @@ export default function BspAssembly({
                   {report.routeClearance?.map(route=><p key={route.label}>{route.label}: {route.walkSamples} center samples{route.lateralSamples ? " · "+route.lateralSamples+" across the route" : ""} · design width {route.width} · clear height {route.clearHeight}.</p>)}
                   {!!report.sourcePreflight?.lightingRisks && (
                     <div>
-                      <p>{report.sourcePreflight.lightingRisks} thin terrain faces may fail native lighting. The preview outlines examples in yellow.</p>
+                      <p>{report.sourcePreflight.lightingRisks} thin render faces may fail native lighting. The preview outlines the thinnest examples in yellow.</p>
                       <ul>{report.sourcePreflight.lightingExamples.map(issue => (
                         <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')}</li>
                       ))}</ul>
