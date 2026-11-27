@@ -1709,6 +1709,8 @@ fn run_with(
         let output = output_dir.join(&name);
         if cache_version == 13 { fs::copy(&compiled, &output)?; }
         let inspected = maps::inspect_map(&output, None)?;
+        let staged_scenario = tags.join(crate::safe_relative(&format!("{}.scenario", receipt.scenario_path))?);
+        crate::native_operations::verify_compiled_vehicle_bsp_masks(&staged_scenario, &output, &inspected)?;
         let sound_classes=crate::audio_rules::verify(&output,&inspected)?;
         if !prepared.radio_imports.is_empty(){crate::native_asset_imports::verify_compiled(&radio_project,&inspected)?;}
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;

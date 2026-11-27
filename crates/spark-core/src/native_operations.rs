@@ -44,6 +44,7 @@ pub fn native_faction_snapshots(fields:&str)->Result<Vec<NativeFactionSnapshot>>
 pub fn verify_native_faction_control_values(trigger:&str,initially_off:&str)->Result<()>{factions::verify_control_values(trigger,initially_off)}
 pub fn verify_native_faction_kits(expected:&[NativeFactionSnapshot],cache:&Path,map:&crate::maps::MapInspection)->Result<()>{factions::verify_cache(expected,cache,map)}
 pub use transport::verify_vehicle_bsp_preservation;
+pub(crate) use transport::verify_compiled_vehicle_bsp_masks;
 pub use transport::{TransportAppend,TransportSnapshot,VehicleFlightTuning,NativeMovementRoute,NativeTransportPilotBinding};
 pub use transport::{flight_recordings as scenario_flight_recordings, NativeFlightRecording, NativeMovementRoute as TransportFlightRoute};
 pub fn native_transport_pilot_bindings(fields:&str,choices:&NativeTransportChoices,read:impl FnMut(&str)->Result<String>,graph:impl FnMut(&str)->Result<Vec<String>>)->Result<Vec<NativeTransportPilotBinding>>{transport::pilot_bindings(fields,choices,read,graph)}

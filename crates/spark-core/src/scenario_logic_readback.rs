@@ -143,6 +143,13 @@ pub(crate) fn scenario_vehicle_bsp_mask(
     })
 }
 
+pub(crate) fn scenario_vehicle_bsp_masks(path: &Path, map: &MapInspection) -> Result<Vec<u16>> {
+    with_scenario(path, map, |reader, space, scenario| {
+        let (rows, count) = space.block(reader, scenario + 0x240, 120, 4096)?;
+        (0..count).map(|index| reader.u16(rows + index * 120 + 32)).collect()
+    })
+}
+
 pub(crate) fn mcc13_sky_reference_count(path: &Path, inspection: &MapInspection) -> Result<usize> {
     with_scenario(path, inspection, |reader, space, scenario| {
         let (_, count) = space.block(reader, scenario + 0x30, 16, 16)?;

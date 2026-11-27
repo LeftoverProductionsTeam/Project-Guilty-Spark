@@ -452,6 +452,8 @@ fn build_partition_cache(
         }
     }
     crate::bsp_compile::verify_compiled_base(project, source, &map)?;
+    let staged_scenario = tags.join(crate::safe_relative(&format!("{}.scenario", source.scenario_path))?);
+    crate::native_operations::verify_compiled_vehicle_bsp_masks(&staged_scenario, &path, &map)?;
     let sky_splits = crate::bsp_assembly::verify_compiled_outdoor_sky_splits(project, &path, &map)?;
     let sky_doors = crate::bsp_assembly::verify_compiled_inherited_sky_portals(project, &path, &map)?;
     if sky_splits > 0 || sky_doors > 0 {

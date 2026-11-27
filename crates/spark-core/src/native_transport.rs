@@ -16,6 +16,45 @@ pub fn verify_vehicle_bsp_preservation(before: &[u8], after: &[u8]) -> Result<()
     Ok(())
 }
 
+/// On a standard MCC multiplayer build, check explicit ownership against the
+/// same staged scenario that was passed to the native compiler.
+pub(crate) fn verify_compiled_vehicle_bsp_masks(
+    staged: &std::path::Path, output: &std::path::Path, map: &crate::maps::MapInspection,
+) -> Result<()> {
+    if (map.header.version, map.header.scenario_type) != (13, 1) || map.header.extended {
+        return Ok(());
+    }
+    crate::reject_links(staged)?;
+    if std::fs::metadata(staged)?.len() > super::MAX_SCENARIO_REVIEW_BYTES as u64 {
+        return invalid("Staged scenario exceeds the native vehicle ownership review limit");
+    }
+    let requested = loose_scenario_vehicle_masks(&std::fs::read(staged)?)?;
+    if requested.iter().all(|&mask| mask == 0) { return Ok(()); }
+    let compiled = crate::maps::scenario_vehicle_bsp_masks(output, map)?;
+    verify_explicit_vehicle_masks(&requested, &compiled)
+}
+
+fn verify_explicit_vehicle_masks(requested: &[u16], compiled: &[u16]) -> Result<()> {
+    if requested.len() != compiled.len() {
+        return invalid("The native compiler changed the number of authored vehicle placements");
+    }
+    for (index, (&expected, &actual)) in requested.iter().zip(compiled).enumerate() {
+        if expected != 0 && expected != actual {
+            return invalid(format!("Vehicle {index} lost its authored BSP ownership (expected 0x{expected:04X}, got 0x{actual:04X}). Build with a compiler that preserves MCC vehicle BSP indices."));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn native_compiler_must_keep_explicit_vehicle_owners() {
+    assert!(verify_explicit_vehicle_masks(&[0, 2048, 4], &[1, 2048, 4]).is_ok());
+    assert!(verify_explicit_vehicle_masks(&[0, 2048, 4], &[0, 0, 4]).is_err());
+    assert!(verify_explicit_vehicle_masks(&[2048], &[1024]).is_err());
+    assert!(verify_explicit_vehicle_masks(&[4, 0], &[4]).is_err());
+}
+
 // Older native writers omit this field from their listing and clear it when
 // serializing a scenario. Read only the HEK prefix needed to verify it.
 fn loose_scenario_vehicle_masks(bytes: &[u8]) -> Result<Vec<u16>> {
