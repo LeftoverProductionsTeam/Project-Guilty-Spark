@@ -64,6 +64,27 @@
   justify-content: center;
   gap: 6px;
 }
+.director-named-takes label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin-block: 5px;
+}
+.director-named-takes fieldset {
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  border: 0;
+}
+.director-named-takes input,
+.director-named-takes select {
+  width: 100%;
+  min-width: 0;
+}
+.director-named-takes button {
+  width: 100%;
+  margin-block: 4px;
+}
 .director-body small {
   font-size: 11px;
   line-height: 1.5;

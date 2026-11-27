@@ -260,6 +260,7 @@ pub(super) async fn director_update(
     revision: u64,
     composition: Composition,
     save: bool,
+    idle_required: Option<bool>,
 ) -> Reply<DirectorSession> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -274,6 +275,9 @@ pub(super) async fn director_update(
                 .ok_or("Camera session closed")?;
             if app.get_webview_window(&owner).is_none() {
                 return Err("Camera window closed".into());
+            }
+            if idle_required.unwrap_or(false) && (s.recording || s.composition.playing) {
+                return Err("Stop playback or recording in the Director before queuing a range".into());
             }
             let view = revised(s, &owner, revision, composition)?;
             if save {

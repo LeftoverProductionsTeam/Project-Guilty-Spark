@@ -16,6 +16,8 @@ pub struct CreatorStudio {
     pub schema_version: u32,
     pub missions: Vec<MissionBeat>,
     pub shots: Vec<CameraShot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub camera_takes: Vec<CameraTake>,
     pub server: ServerPlan,
     pub playtests: Vec<PlaytestRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -25,7 +27,34 @@ pub struct CreatorStudio {
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct EngineMachinima{pub enabled:bool,pub playback:String,#[serde(default)]pub camera_id:Option<String>,#[serde(default)]pub auto_start:bool}
+pub struct EngineMachinima {
+    pub enabled: bool,
+    pub playback: String,
+    #[serde(default)]
+    pub camera_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub take_id: Option<String>,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CameraTake {
+    pub id: String,
+    pub name: String,
+    pub first_shot_id: String,
+    pub last_shot_id: String,
+}
+impl CameraTake {
+    fn shots<'a>(&self, timeline: &'a [CameraShot]) -> Result<&'a [CameraShot]> {
+        let first = timeline.iter().position(|shot| shot.id == self.first_shot_id);
+        let last = timeline.iter().position(|shot| shot.id == self.last_shot_id);
+        match (first, last) {
+            (Some(first), Some(last)) if first <= last => Ok(&timeline[first..=last]),
+            _ => invalid("A camera take needs existing first and last keys in timeline order"),
+        }
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct MissionSoundCue {
@@ -739,19 +768,44 @@ fn variant_token(s: &str) -> bool {
 }
 
 impl CreatorStudio {
+    pub(crate) fn engine_camera_shots(&self, options: &EngineMachinima) -> Result<&[CameraShot]> {
+        match options.take_id.as_deref() {
+            None => Ok(&self.shots),
+            Some(id) => self.camera_takes.iter().find(|take| take.id == id)
+                .ok_or_else(|| crate::SparkError::Invalid("Choose an existing take for the native sequence".into()))?
+                .shots(&self.shots),
+        }
+    }
+
+    pub(crate) fn enabled_engine_camera(&self) -> Result<Option<(&EngineMachinima, &[CameraShot])>> {
+        self.engine_machinima.as_ref().filter(|options| options.enabled)
+            .map(|options| self.engine_camera_shots(options).map(|shots| (options, shots)))
+            .transpose()
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.cinematic_trigger_volume.as_ref().is_some_and(|name|!script_ident(name)){return invalid("Cinematic trigger area needs a native script identifier");}
         if let Some(engine)=&self.engine_machinima{
             if !["fixed","sequence"].contains(&engine.playback.as_str())||engine.camera_id.as_ref().is_some_and(|id|!valid_id(id)){return invalid("Invalid game-native machinima settings");}
-            if engine.enabled&&(self.shots.is_empty()||self.shots.len()>64||engine.camera_id.as_ref().is_some_and(|id|!self.shots.iter().any(|s|&s.id==id))){return invalid("An engine take needs 1–64 camera keys and an existing selected camera");}
+            let shots = self.engine_camera_shots(engine)?;
+            if (engine.take_id.is_some() && engine.playback != "sequence") ||
+                (engine.enabled && (shots.is_empty() || shots.len() > 64 || engine.camera_id.as_ref().is_some_and(|id| !shots.iter().any(|s| &s.id==id)))) {
+                return invalid("An engine take needs 1–64 camera keys and an existing selected camera");
+            }
         }
         if self.schema_version != STUDIO_SCHEMA_VERSION
-            || self.missions.len() > 128 || self.shots.len() > 256
+            || self.missions.len() > 128 || self.shots.len() > 256 || self.camera_takes.len() > 64
             || self.playtests.len() > 500 || self.server.rotation.len() > 128 || self.server.game_types.len() > 64
         {
             return invalid("Unsupported Creator Studio version or collection limit");
         }
         let mut ids = HashSet::new();
+        for take in &self.camera_takes {
+            if !valid_id(&take.id) || !ids.insert(&take.id) || !bounded(&take.name, 90) || take.name.trim().is_empty() {
+                return invalid("Give each camera take a valid name and identity");
+            }
+            take.shots(&self.shots)?;
+        }
         if let Some(m) = &self.machinima {
             if ![24, 30, 60].contains(&m.fps)
                 || !["16:9", "2.39:1", "1:1", "9:16"].contains(&m.aspect.as_str())
@@ -921,7 +975,7 @@ mod tests {
     use super::*;
     fn studio() -> CreatorStudio {
         CreatorStudio {
-            schema_version: 1, missions: vec![], shots: vec![], playtests: vec![], machinima: None,engine_machinima:None,cinematic_trigger_volume:None,
+            schema_version: 1, missions: vec![], shots: vec![], camera_takes: vec![], playtests: vec![], machinima: None,engine_machinima:None,cinematic_trigger_volume:None,
             server: ServerPlan { name: "LAN Test".into(), runtime: "haloCustomEdition".into(),
                 max_players: 8, public_listing: false, rotation: vec![], game_types: vec![] },
         }
@@ -1243,7 +1297,7 @@ mod tests {
         doc.logic=Some(serde_json::from_value(serde_json::json!({"schemaVersion":1,"triggers":[],"devices":[],"rules":[],"handwrittenSources":[{"filename":"gs_mission.hsc","content":format!("{NATIVE_MISSION_BINDING}{}\n; fixture source",serde_json::to_string(&binding).unwrap())}]})).unwrap());
         project.studio=Some(studio);assert!(native_mission_binding(&project,&doc).unwrap().is_some());
         project.studio.as_mut().unwrap().shots[0].camera_position[0]=9.;assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("shots changed"));
-        project.studio.as_mut().unwrap().shots=binding.cinematic.unwrap();project.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,auto_start:false});
+        project.studio.as_mut().unwrap().shots=binding.cinematic.unwrap();project.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,take_id:None,auto_start:false});
         assert!(native_mission_binding(&project,&doc).unwrap_err().to_string().contains("both would own"));
     }
 

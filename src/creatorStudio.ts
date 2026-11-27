@@ -162,6 +162,15 @@ export interface CameraShot {
   roll?: number;
   easing?: 'linear' | 'smooth' | 'cut';
 }
+export interface CameraTake {id:string;name:string;firstShotId:string;lastShotId:string}
+
+export function cameraTakeShots(shots: CameraShot[], take: CameraTake): CameraShot[] {
+  const first=shots.findIndex(shot=>shot.id===take.firstShotId);
+  const last=shots.findIndex(shot=>shot.id===take.lastShotId);
+  if(first<0||last<first)throw Error('A camera take needs existing first and last keys in timeline order.');
+  return shots.slice(first,last+1);
+}
+
 export type ServerRuntime = 'haloCustomEdition' | 'haloPC' | 'haloDemo' | 'mcc' | 'openCE' | 'chupathingyCE';
 export interface GameTypeDesign {
   id: string;
@@ -203,10 +212,11 @@ export interface PlaytestRecord {
 export interface CreatorStudioDocument {
   /** Recovered native cinematic activation; null keeps manual invocation. */
   cinematicTriggerVolume?:string|null;
-  engineMachinima?:{enabled:boolean;playback:'fixed'|'sequence';cameraId?:string|null;autoStart:boolean}|null;
+  engineMachinima?:{enabled:boolean;playback:'fixed'|'sequence';cameraId?:string|null;takeId?:string|null;autoStart:boolean}|null;
   schemaVersion: 1;
   missions: MissionBeat[];
   shots: CameraShot[];
+  cameraTakes?: CameraTake[];
   server: ServerPlan;
   playtests: PlaytestRecord[];
   machinima?: import('./machinima').MachinimaSettings;
@@ -398,8 +408,15 @@ export function missionBranchGroups(missions:MissionBeat[]):Map<string,{volume:s
   return groups;
 }
 /** Validate the exact schema persisted by the Rust project. */
+export function engineCameraShots(studio: CreatorStudioDocument): CameraShot[] {
+  const id=studio.engineMachinima?.takeId;
+  if(id==null)return studio.shots;
+  const take=studio.cameraTakes?.find(item=>item.id===id);
+  if(!take)throw Error('Choose an existing take for the native sequence.');
+  return cameraTakeShots(studio.shots,take);
+}
+
 export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
-  if(doc.engineMachinima){const e=doc.engineMachinima;if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||(e.cameraId!=null&&!doc.shots?.some(s=>s.id===e.cameraId))||(e.enabled&&(!doc.shots?.length||doc.shots.length>64)))return ['Invalid game-native machinima take: choose 1–64 camera keys and an existing selected camera'];}
   const failures: string[] = [];
   if(doc.cinematicTriggerVolume!=null&&(typeof doc.cinematicTriggerVolume!=='string'||! /^[A-Za-z_][A-Za-z0-9_]{0,30}$/.test(doc.cinematicTriggerVolume)))return ['Cinematic trigger area needs a native script identifier'];
   if (!doc || doc.schemaVersion !== 1) return ['Unsupported Creator Studio schema'];
@@ -444,6 +461,24 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
       (shot.easing !== undefined && !['linear','smooth','cut'].includes(shot.easing)) ||
       !boundedPos(shot.cameraPosition) || !boundedPos(shot.lookAt) ||
       (shot.cameraMarker != null && shot.cameraMarker !== '' && !scriptIdent.test(shot.cameraMarker))) failures.push(`Invalid camera shot ${shot.id?.slice(0, 40) ?? '(unknown)'}`);
+  }
+  if(doc.cameraTakes!==undefined&&(!Array.isArray(doc.cameraTakes)||doc.cameraTakes.length>64))return ['The project supports up to 64 named camera takes'];
+  for(const take of doc.cameraTakes??[]){
+    if(!take||!unique(take.id)||!safeText(take.name,90)||!take.name.trim()){
+      failures.push('Give each camera take a valid name and identity');
+      continue;
+    }
+    try{cameraTakeShots(doc.shots,take);}catch(error){failures.push(String(error));}
+  }
+  if(doc.engineMachinima){
+    const e=doc.engineMachinima;
+    try{
+      const shots=engineCameraShots(doc);
+      if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||
+        (e.takeId!=null&&e.playback!=='sequence')||
+        (e.cameraId!=null&&(typeof e.cameraId!=='string'||!recordId.test(e.cameraId)))||
+        (e.enabled&&(!shots.length||shots.length>64||(e.cameraId!=null&&!shots.some(shot=>shot.id===e.cameraId)))))failures.push('Invalid game-native machinima take: choose 1–64 keys and an existing selected camera');
+    }catch(error){failures.push(String(error));}
   }
   const s = doc.server;
   if (!safeText(s.name, 63) || !s.name.trim() || s.name.includes('"') || s.name.includes('\\') || !runtimes.has(s.runtime) ||

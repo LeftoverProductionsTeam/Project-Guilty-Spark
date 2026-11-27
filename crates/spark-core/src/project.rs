@@ -470,7 +470,7 @@ impl Project {
             hash.update(serde_json::to_vec(active)?);
             crate::hex_bytes(hash.finalize())
         };
-        let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
+        let camera = self.studio.as_ref().map(crate::creative::CreatorStudio::enabled_engine_camera).transpose()?.flatten();
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
         let native_audio=crate::native_audio::fingerprint_inputs(self);
         if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.tag_renames.is_empty()&&self.native_asset_imports.is_empty()&&native_audio.is_empty()&&self.native_lighting.is_none(){return Ok(base);}

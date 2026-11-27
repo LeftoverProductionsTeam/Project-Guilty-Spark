@@ -7305,9 +7305,66 @@ test('Forerunner HREC camera keys enter the normal Machinima timeline and Undo',
   await page.keyboard.press('Control+s');
   const keys=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.shots);
   await expect.poll(keys).toMatchObject([{name:'Opening · 1',cameraPosition:[2,0,1.6],durationMs:250},{name:'Opening · 2',cameraPosition:[4,0,1.6]}]);
+  const imported=await keys();
+  const ranges=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.cameraTakes??[]);
+  await expect.poll(ranges).toMatchObject([{name:'Opening',firstShotId:imported[0].id,lastShotId:imported[1].id}]);
+  await expect(page.locator('.director-timeline button')).toHaveCount(2);
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+s');
   await expect.poll(async()=>(await keys())?.length??0).toBe(0);
+  await expect.poll(ranges).toEqual([]);
+  await page.keyboard.press('Control+y');
+  await page.keyboard.press('Control+s');
+  await expect.poll(ranges).toMatchObject([{name:'Opening'}]);
+
+  const named=box.locator('.director-named-takes');
+  const namedSummary=named.locator('summary');
+  await revealPagedControl(namedSummary);
+  await namedSummary.click();
+  const range=named.getByRole('combobox',{name:'Preview range'});
+  await revealPagedControl(range);
+  await range.selectOption('');
+  const name=named.getByRole('textbox',{name:'Camera take name'});
+  await revealPagedControl(name);
+  await name.fill('End card');
+  const first=named.getByRole('combobox',{name:'First key'});
+  await revealPagedControl(first);
+  await first.selectOption(imported[1].id);
+  const create=named.getByRole('button',{name:'Save named take'});
+  await revealPagedControl(create);
+  await create.click();
+  await expect(page.locator('.director-timeline button')).toHaveText(['Opening · 2']);
+
+  await openDrawer(page,'In-game recording');
+  await page.getByRole('combobox',{name:'Engine playback'}).selectOption('sequence');
+  await page.getByRole('checkbox',{name:'Include native engine camera controls in the next MCC build'}).check();
+  await expect(page.getByRole('combobox',{name:'Native sequence take'}).locator('option:checked')).toHaveText('End card');
+  await page.keyboard.press('Control+s');
+  await expect.poll(ranges).toMatchObject([{name:'Opening'},{name:'End card',firstShotId:imported[1].id,lastShotId:imported[1].id}]);
+  const saved=await page.evaluate(()=>(window as any).__sparkMock.saved.studio);
+  expect(saved.engineMachinima).toMatchObject({enabled:true,playback:'sequence',takeId:saved.cameraTakes[1].id});
+
+  await page.evaluate(()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+    const first={id:'existing',name:'Existing camera',durationMs:1000,cameraPosition:[0,0,1],lookAt:[0,1,1],fov:60,roll:0,easing:'cut'};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='director_session')return {projectId:'a',revision:4,recording:false,
+        composition:{shots:[first],tracking:'free',target:null,selected:first.id,playing:false,startedAtMs:0,playheadMs:0}};
+      if(command==='director_update'){w.__queuedCameraRange=args;return {};}
+      if(command==='director_popout')return null;
+      return invoke(command,args);
+    };
+  });
+  await openDrawer(page,'Camera keys');
+  const queue=named.getByRole('button',{name:'Queue range in Recording Director ↗'});
+  await revealPagedControl(queue);
+  await queue.click();
+  const queuedArgs=()=>page.evaluate(()=>(window as any).__queuedCameraRange);
+  await expect.poll(queuedArgs).toMatchObject({revision:4,idleRequired:true,composition:{playheadMs:1000,shots:[
+    {id:'existing',name:'Existing camera'},{name:'Opening · 2',cameraPosition:[4,0,1.6]}]}});
+  const queued=await queuedArgs();
+  expect(queued.composition.selected).toBe(queued.composition.shots[1].id);
+  expect(queued.composition.selected).not.toBe(imported[1].id);
 });
 
 test('advanced HMV16 placement edits save and undo without changing its effect data', async ({page}) => {

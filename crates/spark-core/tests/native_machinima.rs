@@ -17,7 +17,23 @@ fn build_receipts_track_native_camera_and_recovery_inputs_but_preserve_old_metad
     let mut p=Project::new("Native fingerprint test");let original=p.fingerprint().unwrap();p.conversion_profile=Some("faithful".into());assert_eq!(p.fingerprint().unwrap(),original);p.conversion_profile=Some("zombie-recovery".into());assert_ne!(p.fingerprint().unwrap(),original);p.conversion_profile=None;
     let mut studio:CreatorStudio=serde_json::from_value(serde_json::json!({"schemaVersion":1,"missions":[],"shots":[],"server":{"name":"Test","runtime":"mcc","maxPlayers":1,"publicListing":false,"rotation":[]},"playtests":[]})).unwrap();
     studio.shots.push(CameraShot{id:"one".into(),name:"Camera".into(),duration_ms:1000,camera_position:[0.,-5.,2.],look_at:[0.,0.,1.],fov:70.,subtitle:String::new(),camera_marker:None,roll:None,easing:None});p.studio=Some(studio);assert_eq!(p.fingerprint().unwrap(),original);
-    p.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"fixed".into(),camera_id:Some("one".into()),auto_start:false});let take=p.fingerprint().unwrap();assert_ne!(take,original);p.studio.as_mut().unwrap().shots[0].camera_position[0]=-0.;assert_eq!(p.fingerprint().unwrap(),take);p.studio.as_mut().unwrap().shots[0].camera_position[0]=3.;assert_ne!(p.fingerprint().unwrap(),take);let moved=p.fingerprint().unwrap();p.studio.as_mut().unwrap().server.name="Only authoring metadata changed".into();assert_eq!(p.fingerprint().unwrap(),moved);
+    p.studio.as_mut().unwrap().engine_machinima=Some(EngineMachinima{enabled:true,playback:"fixed".into(),camera_id:Some("one".into()),take_id:None,auto_start:false});let take=p.fingerprint().unwrap();assert_ne!(take,original);p.studio.as_mut().unwrap().shots[0].camera_position[0]=-0.;assert_eq!(p.fingerprint().unwrap(),take);p.studio.as_mut().unwrap().shots[0].camera_position[0]=3.;assert_ne!(p.fingerprint().unwrap(),take);let moved=p.fingerprint().unwrap();p.studio.as_mut().unwrap().server.name="Only authoring metadata changed".into();assert_eq!(p.fingerprint().unwrap(),moved);
+
+    let studio = p.studio.as_mut().unwrap();
+    studio.shots.push(CameraShot { id: "outside".into(), ..studio.shots[0].clone() });
+    studio.camera_takes.push(spark_core::creative::CameraTake {
+        id: "range".into(), name: "Arrival".into(), first_shot_id: "one".into(), last_shot_id: "one".into(),
+    });
+    let options = studio.engine_machinima.as_mut().unwrap();
+    options.take_id = Some("range".into());
+    options.playback = "sequence".into();
+    let named = p.fingerprint().unwrap();
+    let studio = p.studio.as_mut().unwrap();
+    studio.shots[1].camera_position[0] = 9.;
+    studio.camera_takes[0].name = "Renamed take".into();
+    assert_eq!(p.fingerprint().unwrap(), named);
+    p.studio.as_mut().unwrap().shots[0].camera_position[0] = 12.;
+    assert_ne!(p.fingerprint().unwrap(), named);
 }
 
 #[test]

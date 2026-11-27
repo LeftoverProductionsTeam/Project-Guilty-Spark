@@ -1430,7 +1430,46 @@ export default function App() {
   }
   function forgeView(project:Project|null,map?:MapDocument){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),onOpenSourceTag:openSourceTag,busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(project!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={persist=>save(persist===true,project?.id)} onBuild={buildQuickForge} onSetupFlavor={openCommunityFlavorSetup} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onReviewAiStart={()=>project&&reviewAiStart(project.id)} onReviewTrigger={()=>project&&reviewAiStart(project.id,'world.trigger-volume')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(map?.savedRevision??0)} dirty={map?.history.dirty??false}/>;}
   function sourceView(map?:MapDocument){const project=map?.history.current;return project?.quickForge?forgeView(project,map):project?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World onImmersiveHistory={type=>applyHistory(type,project.id)} immersiveWritable={!native||windowWriters[project.id]===true} library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),onOpenSourceTag:openSourceTag,busy}} key={project.id} project={project} inspection={map.inspection} assetMeshes={map.meshes} edit={edit} notify={notice} onSelectMap={id=>{void openProject(id,'quickforge');}} onReviewAiStart={()=>reviewAiStart(project.id)} onReviewCamera={()=>reviewAiStart(project.id,'world.cutscene-camera')} onReviewTrigger={()=>reviewAiStart(project.id,'world.trigger-volume')} onReviewDevice={()=>reviewAiStart(project.id,'world.device-placement')} onReviewCommand={()=>reviewAiStart(project.id,'world.command-list')} onBeforeResources={persist=>save(persist===true,project.id)} onBakeBuild={startBuild} onResourcesConnected={applyResourceMetadata} onDetachTags={detachTagPanel} onOpenTag={(tagId,sourceId)=>{void openSourceTag(sourceId??project.id,tagId);}}/></Suspense>:forgeView(null);}
-  async function openRecordingDirector(){const project=historyRef.current.current;if(!project)return;try{await save();window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:project.id}));let session=await call<import('./directorSession').DirectorSession>('director_session',{projectId:project.id});if(session.revision===0){const pose=readMapSession<{position:number[];target?:number[];quaternion:number[]}|null>(project.id,'camera.world.PerspectiveCamera',null);if(pose?.position.length===3&&pose.quaternion?.length===4){const[x,y,z,w]=pose.quaternion,p=pose.position,target=pose.target??[p[0]-2*(x*z+w*y),p[1]-2*(y*z-w*x),p[2]-(1-2*(x*x+y*y))];session=await call('director_update',{projectId:project.id,revision:session.revision,composition:{...session.composition,pose:{position:p,lookAt:target,fov:55,roll:0}},save:true});}}await call('director_popout',{projectId:project.id});setDockedDirector(false);if(workspace==='machinima')setWorkspace('world');notice('Recording Director opened. Use its display selector or drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
+  async function openRecordingDirector(shots?: readonly import('./creatorStudio').CameraShot[]) {
+    const project=historyRef.current.current;
+    if(!project)return;
+    try {
+      await save(false, project.id);
+      window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:project.id}));
+      const session=await call<import('./directorSession').DirectorSession>('director_session',{projectId:project.id});
+      if (shots?.length) {
+        const composition = session.composition;
+        if (session.recording || composition.playing) throw Error('Stop playback or recording in the Director before queuing a range.');
+        if (composition.shots.length + shots.length > 256) throw Error('The Recording Director holds up to 256 camera keys.');
+        const copied = shots.map(({name,durationMs,cameraPosition,lookAt,fov,roll,easing}) =>
+          ({id:crypto.randomUUID(),name,durationMs,cameraPosition,lookAt,fov,roll:roll??0,easing:easing??'smooth'}));
+        const first = copied[0];
+        await call('director_update', {projectId:project.id, revision:session.revision, save:true, idleRequired:true,
+          composition:{...composition, shots:[...composition.shots, ...copied], selected:first.id,
+            pose:{position:first.cameraPosition, lookAt:first.lookAt, fov:first.fov, roll:first.roll},
+            tracking:'free', target:null, startedAtMs:0,
+            playheadMs:composition.shots.reduce((total,key)=>total + key.durationMs, 0)}});
+      } else if (session.revision === 0 && !session.recording) {
+        const pose=readMapSession<{position:number[];target?:number[];quaternion:number[]}|null>(
+          project.id,'camera.world.PerspectiveCamera',null);
+        if (pose?.position.length===3 && pose.quaternion?.length===4) {
+          const [x,y,z,w]=pose.quaternion,p=pose.position;
+          const target=pose.target??[p[0]-2*(x*z+w*y),p[1]-2*(y*z-w*x),p[2]-(1-2*(x*x+y*y))];
+          await call('director_update',{projectId:project.id,revision:session.revision,
+            composition:{...session.composition,pose:{position:p,lookAt:target,fov:55,roll:0}},save:true});
+        }
+      }
+      await call('director_popout',{projectId:project.id});
+      if (historyRef.current.current?.id === project.id) {
+        setDockedDirector(false);
+        if(!shots && workspace==='machinima')setWorkspace('world');
+      }
+      notice(shots?.length ? 'Camera range queued in Recording Director.' :
+        'Recording Director opened. Use its display selector or drag it to another monitor.','success');
+    } catch(e) {
+      notice(String(e),'error');
+    }
+  }
   function libraryView(){return (<Library
           data={data}
           onWorkspace={setWorkspace}
@@ -1545,7 +1584,7 @@ export default function App() {
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} onSave={!activeJob&&windowWriters[current.id]!==false?()=>save(false,current.id):undefined} />;
       case 'creator': return <CreatorStudio project={current} inspection={inspection} edit={edit} notify={notice} onOpenRuntimes={() => setWorkspace('runtimes')} onBuild={()=>setWorkspace('build')} onLevelEditor={()=>setWorkspace('quickforge')} onMachinima={()=>setWorkspace('machinima')}/>;
-      case 'machinima': if(dockedDirector)return <DockedDirector key={current.id} projectId={current.id} embedded onPopout={()=>void openRecordingDirector()} onClose={()=>setDockedDirector(false)}/>;return <MachinimaWorkspace key={current.id} project={current} inspection={inspection} assetMeshes={meshes} data={data} edit={edit} notify={notice} onResourcesConnected={applyResourceMetadata} onSave={save} onLive={()=>setWorkspace('live')} onEditor={()=>setWorkspace('quickforge')} onDirector={()=>void openRecordingDirector()} onBuild={()=>setWorkspace('build')}/>;
+      case 'machinima': if(dockedDirector)return <DockedDirector key={current.id} projectId={current.id} embedded onPopout={()=>void openRecordingDirector()} onClose={()=>setDockedDirector(false)}/>;return <MachinimaWorkspace key={current.id} project={current} inspection={inspection} assetMeshes={meshes} data={data} edit={edit} notify={notice} onResourcesConnected={applyResourceMetadata} onSave={save} onLive={()=>setWorkspace('live')} onEditor={()=>setWorkspace('quickforge')} onDirector={shots=>void openRecordingDirector(shots)} onBuild={()=>setWorkspace('build')}/>;
       case 'tags':
         return (
           <Tags key={current.id} project={current} inspection={inspection} entries={data.entries} hasUnsavedChanges={history.dirty} onSave={()=>save(false,current.id)}

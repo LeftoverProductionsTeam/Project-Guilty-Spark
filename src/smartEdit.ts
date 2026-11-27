@@ -1,4 +1,5 @@
 import type { Project, RuntimeId } from './types';
+import { engineCameraShots } from './creatorStudio';
 
 export type EditRoute = 'directCache' | 'nativeRebuild' | 'workingTags' | 'quickForge' | 'liveSession';
 export type EditPreference = 'automatic' | EditRoute;
@@ -77,7 +78,7 @@ export function editRevisionKey(p: Project) {
     p.animationAssignments ?? [],
     p.animations?.filter((asset) => p.animationAssignments?.some((a) => a.assetId === asset.id)) ?? [],
     p.powerups ?? [],
-    p.studio?.engineMachinima?.enabled ? [p.studio.engineMachinima, p.studio.shots] : null,
+    p.studio?.engineMachinima?.enabled ? [p.studio.engineMachinima, engineCameraShots(p.studio)] : null,
     p.conversionProfile,
     p.activeBuildTarget,
     p.buildTargets?.find((t) => t.id === p.activeBuildTarget) ?? null,

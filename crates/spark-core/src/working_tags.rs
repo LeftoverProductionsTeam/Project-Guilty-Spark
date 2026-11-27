@@ -476,7 +476,10 @@ pub fn source_parent_project(project: &Project, build: &BuildRecord, jobs_root: 
     }
     // Studio also holds applied recording inputs. They still require their
     // existing native camera/source build, never authoring-only parent reuse.
-    let camera_inputs=|value:&Project|serde_json::to_value(value.studio.as_ref().and_then(|studio|studio.engine_machinima.as_ref().filter(|options|options.enabled).map(|options|(options,&studio.shots))));
+    let camera_inputs=|value:&Project| -> Result<serde_json::Value> {
+        let inputs = value.studio.as_ref().map(crate::creative::CreatorStudio::enabled_engine_camera).transpose()?.flatten();
+        Ok(serde_json::to_value(inputs)?)
+    };
     if camera_inputs(&parent)?!=camera_inputs(project)?{return invalid("Native recording inputs changed; use the existing camera/source build before reusing this parent");}
     if crate::native_audio::fingerprint_inputs(&parent)!=crate::native_audio::fingerprint_inputs(project){return invalid("Native sound placements changed; use their normal source build before reusing this parent");}
     mission_radio_import_delta(&parent,project)?;
@@ -2297,7 +2300,7 @@ mod tests {
         assert_ne!(c.project.fingerprint().unwrap(),old_fp);
         let snapshot=source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap();assert_eq!(snapshot.fingerprint().unwrap(),old_fp);assert!(snapshot.studio.is_none());
         assert!(prepare(&c.project,&c.input,&c.jobs,&uuid::Uuid::new_v4().to_string()).err().unwrap().to_string().contains("explicitly compile scripts"));
-        let studio=c.project.studio.as_mut().unwrap();studio.shots.push(serde_json::from_value(serde_json::json!({"id":"camera","name":"Intro","durationMs":1000,"cameraPosition":[0.,0.,2.],"lookAt":[1.,0.,2.],"fov":70.,"subtitle":""})).unwrap());studio.engine_machinima=Some(crate::creative::EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,auto_start:false});
+        let studio=c.project.studio.as_mut().unwrap();studio.shots.push(serde_json::from_value(serde_json::json!({"id":"camera","name":"Intro","durationMs":1000,"cameraPosition":[0.,0.,2.],"lookAt":[1.,0.,2.],"fov":70.,"subtitle":""})).unwrap());studio.engine_machinima=Some(crate::creative::EngineMachinima{enabled:true,playback:"sequence".into(),camera_id:None,take_id:None,auto_start:false});
         assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("Native recording inputs changed"));c.project.studio=mission_project("Reach the pad.").studio;
         c.project.title="Changed source identity".into();assert!(source_parent_project(&c.project,&c.input.parent_build,&c.jobs).unwrap_err().to_string().contains("other source inputs changed"));
         assert_eq!(project::load_project(&parent.join("project.gsproject")).unwrap().fingerprint().unwrap(),old_fp);

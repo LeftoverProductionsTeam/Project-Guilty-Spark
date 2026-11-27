@@ -4,8 +4,8 @@ import {WorkspacePanel} from './WorkspacePanels';
 import {useWorkspaceActivity} from './WorkspaceActivity';
 import { Camera, Clapperboard, Pause, Play, Plus, Square, Download, Upload, Video } from 'lucide-react';
 import type { Bootstrap, MapInspection, MeshData, OpenProject, Project, Vec3 } from '../types';
-import type { CameraShot } from '../creatorStudio';
-import { emptyCreatorStudio, validateCreatorStudio, missionCameraUsers } from '../creatorStudio';
+import type { CameraShot, CameraTake, CreatorStudioDocument } from '../creatorStudio';
+import { emptyCreatorStudio, validateCreatorStudio, missionCameraUsers, cameraTakeShots, engineCameraShots } from '../creatorStudio';
 import { call, native } from '../api';
 import { catalogAssets, placeAsset } from '../forge';
 import type { ForgeMesh, ForgePlacement, QuickForgeDocument } from '../forge';
@@ -44,11 +44,11 @@ interface Props {
   inspection: MapInspection | null;
   assetMeshes: Record<string, MeshData>;
   data: Bootstrap;
-  edit: (p: Project, description: string) => void;
+  edit: (p: Project, description: string) => boolean | void;
   notify: (message: string) => void;
   onLive: () => void;
   onEditor: () => void;
-  onDirector: () => void;
+  onDirector: (shots?: readonly CameraShot[]) => void;
   onBuild?:()=>void;
   onSave:()=>Promise<void>;
   onResourcesConnected:(open:OpenProject)=>Promise<void>;
@@ -193,11 +193,18 @@ export default function MachinimaWorkspace({
       actorSources[0]?.id ??
       '',
   );
-  const shot = shots.find((s) => s.id === selected),
-    duration = takeDuration(shots),
-    playing = transport.playing;
+  const [takeId, setTakeId] = useMapState(project.id, 'director.take', '');
+  const takes = studio.cameraTakes ?? [];
+  const take = takes.find(row => row.id === takeId);
+  const playShots = take ? cameraTakeShots(shots, take) : shots;
+  const duration = takeDuration(playShots);
+  const shot = shots.find(s => s.id === selected);
+  const playing = transport.playing;
+  const engine = studio.engineMachinima;
+  const boundary = shot && takes.some(row => row.firstShotId === shot.id || row.lastShotId === shot.id);
+  const missionUsers = shot ? missionCameraUsers(studio, shot.id) : [];
   useWorkspaceFileActions('director:'+project.id,[
-    {id:'export-take',label:'Export camera take…',run:()=>downloadLocalText('spark-camera-take.json',encodeCameraTake(shots,settings),'application/json')},
+    {id:'export-take',label:'Export camera take…',run:()=>downloadLocalText('spark-camera-take.json',encodeCameraTake(playShots,settings),'application/json')},
     {id:'import-take',label:'Import camera take…',disabled:playing||recording,run:()=>takeInput.current?.click()},
     {id:'import-hrec',label:'Import Forerunner recording…',disabled:playing||recording||!inspection,run:()=>replayInput.current?.click()},
     {id:'export-shots',label:'Export shot list CSV…',run:()=>downloadLocalText('spark-shot-list.csv',shotListCsv(shots),'text/csv')},
@@ -219,10 +226,22 @@ export default function MachinimaWorkspace({
   useEffect(() => {
     if (!shots.some((s) => s.id === selected)) setSelected(shots[0]?.id ?? '');
   }, [shots, selected]);
-  function save(next: CameraShot[], description: string, preferences: MachinimaSettings = settings) {
-    const updated={...studio,shots:next,machinima:{...preferences}},problems=validateCreatorStudio(updated);
+  useEffect(() => {
+    if (!takeId || take) return;
+    setTakeId('');
+    setTime(0);
+    setTransport(t => ({...t, time: 0, playing: false, preview: false, seek: t.seek + 1}));
+  }, [takeId, take, setTakeId]);
+  function save(
+    next: CameraShot[],
+    description: string,
+    preferences: MachinimaSettings = settings,
+    changes: Partial<Pick<CreatorStudioDocument, 'cameraTakes' | 'engineMachinima'>> = {},
+  ) {
+    const updated={...studio,...changes,shots:next,machinima:{...preferences}},problems=validateCreatorStudio(updated);
     if(problems.length){setMessage(problems.join('; '));return false;}
-    edit({ ...project, studio: updated }, description);
+    if (edit({ ...project, studio: updated }, description) === false) return false;
+    setMessage('');
     return true;
   }
   function preference<K extends keyof MachinimaSettings>(key: K, value: MachinimaSettings[K]) {
@@ -235,15 +254,31 @@ export default function MachinimaWorkspace({
         'Edit camera keyframe',
       );
   }
-  function seek(value: number, preview = true) {
-    const next = Math.max(0, Math.min(duration, value));
+  function seek(value: number, preview = true, length = duration) {
+    const next = Math.max(0, Math.min(length, value));
     setTime(next);
     setTransport((t) => ({ ...t, time: next, preview, seek: t.seek + 1 }));
   }
   function selectShot(id: string) {
+    if (recording) return;
     setSelected(id);
-    const i = shots.findIndex((s) => s.id === id);
-    seek(shotStart(shots, i));
+    const index = playShots.findIndex(s => s.id === id);
+    if (index >= 0) {
+      seek(shotStart(playShots, index));
+    } else {
+      chooseTake('');
+      seek(shotStart(shots, shots.findIndex(s => s.id === id)), true, takeDuration(shots));
+    }
+  }
+  function chooseTake(id: string) {
+    setTakeId(id);
+    const start = takes.find(row => row.id === id)?.firstShotId;
+    if (start) setSelected(start);
+    setTime(0);
+    setTransport(t => ({...t, time: 0, playing: false, preview: false, seek: t.seek + 1}));
+  }
+  function configureEngine(options: NonNullable<CreatorStudioDocument['engineMachinima']>) {
+    save(shots, 'Configure game-native camera take', settings, {engineMachinima: options});
   }
   function capture(replace = false) {
     try {
@@ -266,7 +301,7 @@ export default function MachinimaWorkspace({
         );
       } else {
         if (shots.length >= 256) throw new Error('A take supports up to 256 camera keys.');
-        save([...shots, next], 'Capture new camera keyframe');
+        if (!save([...shots, next], 'Capture new camera keyframe')) return;
         setSelected(next.id);
       }
       setMessage('Camera key saved in this project.');
@@ -286,7 +321,7 @@ export default function MachinimaWorkspace({
   const rig = (
     <MachinimaRig
       renderProfile={project.renderFeatures}
-      shots={shots}
+      shots={playShots}
       settings={settings}
       transport={transport}
       bridge={bridge}
@@ -299,7 +334,7 @@ export default function MachinimaWorkspace({
       }}
     />
   );
-  const sampled = sampleCamera(shots, time);
+  const sampled = sampleCamera(playShots, time);
   return (
     <div className="machinima-workspace">
       <header className="director-heading">
@@ -311,19 +346,45 @@ export default function MachinimaWorkspace({
           <p>Source camera rehearsal · hold RMB + WASD, Q/E to descend / ascend · actor arrows and Q/E</p>
         </div>
         <div>
-          <button onClick={onEditor}>Level editor</button><button onClick={onDirector}>Recording Director ↗</button>
+          <button onClick={onEditor}>Level editor</button><button onClick={() => onDirector()}>Recording Director ↗</button>
           <button onClick={onLive}>MCC live mode</button>
         </div>
       </header>
       <WorkspacePanel id="engine-recording" label="In-game recording" defaultDock="right"><div className="engine-machinima-controls">
         <NativeCameraControls/>
         <p>Build a private MCC map variant with these camera points. In Halo, toggle your flashlight to start/stop the take. Movement and actions remain enabled while the game camera is detached. Record the Halo window with OBS Game Capture at the game’s full resolution.</p>
-        <label><input type="checkbox" checked={!!studio.engineMachinima?.enabled} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{enabled:e.target.checked,playback:studio.engineMachinima?.playback??'fixed',cameraId:shot?.id??null,autoStart:studio.engineMachinima?.autoStart??false}}},'Configure game-native machinima take')}/>Include native engine camera controls in the next MCC build</label>
-        {studio.engineMachinima?.enabled&&<>
-          <label>Engine camera<select aria-label="Engine camera" value={studio.engineMachinima.cameraId??shots[0]?.id??''} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{...studio.engineMachinima!,cameraId:e.target.value}}},'Choose engine camera')}>{shots.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <label>Engine playback<select aria-label="Engine playback" value={studio.engineMachinima.playback} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{...studio.engineMachinima!,playback:e.target.value as 'fixed'|'sequence'}}},'Choose engine camera playback')}><option value="fixed">Fixed camera · be your own actor</option><option value="sequence">Play camera sequence · actor remains controllable</option></select></label>
-          <label><input type="checkbox" checked={studio.engineMachinima.autoStart} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{...studio.engineMachinima!,autoStart:e.target.checked}}},'Set engine take startup')}/>Start the take when the player spawns</label>
-          <button disabled={!shots.length||shots.length>64} onClick={onBuild}>Open MCC build &amp; conversion</button>
+        <label><input type="checkbox" checked={!!engine?.enabled} disabled={!shots.length}
+          onChange={e => configureEngine({
+            enabled: e.target.checked,
+            playback: engine?.playback ?? (take ? 'sequence' : 'fixed'),
+            takeId: engine ? engine.takeId : take?.id,
+            cameraId: engine?.cameraId ?? null,
+            autoStart: engine?.autoStart ?? false,
+          })}/>Include native engine camera controls in the next MCC build</label>
+        {shots.length > 0 && <>
+          <label>Engine playback<select aria-label="Engine playback" value={engine?.playback ?? 'fixed'}
+            onChange={e => configureEngine({
+              enabled: engine?.enabled ?? false, autoStart: engine?.autoStart ?? false,
+              playback: e.target.value === 'sequence' ? 'sequence' : 'fixed',
+              takeId: e.target.value === 'sequence' ? take?.id : null,
+              cameraId: e.target.value === 'fixed' ? shot?.id : null,
+            })}><option value="fixed">Fixed camera · be your own actor</option><option value="sequence">Play camera sequence · actor remains controllable</option></select></label>
+          {engine?.playback === 'sequence'
+            ? <label>Native sequence take<select value={engine.takeId ?? ''}
+                onChange={e => configureEngine({...engine, takeId: e.target.value || null, cameraId: null})}>
+                <option value="">Whole timeline</option>
+                {takes.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
+              </select></label>
+            : <label>Engine camera<select aria-label="Engine camera" value={engine?.cameraId ?? shots[0]?.id ?? ''}
+                onChange={e => configureEngine({enabled: engine?.enabled ?? false, playback: 'fixed',
+                  autoStart: engine?.autoStart ?? false, cameraId: e.target.value})}>
+                {shots.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select></label>}
+        </>}
+        {engine?.enabled && <>
+          <label><input type="checkbox" checked={engine.autoStart}
+            onChange={e => configureEngine({...engine, autoStart: e.target.checked})}/>Start the take when the player spawns</label>
+          <button disabled={!engineCameraShots(studio).length} onClick={onBuild}>Open MCC build &amp; conversion</button>
           <label>Native recording resolution<select aria-label="Native recording resolution" value={nativeResolution} onChange={e=>setNativeResolution(e.target.value)}><option value="desktop">Current monitor resolution</option><option value="1080p">1920 × 1080</option><option value="1440p">2560 × 1440</option><option value="4k">3840 × 2160</option></select></label>
           <button disabled={!native||launching||!project.builds.some(b=>b.status==='validated')} onClick={()=>{setLaunching(true);void(async()=>{try{await onSave();const build=project.builds.filter(b=>b.status==='validated').at(-1)!;const result=await call<string>('launch_engine_take',{projectId:project.id,buildId:build.id,resolution:nativeResolution});setMessage(result);}catch(e){notify(String(e));}finally{setLaunching(false);}})();}}>{launching?'Opening native take…':'Launch built take in MCC Standalone'}</button>
           <p className="subtle">Uses the current validated build’s private tags and your installed MCC editing-kit runtime. Rebuild after changing cameras or animation assignments. OBS captures the game at the selected resolution.</p>
@@ -344,6 +405,7 @@ export default function MachinimaWorkspace({
                 key={s.id}
                 className={selected === s.id ? 'selected' : ''}
                 aria-pressed={selected === s.id}
+                disabled={recording}
                 onClick={() => selectShot(s.id)}
               >
                 <span>
@@ -392,8 +454,9 @@ export default function MachinimaWorkspace({
                 Duplicate
               </button>
               <button
-                disabled={playing||missionCameraUsers(studio,shot.id).length>0}
-                title={missionCameraUsers(studio,shot.id).length?'Change this mission scene boundary in Creator Studio before deleting the key.':undefined}
+                disabled={playing || recording || boundary || missionUsers.length > 0}
+                title={boundary ? 'Change the take boundary before deleting this key.' :
+                  missionUsers.length ? 'Change the mission scene boundary in Creator Studio before deleting the key.' : undefined}
                 onClick={() => {
                   save(
                     shots.filter((s) => s.id !== shot.id),
@@ -406,12 +469,53 @@ export default function MachinimaWorkspace({
               </button>
             </div>
           )}
+          <details className="director-named-takes">
+            <summary>Named camera takes</summary>
+            <label>Preview range<select value={take?.id ?? ''} disabled={playing || recording}
+              onChange={e => chooseTake(e.target.value)}>
+              <option value="">Whole timeline</option>
+              {takes.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
+            </select></label>
+            {shots.length > 0 && <form key={take ? JSON.stringify(take) : 'new'} onSubmit={event => {
+              event.preventDefault();
+              const fields = new FormData(event.currentTarget);
+              const row: CameraTake = {
+                id: take?.id ?? crypto.randomUUID(),
+                name: String(fields.get('name')).trim(),
+                firstShotId: String(fields.get('first')),
+                lastShotId: String(fields.get('last')),
+              };
+              const cameraTakes = take ? takes.map(item => item.id === take.id ? row : item) : [...takes, row];
+              if (save(shots, take ? 'Edit camera take' : 'Name camera take', settings, {cameraTakes})) {
+                chooseTake(row.id);
+                setSelected(row.firstShotId);
+              }
+            }}>
+              <fieldset disabled={playing || recording}>
+                <label>Camera take name<input name="name" required maxLength={90} defaultValue={take?.name ?? ''}/></label>
+                <label>First key<select name="first" defaultValue={take?.firstShotId ?? shots[0].id}>
+                  {shots.map((row, index) => <option key={row.id} value={row.id}>{index + 1} · {row.name}</option>)}
+                </select></label>
+                <label>Last key<select name="last" defaultValue={take?.lastShotId ?? shots.at(-1)?.id}>
+                  {shots.map((row, index) => <option key={row.id} value={row.id}>{index + 1} · {row.name}</option>)}
+                </select></label>
+                <button>{take ? 'Save take range' : 'Save named take'}</button>
+              </fieldset>
+            </form>}
+            {take && <button disabled={playing || recording || engine?.takeId === take.id}
+              title={engine?.takeId === take.id ? 'Select a different native sequence before removing this range.' : undefined}
+              onClick={() => {
+                if (save(shots, 'Remove camera take range', settings, {cameraTakes: takes.filter(row => row.id !== take.id)})) chooseTake('');
+              }}>Remove take range</button>}
+            <button disabled={!native || !playShots.length || playing || recording}
+              onClick={() => onDirector(playShots)}>Queue range in Recording Director ↗</button>
+          </details>
           <h3>Take files</h3>
           <button
             onClick={() =>
               downloadLocalText(
                 'spark-camera-take.json',
-                encodeCameraTake(shots, settings),
+                encodeCameraTake(playShots, settings),
                 'application/json',
               )
             }
@@ -435,7 +539,8 @@ export default function MachinimaWorkspace({
                 const take = parseCameraTake(await file.text());
                 if (take.shots.length + shots.length > 256)
                   throw new Error('Imported take would exceed 256 camera keys.');
-                save([...shots, ...take.shots], 'Import camera take', take.settings);
+                if (!save([...shots, ...take.shots], 'Import camera take', take.settings)) return;
+                chooseTake('');
                 setMessage(`Appended ${take.shots.length} camera keys.`);
               } catch (error) {
                 notify(String(error));
@@ -478,11 +583,14 @@ export default function MachinimaWorkspace({
               {!replay.mapSha256 && <small>This recording identifies the map by name. Review the keys against the open map.</small>}
               <button type="button" disabled={playing||recording} onClick={()=>{
                 try{
-                  const remaining=(studio.engineMachinima?.enabled ? 64 : 256)-shots.length;
-                  const imported=hrecCameraShots(replay,replayTrack,replayName,Math.min(remaining,64));
-                  if(save([...shots,...imported],'Import camera take · '+replayName)){
-                    setSelected(imported[0].id);
-                    setMessage('Appended '+imported.length+' editable recording keys to the timeline.');
+                  const name = replayName.trim();
+                  const imported = hrecCameraShots(replay, replayTrack, name, Math.min(256 - shots.length, 64));
+                  const row: CameraTake = {id: crypto.randomUUID(), name,
+                    firstShotId: imported[0].id, lastShotId: imported[imported.length - 1].id};
+                  if (save([...shots, ...imported], 'Import camera take · ' + name, settings, {cameraTakes: [...takes, row]})) {
+                    chooseTake(row.id);
+                    setSelected(row.firstShotId);
+                    setMessage('Saved ' + name + ' with ' + imported.length + ' editable camera keys.');
                   }
                 }catch(error){notify(String(error));}
               }}>Append camera take</button>
@@ -557,7 +665,7 @@ export default function MachinimaWorkspace({
                   {settings.safeFrame && <div className="director-safe" />}
                   {settings.center && <div className="director-cross" />}
                   {sampled && transport.preview && (
-                    <span className="director-subtitle">{shots[sampled.index].subtitle}</span>
+                    <span className="director-subtitle">{playShots[sampled.index].subtitle}</span>
                   )}
                 </div>
               </div>
@@ -565,7 +673,7 @@ export default function MachinimaWorkspace({
           </div>
           <div className="director-transport">
             <button
-              disabled={!shots.length}
+              disabled={!playShots.length}
               aria-label={playing ? 'Pause camera take' : 'Play camera take'}
               onClick={() => {
                 if (playing) {
@@ -607,19 +715,20 @@ export default function MachinimaWorkspace({
               max={Math.max(1, duration)}
               step={1000 / settings.fps}
               value={Math.min(time, duration)}
-              disabled={!shots.length}
+              disabled={!playShots.length || recording}
               onChange={(e) => seek(Number(e.target.value))}
             />
             <output>
-              {(time / 1000).toFixed(2)} / {(duration / 1000).toFixed(2)} s
+              {(Math.min(time,duration) / 1000).toFixed(2)} / {(duration / 1000).toFixed(2)} s
             </output>
           </div>
           <div className="director-timeline">
-            {shots.map((s) => (
+            {playShots.map((s, index) => (
               <button
                 key={s.id}
                 style={{ flexGrow: s.durationMs }}
-                className={sampled?.index === shots.indexOf(s) ? 'active' : ''}
+                disabled={recording}
+                className={sampled?.index === index ? 'active' : ''}
                 onClick={() => selectShot(s.id)}
                 title={s.name}
               >

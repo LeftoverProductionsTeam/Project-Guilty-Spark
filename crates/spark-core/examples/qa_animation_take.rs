@@ -141,6 +141,7 @@ fn main() -> spark_core::Result<()> {
         enabled: true,
         playback: "fixed".into(),
         camera_id: Some("native-camera".into()),
+        take_id: None,
         auto_start: true,
     });
     p.studio = Some(studio);
