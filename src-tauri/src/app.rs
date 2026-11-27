@@ -338,7 +338,7 @@ fn find_local_invader(state:&AppState)->Option<PathBuf>{
     if let Ok(executable)=std::env::current_exe(){if let Some(directory)=executable.parent(){anchors.push(directory.to_path_buf());}}
     let mut seen=std::collections::HashSet::new();
     for anchor in anchors {for parent in anchor.ancestors().take(10).filter(|p|p.parent().is_some()) {
-        for suffix in ["tools/invader"] {
+        for suffix in ["tools/invader", "tools/invader-expanded-sky"] {
             let candidate=parent.join(suffix);
             if !seen.insert(candidate.clone())||!candidate.is_dir()||core::reject_links(&candidate).is_err(){continue;}
             let names=if cfg!(windows){["invader-extract.exe","invader-info.exe","invader-build.exe"]}else{["invader-extract","invader-info","invader-build"]};

@@ -1,0 +1,34 @@
+diff --git a/src/tag/hek/definition/scenario.json b/src/tag/hek/definition/scenario.json
+index e2573ff..5b4b895 100644
+--- a/src/tag/hek/definition/scenario.json
++++ b/src/tag/hek/definition/scenario.json
+@@ -3526,7 +3526,8 @@
+                 "name": "skies",
+                 "type": "TagReflexive",
+                 "struct": "ScenarioSky",
+-                "maximum": 8
++                "maximum": 8,
++                "extended_maximum": 16
+             },
+             {
+                 "name": "type",
+diff --git a/src/tag/parser/compile/scenario/pre_compile.cpp b/src/tag/parser/compile/scenario/pre_compile.cpp
+index 4768566..485468a 100644
+--- a/src/tag/parser/compile/scenario/pre_compile.cpp
++++ b/src/tag/parser/compile/scenario/pre_compile.cpp
+@@ -675,6 +675,15 @@ namespace Invader::Parser {
+ 
+         merge_child_scenarios(workload, tag_index, *this);
+ 
++        // Source tags may carry MCC13 skies. Keep other compiled targets at eight.
++        const auto game_engine = workload.get_build_parameters()->details.build_game_engine;
++        if (this->skies.size() > 8 &&
++            game_engine != HEK::GameEngine::GAME_ENGINE_MCC_COMBAT_EVOLVED_ANNIVERSARY) {
++            REPORT_ERROR_PRINTF(workload, ERROR_TYPE_FATAL_ERROR, tag_index,
++                                "Scenario has %zu skies; the selected engine supports at most eight", this->skies.size());
++            throw InvalidTagDataException();
++        }
++
+         if(!workload.cache_file_type.has_value()) {
+             workload.cache_file_type = this->type;
+             workload.demo_ui = this->flags & HEK::ScenarioFlagsFlag::SCENARIO_FLAGS_FLAG_USE_DEMO_UI;
