@@ -414,7 +414,12 @@ fn main() -> Result<()> {
         let p = spark_core::project::load_project(Path::new(&a[2]))?;
         let source = p.source.as_ref().unwrap();
         let i = maps::inspect_map(&source.preserved_path, source.resource_directory.as_deref())?;
-        let geometry = bsp_assembly::generate_project(&p, &i, &AtomicBool::new(false))?;
+        let cancel = AtomicBool::new(false);
+        let geometry = if p.bsp_assembly.as_ref().is_some_and(|plan| plan.preserve_donor_bsp) {
+            bsp_assembly::generate_editor_connector(&p, &i, &cancel)?.geometry
+        } else {
+            bsp_assembly::generate_project(&p, &i, &cancel)?
+        };
         let output = Path::new(&a[3]);
         if output.exists() {
             return Err(spark_core::SparkError::Invalid(

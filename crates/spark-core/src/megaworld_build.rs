@@ -247,6 +247,17 @@ pub fn probe_partition_scenario(
     partition_preview(project, inspection, jobs, id, cancel, event, stage, false)
 }
 
+fn preflight_retained_connector(
+    project: &Project, inspection: &MapInspection, cancel: &AtomicBool,
+) -> Result<Option<crate::bsp_assembly::PreservedConnector>> {
+    if !project.bsp_assembly.as_ref().is_some_and(|plan| plan.rebuild_native_connector) {
+        return Ok(None);
+    }
+    let connector = crate::bsp_assembly::generate_editor_connector(project, inspection, cancel)?;
+    connector.geometry.source_preflight()?.require_buildable()?;
+    Ok(Some(connector))
+}
+
 fn partition_preview(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync, stage: crate::bsp_compile::PartitionStage,
@@ -263,6 +274,7 @@ fn partition_preview(
     let source_tags = tools.base_tags_directory.as_ref().unwrap();
     let source = project.source.as_ref().unwrap();
     let plan = project.bsp_assembly.as_ref().unwrap();
+    let retained_connector = preflight_retained_connector(project, inspection, &cancel)?;
     crate::reject_links(jobs)?;
     fs::create_dir_all(jobs)?;
     let workspace = jobs.join(id);
@@ -295,7 +307,7 @@ fn partition_preview(
             let edit = build::tool_path(&tools, "invader-edit").unwrap();
             crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
         }
-        let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version, GameplayLimits::partition(cache_target(project).unwrap().version))?;
+        let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version, GameplayLimits::partition(cache_target(project).unwrap().version), retained_connector)?;
         let receipt = if bind {
             let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
             serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
@@ -574,6 +586,7 @@ pub fn run_with_reviewed_runtime(
     } else { GameplayLimits::native(target.version) };
     let source=project.source.as_ref().unwrap();let plan=project.bsp_assembly.as_ref().unwrap();
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("An original region changed after planning");}}
+    let retained_connector = preflight_retained_connector(project, inspection, &cancel)?;
     crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);
     let base=tools.base_tags_directory.as_ref().unwrap();let inputs=crate::native_staging::inventory(base,&cancel)?;
     let import_root=jobs.parent().ok_or_else(||SparkError::Invalid("Managed import root is missing".into()))?;
@@ -603,7 +616,7 @@ pub fn run_with_reviewed_runtime(
     if plan.separate_native_bsps {
         let parts = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &dir, &tags,
             crate::bsp_compile::PartitionStage::Lighting, target.version,
-            if target.version == 609 { GameplayLimits::partition(target.version) } else { limits })?;
+            if target.version == 609 { GameplayLimits::partition(target.version) } else { limits }, retained_connector)?;
         let cache = build_partition_cache(project, inspection, &parts, &tools, &runner, &dir, &tags, &dir.join("output"), target, true)?;
         if cancel.load(Ordering::Relaxed) { return invalid("Build cancelled"); }
         if crate::tool_transaction::inventory(base_tags)? != hashes {

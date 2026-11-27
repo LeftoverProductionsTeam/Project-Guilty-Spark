@@ -1334,13 +1334,12 @@ fn apply_outdoor_stock_skies(
 fn prepare_retained_connector(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
     runner: &Runner, workspace: &Path, tags: &Path, base_tags: &Path, stage: PartitionStage,
+    intact: bsp_assembly::PreservedConnector,
 ) -> Result<PreparedPartitions> {
     let plan = project.bsp_assembly.as_ref().unwrap();
     let source = project.source.as_ref().unwrap();
-    let intact = bsp_assembly::generate_editor_connector(project, inspection, runner.cancel)?;
     let [slot, island] = intact.replacement_slots.ok_or_else(|| SparkError::Invalid("Missing reviewed connector slots".into()))?;
     let geometry = &intact.geometry;
-    geometry.source_preflight()?.require_buildable()?;
     let mut structure_tags = maps::scenario_bsp_tag_paths(&source.preserved_path, inspection)?;
     let donor_tag = format!("{}.scenario_structure_bsp", structure_tags[island]);
     let structure_check = stage == PartitionStage::StructureCheck;
@@ -1412,6 +1411,7 @@ fn prepare_retained_connector(
 pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
     runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32, limits: crate::megaworld_build::GameplayLimits,
+    retained_connector: Option<bsp_assembly::PreservedConnector>,
 ) -> Result<PreparedPartitions> {
     let bind = matches!(stage, PartitionStage::Collision | PartitionStage::Lighting);
     let base_tags = if stage == PartitionStage::StructureCheck {
@@ -1422,7 +1422,8 @@ pub(crate) fn prepare_partition_structure(
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
     if plan.rebuild_native_connector {
-        return prepare_retained_connector(project, inspection, tools, runner, workspace, tags, base_tags, stage);
+        let intact = retained_connector.ok_or_else(|| SparkError::Invalid("Missing preflight result for the retained connector".into()))?;
+        return prepare_retained_connector(project, inspection, tools, runner, workspace, tags, base_tags, stage, intact);
     }
     let (base_geometry, added_geometry, switches, overlap, overlap_samples, max_floor_delta, intact_overlaps) =
         if plan.preserve_donor_bsp {
