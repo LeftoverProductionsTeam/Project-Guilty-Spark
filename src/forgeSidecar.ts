@@ -1,7 +1,7 @@
 import type { ForgePlacement } from './forge';
 import type { MapInspection, Project, SceneObject, Vec3 } from './types';
 
-import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, supportsHmvMap, type ForgeLayoutTarget, type HmvBaseIdentity, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
+import { emptyHmv, HMV_NAME, HMV_PLACEMENT_GROUPS, hmvObjectiveDefinition, isHmvDeviceGroup, isHmvPlacementGroup, readHmv, supportsHmvMap, type ForgeLayoutTarget, type HmvBaseIdentity, type HmvAdvancedPose, type HmvLayoutDetails, type HmvObjectiveProperties, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties, type HmvTeleporterRole } from './forgeHmv';
 
 type LayoutIdentity = { name: string; baseSha256: string };
 export type ForgeSidecar = LayoutIdentity & (
@@ -160,6 +160,7 @@ function parse(sidecar: ForgeSidecar, map: MapInspection) {
     spawns: layoutSpawns(layout, recordKeys),
     teleporters: layout.teleporterRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
     objectives: layout.objectiveRecords.map(record => ({ ...record, id: prefix + recordKeys[record.index] })),
+    advancedPlacements: layout.advancedPlacements,
     writeMarker: layout.write,
     metadata: { details: layout.details, date: layout.date },
     hmvCompatibility: { version: layout.version, preservedFeatures: layout.preservedFeatures },
@@ -180,6 +181,7 @@ export function inspectForgeSidecar(sidecar: ForgeSidecar,map: MapInspection) {
   const properties = new Map(rows.flatMap(row => row.properties ? [[prefix + row.key, row.properties] as const] : []));
   const devices = rows.filter(row => isHmvDeviceGroup(row.tag.class)).map(row => prefix + row.key);
   return { editable: rows.length, retained, forerunner, properties, spawns, teleporters, objectives, devices,
+    advancedPlacements: 'advancedPlacements' in parsed ? parsed.advancedPlacements : [],
     metadata: 'metadata' in parsed ? parsed.metadata : undefined,
     hmvCompatibility: 'hmvCompatibility' in parsed ? parsed.hmvCompatibility : undefined,
     hmvConversionIssue: 'hmvConversionIssue' in parsed ? parsed.hmvConversionIssue : undefined,
@@ -448,6 +450,21 @@ export function removeHmvPlacement(project: Project, map: MapInspection, object:
     forgeSidecar: { ...previous, bytes: Array.from(bytes), recordKeys: keys.filter((_, record) => record !== index) },
     scene: project.scene.filter(row => row.id !== object.id),
   } satisfies Project;
+}
+
+export function updateHmvAdvancedPose(project: Project, map: MapInspection, index: number, pose: HmvAdvancedPose) {
+  const sidecar = project.forgeSidecar;
+  if (!sidecar?.bytes || sidecar.baseSha256 !== map.sha256 || project.source?.sha256 !== map.sha256) {
+    throw Error('Open the preserved base map for this HMV layout.');
+  }
+  const layout = readHmv(sidecar.bytes, map);
+  const record = layout.advancedPlacements.find(item => item.index === index);
+  if (!record) throw Error('The selected spatial record is no longer in the layout.');
+  if (Math.fround(pose.yaw) === record.yaw &&
+      pose.position.every((value, axis) => Math.fround(value) === record.position[axis])) return project;
+  const bytes = Array.from(layout.writeAdvancedPose(index, pose));
+  readHmv(bytes, map);
+  return { ...project, forgeSidecar: { ...sidecar, bytes } } satisfies Project;
 }
 
 export function updateHmvLayoutDetails(project: Project, map: MapInspection, details: HmvLayoutDetails) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadMedia } from '../machinimaCapture';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForerunnerTextHmv, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, canPlaceHmvSpawn, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForerunnerTextHmv, exportForgeSidecar, FORGE_SIDECAR_LIMIT, hmvPlacementTag, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, showHmvDevices, showHmvMarkers, updateHmvAdvancedPose, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from '../forgeSidecar';
 import { HMV_LIMIT, HMV_NAME, HMV_OBJECTIVES, HMV_SPAWN_MODES, HMV_TELEPORTER_CHANNELS, hmvObjectiveDefinition, isHmvDeviceGroup, supportsChupathingyForge, supportsHmvMap, type ForgeLayoutTarget, type HmvObjectiveType, type HmvPlacementProperties, type HmvSpawnProperties } from '../forgeHmv';
 import type { MapInspection, Project, SceneObject } from '../types';
 import { useMapState } from '../mapSession';
@@ -25,6 +25,7 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const [problem,setProblem] = useState('');
   const [checkingForge,setCheckingForge] = useState<ForgeLayoutTarget | null>(null);
   const [objectiveType, setObjectiveType] = useState<HmvObjectiveType>(0);
+  const [recordIndex,setRecordIndex] = useState(-1);
   const layout = project.forgeSidecar;
   const summary = useMemo(() => {
     if (!layout) return null;
@@ -37,6 +38,8 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
   const selectedTag = canAddHmv && hmvPlacementTag(project, map, selected);
   const selectedSpawn = canAddHmv && canPlaceHmvSpawn(project, map, selected);
   const metadata = summary?.metadata;
+  const records = summary?.advancedPlacements ?? [];
+  const record = records.find(item => item.index === recordIndex) ?? records[0];
   const properties = selected && summary?.properties.get(selected.id);
   const selectedDevice = selectedTag && isHmvDeviceGroup(selectedTag.class);
   const spawn = summary?.spawns.find(row => row.id === selected?.id);
@@ -319,6 +322,33 @@ export default function ForgeSidecarPanel({ project, map, edit, selected, onSele
           {' '}Choose Export Forge layout copy to keep the full layout.
         </p>
       )}
+      {record && <details>
+        <summary>Edit advanced Forge placements</summary>
+        <label className="field-label">Advanced record
+          <select value={record.index} onChange={event=>setRecordIndex(Number(event.target.value))}>
+            {records.map(item=><option key={item.index} value={item.index}>#{item.index + 1} · {item.label}{item.path ? ' · '+item.path : ''}</option>)}
+          </select>
+        </label>
+        <form key={JSON.stringify(record)} onSubmit={event=>{
+          event.preventDefault();
+          const fields=new FormData(event.currentTarget);
+          try {
+            const read=(name:string)=>Number(fields.get(name));
+            const next=updateHmvAdvancedPose(project,map,record.index,{
+              position:[read('X'),read('Y'),read('Z')], yaw:read('Yaw')*Math.PI/180,
+            });
+            if(next!==project)edit(next,'Move '+record.label+' · #'+(record.index+1));
+            setProblem('');
+          } catch (error) {setProblem(String(error));}
+        }}>
+          {(['X','Y','Z','Yaw'] as const).map((name,index)=><label className="field-label" key={name}>
+            {name === 'Yaw' ? 'Yaw (degrees)' : name}
+            <input type="number" name={name} required step="any"
+              defaultValue={index<3 ? record.position[index] : record.yaw*180/Math.PI}/>
+          </label>)}
+          <button type="submit">Apply advanced placement</button>
+        </form>
+      </details>}
       {!!hiddenDevices.length && <button type="button" onClick={() => {
         try {
           const next = showHmvDevices(project, map);

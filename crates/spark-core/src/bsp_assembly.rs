@@ -1298,10 +1298,7 @@ fn generate_end(
     // At native render precision, another diagonal can eliminate a sliver
     // without moving the exported positions or crossing a material/UV seam.
     // The collision hull and its original surface flags are already sealed.
-    for value in &mut gl.vert_properties {
-        *value = f64::from(*value as f32);
-    }
-    crate::bsp_triangulate::improve_native_render(&mut gl);
+    let retriangulated = crate::bsp_triangulate::improve_native_render(&mut gl);
     let ridge_projection = assembly.high_ground.as_ref().and_then(|ridge| {
         let seam = assembly.terrain_seam.as_ref()?;
         let ribbon = terrain_ribbon.as_ref()?;
@@ -1311,7 +1308,7 @@ fn generate_end(
         let slot = passage_materials[1 + usize::from(assembly.infantry_tunnel.is_some())];
         Some((slot, ribbon.base_projection()))
     });
-    append_render_faces(&gl, &materials, &mut mesh, &mut triangle_materials, ridge_projection)?;
+    let collapsed = append_render_faces(&gl, &materials, &mut mesh, &mut triangle_materials, ridge_projection)?;
     let connector_triangles = triangle_materials.iter().filter(|&&slot|
         slot >= first_connector_material && materials[slot].shader_path.is_some() && !materials[slot].collision_only
     ).count();
@@ -1361,7 +1358,11 @@ fn generate_end(
     } else {
         "This rebuild regenerates collision, portals and lightmaps. Original per-cluster weather, sound and render-only details require review. Donor scenery is optional. Campaign actors, scripts and gameplay objects are outside this build."
     };
-    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings:vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials,exact_sky_portals}, overlap_floor))
+    let mut warnings = vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()];
+    if retriangulated > 0 || collapsed > 0 {
+        warnings.push(format!("Render repair applied to this preview. Retriangulated {retriangulated} coplanar pairs and omitted {collapsed} fragments with zero export area. Review the repaired surfaces before building."));
+    }
+    Ok((AssemblyGeometry{report:AssemblyReport{input_triangles:base_input+donor_input,output_triangles:mesh.indices.len()/3,connector_triangles,generated_uv_faces,walk_samples,portal_count,route_clearance,donor_scenery,warnings},mesh,materials,triangle_materials,exact_sky_portals}, overlap_floor))
 }
 fn is_source_surface_effect(tag: &maps::Tag) -> bool {
     if tag.class == "swat" {
@@ -1536,7 +1537,8 @@ fn append_render_faces(
     mesh: &mut MeshData,
     slots: &mut Vec<usize>,
     terrain_projection: Option<(usize, &RenderTri)>,
-) -> Result<()> {
+) -> Result<usize> {
+    let mut collapsed = 0;
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
         let slot = gl.face_id[face] as usize;
         if slot >= materials.len() {
@@ -1554,8 +1556,10 @@ fn append_render_faces(
         // Collision was emitted separately. These fragments cover no surface in
         // the export, even if their original double-precision coordinates differ.
         if triangle_area_normal(points.map(native_export_point)) == [0.; 3] {
+            collapsed += 1;
             continue;
         }
+        let points = points.map(|point| point.map(|axis| f64::from(axis as f32)));
         let n = normal(points[0], points[1], points[2]);
         for (v, p) in points.iter().enumerate() {
             mesh.positions.extend(p.map(|x| x as f32));
@@ -1575,7 +1579,7 @@ fn append_render_faces(
             .extend([first as u32, first as u32 + 1, first as u32 + 2]);
         slots.push(slot);
     }
-    Ok(())
+    Ok(collapsed)
 }
 
 // Automatic cuts may span a change of grade along the same horizontal run.
@@ -2323,7 +2327,7 @@ pub fn generate_preserved_connector(
     let chart_points = if points.iter().all(|point| point[2] == points[0][2]) { &level_span[..] } else { &points[..] };
     let mut render = if bent { collision_source } else { connector_charts(chart_points, side, height, sky) };
     crate::bsp_triangulate::refine_connector_charts(&mut render, MAX_OUTPUT_TRIANGLES)?;
-    append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
+    let collapsed = append_render_faces(&render, &materials, &mut mesh, &mut triangle_materials, None)?;
     mesh.parts.push(maps::MeshPart { name: "Intact BSP connector".into(), index_start: 0, index_count: mesh.indices.len() });
     let mut warnings = vec![format!("Shared floor spans {:.2} and {:.2} units. Runtime travel requires playtesting.",
         2. * landings[0].1, 2. * landings[1].1)];
@@ -2332,9 +2336,12 @@ pub fn generate_preserved_connector(
     } else {
         warnings.push(format!("Maximum floor difference is {:.3} units.", landings[0].2.max(landings[1].2)));
     }
+    if collapsed > 0 {
+        warnings.push(format!("Render repair omitted {collapsed} fragments with zero export area. Review the connector preview before building."));
+    }
     let report = AssemblyReport {
-        input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri(),
-        generated_uv_faces: render.num_tri(), walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
+        input_triangles: 0, output_triangles: mesh.indices.len() / 3, connector_triangles: render.num_tri() - collapsed,
+        generated_uv_faces: render.num_tri() - collapsed, walk_samples: route_clearance.iter().map(|route| route.walk_samples).sum(),
         portal_count: 0, route_clearance, donor_scenery: 0,
         warnings,
     };
@@ -3885,7 +3892,7 @@ mod tests {
             shader_class: Some("senv".into()), flags: 0, collision_only: false,
         };
         let (mut mesh, mut slots) = (MeshData::default(), Vec::new());
-        append_render_faces(&gl, &[material], &mut mesh, &mut slots, None).unwrap();
+        assert_eq!(append_render_faces(&gl, &[material], &mut mesh, &mut slots, None).unwrap(), 1);
         assert_eq!(mesh.indices, [0, 1, 2]);
         assert_eq!(slots, [0]);
         assert_eq!(mesh.positions, [0., 0., 0., 2., 2e-8, 0., 4., 0., 0.]);

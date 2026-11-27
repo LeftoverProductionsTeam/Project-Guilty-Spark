@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { ArrowRight, ChevronDown, FileCode2, RotateCcw } from 'lucide-react';
-import { classNames, fieldValue, formatNumber, shortPath } from '../editor';
+import { classNames, effectiveReferenceId, fieldValue, formatNumber, shortPath } from '../editor';
 import type { Project, Tag, TagField } from '../types';
 import { NumberField } from './ui';
 import { renamedTagPath } from '../tagRenames';
@@ -45,12 +45,14 @@ export default function TagFields({
   tags,
   advanced = false,
   change,
+  onNavigate,
 }: {
   project: Project;
   tag: Tag;
   tags: Tag[];
   advanced?: boolean;
   change: (field: TagField, value: number) => void;
+  onNavigate?: (id: number) => void;
 }) {
   const prefix = useId();
   const referencePath = (id:number) => {
@@ -59,9 +61,14 @@ export default function TagFields({
   };
   const vehicleRules = tag.fields.filter(isVehicleRule);
   const usesCarrierReference = tag.fields.some(field => field.targetClass === 'actv' || field.targetClass === 'vehi');
+  const physics = tag.class === 'vehi' && usesCarrierReference ? tag.references
+    .filter(ref => ref.class === 'phys')
+    .map(ref => tags.find(target => target.id === effectiveReferenceId(project,tag,ref) && target.class === 'phys'))
+    .find(target => target !== undefined) : undefined;
   return tag.fields.length ? (
     <>
       {usesCarrierReference && <p className="subtle">Choose a replacement from this map. Save an edited map copy and test it in the target game.</p>}
+      {physics && onNavigate && <button type="button" className="small-button" onClick={()=>onNavigate(physics.id)}>Open carrier physics</button>}
       {tag.class === 'phys' && <p className="subtle">These coefficients apply to every object that uses this physics tag.</p>}
       {!!vehicleRules.length && <VehicleRules project={project} tag={tag} rules={vehicleRules} change={change} />}
       {tag.fields.filter(field => !isVehicleRule(field)).map((field) => {
@@ -69,6 +76,7 @@ export default function TagFields({
           changed = value !== field.value;
         const detailedReference = field.kind === 'reference' && ['proj', 'actv', 'vehi'].includes(field.targetClass ?? '');
         const references=field.kind==='reference' ? tags.filter(candidate=>candidate.class===field.targetClass) : [];
+        const linked = detailedReference && references.some(candidate=>candidate.id===value);
         if(detailedReference)references.sort((a,b)=>shortPath(renamedTagPath(project,a)).localeCompare(shortPath(renamedTagPath(project,b)))||renamedTagPath(project,a).localeCompare(renamedTagPath(project,b)));
         const picker = field.kind === 'reference' && (
           <select
@@ -124,6 +132,10 @@ export default function TagFields({
                   onCommit={(next) => change(field, next)}
                 />
               )}
+              {linked && onNavigate && <button type="button" className="field-reset"
+                aria-label={`Open ${field.label} tag`} title={referencePath(value)} onClick={()=>onNavigate(value)}>
+                <ArrowRight size={13} />
+              </button>}
               <button
                 className="field-reset"
                 aria-label={`Reset ${field.label}`}

@@ -31,6 +31,50 @@ export interface GpuLightmapDraft {
   release:()=>void;
 }
 
+/** An ordinary image for the matching BSP page in Aether. The GPU returns
+ * bottom-up rows, so the TGA specifies that origin and can keep the row order.
+ * Lighting is mapped to linear 8-bit channels without display tone mapping. */
+export function encodeAetherLightmapPage(draft: Pick<GpuLightmapDraft,'size'|'pixels'>): Uint8Array<ArrayBuffer> {
+  const {size,pixels}=draft;
+  if (![256,512,1024].includes(size) || pixels.length!==size*size*4) {
+    throw Error('Choose a baked GPU lightmap page.');
+  }
+  const output=new Uint8Array(18+size*size*3);
+  const header=new DataView(output.buffer);
+  output[2]=2;
+  header.setUint16(12,size,true);
+  header.setUint16(14,size,true);
+  output[16]=24;
+  const coverage=new Uint8Array(size*size);
+  const encode=(channel:number)=>Math.round(Math.min(1,Math.max(0,channel))*255);
+  for(let i=0;i<coverage.length;i++){
+    const p=i*4;
+    if(!Number.isFinite(pixels[p+3]))throw Error('Lightmap coverage is invalid.');
+    if(pixels[p+3]<=0.5)continue;
+    if(!pixels.subarray(p,p+3).every(Number.isFinite))throw Error('Lightmap color is invalid.');
+    coverage[i]=1;
+    output[18+i*3]=encode(pixels[p+2]);
+    output[19+i*3]=encode(pixels[p+1]);
+    output[20+i*3]=encode(pixels[p]);
+  }
+  if(!coverage.includes(1))throw Error('This lightmap page has no covered texels.');
+  // Extend colors two texels for bilinear filtering. Bake values and original
+  // chart coordinates stay intact, and every step reads only the previous ring.
+  for(let ring=1;ring<=2;ring++){
+    for(let i=0;i<coverage.length;i++){
+      if(coverage[i])continue;
+      const x=i%size;
+      const adjacent=[i-size,i+size,x>0?i-1:-1,x+1<size?i+1:-1];
+      const source=adjacent.find(j=>coverage[j]>0 && coverage[j]<=ring);
+      if(source===undefined)continue;
+      coverage[i]=ring+1;
+      const at=18+source*3;
+      output.copyWithin(18+i*3,at,at+3);
+    }
+  }
+  return output;
+}
+
 const uvVertex=[
   'precision highp float;',
   'in vec3 position; in vec3 normal; in vec2 lightmapUv;',

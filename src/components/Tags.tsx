@@ -419,7 +419,7 @@ export default function Tags({
               {isNativeHud(selectedTag)?<HudEditor key={project.id+':'+inspection.sha256+':'+selectedTag.id}
                 project={project} tag={selectedTag} tags={tags} advanced={advanced} edit={edit} notify={notify} onNavigate={navigateToTag}/>:<TagFields
                 project={project} tag={selectedTag} tags={tags} advanced={advanced}
-                change={(field, value) => change(selectedTag, field, value)}/>}
+                change={(field, value) => change(selectedTag, field, value)} onNavigate={navigateToTag}/>}
               <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
             </div>
             {projectile && rocket && (

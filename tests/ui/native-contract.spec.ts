@@ -7275,6 +7275,56 @@ test('Chupathingy Forge places and reopens a base-map control', async ({page}) =
   await expect(physics).toHaveValue('fixed');
 });
 
+test('advanced HMV16 placement edits save and undo without changing its effect data', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const open = (window as any).__sparkMock.projects.a;
+    open.project.source.cacheVersion = 5;
+    open.inspection.header.version = 5;
+    open.inspection.header.crc32 = 0;
+  });
+  const original = Buffer.from('SEZSRwQAQAABAAAAdGVzdAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIAEwCEAAAAsn6lSXBhZXcMd2VhcG9uc1x0ZXN0AAAA/wAAgD8AAABAAABAQAAAAAAAAIA+AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAA//8C/wAAgEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAVGVzdCBGb3JnZQBTcGFyawAAAA==','base64');
+  const recordAt = 64+5+original[68];
+  const metaAt = original.length-original.readUInt16LE(54);
+  const tag = Buffer.from('effects/test'.replace('/','\\'));
+  const reference = Buffer.concat([Buffer.from('effe'.split('').reverse().join('')),Buffer.from([tag.length]),tag]);
+  const effect = Buffer.alloc(48);
+  effect.writeUInt16LE(1);
+  effect[2]=23;
+  effect.writeFloatLE(1,4);
+  effect[39]=5;
+  const input = Buffer.concat([original.subarray(0,recordAt),reference,original.subarray(recordAt,metaAt),effect,original.subarray(metaAt)]);
+  input.writeUInt16LE(16,4);
+  input.writeUInt16LE(2,50);
+  input.writeUInt16LE(3,52);
+  input.writeUInt32LE(input.length-64,56);
+  input.writeUInt32LE(crc32(input.subarray(64)),60);
+
+  await openFixture(page);
+  await chooseTool(page,'Level editor');
+  await page.getByRole('button',{name:'Forge layouts',exact:true}).click();
+  const panel=page.locator('.forge-sidecar-panel');
+  await panel.getByLabel('Import Forge layout').setInputFiles({name:'effect.hmv',mimeType:'application/octet-stream',buffer:input});
+  await panel.getByText('Edit advanced Forge placements',{exact:true}).click();
+  const position=panel.getByRole('spinbutton',{name:'X',exact:true});
+  await expect(position).toHaveValue('1');
+  await position.fill('9.25');
+  await panel.getByRole('button',{name:'Apply advanced placement',exact:true}).click();
+  await page.keyboard.press('Control+z');
+  await expect(position).toHaveValue('1');
+  await page.keyboard.press('Control+y');
+  await expect(position).toHaveValue('9.25');
+  await page.keyboard.press('Control+s');
+  const at=recordAt+reference.length+96;
+  await expect.poll(async()=>{
+    const bytes=await page.evaluate(()=>(window as any).__sparkMock.saved?.forgeSidecar?.bytes);
+    return bytes ? Buffer.from(bytes).readFloatLE(at+4) : null;
+  }).toBe(9.25);
+  const saved=Buffer.from(await page.evaluate(()=>(window as any).__sparkMock.saved.forgeSidecar.bytes));
+  expect(saved.subarray(at+20)).toEqual(input.subarray(at+20));
+  await expect(panel.getByRole('button',{name:'Export for Forerunner',exact:true})).toBeDisabled();
+});
+
 test('Chupathingy Forge .hmv uses the shared history, Save and lossless export controls', async ({page}) => {
   await mockDesktop(page);
   await page.evaluate(() => {

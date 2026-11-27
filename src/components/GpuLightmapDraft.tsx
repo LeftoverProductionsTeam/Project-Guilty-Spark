@@ -5,7 +5,8 @@ import type {MapInspection,MeshData,ShaderPreview,Vec3} from '../types';
 import type {EditorEnvironment} from '../environment';
 import {sunlightPosition,toHex,validateEnvironment} from '../environment';
 import {inspectLightmapPages} from '../haloLightmap';
-import {bakeGpuLightmapDraft} from '../gpuLightmap';
+import {bakeGpuLightmapDraft,encodeAetherLightmapPage} from '../gpuLightmap';
+import {downloadMedia} from '../machinimaCapture';
 import type {GpuLightmapDraft as Draft} from '../gpuLightmap';
 
 /** Capture the existing R3F renderer; never construct a second context. */
@@ -48,7 +49,7 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
   const [pageKey,setPageKey]=useState(''),[size,setSize]=useState<256|512|1024>(512);
   const page=pages.find(p=>p.key===pageKey)??pages[0];
   const [busy,setBusy]=useState(false),[status,setStatus]=useState(''),[preview,setPreview]=useState<{url:string;label:string}|null>(null);
-  const operation=useRef<AbortController|null>(null),held=useRef<{url:string;release:()=>void}|null>(null);
+  const operation=useRef<AbortController|null>(null),held=useRef<(Draft & {url:string})|null>(null);
   function discard() {if(held.current){URL.revokeObjectURL(held.current.url);held.current.release();held.current=null;}}
   // Retained editor may pause. Cancel pending work without sharing its GL state.
   // Completed drafts survive workspace pauses; geometry/source/light changes invalidate them.
@@ -75,7 +76,7 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
       const blob=await displayPage(output,controller.signal);
       controller.signal.throwIfAborted();
       url=URL.createObjectURL(blob);
-      held.current={url,release:output.release};
+      held.current={...output,url};
       setPreview({url,label:output.triangles+' triangles · '+output.coveredTexels+' covered texels · '+output.size+'²'});
       setStatus('Direct-light GPU draft ready · original/native pages unchanged');
       output=undefined;url=undefined;
@@ -90,8 +91,7 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
   return <details className="gs-gpu-lightmap-draft">
     <summary>Spark GPU lightmap draft</summary>
     <p className="forge-hint">Direct sun, BSP shadows and ambient fill on existing native UVs.
-      Opaque BSP only; no object shadows, indirect light, emissive transport, fog or native output.
-      This draft does not replace the native Halo Tool/OpenTool baking workflows.</p>
+      The bake includes opaque BSP surfaces. Export the original UV page for Aether and review the compiled bitmap in Halo Tool.</p>
     <div className="action-row" style={{display:'flex',flexWrap:'wrap',gap:4}}>
       <select aria-label="GPU draft native lightmap page" value={page?.key??''} disabled={busy}
         onChange={e=>setPageKey(e.target.value)}>
@@ -111,7 +111,16 @@ export default function GpuLightmapDraft({renderer,mesh,inspection,environment,a
       <img src={preview.url} alt="Tone-mapped GPU direct-light draft, not a native Halo lightmap"
         style={{display:'block',maxWidth:'100%',width:256,height:'auto'}}/>
       <figcaption className="forge-hint">{preview.label} · Display tone mapping: Reinhard + sRGB.
-        Source {inspection?.sha256.slice(0,12)}. No game or native-output acceptance.</figcaption>
+        Source {inspection?.sha256.slice(0,12)}.</figcaption>
+      <button className="small-button" type="button" onClick={()=>{
+        const draft=held.current;
+        if(!draft||draft.sourceSha256!==inspection?.sha256||draft.key!==page?.key||draft.size!==size)return;
+        try {
+          const tga=encodeAetherLightmapPage(draft);
+          downloadMedia('spark-'+draft.sourceSha256.slice(0,12)+'-bsp-'+page.bspIndex+'-page-'+page.page+'.tga',new Blob([tga],{type:'image/x-tga'}));
+          setStatus('Exported Aether source image for BSP '+(page.bspIndex+1)+', page '+page.page+'.');
+        } catch(error){setStatus(error instanceof Error?error.message:String(error));}
+      }}>Export Aether lightmap page</button>
     </figure>}
   </details>;
 }

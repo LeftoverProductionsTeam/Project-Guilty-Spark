@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgePlacementSnapshot, exportForerunnerTextHmv, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
+import { addHmvObjective, addHmvPlacement, addHmvTeleporterPair, changeHmvObjectiveSlot, changeHmvTeleporterChannel, exportForgePlacementSnapshot, exportForerunnerTextHmv, exportForgeSidecar, importForgeSidecar, inspectForgeSidecar, removeForgeSidecar, removeHmvPlacement, showHmvDevices, showHmvMarkers, updateHmvAdvancedPose, updateHmvLayoutDetails, updateHmvPlacementProperties, updateHmvSpawnProperties } from './forgeSidecar';
 import { crc32 } from './sourceZip';
 import { readHmv, supportsChupathingyForge } from './forgeHmv';
 import type { MapInspection, Project } from './types';
@@ -190,6 +190,17 @@ describe('Chupathingy Forge binary layouts', () => {
     expect(saved.slice(advancedStart, advancedStart + rows.length * 48))
       .toEqual(fixture.slice(advancedStart, advancedStart + rows.length * 48));
     expect(saved.slice(-originalMeta.length - canvas.length, -originalMeta.length)).toEqual(canvas);
+    const decalPlacement = final.advancedPlacements.find(row=>row.label==='decals')!;
+    const pose = { position: [8, -3, 2] as [number,number,number], yaw: 0.75 };
+    const revised = updateHmvAdvancedPose(reopenedProject, map, decalPlacement.index, pose);
+    const moved = exportForgeSidecar(revised, map) as Uint8Array;
+    expect(readHmv(Array.from(moved),map).advancedPlacements.find(row=>row.index===decalPlacement.index)).toMatchObject(pose);
+    const recordStart=advancedStart+(decalPlacement.index-2)*48;
+    // Only the payload checksum and the selected pose may change.
+    expect(moved.slice(0,60)).toEqual(fixture.slice(0,60));
+    expect(moved.slice(64,recordStart+4)).toEqual(fixture.slice(64,recordStart+4));
+    expect(moved.slice(recordStart+20)).toEqual(fixture.slice(recordStart+20));
+    expect(()=>updateHmvAdvancedPose(reopenedProject,map,0,pose)).toThrow('no longer in the layout');
 
     const without257th = readHmv(Array.from(readHmv(Array.from(fixtures[2]), map).remove(256)), map);
     expect(without257th.version).toBe(11);

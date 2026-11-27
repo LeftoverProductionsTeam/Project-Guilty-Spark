@@ -15,6 +15,12 @@ const recordSize = 48;
 const metadataSizes = [32, 32, 128, 17] as const;
 const metadataControl = /[\u0000-\u001f\u007f-\u009f]/;
 export type HmvLayoutDetails = { title: string; author: string; description: string };
+export type HmvAdvancedPose = { position: Vec3; yaw: number };
+export type HmvAdvancedPlacement = HmvAdvancedPose & {
+  index: number;
+  label: string;
+  path?: string;
+};
 export const HMV_TELEPORTER_CHANNELS = 16;
 const teleporterLimit = 32;
 const objectiveLimit = 64;
@@ -229,6 +235,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
   let markers = false, senders = 0, receivers = 0;
   const hills = new Uint8Array(16);
   const advancedCounts = new Uint16Array(advancedKinds.length);
+  const advancedPlacements: HmvAdvancedPlacement[] = [];
   let aiMovement = 0;
   for (let index = 0; index < recordsCount; index++, offset += recordSize) {
     const kind = bytes[offset + 2], team = view.getInt8(offset + 3);
@@ -266,6 +273,10 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
         requireLayout(!team && !variant && ref?.group === (kind === 23 ? 'effe' : 'deca')
           && (kind === 23 ? p0 <= 60 : p0 >= 1 && p0 <= 40)
           && parameters.subarray(1).every(value => value === 0), invalid);
+      }
+      if (kind !== 22) {
+        const [x, y, z, yaw] = transform;
+        advancedPlacements.push({ index, label: feature.label, path: ref?.path, position: [x, y, z], yaw });
       }
       recordVersions[index] = feature.version;
       markers = true;
@@ -447,6 +458,7 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     spawnRecords,
     teleporterRecords,
     objectiveRecords,
+    advancedPlacements,
     details,
     date,
     version,
@@ -460,6 +472,12 @@ export function readHmv(input: number[], map: HmvBaseIdentity) {
     write(index: number, position: Vec3, rotation: Vec3) {
       requireEditablePlacement(index);
       writePose(view, recordsStart + index * recordSize + 4, position, rotation, isMarker(index));
+    },
+    writeAdvancedPose(index: number, pose: HmvAdvancedPose) {
+      requireLayout(advancedPlacements.some(record => record.index === index), 'select a spatial advanced record.');
+      writePose(view, recordsStart + index * recordSize + 4, pose.position, [pose.yaw, 0, 0], true);
+      writeChecksum(bytes, view);
+      return bytes;
     },
     writeDetails(updated: HmvLayoutDetails) {
       requireLayout(updated.title.length > 0, 'enter a layout title.');

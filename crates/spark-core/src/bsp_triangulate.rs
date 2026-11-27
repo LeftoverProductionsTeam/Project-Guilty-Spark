@@ -21,8 +21,11 @@ fn at(m: &MeshGL64, id: u64) -> V {
     std::array::from_fn(|k| m.vert_properties[id as usize * m.num_prop as usize + k])
 }
 fn face(m: &MeshGL64, t: [u64; 3]) -> (V, f64) {
-    let a = sub(at(m, t[1]), at(m, t[0]));
-    let b = sub(at(m, t[2]), at(m, t[0]));
+    triangle_quality(t.map(|id| at(m, id)))
+}
+fn triangle_quality([origin, b, c]: [V; 3]) -> (V, f64) {
+    let a = sub(b, origin);
+    let b = sub(c, origin);
     let n = cross(a, b);
     let size = dot(n, n).sqrt();
     let max = dot(a, a).max(dot(b, b)).max(dot(sub(a, b), sub(a, b)));
@@ -55,6 +58,11 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
         return 0;
     }
+    let point = |mesh: &MeshGL64, id| {
+        let position = at(mesh, id);
+        if native_render { position.map(|axis| f64::from(axis as f32)) } else { position }
+    };
+    let quality = |mesh: &MeshGL64, ids: [u64; 3]| triangle_quality(ids.map(|id| point(mesh, id)));
     let mut flips = 0;
     for _ in 0..16 {
         let mut edges: BTreeMap<(u64, u64), Vec<(usize, u64, u64, u64)>> = BTreeMap::new();
@@ -84,8 +92,8 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             }
             let old = [a, b, c];
             let other = [b, a, d];
-            let (n, q) = face(m, old);
-            let (n2, q2) = face(m, other);
+            let (n, q) = quality(m, old);
+            let (n2, q2) = quality(m, other);
             // Check the fourth UV against the better-conditioned chart.
             // Projecting from a nearly collinear triangle magnifies rounding
             // and can reject a valid diagonal in the same affine chart.
@@ -100,7 +108,7 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             } else {
                 continue;
             };
-            if [c, d].into_iter().any(|id| dot(sub(at(m, id), at(m, a)), reference).abs() > 1e-7) {
+            if [c, d].into_iter().any(|id| dot(sub(point(m, id), point(m, a)), reference).abs() > 1e-7) {
                 continue;
             }
             // Only exported render slivers may vary slightly within the same
@@ -116,8 +124,8 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             }
             let left = [c, d, b];
             let right = [d, c, a];
-            let (nl, ql) = face(m, left);
-            let (nr, qr) = face(m, right);
+            let (nl, ql) = quality(m, left);
+            let (nr, qr) = quality(m, right);
             if dot(reference, nl) < 1. - 1e-10
                 || dot(reference, nr) < 1. - 1e-10
                 || ql.min(qr) <= q.min(q2) * 1.01 + 1e-10
@@ -361,7 +369,7 @@ mod tests {
             vert_properties: vec![
                 0., 0., 0., 0., 0.,
                 4., 0., 0., 1., 0.,
-                2., 0., 0., 0.5, 0.,
+                2., 0., 1e-48, 0.5, 0.,
                 2., -4., 0., 0.5, -1.,
             ],
             ..Default::default()
