@@ -7945,7 +7945,7 @@ test('creator converts an Atlas seam draft to a road that retains both BSPs', as
   await (await constructionControl(page, 'button', 'Keep both BSPs and build the crossing')).click();
   await expect(await constructionControl(page, 'checkbox', 'Preserve both BSPs in native build')).toBeChecked();
   await expect(await constructionControl(page, 'checkbox', 'Open land bridge')).toBeChecked();
-  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await (await constructionControl(page, 'button', 'Preview draft & triangles')).click();
   await expect.poll(() => page.evaluate(() => (window as any).__atlasRoadPreview?.draft)).toMatchObject({
     separateNativeBsps: true, preserveDonorBsp: true, openRoad: true,
     tunnelWidth: 6, tunnelHeight: 4, tunnelShaderPath: 'synthetic/road',
@@ -8054,13 +8054,13 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await expect(tunnelLighting).toBeChecked();
   await tunnelLighting.uncheck();
   await tunnelLighting.check();
-  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await (await constructionControl(page, 'button', 'Preview draft & triangles')).click();
   await expect.poll(() => page.evaluate(() => (window as any).__intactPreviewArgs.draft.tunnelBakeFill)).toBe(true);
   await (await constructionControl(page, 'button', 'Apply connection')).click();
   await page.keyboard.press('Control+s');
   await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.bspAssembly?.tunnelBakeFill)).toBe(true);
   await (await constructionControl(page, 'checkbox', 'Open land bridge')).check();
-  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await (await constructionControl(page, 'button', 'Preview draft & triangles')).click();
   await expect.poll(() => page.evaluate(() => (window as any).__intactPreviewArgs.draft.openRoad)).toBe(true);
   await (await constructionControl(page, 'button', 'Apply connection')).click();
   await page.keyboard.press('Control+s');
@@ -8073,7 +8073,7 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await (await constructionControl(page,'button','Plan underground infantry tunnel')).click();
   await expect(assembly.getByText('Enclosed native tunnel · 2.0 wide',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__regionalPlanArgs.regionalPreset)).toBe('undergroundInfantryTunnel');
-  await (await constructionControl(page,'button','Preview connector with donor intact')).click();
+  await (await constructionControl(page,'button','Preview draft & triangles')).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__intactPreviewArgs.draft.tunnelPoints[1][2])).toBe(-20);
   await (await constructionControl(page,'button','Apply connection')).click();
   await page.keyboard.press('Control+s');

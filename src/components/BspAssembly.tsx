@@ -478,6 +478,10 @@ export default function BspAssembly({
   const selectedSection=draft?.sections?.find(section=>routeView===`section:${section.id}`);
   const secondary=selectedSection??(routeKey&&draft?.[routeKey]);
   const routeDraft=draft&&secondary?{...draft,tunnelPoints:secondary.points,tunnelWidth:secondary.width,tunnelHeight:secondary.height,tunnelShaderPath:secondary.shaderPath,archSegments:selectedSection?.archSegments,openRoad:selectedSection?.openRoad??false}:draft;
+  const nativePrimary = !!draft?.separateNativeBsps && !secondary;
+  const lockedRouteShape = editingRetained && !secondary;
+  const minRouteWidth = routeDraft?.openRoad ? (nativePrimary ? 6 : 3) : 0.8;
+  const minRouteHeight = routeDraft?.openRoad ? (nativePrimary ? 4 : 3) : 1;
   function updateRoute(change:Partial<Plan>){
     if(selectedSection){update({sections:draft!.sections!.map(section=>section.id===selectedSection.id?{...section,points:change.tunnelPoints??section.points,width:change.tunnelWidth??section.width,height:change.tunnelHeight??section.height,shaderPath:change.tunnelShaderPath??section.shaderPath,...('archSegments' in change?{archSegments:change.archSegments}:{}),...('openRoad' in change?{openRoad:change.openRoad}:{})}:section)});}
     else if(routeKey&&secondary){const route=secondary;update({[routeKey]:{...route,
@@ -514,7 +518,7 @@ export default function BspAssembly({
     await perform(async current=>{
       const signature=assemblySignature(value);
       setRouteIssue(null);
-      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector ? { intactConnector: true } : {})}).catch(cause=>{
+      const checked=await call<AssemblyReport>('preview_bsp_assembly',{projectId:project.id,includeGeometry:true,draft:value,nativeBspIndex:value.separateNativeBsps ? nativeBspIndex : undefined,...(intactConnector || value.preserveDonorBsp ? { intactConnector: true } : {})}).catch(cause=>{
         const point = assemblyRouteIssuePoint(String(cause));
         if (point && current() && latest.current.signature === signature) setRouteIssue({signature,point});
         throw cause;
@@ -878,10 +882,26 @@ export default function BspAssembly({
                 units; Z is up. Moving the section also moves its tunnel mouth.
               </p>
               {selectedSection&&<label className="bsp-section-name">Section name<input aria-label="Seam section name" maxLength={60} value={selectedSection.name} onChange={e=>update({sections:draft.sections!.map(section=>section.id===selectedSection.id?{...section,name:e.target.value}:section)})}/></label>}
-              {(!draft.terrainSeam||!!selectedSection)&&!routeKey&&<label>Opening <select aria-label="Seam opening shape" value={routeDraft!.archSegments?'arch':routeDraft!.openRoad?'road':'tunnel'} disabled={busy} onChange={e=>updateRoute({archSegments:e.target.value==='arch'?6:undefined,openRoad:e.target.value==='road',...(e.target.value==='road'?{tunnelWidth:Math.max(4,routeDraft!.tunnelWidth),tunnelHeight:Math.max(4,routeDraft!.tunnelHeight)}:{})})}><option value="tunnel">Rectangular tunnel</option><option value="arch">Arch through both sides</option><option value="road">Open canyon road</option></select></label>}
+              {(!draft.terrainSeam || !!selectedSection) && !routeKey && (
+                <label>Opening <select aria-label="Seam opening shape"
+                  value={routeDraft!.archSegments ? 'arch' : routeDraft!.openRoad ? 'road' : 'tunnel'}
+                  disabled={busy || lockedRouteShape} onChange={event => {
+                    const opening = event.target.value;
+                    updateRoute({ archSegments: opening === 'arch' ? 6 : undefined, openRoad: opening === 'road',
+                      ...(opening === 'road' ? {
+                        tunnelWidth: Math.max(nativePrimary ? 6 : 4, routeDraft!.tunnelWidth),
+                        tunnelHeight: Math.max(4, routeDraft!.tunnelHeight),
+                      } : {}) });
+                  }}>
+                  <option value="tunnel">Rectangular tunnel</option>
+                  {!nativePrimary && <option value="arch">Arch through both sides</option>}
+                  <option value="road" disabled={nativePrimary && (!draft.preserveDonorBsp || draft.tunnelPoints.length > 2)}>Open canyon road</option>
+                </select></label>
+              )}
+              {lockedRouteShape && <small>Existing landings and opening stay fixed. Drag or snap the interior bends, then preview clearance.</small>}
               <div className="bsp-seam-sliders">
-                <label>Width <output>{routeDraft!.tunnelWidth.toFixed(1)}</output><input type="range" aria-label="Seam preview width" min={routeDraft!.openRoad?3:.8} max={16} step={.1} value={routeDraft!.tunnelWidth} onChange={e=>updateRoute({tunnelWidth:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
-                <label>Head clearance <output>{routeDraft!.tunnelHeight.toFixed(1)}</output><input type="range" aria-label="Seam preview height" min={routeDraft!.openRoad?3:1} max={16} step={.1} value={routeDraft!.tunnelHeight} onChange={e=>updateRoute({tunnelHeight:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
+                <label>Width <output>{routeDraft!.tunnelWidth.toFixed(1)}</output><input type="range" aria-label="Seam preview width" disabled={lockedRouteShape} min={minRouteWidth} max={16} step={.1} value={routeDraft!.tunnelWidth} onChange={e=>updateRoute({tunnelWidth:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
+                <label>Head clearance <output>{routeDraft!.tunnelHeight.toFixed(1)}</output><input type="range" aria-label="Seam preview height" disabled={lockedRouteShape} min={minRouteHeight} max={16} step={.1} value={routeDraft!.tunnelHeight} onChange={e=>updateRoute({tunnelHeight:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>
                 {routeDraft!.archSegments&&<label>Arch facets <output>{routeDraft!.archSegments}</output><input type="range" aria-label="Seam arch facets" min={2} max={12} step={1} value={routeDraft!.archSegments} onChange={e=>updateRoute({archSegments:Number(e.target.value)})} onPointerUp={()=>void previewDraft()} onKeyUp={previewSliderKey}/></label>}
                 <button disabled={busy||!native||!selectionMatches} onClick={()=>void previewDraft()}>{busy?'Rebuilding preview…':'Preview draft & triangles'}</button>
                 <span>Release a slider or adjust it with the arrow, Home/End or Page Up/Down keys to rebuild the exact preview and triangle count. Apply keeps it as one undoable source edit; native compilation is still required.</span>
@@ -975,7 +995,7 @@ export default function BspAssembly({
                   {routeDraft!.archSegments?'Arch radius':'Tunnel width'}
                   <NumberField
                     value={routeDraft!.archSegments?routeDraft!.tunnelWidth/2:routeDraft!.tunnelWidth}
-                    min={routeDraft!.archSegments?0.4:0.8}
+                    min={routeDraft!.archSegments ? 0.4 : minRouteWidth}
                     max={routeDraft!.archSegments?8:16}
                     step={0.1}
                     label={routeDraft!.archSegments?'Tunnel arch radius':'Tunnel width'}
@@ -988,7 +1008,7 @@ export default function BspAssembly({
                   Clear height
                   <NumberField
                     value={routeDraft!.tunnelHeight}
-                    min={1}
+                    min={minRouteHeight}
                     max={16}
                     step={0.1}
                     label="Tunnel clear height"
@@ -1149,10 +1169,10 @@ export default function BspAssembly({
                 {draft.separateNativeBsps && <>
                   <p>{draft.preserveDonorBsp ? 'Spark keeps both native BSPs and builds only the connector. Choose MCC13.' : canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
                   {canPreserveBsp && (!stockAtlasSeed || !!draft.atlasFromRegionId) && baseParts.length <= 14 && <div>
-                    <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends before changing BSP preservation.' : undefined}><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || draft.tunnelPoints.length > 2 || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
+                    <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends before changing BSP preservation.' : undefined}><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || editingRetained || draft.tunnelPoints.length > 2 || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
                       onChange={event => update({ preserveDonorBsp: event.target.checked, openRoad: event.target.checked && draft.openRoad, tunnelBakeFill: event.target.checked && !draft.openRoad })} /> Preserve both BSPs in native build</label>
                     {draft.preserveDonorBsp && <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends to use a straight land bridge.' : undefined}>
-                      <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy || draft.tunnelPoints.length > 2}
+                      <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy || editingRetained || draft.tunnelPoints.length > 2}
                         onChange={event => update(event.target.checked ? {
                           openRoad: true, tunnelBakeFill: false, tunnelWidth: Math.max(6, draft.tunnelWidth), tunnelHeight: Math.max(4, draft.tunnelHeight),
                         } : { openRoad: false })} /> Open land bridge
@@ -1167,8 +1187,8 @@ export default function BspAssembly({
                       <input type="checkbox" checked={draft.directionalDonorLanding ?? false} disabled={busy}
                         onChange={event => update({ directionalDonorLanding: event.target.checked })} /> Fit floor at donor switches
                     </label>}
-                    <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
-                      onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>
+                    {!draft.preserveDonorBsp && <button type="button" disabled={busy || !native || !selectionMatches || draft.yawDegrees !== 0}
+                      onClick={() => void previewDraft(draft, true)}>Preview connector with donor intact</button>}
                     <p className="subtle">With preservation enabled, apply and save the connection, then build for MCC13. The connector gets its own BSP slot. Leave straight space around each landing for the native switches.</p>
                   </div>}
                   <button type="button" disabled={busy || !native || !selectionMatches || !applied}
