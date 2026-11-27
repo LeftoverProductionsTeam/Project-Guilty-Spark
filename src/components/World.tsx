@@ -6,7 +6,9 @@ import {NATIVE_COMMAND_VIEW} from '../nativeOperations';
 import type {NativeTagContext,NativeCommandDraft} from '../nativeOperations';
 import NativeTriggerVolumeOverlay from './NativeTriggerVolumeOverlay';
 import {NATIVE_VOLUME_VIEW,volumeCenter,volumeQuaternion} from '../nativeTriggerVolume';
-import {NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
+import {assemblySignature, NATIVE_BSP_SWITCH_PREVIEW} from '../bspAssembly';
+import {BSP_STRUCTURE_WITNESS, type BspStructureWitness} from '../haloWrl';
+import {WrlErrorOverlay} from './ForgeViewport';
 import type {NativeBspSwitchPreview} from '../bspAssembly';
 import type {NativeVolumeView} from '../nativeTriggerVolume';
 import {NATIVE_CAMERA_VIEW,cameraPoint,nativeCameraPose} from '../nativeCutsceneCamera';
@@ -754,6 +756,9 @@ export default function World({
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
+  const [bspWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
+  const currentBspDiagnostics = bspWitness && bspWitness.sourceSha256 === project.source?.sha256 &&
+    bspWitness.assemblySignature === assemblySignature(project.bspAssembly ?? null) ? bspWitness.diagnostics : null;
   const assemblyDonor=useAssemblyDonor(project,pickTarget==='donor'&&!!pickingLanding),assembly=assemblyDonor.source,assemblyPlan=assemblyDonor.plan;
   const donorBounds=useMemo(()=>assembly&&assemblyPlan?assemblyBounds(assembly.terrain,assemblyPlan.translation,assemblyPlan.yawDegrees):null,[assembly?.terrain,assemblyPlan?.translation,assemblyPlan?.yawDegrees]);
   const joinedBaseMesh=assemblyDonor.preview?.surfaces.find(surface=>surface.source===0)?.mesh;
@@ -1886,6 +1891,7 @@ export default function World({
                     onSceneDragEnd={onSceneDragEnd}
                   />
                 )}
+                {!cinematic && project.bspAssembly && currentBspDiagnostics && <WrlErrorOverlay diagnostics={currentBspDiagnostics} />}
                 {!cinematic&&!externalCameraAuthority&&<NativeTriggerVolumeOverlay project={project} mode={mode} enabled={activity.active&&!fly&&!cameraLocked&&!pickTarget} snap={snap} onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}
                 {!cinematic&&!externalCameraAuthority&&<NativeAiStartOverlay project={project} command={nativeCommand} onCommandChange={setNativeCommand} mode={mode} enabled={activity.active&&!fly&&!cameraLocked&&!pickTarget} snap={snap}
                   onSelectScene={()=>{setPlayerView(false);setSelected(null);setZoneSelection(null);}} onStart={onSceneDragStart} onEnd={onSceneDragEnd} notify={notify}/>}

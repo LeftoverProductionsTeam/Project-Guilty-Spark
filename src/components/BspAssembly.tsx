@@ -17,7 +17,7 @@ import MapSourceDrop from './MapSourceDrop';
 import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import { analyzeHaloToolLog } from '../haloToolDiagnostics';
-import { parseHaloWrl } from '../haloWrl';
+import { BSP_STRUCTURE_WITNESS, parseHaloWrl, type BspStructureWitness } from '../haloWrl';
 import { volumeCenter } from '../nativeTriggerVolume';
 import type { NativeVolumeGeometry } from '../nativeOperations';
 type StructureCheck = {
@@ -239,6 +239,7 @@ export default function BspAssembly({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
+  const [visibleWitness, setVisibleWitness] = useMapState<BspStructureWitness | null>(project.id, BSP_STRUCTURE_WITNESS, null);
   const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
   const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
@@ -460,6 +461,7 @@ export default function BspAssembly({
     if (!draft || !applied || !selectionMatches || busy) return;
     const key = structureKey;
     setStructureCheck(null);
+    setVisibleWitness(null);
     await perform(async current => {
       const check = await call<StructureCheck>(
         'check_bsp_assembly_structure', { projectId: project.id, draft });
@@ -1042,6 +1044,8 @@ export default function BspAssembly({
                         : 'Native structure check failed'}</strong>
                       {currentStructureCheck.issue && <p>{currentStructureCheck.issue}</p>}
                       {structureActions.length > 0 && <ul>{structureActions.map(action => <li key={action}>{action}</li>)}</ul>}
+                      {visibleWitness?.sourceSha256 === project.source?.sha256 && visibleWitness?.assemblySignature === assemblySignature(draft) &&
+                        <button type="button" onClick={() => setVisibleWitness(null)}>Clear native error overlay</button>}
                       {currentStructureCheck.witnesses.map(witness => {
                         try {
                           const geometry = parseHaloWrl(witness.text);
@@ -1051,6 +1055,10 @@ export default function BspAssembly({
                           ];
                           return locations.length > 0 && <details key={witness.name}>
                             <summary>Affected areas in {witness.name}</summary>
+                            <button type="button" onClick={() => {
+                              if (project.source) setVisibleWitness({ sourceSha256: project.source.sha256,
+                                assemblySignature: assemblySignature(draft), diagnostics: geometry });
+                            }}>Show native errors in viewport</button>
                             <ul>{locations.map(([label, point], index) => (
                               <li key={index}>{label} near {point.map(axis => axis.toFixed(3)).join(', ')} in Halo world units</li>
                             ))}</ul>
