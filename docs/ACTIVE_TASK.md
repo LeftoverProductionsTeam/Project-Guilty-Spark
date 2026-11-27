@@ -5,7 +5,7 @@ Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 4f28d8f8 / bf4c156e includes the curved Box plow. Previous 42c19e04 / d0135aaa. Earlier 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependencies and road-plow collision. Exact 61f8d17b appeared in Forerunner’s Zombies chooser. Windows blocked Host before map load. Latest guides users to Play Solo and keeps Stop available after edits.
-Next action: bake reviewed Sidewinder source aea17d8e through the native CE609 builder. Verify Warthog clearance on d0 with a normal UNSC driver, then merge Extraction pools.
+Next action: localize structure open edges 1329–1331 on Sidewinder source aea17d8e before any full retry. d0 foot and Ghost loops passed. Verify Warthog clearance with a stock Spartan before merging Extraction pools.
 
 ## Acceptance
 
@@ -41,7 +41,7 @@ Folder prefix is `megaworld-compact-native-`. Keep f5a4ca22 / 4a095213 as the re
 - Spark commit 4e218d25 runs retained-connector geometry checks before tag staging. Exact Death Island cache d893d81c reproduces retained-BSP intrusion at (-179.31, 387.98, 1.09) and now stops before creating a staging job. The Boarding Action control separately stops at (732.50, 53.19, -17.66). The exact b5178c77 source passed the in-place clearance check using its retained entrances and preserved switch volumes.
 - Spark 37b53042 verifies both scenery closures (15 files). The sparse test recovered 13 from exact source. Physical short paths in fe892849 fixed Halo Tool opening a 273-character tag path. Native slot 10 baked two pages (BSP 1745ccfd, bitmap 4d163cd5). The owner purged the physical Forerunner staging folder containing this bake. Recover exact surviving inputs before packaging. Stock Windows Invader 5606801e refused 11 skies at its eight-slot limit. No playable cache from this edit.
 - Construction can select and save an in-place edit to an inherited isolated connector. Preview and Build require its original landings, switch volumes and BSP slot identities. The actual editor-led native bake/reopen and traversal remain unverified. This path edits the connector alone. The entrance ramp and floor patches in b517 still use the retained native repair harness.
-- Exact d0c4c13b passed the first-person 11→10→3→10→11 foot loop on 02aa847e. d08ec305 restored Warthog spawn. The Elite lacks a Warthog seat-entry animation. Evidence and the separate mask-only control are recorded in MEGAWORLD_SEAM_ROUTES_20261108.md. Two-way Warthog and the final receipt await native acceptance.
+- Exact d0c4c13b passed the first-person 11→10→3→10→11 foot loop on 02aa847e. d08ec305 restored Warthog spawn and passed the Ghost round trip. The Elite lacks a Warthog seat-entry animation. Evidence and the separate mask-only control are recorded in MEGAWORLD_SEAM_ROUTES_20261108.md. Two-way Warthog and the final receipt await native acceptance.
 
 ## Operations and safe checkpoint
 
