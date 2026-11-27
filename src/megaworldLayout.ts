@@ -8,6 +8,21 @@ export interface ExtractionPoint {row:number;label:string;position:Vec3;teamInde
 export type ExtractionPoints = Record<"playerStarts"|"weapons"|"vehicles", ExtractionPoint[]>;
 export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[];extraction?:Record<string, ExtractionPool>}
 
+export function stockExtractionDraft(points:ExtractionPoints):ExtractionPool {
+  const eligible=(team:number)=>points.playerStarts.filter(point=>point.teamIndex===team||point.teamIndex===-1);
+  const first=eligible(0).find(start=>eligible(1).some(other=>other.row!==start.row));
+  const second=first&&eligible(1).find(start=>start.row!==first.row);
+  const vehicles=points.vehicles.map(point=>point.row);
+  const occupied=new Set(points.vehicles.map(point=>point.position.join(',')));
+  const weapons=points.weapons.filter(point=>{
+    const key=point.position.join(',');
+    if(occupied.has(key))return false;
+    occupied.add(key);
+    return true;
+  }).map(point=>point.row);
+  return {playerStarts:first&&second?[first.row,second.row]:[],weapons,vehicles};
+}
+
 export function selectedExtractionPoints(pool:ExtractionPool, candidates:ExtractionPoints, authoredVehicles:ReadonlyMap<string,ExtractionPoint>=new Map()):ExtractionPoints {
   const select = (kind:keyof ExtractionPoints, minimum:number, maximum=Infinity) => {
     const rows = pool[kind];

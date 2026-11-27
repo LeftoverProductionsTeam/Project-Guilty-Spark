@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {call,native} from '../api';
 import type {Project} from '../types';
-import {previewExtractionRoll,selectedExtractionPoints} from '../megaworldLayout';
+import {previewExtractionRoll,selectedExtractionPoints,stockExtractionDraft} from '../megaworldLayout';
 import type {ExtractionPoints,ExtractionPool,LayoutRegion,MegaworldLayout} from '../megaworldLayout';
 
 const fields=[
@@ -80,6 +80,11 @@ export default function AtlasExtraction({region,layout,project,readOnly,onLayout
     <button disabled={!native||working} onClick={()=>void readPoints()}>{working?'Reviewing native points…':'Read native points'}</button>
     {error&&<p role="alert">{error}</p>}
     {candidates&&<>
+      {!saved&&pool.playerStarts.length===0&&pool.weapons.length===0&&pool.vehicles.length===0&&!pool.authoredVehicleIds?.length&&
+        <button type="button" disabled={readOnly||!currentReview} onClick={()=>{
+          setDraft({savedKey,pool:stockExtractionDraft(candidates)});
+          setPreview(null);
+        }}>Fill from reviewed stock placements</button>}
       {!candidates.vehicles.length&&<p role="status" className="atlas-note">
         This region has no stock vehicle point. Place an imported native vehicle on supported ground in World, then assign it here.
       </p>}

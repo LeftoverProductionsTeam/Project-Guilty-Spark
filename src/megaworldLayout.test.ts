@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import stockAtlas from '../docs/fixtures/c43-original-bsp-atlas.json';
-import {alignAtlasDonor,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout,selectedExtractionPoints,previewExtractionRoll} from './megaworldLayout';
+import {alignAtlasDonor,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout,selectedExtractionPoints,previewExtractionRoll,stockExtractionDraft} from './megaworldLayout';
 import type {AtlasRegion,ExtractionPoint,ExtractionPoints} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
@@ -139,4 +139,19 @@ it('keeps a saved Extraction pool when reorganizing or adding Atlas regions',()=
  const extraction={[source.id]:{playerStarts:[1,3],weapons:[2,5,6],vehicles:[1]}};
  expect(spreadLayout({...plan,extraction}).extraction).toEqual(extraction);
  expect(addLayoutRegions({...plan,extraction},[region('neighbor',1)]).extraction).toEqual(extraction);
+});
+
+it('fills a starter draft with faction starts and preserves room for an authored vehicle',()=>{
+ const point=(row:number,x:number,teamIndex?:number):ExtractionPoint=>({row,label:String(row),position:[x,0,0],teamIndex});
+ const candidates:ExtractionPoints={
+  playerStarts:[point(10,0,-1),point(11,1,0),point(12,2,1)],
+  weapons:[point(20,10),point(21,11),point(22,12),point(23,13)],
+  vehicles:[point(30,13)]
+ };
+ const draft=stockExtractionDraft(candidates);
+ expect(draft).toEqual({playerStarts:[10,12],weapons:[20,21,22],vehicles:[30]});
+ expect(()=>selectedExtractionPoints(draft,candidates)).not.toThrow();
+ expect(stockExtractionDraft({...candidates,vehicles:[]})).toEqual({
+  playerStarts:[10,12],weapons:[20,21,22,23],vehicles:[]
+ });
 });
