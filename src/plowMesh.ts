@@ -4,7 +4,9 @@ export type PlowProfile = 'moldboard' | 'rounded' | 'v';
 
 export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile,
   detail: 'render' | 'collision' = 'render'): MeshData {
-  const columns = detail === 'collision' ? 8 : 16;
+  // A straight blade is constant across its width. One collision column
+  // keeps its exact profile without introducing seams at the hull join.
+  const columns = detail === 'render' ? 16 : wrap === 0 ? 1 : 8;
   const rows = detail === 'collision' ? 4 : 12;
   const mesh: MeshData = { positions: [], indices: [], uvs: [], label: 'Plow blade', source: 'Spark shape' };
   const rake = Math.min(depth, height * 0.7);

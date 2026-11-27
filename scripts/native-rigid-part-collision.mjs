@@ -70,11 +70,8 @@ export async function buildNativeRigidPartCollision({
    }
    return v;
  }
- const stem='spark_workshop/vehicle_blade_collision';
- const output=stem+'/vehicle_blade_collision.model_collision_geometry';
- const folder=path.join(data,stem,'physics');
- await fs.mkdir(folder,{recursive:true});await fs.mkdir(path.join(tags,stem),{recursive:true});
- await fs.copyFile(path.join(tags,originalTag),path.join(tags,output));
+ const bladeStem='spark_workshop/vehicle_blade_collision';
+ const stockStem='spark_workshop/vehicle_stock_collision';
 
  const allPermutations=[...new Set(baseline.regions.flatMap(region=>region.permutations.map(perm=>perm.name)))];
  const script=fileURLToPath(new URL('./vehicle-collision-union.py',import.meta.url));
@@ -91,7 +88,7 @@ export async function buildNativeRigidPartCollision({
    console.log(JSON.stringify({stockFaces:stock.faces.length,bladeFaces:faces.length,bakedFaces:output.faces.length,blender:log.trim().split(/\r?\n/).slice(-2)}));
    return output;
  }
- for(const permutation of allPermutations){
+ async function writePermutation(permutation,folder,includeBlade){
    const vertices=[],triangles=[];
    for(const [index,node] of baseline.nodes.entries()){
      if(node.name!==rig[index].name)throw Error('Collision node order differs from renderer');
@@ -108,7 +105,7 @@ export async function buildNativeRigidPartCollision({
          geometry.faces.push({corners:[corners[0],corners[corner],corners[corner+1]],material:surface.material});
        }
      }
-     if(index===hull&&permutation==='__base')geometry=await unionHull(geometry);
+     if(includeBlade&&index===hull&&permutation==='__base')geometry=await unionHull(geometry);
      for(const vertex of geometry.points)vertices.push(String(index),vertex.map(value=>value.toFixed(6)).join('\t'),'0\t0\t1','-1','0','0\t0\t0');
      for(const face of geometry.faces)triangles.push(String(node.region),String(face.material),face.corners.map(vertex=>vertex+base).join('\t'));
    }
@@ -116,13 +113,24 @@ export async function buildNativeRigidPartCollision({
    const text=['8200',String(source.checksum|0),String(source.nodes.length),...source.rig,String(baseline.materials.length),...materials,'0',String(baseline.regions.length),...baseline.regions.map(region=>region.name),String(vertices.length/6),...vertices,String(triangles.length/3),...triangles].join('\n')+'\n';
    await fs.writeFile(path.join(folder,permutation+' superhigh.jms'),text,{flag:'wx'});
  }
- const logging=await launch(compiler,['collision-geometry',stem.replaceAll('/','\\')]);
- const warnings=logging.split(/\r?\n/).filter(line=>line.includes('### WARNING'));
- if(/### ERROR|exception/i.test(logging)||!/(created|updated) collision model/.test(logging))throw Error('Native collision compiler refused the seeded geometry');
-
- const rebuiltText=await dump(output),candidate=read(rebuiltText);
- const metadata=text=>text.split(/\r?\n(?=nodes\[\d+\]\s+array)/,1)[0].trim();
- if(metadata(originalText)!==metadata(rebuiltText))throw Error('Native damage, material definitions, regions or other collision metadata changed');
+ async function compileCollision(stem,includeBlade){
+   const output=stem+'/'+path.posix.basename(stem)+'.model_collision_geometry';
+   const folder=path.join(data,stem,'physics');
+   await fs.mkdir(folder,{recursive:true});
+   await fs.mkdir(path.join(tags,stem),{recursive:true});
+   await fs.copyFile(path.join(tags,originalTag),path.join(tags,output));
+   for(const permutation of allPermutations)await writePermutation(permutation,folder,includeBlade);
+   const logging=await launch(compiler,['collision-geometry',stem.replaceAll('/','\\')]);
+   if(/### ERROR|exception/i.test(logging)||!/(created|updated) collision model/.test(logging))
+     throw Error('Native collision compiler refused '+stem);
+   const rebuiltText=await dump(output);
+   const metadata=text=>text.split(/\r?\n(?=nodes\[\d+\]\s+array)/,1)[0].trim();
+   if(metadata(originalText)!==metadata(rebuiltText))
+     throw Error('Native damage, material definitions, regions or other collision metadata changed in '+stem);
+   return {output,result:read(rebuiltText),warnings:logging.split(/\r?\n/).filter(line=>line.includes('### WARNING'))};
+ }
+ const stock=await compileCollision(stockStem,false);
+ const {output,result:candidate,warnings}=await compileCollision(bladeStem,true);
  const polygons=bsp=>bsp.surfaces.map((_,index)=>polygon(bsp,index));
  const pointMatches=(a,b)=>a.every((value,axis)=>Math.abs(value-b[axis])<=.000025);
  const sameFace=(a,b)=>a.points.length===b.points.length&&a.material===b.material&&a.flags.join()===b.flags.join()&&
@@ -159,6 +167,7 @@ export async function buildNativeRigidPartCollision({
  if(!contact.every(row=>row.after!==null&&(row.before===null||row.after>row.before+.04)))throw Error('Blade contact is missing from the native collision readback');
  return { tag: output.replaceAll('/','\\'), permutations:allPermutations,nodes:baseline.nodes.length,
    preservedNonHullNodes:baseline.nodes.length-1,
-   originalHullSurfaces:stockHull.surfaces.length,hullSurfaces:newHull.surfaces.length,contact,warnings };
+   originalHullSurfaces:stockHull.surfaces.length,stockRebuildSurfaces:stock.result.nodes[hull].bsps[0].surfaces.length,
+   hullSurfaces:newHull.surfaces.length,contact,stockWarnings:stock.warnings,warnings };
 
 }

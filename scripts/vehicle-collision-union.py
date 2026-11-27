@@ -56,6 +56,13 @@ def combine_collision(source, destination):
     bmesh.ops.remove_doubles(topology, verts=list(topology.verts), dist=0.12)
     if any(not edge.is_manifold for edge in topology.edges):
         raise ValueError("The composed collider is not closed")
+    # The blade grid contains planar strips and the union can leave pieces of
+    # those strips at the mount. Remove their internal edges before selecting
+    # diagonals for Tool. Keep distinct collision materials and the curved rows.
+    bmesh.ops.dissolve_limit(
+        topology, angle_limit=0.00001, verts=list(topology.verts),
+        edges=list(topology.edges), delimit={'MATERIAL'},
+    )
     bmesh.ops.triangulate(topology, faces=list(topology.faces))
     topology.to_mesh(stock.data)
     topology.free()

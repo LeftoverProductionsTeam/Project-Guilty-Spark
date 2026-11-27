@@ -4,8 +4,8 @@ Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native ga
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark a76db616 / c651df64. Windows app passed Road plow profile, curl, paint, collapse/reopen and Undo. Previous 59f954c2 / 4db2570a retains verified Blender review/apply/Undo/Redo/Save/reopen. Prior eight-size, OpenCE restart and window handoff evidence retained. Monitor patrol remains open.
-Zombie Survival: 05a4268a logged 102 failed carrier exits. Road-plow MCC13 cache 901cacc5 passed CRC, paint UV/material readback at all four LODs and hull contact readback. Forerunner deaca69b loaded it through Host Zombie Apocalypse and enabled the authored roster. Both test roots retired. Boarding, driving and the near-coplanar warning remain open.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the private Zombie Survival variant and review its hull warning.
+Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier road blade 901cacc5 through Host Zombie Apocalypse. Stock collider built clean. H1A marked the blade/hood tangent at x92.9 z46.7 cm. A 2 cm deeper mount and removal of redundant planar edges produced clean MCC13 cdcbe2c5 with matching CRC, paint/LOD readback and all three contact samples. V-plow warning, road-blade driving and creator attachment workflow remain open.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive clean road blade cdcbe2c5 and expose reviewed vehicle attachments in Spark.
 
 ## Acceptance
 

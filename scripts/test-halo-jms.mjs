@@ -36,6 +36,13 @@ const roadTopology=auditQuickForgeMesh(roadBlade);
 assert.equal(roadTopology.edgeClosedShellCandidates,1);
 assert.equal(roadTopology.windingConflicts,0);
 assert.equal(roadTopology.nonManifoldEdges,0);
+const roadCollision=plowMesh([.22,3,.72],80,0,'moldboard','collision');
+assert.equal(roadCollision.indices.length/3,36);
+assert.equal(auditQuickForgeMesh(roadCollision).edgeClosedShellCandidates,1);
+// The simplified collider keeps the two edges of each sampled lateral strip.
+for(let row=0;row<5;row++)for(let edge=0;edge<2;edge++)
+  assert.deepEqual(roadCollision.positions.slice((row*2+edge)*3,(row*2+edge)*3+3),
+    roadBlade.positions.slice((row*3*17+edge*16)*3,(row*3*17+edge*16)*3+3));
 
 const recovered=[
   '8200','4180762708','2',

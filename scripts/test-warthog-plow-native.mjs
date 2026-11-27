@@ -67,7 +67,9 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const bladeWidth=Math.min(width*1.1/100,2.5);
   const dimensions=[.22,bladeWidth,.65];
   const mesh=plowMesh(dimensions,curl,sweep,bladeProfile);
-  const origin=[front+15,0,bottom+5],proof=[];
+  // Seat the road blade farther into the hood so the rear face crosses the
+  // hull decisively instead of leaving a barely intersecting strip.
+  const origin=[front+(bladeProfile==='moldboard'?13:15),0,bottom+5],proof=[];
   const paint=paintSource?await compileNativePartPaint({source:path.resolve(paintSource),tags,data,run}):null;
   const mount={node:'frame hull',region:'hull',material:paint?.name??'warthog hull',position:origin.map(x=>x/100)};
   for(const name of await fs.readdir(base)){
@@ -161,6 +163,8 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
       contactSamples:[[0,0],[contactWidth,0],[-contactWidth,0]],
     });
   }
+  if(bladeProfile==='moldboard'&&collision?.warnings.length)
+    throw Error('Road blade collision compiler warning: '+collision.warnings.join('; '));
   const references=[['model',candidate]];
   if(collision)references.push(['collision_model',collision.tag]);
   await run('edit',['-t',tags,...references.flatMap(([field,tag])=>['-S',field,tag]),'-O',variant,vehicle]);
