@@ -1,14 +1,16 @@
 # Active engineering checkpoint
 
-Task: Product Completion V2.1. P0 compact MegaWorld, P1 creator toolchain, P2 flagship game creation, P3 quality and compatibility.
+Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 Spark ab6e71ab adds Join BSP partial coplanar overlap preflight. Native retained Timberland–Sidewinder preview matched previous b1392c32, including the same four preexisting collapsed faces. Source hashes were preserved. Previous is b1392c32.
-Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
+Latest verified revision: Win64 356ec94f, SHA d75b353d. A real Forerunner operator HREC imported 46 editable keys and a named take, persisted and queued into the native Director. Previous is 33744cf.
+Creator tooling: Local f3f7582 and 413f783 verify Atlas pool authoring and readback on the installed map. Local 2351425 opens rendered tunnel ends and retains collision; native visual acceptance is open. Prior compact four-region eb07d166 remains a reference, including the verified west approach.
 Be Native is a retained regression fixture. The 8ef8f62 checkpoint has the physical seat, flight and HUD evidence.
-Next action: run packaged Construction preview on retained Timberland–Sidewinder. Native-precision render retriangulation and zero-area emission guards passed focused BSP tests. Continue compact Timberland–Blood Gulch, operation-level Forge, guarded reload and original Demo parity.
+Next action: Private 19-region 919fbcce / receipt 204b37f6 in megaworld-compact-native-919fbcce was handed to Forerunner. Slots 3/10/11 and switches 18–21 rebuilt, 493 relocated rows verified, 11 untouched BSP tags byte-identical. Compiled clearance rejects Carousel BSP 3 intruding near (794.77,-11.41,-29.70). Trace the exact face and repair the local entrance, then verify normal-spawn foot/Warthog round trips with rendering. Restore stock spatial ambience before release. Rebuilt slots use representative original assignments.
 
-PRODUCT COMPLETION V2.1 sets the current priorities. P0 is reliable compact world construction. P1 is the full creator toolchain. P2 is flagship game creation. P3 is product quality and compatibility. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Existing Be Native and stand-alone tests are retained regression fixtures. Reuse the existing Spark and Forerunner contracts and keep the current Latest ground preview playable.
+Extraction: Forerunner handoff sealed fd7a49fa / 868a8adf / 3ce3b0da in megaworld-19-pools-native-fd7a49fa. All 19 pools, old placements and 14 BSP tags verified. All three files rehashed after handoff. Keep exact bytes for native acceptance. Latest fcfe9d44 preserved.
+
+Product Completion V3 governs priorities. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Keep the single released ground Extraction preview playable. Installed Forerunner 4ed9dcfe loaded MegaWorld through Choose Map & Host and spawned in the UNSC hub. Play Solo offered Be Native only; report that runtime selector defect separately.
 
 ## Acceptance
 
