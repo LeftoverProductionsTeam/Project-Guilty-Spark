@@ -555,6 +555,10 @@ function Scene({
         key={"buried-spawn-" + issue.imported + "-" + issue.index}
         points={[issue.position, [issue.position[0], issue.position[1], issue.floorHeight + 0.3]]}
         color="#ff617a" raycast={() => null} lineWidth={5} depthTest={false} renderOrder={1002} />)}
+      {!cinematic && joinedPreview?.terrainSceneryIssues?.map(issue => <Line
+        key={"unsupported-scenery-" + issue.imported + "-" + issue.id}
+        points={[issue.position, [issue.position[0], issue.position[1], issue.floorHeight ?? issue.position[2] - 1]]}
+        color="#ffae64" raycast={() => null} lineWidth={4} depthTest={false} renderOrder={1002} />)}
       {!cinematic && joinedPreview?.sourcePreflight && (() => {
         const {examples, lightingExamples, facingExamples = []} = joinedPreview.sourcePreflight;
         const outline = (vertices: [Vec3, Vec3, Vec3], color: string, key: string) =>

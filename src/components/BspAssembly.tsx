@@ -1322,6 +1322,14 @@ export default function BspAssembly({
                       {!issue.imported && project.scene.some(object => object.id === "spawn-" + issue.index) && <button onClick={() => { selectObject("spawn-" + issue.index); revealPanel("inspector"); }}>Select spawn</button>}
                     </li>)}</ul>
                   </div>}
+                  {!!report.terrainSceneryIssues?.length && <details open>
+                    <summary>Scenery to review ({report.terrainSceneryIssues.length})</summary>
+                    <p>The terrain join lowered or removed the ground under these props.</p>
+                    <ul>{report.terrainSceneryIssues.map(issue => <li key={String(issue.imported) + issue.id}>
+                      {issue.name}{issue.imported ? " · Imported" : ""} · {issue.floorHeight === null ? "No floor nearby" : (issue.position[2] - issue.floorHeight).toFixed(2) + " units above the ground"}
+                      {!issue.imported && <button onClick={() => { selectObject(issue.id); revealPanel("inspector"); }}>Select scenery</button>}
+                    </li>)}</ul>
+                  </details>}
                   {report.sourcePreflight && report.sourcePreflight.blockedFaces > 0 ? (
                     <div role="alert">
                       <p>Native build blocked by {report.sourcePreflight.blockedFaces} source faces. The preview outlines examples in red and overlapping faces in orange. Adjust the join and check the preview again.</p>

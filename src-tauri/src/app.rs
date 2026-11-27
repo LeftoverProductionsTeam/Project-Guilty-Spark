@@ -778,13 +778,15 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
                 if standard_multiplayer {
                     let starts = core::bsp_assembly::preview_terrain_start_issues(&p, &i, &donor, &geometry).map_err(error)?;
                     if !starts.is_empty() { result["terrainStartIssues"] = serde_json::to_value(starts).map_err(error)?; }
+                    let scenery = core::bsp_assembly::preview_terrain_scenery_issues(&p, &i, &donor, &geometry).map_err(error)?;
+                    if !scenery.is_empty() { result["terrainSceneryIssues"] = serde_json::to_value(scenery).map_err(error)?; }
                     match maps::scenario_gameplay_merge_budget(&source.preserved_path, &i, &plan.donor_source.preserved_path, &donor) {
                         Ok(budget) => result["nativeGameplayBudget"] = serde_json::to_value(budget).map_err(error)?,
                         Err(e) => result["nativeGameplayBudgetError"] = serde_json::json!(e.to_string()),
                     }
                 }
             }
-            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor && replacement_slot.is_none(),"sourcePreflight":result["sourcePreflight"].clone(),"terrainStartIssues":result.get("terrainStartIssues"),"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor && replacement_slot.is_none(),"sourcePreflight":result["sourcePreflight"].clone(),"terrainStartIssues":result.get("terrainStartIssues"),"terrainSceneryIssues":result.get("terrainSceneryIssues"),"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
         }
         if let (Some(slot), Some(viewport)) = (replacement_slot, result.get_mut("viewport")) {
             viewport["replacementSlot"] = slot.into();

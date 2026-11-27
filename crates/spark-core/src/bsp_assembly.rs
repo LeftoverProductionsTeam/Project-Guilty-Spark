@@ -2208,6 +2208,61 @@ pub fn preview_terrain_start_issues(
     crate::bsp_player_starts::PreparedStarts::from_sources(project, base, plan, donor, limit)?.generated_terrain_issues(geometry)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerrainSceneryIssue {
+    pub id: String,
+    pub name: String,
+    pub imported: bool,
+    pub position: [f32; 3],
+    pub floor_height: Option<f32>,
+}
+
+/// Compare support at originally grounded scenery origins after the native
+/// terrain join. Preserve authored placements and report cases for review.
+pub fn preview_terrain_scenery_issues(
+    project: &Project, base: &MapInspection, donor: &MapInspection, geometry: &AssemblyGeometry,
+) -> Result<Vec<TerrainSceneryIssue>> {
+    let Some(plan) = project.bsp_assembly.as_ref().filter(|plan| !plan.separate_native_bsps && plan.terrain_seam.is_some()) else {
+        return Ok(Vec::new());
+    };
+    let source = project.source.as_ref().ok_or_else(|| SparkError::Invalid("Missing terrain source".into()))?;
+    let indices: Vec<_> = geometry.mesh.indices.chunks_exact(3).zip(&geometry.triangle_materials)
+        .filter(|(_, slot)| {
+            let material = &geometry.materials[**slot];
+            material.collision_only && material.flags & 2 == 0
+        })
+        .flat_map(|(ids, _)| ids.iter().copied()).collect();
+    let joined = crate::bsp_clearance::RouteChecker::for_indices(&geometry.mesh, &indices)?;
+    let edited: BTreeMap<_, _> = project.scene.iter().map(|object| (object.id.as_str(), object)).collect();
+    let mut issues = Vec::new();
+    for (imported, map, path) in [(false, base, &source.preserved_path), (true, donor, &plan.donor_source.preserved_path)] {
+        if imported && !plan.include_donor_scenery { continue; }
+        let mut candidates = Vec::new();
+        for original in map.objects.iter().filter(|object| object.kind == "Scenery" && object.tag_id.is_some()) {
+            let object = if imported { original } else { edited.get(original.id.as_str()).copied().unwrap_or(original) };
+            let local = object.position;
+            let position = if imported {
+                transform(local.map(f64::from), plan.translation, plan.yaw_degrees).map(|v| v as f32)
+            } else { local };
+            let floor_height = joined.native_ground_z([position[0], position[1], position[2] + 0.04], 12.);
+            if floor_height.is_none_or(|floor| position[2] - floor > 0.35) {
+                candidates.push((object, position, floor_height));
+            }
+        }
+        if candidates.is_empty() { continue; }
+        let (collision, _) = maps::collision_source(path, map)?;
+        let source_floor = crate::bsp_clearance::RouteChecker::for_part(&collision, if imported { plan.donor_bsp_index } else { plan.base_bsp_index })?;
+        for (object, position, floor_height) in candidates {
+            let [x, y, z] = object.position;
+            if source_floor.native_ground_z([x, y, z + 0.04], 0.5).is_some_and(|floor| z - floor <= 0.15) {
+                issues.push(TerrainSceneryIssue { id: object.id.clone(), name: object.name.clone(), imported, position, floor_height });
+            }
+        }
+    }
+    Ok(issues)
+}
+
 pub fn generate_project(
     project: &Project,
     base: &MapInspection,

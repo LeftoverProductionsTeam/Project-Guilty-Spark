@@ -1949,6 +1949,13 @@ pub(crate) fn prepare_native_with_limits(
             ));
         }
     }
+    let terrain_scenery = bsp_assembly::preview_terrain_scenery_issues(project, inspection, &donor, &geometry)?;
+    if !terrain_scenery.is_empty() {
+        let names = terrain_scenery.iter().take(8).map(|issue| issue.name.as_str()).collect::<Vec<_>>().join(", ");
+        runner.emit("bsp-scenery-support", format!(
+            "The terrain join lowers or removes the ground under {} scenery placements. Review them in Construction. Affected scenery includes {names}.", terrain_scenery.len(),
+        ), 35, "warning");
+    }
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
     let donor_bsp = bsp_tag(&assembly.donor_source.preserved_path, &donor, assembly.donor_bsp_index)?;
