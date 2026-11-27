@@ -411,6 +411,8 @@ pub struct AssemblySourcePreflight {
     pub facing_examples: Vec<AssemblySourceIssue>,
     pub overlap_check_incomplete: bool,
     pub lighting_examples: Vec<AssemblySourceIssue>,
+    #[serde(skip)]
+    pub(crate) narrow_terrain_materials: BTreeSet<usize>,
     pub examples: Vec<AssemblySourceIssue>,
 }
 
@@ -579,6 +581,9 @@ impl AssemblyGeometry {
             }
             if let Some(altitude) = lighting_risk {
                 report.lighting_risks += 1;
+                if terrain && material.shader_class.as_deref() == Some("senv") {
+                    report.narrow_terrain_materials.insert(self.triangle_materials[triangle]);
+                }
                 let position = lighting_examples.partition_point(|(previous, _)| *previous <= altitude);
                 if position < 8 {
                     lighting_examples.insert(position, (altitude, AssemblySourceIssue {
@@ -2182,6 +2187,25 @@ fn append_exact_portals(
         }
     }
     Ok(cuts.len())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerrainStartIssue {
+    pub index: usize,
+    pub imported: bool,
+    pub position: [f32; 3],
+    pub floor_height: f64,
+}
+
+pub fn preview_terrain_start_issues(
+    project: &Project, base: &MapInspection, donor: &MapInspection, geometry: &AssemblyGeometry,
+) -> Result<Vec<TerrainStartIssue>> {
+    let Some(plan) = project.bsp_assembly.as_ref().filter(|plan| !plan.separate_native_bsps && plan.terrain_seam.is_some()) else {
+        return Ok(Vec::new());
+    };
+    let limit = maps::player_start_read_limit(base.header.version) + maps::player_start_read_limit(donor.header.version);
+    crate::bsp_player_starts::PreparedStarts::from_sources(project, base, plan, donor, limit)?.generated_terrain_issues(geometry)
 }
 
 pub fn generate_project(
@@ -5650,7 +5674,9 @@ mod tests {
             },
             materials: vec![
                 material("collision", true), material("render", false),
-                material("+exactportal", false), material("gster_test", false),
+                material("+exactportal", false), AssemblyMaterial {
+                    shader_class: Some("senv".into()), ..material("gster_test", false)
+                },
             ],
             triangle_materials: vec![0, 1, 2, 0, 3, 1],
             exact_sky_portals: Vec::new(),
@@ -5670,11 +5696,13 @@ mod tests {
         assert_eq!(report.blocked_faces, 2);
         assert_eq!(report.lighting_risks, 1);
         assert_eq!(report.lighting_examples[0].triangle, 4);
+        assert_eq!(report.narrow_terrain_materials, BTreeSet::from([3]));
         geometry.materials[3].name = "gsstock_carousel".into();
         geometry.materials[3].shader_class = Some("senv".into());
         let stock = geometry.source_preflight().unwrap();
         assert_eq!(stock.lighting_risks, 1);
         assert_eq!(stock.lighting_examples[0].triangle, 4);
+        assert!(stock.narrow_terrain_materials.is_empty());
         geometry.mesh.uvs[7] = 0.;
         let stock = geometry.source_preflight().unwrap();
         assert_eq!(stock.blocked_faces, 2, "Only the existing terrain guard rejects collapsed UVs");

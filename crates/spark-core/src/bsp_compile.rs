@@ -1937,7 +1937,18 @@ pub(crate) fn prepare_native_with_limits(
         return invalid(format!("Combined teleporter markers exceed the {} slots for the selected target", limits.flags));
     }
     let geometry = bsp_assembly::generate_project(project, inspection, runner.cancel)?;
-    geometry.source_preflight()?.require_buildable()?;
+    let source_preflight = geometry.source_preflight()?;
+    source_preflight.require_buildable()?;
+    if let Some(starts) = &restored_starts {
+        if let Some(issue) = starts.generated_terrain_issues(&geometry)?.first() {
+            let region = if issue.imported { "Imported" } else { "Destination" };
+            let [x, y, z] = issue.position;
+            return invalid(format!(
+                "{region} player start {} at ({x:.3}, {y:.3}, {z:.3}) is covered by the new landing at Z {:.3}. Adjust the landing or review the spawn position in Level Editor before building.",
+                issue.index, issue.floor_height,
+            ));
+        }
+    }
     let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_bsp = bsp_tag(&base_source.preserved_path, inspection, 0)?;
     let donor_bsp = bsp_tag(&assembly.donor_source.preserved_path, &donor, assembly.donor_bsp_index)?;
@@ -2021,9 +2032,45 @@ pub(crate) fn prepare_native_with_limits(
             Some(&format!("gsbsp_{}_1", &runner.id[..8])), &edit, runner, workspace, tags)?;
     crate::native_lighting::apply(project,tags,&inspection.scenario_path,&edit,runner,workspace)?;
     apply_outdoor_stock_skies(project, &bsp, &inspection.scenario_path, &edit, tools, runner, workspace, tags, limits.skies)?;
-    with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, [bsp.as_str()], |scenario| {
-        bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name, false)
-    })?;
+    // Use Halo Tool's alternate chart mode only for generated terrain
+    // aliases flagged by the existing source check. Restore the original
+    // native tag bytes before cache compilation, even when the bake fails.
+    let mut aliases = Vec::new();
+    for index in source_preflight.narrow_terrain_materials {
+        let material = &geometry.materials[index];
+        let tag = format!("gsbsp_{}_{}\\materials\\{}.shader_environment", &runner.id[..8], material.source, material.name);
+        let path = tags.join(safe_relative(&tag)?);
+        reject_links(&path)?;
+        let original = fs::read(&path)?;
+        let value = runner.run(&edit, &["-t".into(), tags.to_string_lossy().into_owned(),
+            "-G".into(), "shader_flags.simple_parameterization".into(), tag.clone()], workspace, "bsp-terrain-lightmap-chart", 65)?;
+        match value.trim() {
+            "0" => {}
+            "1" => aliases.push((tag, path, original)),
+            _ => return invalid("Native terrain shader did not report its lightmap chart mode"),
+        }
+    }
+    let baked = (|| {
+        for (tag, _, _) in &aliases {
+            runner.run(&edit, &["-t".into(), tags.to_string_lossy().into_owned(),
+                "-S".into(), "shader_flags.simple_parameterization".into(), "0".into(), tag.clone()], workspace, "bsp-terrain-lightmap-chart", 65)?;
+            let value = runner.run(&edit, &["-t".into(), tags.to_string_lossy().into_owned(),
+                "-G".into(), "shader_flags.simple_parameterization".into(), tag.clone()], workspace, "bsp-terrain-lightmap-chart", 65)?;
+            if value.trim() != "0" {
+                return invalid("Native terrain shader did not enter the bake chart mode");
+            }
+        }
+        with_native_bake_scenario(&inspection.scenario_path, &edit, runner, workspace, tags, [bsp.as_str()], |scenario| {
+            bake_structure_lightmaps(project, &tool, runner, workspace, scenario, name, false)
+        })
+    })();
+    for (_, path, original) in aliases {
+        project::atomic_write(&path, &original, false)?;
+        if fs::read(&path)? != original {
+            return invalid("Could not restore the staged terrain shader after baking");
+        }
+    }
+    baked?;
     if let Some(starts) = &restored_starts {
         starts.append(&inspection.scenario_path, tools, runner, workspace)?;
     }

@@ -75,6 +75,13 @@ interface AssemblySourcePreflight {
   facingExamples?: AssemblySourceIssue[];
 }
 
+interface TerrainStartIssue {
+  index: number;
+  imported: boolean;
+  position: Vec3;
+  floorHeight: number;
+}
+
 export interface AssemblyReport {
   inputTriangles: number;
   outputTriangles: number;
@@ -99,7 +106,8 @@ export interface AssemblyReport {
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number;lateralSamples?:number}[];
   warnings: string[];
   sourcePreflight?: AssemblySourcePreflight;
-  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;replacementSlot?:number;sourcePreflight?:AssemblySourcePreflight;surfaces:{source:number;mesh:import('./types').MeshData}[]};
+  terrainStartIssues?: TerrainStartIssue[];
+  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;replacementSlot?:number;sourcePreflight?:AssemblySourcePreflight;terrainStartIssues?:TerrainStartIssue[]|null;surfaces:{source:number;mesh:import('./types').MeshData}[]};
 }
 /** Semantic identity across IPC object-key ordering and old omitted options. */
 export function assemblySignature(plan: BspAssembly | null): string {

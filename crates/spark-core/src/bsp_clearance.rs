@@ -397,7 +397,19 @@ pub(crate) fn review_native_switch_floor(
 
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
-    pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh, &mesh.indices)? }) }
+    pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Self::for_indices(mesh, &mesh.indices) }
+
+    pub(crate) fn for_indices(mesh: &MeshData, indices: &[u32]) -> Result<Self> {
+        Ok(Self { index: Index::new(mesh, indices)? })
+    }
+
+    pub(crate) fn terrain_above_start(&self, position: [f32; 3]) -> Option<f64> {
+        // A 0.05-unit lift is already used by compiled placement ownership.
+        // A generated walkable surface within the standing capsule height can
+        // bury a previously valid spawn. Leave higher stacked terrain alone.
+        let raised = add(position.map(f64::from), [0., 0., 0.05]);
+        self.index.floor_in_range(raised, &mut Vec::new(), 0., 0.65)
+    }
 
     pub(crate) fn for_part(mesh: &MeshData, index: usize) -> Result<Self> {
         let part = mesh.parts.get(index).ok_or_else(|| SparkError::Invalid("Missing compiled partition collision".into()))?;

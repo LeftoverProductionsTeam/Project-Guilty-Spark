@@ -102,6 +102,25 @@ impl PreparedStarts {
         Ok(Self { base, donor, base_bsp_count })
     }
 
+    pub(crate) fn generated_terrain_issues(&self, geometry: &bsp_assembly::AssemblyGeometry) -> Result<Vec<bsp_assembly::TerrainStartIssue>> {
+        let terrain: Vec<_> = geometry.mesh.indices.chunks_exact(3).zip(&geometry.triangle_materials)
+            .filter(|(_, slot)| {
+                let material = &geometry.materials[**slot];
+                material.name.starts_with("gster") && material.shader_path.is_some() && !material.collision_only
+            })
+            .flat_map(|(indices, _)| indices.iter().copied()).collect();
+        if terrain.is_empty() { return Ok(Vec::new()); }
+        let checker = crate::bsp_clearance::RouteChecker::for_indices(&geometry.mesh, &terrain)?;
+        Ok([(false, &self.base), (true, &self.donor)].into_iter().flat_map(|(imported, rows)| {
+            rows.iter().enumerate().filter_map({
+                let checker = &checker;
+                move |(index, row)| checker.terrain_above_start(row.position).map(|floor_height| {
+                    bsp_assembly::TerrainStartIssue { index, imported, position: row.position, floor_height }
+                })
+            })
+        }).collect())
+    }
+
     pub(crate) fn append(
         &self,
         scenario: &str,

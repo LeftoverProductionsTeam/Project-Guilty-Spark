@@ -551,6 +551,10 @@ function Scene({
       {routeFailure && !cinematic && <mesh position={routeFailure} renderOrder={1003} raycast={() => null}>
         <sphereGeometry args={[0.35, 12, 8]} /><meshBasicMaterial color="#ff617a" depthTest={false} />
       </mesh>}
+      {!cinematic && joinedPreview?.terrainStartIssues?.map(issue => <Line
+        key={"buried-spawn-" + issue.imported + "-" + issue.index}
+        points={[issue.position, [issue.position[0], issue.position[1], issue.floorHeight + 0.3]]}
+        color="#ff617a" raycast={() => null} lineWidth={5} depthTest={false} renderOrder={1002} />)}
       {!cinematic && joinedPreview?.sourcePreflight && (() => {
         const {examples, lightingExamples, facingExamples = []} = joinedPreview.sourcePreflight;
         const outline = (vertices: [Vec3, Vec3, Vec3], color: string, key: string) =>

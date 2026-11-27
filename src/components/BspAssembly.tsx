@@ -238,6 +238,7 @@ export default function BspAssembly({
 }) {
   const {active}=useWorkspaceActivity();
   const revealPanel=useRevealWorkspacePanel();
+  const [, selectObject] = useMapState<string | null>(project.id, 'world.selection', null);
   const sourceSha256 = project.source?.sha256;
   const nativePartitioned = sourceSha256 && inspection?.sha256 === sourceSha256
     && (inspection.mesh.parts?.length ?? 0) > 1 && [609, 13].includes(inspection.header.version);
@@ -1314,6 +1315,13 @@ export default function BspAssembly({
                   {report.sourcePreflight?.overlapCheckIncomplete && (
                     <p>The overlap check reached its search limit. Check dense regions in smaller joins for a complete preview.</p>
                   )}
+                  {!!report.terrainStartIssues?.length && <div role="alert">
+                    <p>The landing covers {report.terrainStartIssues.length === 1 ? "one spawn" : report.terrainStartIssues.length + " spawns"}. Adjust the landing or a destination spawn before building.</p>
+                    <ul>{report.terrainStartIssues.map(issue => <li key={String(issue.imported) + issue.index}>
+                      {issue.imported ? "Imported" : "Destination"} spawn {issue.index + 1} · {issue.position.map(value => value.toFixed(2)).join(", ")} · floor Z {issue.floorHeight.toFixed(2)}
+                      {!issue.imported && project.scene.some(object => object.id === "spawn-" + issue.index) && <button onClick={() => { selectObject("spawn-" + issue.index); revealPanel("inspector"); }}>Select spawn</button>}
+                    </li>)}</ul>
+                  </div>}
                   {report.sourcePreflight && report.sourcePreflight.blockedFaces > 0 ? (
                     <div role="alert">
                       <p>Native build blocked by {report.sourcePreflight.blockedFaces} source faces. The preview outlines examples in red and overlapping faces in orange. Adjust the join and check the preview again.</p>
@@ -1321,7 +1329,7 @@ export default function BspAssembly({
                         <li key={issue.triangle}>Triangle {issue.triangle} · {issue.material} · {issue.center.map(value => value.toFixed(3)).join(', ')} · {issue.reason}{issue.overlapsTriangle !== undefined ? ` with triangle ${issue.overlapsTriangle}` : ''}</li>
                       ))}</ul>
                     </div>
-                  ) : <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>}
+                  ) : !report.terrainStartIssues?.length && <p>{draft.separateNativeBsps ? 'Build next to check the compiled BSPs. Test both directions of the passage and the switch volumes in a supported runtime.' : 'Build next to check compiled collision. Walk the cave and high ground, drive the road in both directions, then test cross-region sniper visibility in Halo.'}</p>}
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}
