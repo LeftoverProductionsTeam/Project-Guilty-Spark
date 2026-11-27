@@ -2419,7 +2419,7 @@ fn intact_common_separation(
     Ok(false)
 }
 
-fn separated_bounds(left: [[f64; 2]; 3], right: [[f64; 2]; 3], clearance: f64) -> bool {
+fn separated_bounds<const N: usize>(left: [[f64; 2]; N], right: [[f64; 2]; N], clearance: f64) -> bool {
     left.into_iter().zip(right).any(|(a, b)| b[0] - a[1] >= clearance || a[0] - b[1] >= clearance)
 }
 
@@ -2432,11 +2432,13 @@ fn verify_intact_neighborhood(
 ) -> Result<()> {
     let route = &plan.tunnel_points;
     let forward = horizontal_direction(&[route[0], *route.last().unwrap()]);
-    let axes = [forward, [-forward[1], forward[0], 0.], [0., 0., 1.]];
+    // The retained routes can be much longer than the new connector. A
+    // world-aligned separating plane may be tighter than the route's axes.
+    let axes = [forward, [-forward[1], forward[0], 0.], [0., 0., 1.], [1., 0., 0.], [0., 1., 0.]];
     let sides = tunnel_sides(points, f64::from(plan.tunnel_width))?;
     let height = f64::from(plan.tunnel_height);
-    let box_for = |meshes: (&MeshData, &MeshData), slot, shift| -> Result<[[f64; 2]; 3]> {
-        let mut bounds = [[0.; 2]; 3];
+    let box_for = |meshes: (&MeshData, &MeshData), slot, shift| -> Result<[[f64; 2]; 5]> {
+        let mut bounds = [[0.; 2]; 5];
         for (index, axis) in axes.into_iter().enumerate() {
             let a = projected_bounds(meshes.0, slot, shift, 0., axis)?;
             let b = projected_bounds(meshes.1, slot, shift, 0., axis)?;
