@@ -285,9 +285,9 @@ export default function WorkspacePanels({
                 </section>
                 {viewActions&&<section className="gs-view-audio" aria-label="Map preview sound"><strong>Map preview sound</strong>{viewActions}</section>}
                 {!detached&&<>
-                {onLayoutName&&<label className="gs-layout-profile">Window layout<input aria-label="Window layout name" maxLength={80} value={layoutName??'Studio'} list="gs-saved-layouts" onChange={event=>onLayoutName(event.target.value)}/><datalist id="gs-saved-layouts">{layoutNames?.map(name=><option key={name} value={name}/>)}</datalist></label>}
-                {onSaveLayout&&<button onClick={onSaveLayout}>Save workspace windows</button>}
-                {onRestoreLayout&&<button onClick={onRestoreLayout}>Restore workspace windows</button>}
+                {onLayoutName&&<label className="gs-layout-profile">Saved arrangement<input title="Name for the current arrangement of Spark windows" aria-label="Window layout name" maxLength={80} value={layoutName??'Studio'} list="gs-saved-layouts" onChange={event=>onLayoutName(event.target.value)}/><datalist id="gs-saved-layouts">{layoutNames?.map(name=><option key={name} value={name}/>)}</datalist></label>}
+                {onSaveLayout&&<button onClick={onSaveLayout}>Save arrangement</button>}
+                {onRestoreLayout&&<button onClick={onRestoreLayout}>Restore arrangement</button>}
                 {descriptors.map((panel) => (
                   <label key={panel.id}>
                     <input

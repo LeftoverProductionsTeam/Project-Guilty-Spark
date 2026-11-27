@@ -256,12 +256,12 @@ export default function Firefight({
     }catch(error){setError(String(error));}
   }
   return (
-    <div className={compact ? 'firefight-compact' : 'analysis-page firefight-page'}>
+    <div className={compact ? 'firefight-compact' : 'analysis-page firefight-page' + (config ? '' : ' firefight-new')}>
       {!compact && (
         <PageTitle
           eyebrow="FIREFIGHT / SURVIVAL AUTHORING"
           title="Build a wave plan from real actors"
-          description="Author deterministic rules and spawn zones. Runtime scripting and network gameplay require separate validation."
+          description="Choose a map with the enemies you want, then build your waves or start from a preset."
         />
       )}
       <div className="firefight-setup">
@@ -333,7 +333,7 @@ export default function Firefight({
                     {preset.name}
                   </button>
                   {preset.missingActorVariants.length > 0 && (
-                    <small>Missing: {preset.missingActorVariants.join(', ')}</small>
+                    <small title={preset.missingActorVariants.join('\n')}>Needs {preset.missingActorVariants.length} {preset.missingActorVariants.length===1?'actor tag':'actor tags'} from Zombie Apocalypse</small>
                   )}
                 </div>
               ))}

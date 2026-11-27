@@ -235,3 +235,12 @@
 @media (max-width: 900px) {
   .gs-director-options .gs-director-output-menu { position: fixed; inset: 8rem .7rem auto; width: auto; max-height: 65vh; overflow: auto; }
 }
+
+body:has(.gs-director-window[data-embedded="false"]), #root:has(.gs-director-window[data-embedded="false"]) { background: transparent !important; }
+.gs-director-window[data-embedded="false"]:not([data-fullscreen="true"]) { border-radius: 14px; }
+.gs-director-window > :is(header,nav), .gs-director-cameras, .gs-director-options > .gs-director-settings {
+  background: linear-gradient(180deg,#c9e9ff19,transparent 58%),#122033ed;
+  box-shadow: inset 0 1px #d4e6f725;
+}
+.gs-director-window .director-close { min-width: 29px; font-size: 16px; }
+.gs-director-window .director-close:hover:enabled { background: #a33547; }

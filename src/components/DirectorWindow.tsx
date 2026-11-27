@@ -467,7 +467,7 @@ export default function DirectorWindow({
     }
   }
   return (
-    <div data-embedded={embedded} className={`gs-director-window ${clean ? 'gs-director-clean' : ''}`}>
+    <div data-embedded={embedded} data-fullscreen={fullscreen} className={`gs-director-window ${clean ? 'gs-director-clean' : ''}`}>
       {!embedded && !clean && !fullscreen && <ResizeEdges />}
       {!clean && embedded && (
         <header>
@@ -495,6 +495,7 @@ export default function DirectorWindow({
             ))}
           </select>
           <button title="Press Esc to bring the controls back" onClick={() => setClean(true)}>Hide interface</button>
+          <button type="button" className="director-close" aria-label="Close Recording Director" title="Close Recording Director" disabled={recording!=='idle'} onClick={()=>void windowAction('close')}>×</button>
         </header>
       )}
       {!clean && (

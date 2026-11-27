@@ -314,7 +314,7 @@ pub(super) async fn director_popout(
         .min_inner_size(640., 360.)
         .decorations(false)
         .shadow(false)
-        .background_color(tauri::window::Color(0, 0, 0, 255))
+        .transparent(true)
         .build()
         .map_err(error)?;
     let monitors = w.available_monitors().map_err(error)?;
@@ -426,6 +426,7 @@ pub(super) fn director_window(
                 )))
                 .map_err(error)?;
         }
+        "close" => window.close().map_err(error)?,
         "dock" => {
             if view.recording {
                 return Err("Stop and save the recording before docking this window".into());

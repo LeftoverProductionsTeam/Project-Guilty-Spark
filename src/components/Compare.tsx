@@ -117,7 +117,7 @@ export default function Compare({
     <div className="analysis-page compare-page">
       <header className="compare-toolbar">
         <h1 title="Compare decoded tag values and scenario structure. Original files stay intact.">
-          Compare variants
+          Compare maps
         </h1>
         {maps.length >= 2 && (
           <div className="compare-selectors">
@@ -180,6 +180,7 @@ export default function Compare({
           </button>
         </div>
       </header>
+      {maps.length >= 2 && <p className="compare-purpose">Choose two versions of a map to review changes. Use the status filters to focus on changed values or tags present on only one side.</p>}
       {maps.length < 2 ? (
         <Empty icon={<ArrowLeftRight size={28} />} title="Import two map variants">
           Use Import map or archive in the library to add restoration candidates, then compare them here.

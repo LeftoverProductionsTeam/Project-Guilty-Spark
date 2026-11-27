@@ -293,7 +293,7 @@ test('C59 Online separates game hosting, compatible joins and source collaborati
   await page.getByRole('button',{name:'Set up editor collaboration',exact:true}).click();
   await expect(page.getByRole('region',{name:'Co-edit setup panel',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Close Co-edit setup',exact:true}).click();
-  await page.getByRole('button',{name:'Join server',exact:true}).click();
+  await page.getByRole('button',{name:'Browse games',exact:true}).click();
   await expect(page.getByRole('region',{name:'Collaborate on source',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Host game',exact:true})).toHaveCount(1);
 });
@@ -1615,7 +1615,7 @@ test('an MCC invitation check explains the missing foreign protocol bridge and n
     if(command==='invitation_prepare')return {id:null,expiresAtUnix:0,executable:null,executableSha256:null,dataRoot:null,route:{client:args.client,kind:'nativeCommunity',canHandoff:false,translationStatus:'mccProtocolBridgeMissing',detail:'The selected MCC client does not implement this protocol.',requirements:[],gameplayVerified:false}};
     return original(command,args);
   };});
-  await chooseTool(page,"Online");await page.getByRole('button',{name:'Join server',exact:true}).click();await page.locator('.compact-invitation>summary').click();await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
+  await chooseTool(page,"Online");await page.getByRole('button',{name:'Browse games',exact:true}).click();await page.locator('.compact-invitation>summary').click();await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
   await page.getByRole('button',{name:'Check invitation & adapter',exact:true}).click();
   await expect(page.getByText(/MCC-to-OpenCE\/Chupathingy\/WebRTC gameplay translation is not implemented/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Hand invitation to client',exact:true})).toHaveCount(0);
@@ -1668,7 +1668,7 @@ test('community games load after selecting a runtime and Join, and an obsolete c
   await chooseTool(page,"Online");
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='community_listing'))).toBe(false);
   await page.getByLabel('Runtime adapter',{exact:true}).selectOption('openCe');
-  await page.getByRole('button',{name:'Join server',exact:true}).click();
+  await page.getByRole('button',{name:'Browse games',exact:true}).click();
   await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishListing)).toBe('function');
   await page.evaluate(() => (window as any).__sparkMock.finishListing());
   const games = page.getByRole('list', {name:'Advertised games',includeHidden:true});
@@ -1694,7 +1694,7 @@ test('a second map window receives a shared listing refresh without another HTTP
     if(command==='community_listing'&&args.refresh){return {listing:null,fetching:true,stale:true,error:null,refreshAfterUnix:Math.floor(Date.now()/1000)+30};}
     return original(command,args);
   };});
-  await chooseTool(page,"Online");await page.getByLabel('Runtime adapter',{exact:true}).selectOption('openCe');await page.getByRole('button',{name:'Join server',exact:true}).click();await expect(page.getByRole('list',{name:'Advertised games',includeHidden:true}).getByRole('listitem',{includeHidden:true})).toHaveCount(2);
+  await chooseTool(page,"Online");await page.getByLabel('Runtime adapter',{exact:true}).selectOption('openCe');await page.getByRole('button',{name:'Browse games',exact:true}).click();await expect(page.getByRole('list',{name:'Advertised games',includeHidden:true}).getByRole('listitem',{includeHidden:true})).toHaveCount(2);
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((item:any)=>item.command==='community_listing'&&item.args.refresh===false))).toBe(true);
 });
 
@@ -3623,7 +3623,7 @@ test('saved MegaWorld keeps its donor controls bound to the saved source when th
 
 
 test('Arena Evolved uses a separate setup/provider boundary without launching or querying Delta',async({page})=>{
- await mockDesktop(page);const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('arenaEvolved');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Join server',exact:true}).click();
+ await mockDesktop(page);const studio=await openStudioMenu(page);await studio.getByLabel('Active Halo runtime',{exact:true}).selectOption('arenaEvolved');await studio.getByLabel('Studio options',{exact:true}).click();await chooseTool(page,'Online');await page.getByRole('button',{name:'Browse games',exact:true}).click();
  await expect(page.getByRole('region',{name:'Arena Evolved online',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Arena Evolved',exact:true})).toBeVisible();
  await expect(page.getByText('Spark has not verified an installed Arena executable or gameplay.',{exact:false})).toBeVisible();
  await expect(page.getByRole('link',{name:'Release & compatibility guide',exact:true})).toHaveAttribute('href','https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta');

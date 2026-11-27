@@ -49,6 +49,7 @@ import BaboonTools from './BaboonTools';
 import NativeTagOperations from './NativeTagOperations';
 import '../runtimeWorkbench.css';
 
+const secondaryActions = new Set(['testScene','publish','host','legacy']);
 const actions = [
   ['play', 'Play Halo', Play],
   ['testScene', 'Test Scene', TestTube2],
@@ -137,6 +138,7 @@ export default function RuntimeDock({
       return value?{key:reportKey,value}:null;});
   }
 
+  const [showMoreActions,setShowMoreActions]=useState(false);
   const [details, setDetails] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -932,7 +934,7 @@ export default function RuntimeDock({
           </button>
         </div>
         <div className="runtime-dock-actions">
-          {actions.map(([id, label, Icon]) => {
+          {actions.filter(([id])=>showMoreActions?secondaryActions.has(id):!secondaryActions.has(id)).map(([id, label, Icon]) => {
             const action = report?.actions.find((a) => a.id === id);
             const state = action?.availability ?? 'setupRequired';
             const running = report?.processes.some(
@@ -978,6 +980,7 @@ export default function RuntimeDock({
               </button>
             );
           })}
+          <button className="runtime-more-actions" type="button" aria-expanded={showMoreActions} onClick={()=>setShowMoreActions(value=>!value)}>{showMoreActions?'Back to main actions':'More actions'}</button>
         </div>
         {notice && (
           <div className="runtime-dock-notice" role="status">

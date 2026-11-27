@@ -77,9 +77,8 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools, onOpenTa
     <details className="panel multi-map-batch">
       <summary>Multi Map Batch Editing <span className="batch-count">{ids.length} selected</span></summary>
       {!native ? <p>Batch review and compilation are available in the desktop app.</p> : (
-        <>
-
-          <fieldset disabled={pending || Boolean(job)}>
+        <div className="batch-layout">
+          <fieldset className="batch-source-step" disabled={pending || Boolean(job)}>
             <legend>1. Source maps · {ids.length} selected</legend>
             <MapSourceDrop batch disabled={pending || Boolean(job)} onImported={rows => {
               onOpenTabs(rows);
@@ -119,7 +118,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools, onOpenTa
               {!filtered.length && <p>No matching saved maps.</p>}
             </div>
           </fieldset>
-          {ids.length >= 2 && <fieldset disabled={pending || Boolean(job)}>
+          {ids.length >= 2 && <fieldset className="batch-edit-step" disabled={pending || Boolean(job)}>
             <legend>2. Shared numeric tag edit</legend>
             <form onSubmit={(event) => {
               event.preventDefault();
@@ -217,7 +216,7 @@ export default function MultiMapBatchEditing({ entries, onOpenMccTools, onOpenTa
               </ul>
             </>
           )}
-        </>
+        </div>
       )}
     </details>
   );

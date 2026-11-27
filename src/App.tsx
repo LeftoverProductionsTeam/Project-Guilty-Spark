@@ -1555,14 +1555,21 @@ export default function App() {
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
     if (workspace === 'community') return <CommunityThanks/>;
     if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onImportConvert={()=>void importFiles(undefined,'build')} currentMapTitle={current?.source?current.title:null} onConvertCurrent={()=>setWorkspace('build')} onLibrary={()=>setWorkspace('library')} busy={busy} onDownloaded={openDownloadedMaps} targetLabel={data.settings.preferredHalo==='mccSteam'||!data.settings.preferredHalo?'MCC Halo 1':data.settings.preferredHalo}/>;
-    if (workspace === 'interface' || workspace === 'settings' && settingsTab === 'interface') return <SettingsPanel tab="interface" onTab={selectSettingsTab}><InterfaceStudio scaleStatus={uiScaleStatus}
-      preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={playInterfaceCue}
+    if (workspace === 'interface' || workspace === 'settings' && settingsTab === 'interface') return <SettingsPanel tab="interface" onTab={selectSettingsTab}><InterfaceStudio key={current?.id} scaleStatus={uiScaleStatus}
+      preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={cue=>{
+        audioPlayer.current ??= new UiCuePlayer();
+        return audioPlayer.current.play(cue,interfacePreferencesRef.current,true);
+      }}
       homeModelSettings={<ShowcaseChoice data={data}/>}
       bitmapTags={matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection) || (!bitmapPreference && !!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase())
         ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? [])
         : (current?.source && inspection?.sha256.toLowerCase()===current.source.sha256.toLowerCase()
           ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? []) : [])}
-      bitmapStatus={ownedHeaderStatus} bitmapLoading={ownedHeaderLoading} bitmapActive={!!ownedHeaderArt}
+      bitmapStatus={ownedHeaderStatus} bitmapLoading={ownedHeaderLoading} bitmapUrl={ownedHeaderArt?.url}
+      onOpenMap={()=>setWorkspace('library')}
+      soundSource={current?.source&&inspection?.sha256===current.source.sha256?{id:current.id,title:current.title,hash:inspection.sha256,tags:inspection.tags.filter(tag=>tag.class==='snd!')}:undefined}
+      onAssignSound={(cue,ref)=>setInterfacePreferences(previous=>({...previous,uiAudioEnabled:true,cues:{...previous.cues,[cue]:ref}}))}
+      onSoundResources={()=>void action(async()=>{if(!current)return;await save(false,current.id);const open=await call<OpenProject|null>('choose_project_resources',{projectId:current.id});if(open)await applyResourceMetadata(open);})}
       onChooseBitmap={(id)=>{try{
         if(!current || !inspection)throw new Error('Import/open a preserved Halo map before choosing an interface bitmap');
         const pinned=pinOwnedInterfaceBitmap(current,inspection,id);
@@ -1756,7 +1763,7 @@ export default function App() {
                 Find tools <kbd>Ctrl K</kbd>
               </button>
               <button onClick={() => setHelp(true)} aria-keyshortcuts="F1"><CircleHelp size={16}/><span>Help & shortcuts</span></button>
-              <button onClick={() => setWorkspace('community')}>About Project Guilty Spark</button>
+              <button onClick={event=>{event.currentTarget.closest('details')?.removeAttribute('open');setWorkspace('community');}}>About Project Guilty Spark</button>
             </div>
             </details>
             <div id="gs-window-actions" className="gs-window-actions" />

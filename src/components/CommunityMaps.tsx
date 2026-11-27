@@ -34,10 +34,11 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
   return <div className="analysis-page gs-map-discovery">
     <PageTitle eyebrow="HALO MODDING ARCHIVES / CREATE • PRESERVE • SHARE"
       title="Community maps"
-      description="Browse releases, import a map, then check its native build targets."
+      description="Find publisher archives by Halo edition, or browse a small featured selection."
       actions={<><button className="small-button" onClick={onLibrary}><FolderOpen size={16}/> Your map library</button>
         <button className="primary" onClick={onImportConvert} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import & convert to MCC'}</button></>}/>
-    <nav className="gs-community-tabs" role="tablist" aria-label="Community map workflow" onKeyDown={e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const nav=e.currentTarget,values=['maps','import','archives'] as const;setSection(values[(values.indexOf(section)+(e.key==='ArrowRight'?1:2))%3]);requestAnimationFrame(()=>nav.querySelector<HTMLButtonElement>('[aria-selected=true]')?.focus());}}>{([['maps','Browse maps'],['import','Download & import'],['archives','Archives & help']] as const).map(([id,label])=><button role="tab" key={id} aria-selected={section===id} tabIndex={section===id?0:-1} onClick={()=>setSection(id)}>{label}</button>)}</nav>
+    <nav className="gs-community-tabs" role="tablist" aria-label="Community map workflow" onKeyDown={e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const nav=e.currentTarget,values=['maps','import','archives'] as const;setSection(values[(values.indexOf(section)+(e.key==='ArrowRight'?1:2))%3]);requestAnimationFrame(()=>nav.querySelector<HTMLButtonElement>('[aria-selected=true]')?.focus());}}>{([['maps','Featured maps'],['import','Download & import'],['archives','Archives by edition']] as const).map(([id,label])=><button role="tab" key={id} aria-selected={section===id} tabIndex={section===id?0:-1} onClick={()=>setSection(id)}>{label}</button>)}</nav>
+    {section==='maps'&&<div className="community-archive-callout"><strong>Looking for older maps or a different Halo edition?</strong><button onClick={()=>setSection('archives')}>Browse full publisher archives ↗</button></div>}
     <div className="gs-community-body" data-scroll-id={`community-${section}`}>
     <div hidden={section!=='maps'}><MapCatalog busy={busy||downloading} onArchives={()=>setSection('archives')} onChoose={map=>{setSelectedMap(map);setSection('import');}}/></div>
     <div hidden={section!=='import'}>

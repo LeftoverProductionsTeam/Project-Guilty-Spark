@@ -242,3 +242,20 @@
 .multi-map-batch .batch-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; margin-block: .45rem; }
 .multi-map-batch .batch-map-list { max-height: 9rem; overflow: auto; padding-inline: .35rem; }
 .multi-map-batch .batch-map-list[hidden] { display: none; }
+
+.application .multi-map-batch { margin-block: .5rem; padding: .45rem .65rem; }
+.multi-map-batch > summary { font-weight: 650; cursor: pointer; padding-block: .25rem; }
+.batch-layout {
+  display: grid; grid-template-columns: minmax(22rem, 1fr) minmax(18rem, .85fr);
+  gap: .15rem 1rem; align-items: start;
+}
+.batch-layout > fieldset { min-inline-size: 0; }
+.batch-layout > :not(.batch-source-step,.batch-edit-step) { grid-column: 1/-1; }
+.batch-layout .batch-source-step { grid-column: 1; }
+.batch-layout .batch-edit-step { grid-column: 2; }
+.batch-layout .map-source-drop { background: color-mix(in srgb, var(--accent) 6%, var(--panel)); border-color: var(--line); }
+.multi-map-batch .batch-map-list { grid-template-columns: repeat(auto-fill,minmax(min(100%, 12rem),1fr)); gap: .15rem .45rem; }
+.multi-map-batch .batch-map-list > label { margin: 0; border-radius: .3rem; padding: .22rem .32rem; }
+.multi-map-batch .batch-map-list > label:has(input:checked) { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.batch-edit-step form { display: flex; align-items: end; flex-wrap: wrap; gap: .35rem; }
+@media(max-width: 900px){.batch-layout { display: block; }}

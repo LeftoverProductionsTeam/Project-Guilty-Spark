@@ -94,7 +94,7 @@ export default function TagFields({
               return (
                 <option key={candidate.id} value={candidate.id}>
                   {detailedReference
-                    ? <span>{shortPath(path)} · {path.split(/[\\/]/).slice(0, -1).join('/') || 'map root'}</span>
+                    ? shortPath(path) + ' · ' + (path.split(/[\\/]/).slice(0, -1).join('/') || 'map root')
                     : shortPath(path)}
                 </option>
               );

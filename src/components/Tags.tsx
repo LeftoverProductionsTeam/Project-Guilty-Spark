@@ -162,6 +162,9 @@ export default function Tags({
     const target=reference.class==='bitm'?tags.find(tag=>tag.id===effectiveReferenceId(project,material,reference)&&tag.class==='bitm'):undefined;
     return target?[target]:[];
   }).filter((tag,index,values)=>values.findIndex(value=>value.id===tag.id)===index):related?.bitmaps??[],[material,related,inspection,project.tagEdits]);
+  const [bitmapQuery,setBitmapQuery]=useState('');
+  const [liveBitmap,setLiveBitmap]=useState<{context:string;shader:number;bitmap:number}|null>(null);
+  const replacementBitmaps=useMemo(()=>tags.filter(t=>t.class==='bitm'&&t.path.toLowerCase().includes(bitmapQuery.trim().toLowerCase())).slice(0,100),[tags,bitmapQuery]);
   const bitmap = relatedTag(`bitmap:${material?.id??'asset'}`,bitmaps);
   const sound = relatedTag('sound',related?.sounds??[]);
   const logicPlacements = project.quickForge?.placements.filter(placement=>placement.tagId===selectedTag?.id&&placement.sourceProjectId===project.id&&placement.sourceSha256===project.source?.sha256)??[];
@@ -178,6 +181,8 @@ export default function Tags({
         : catalogAssets({ project, inspection }).find((asset) => asset.tagId === selectedTag?.id),
     [project.id, project.source?.sha256, inspection, selectedTag?.id],
   );
+  const bitmapPreview=useMemo(()=>material && selectedModel && liveBitmap?.context===contextKey && liveBitmap.shader===material.id
+    ? {project,shaderTagId:material.id,bitmapTagId:liveBitmap.bitmap} : undefined,[project,material?.id,selectedModel,liveBitmap,contextKey]);
   const classes = useMemo(() => [...new Set(tags.map((t) => t.class))].sort(), [tags]);
   const shown = useMemo(
     () =>
@@ -240,6 +245,16 @@ export default function Tags({
           <button className="small-button" onClick={()=>navigateToTag(material.id)}>Open shader tag</button>
           <p className="subtle">Source shader data. Rebuild a map copy to preview saved native changes.</p>
         </>}
+        {material && previewShaderIds.includes(material.id) && <fieldset className="tag-bitmap-swap">
+          <legend>Preview a bitmap swap</legend>
+          <input type="search" aria-label="Find replacement bitmap" placeholder="Find a bitmap in this map…" value={bitmapQuery} onChange={e=>setBitmapQuery(e.target.value)}/>
+          <select aria-label="Preview replacement bitmap" value={bitmapPreview?.bitmapTagId??''} onChange={e=>setLiveBitmap(e.target.value?{context:contextKey,shader:material.id,bitmap:Number(e.target.value)}:null)}>
+            <option value="">Original texture</option>
+            {replacementBitmaps.map(t=><option key={t.id} value={t.id}>{t.path}</option>)}
+            {bitmapPreview&&!replacementBitmaps.some(t=>t.id===bitmapPreview.bitmapTagId)&&<option value={bitmapPreview.bitmapTagId}>Current preview</option>}
+          </select>
+          <small>Preview only. Use Native Output to save a shader change.</small>
+        </fieldset>}
         {pick(`bitmap:${material?.id??'asset'}`,bitmaps,bitmap)}
         {bitmap&&openedContext('Materials')&&<BitmapPreview key={`${project.id}:${inspection?.sha256}:${bitmap.id}`} project={project} tagId={bitmap.id} cube={tags.some(tag=>tag.shaderPreview?.reflection?.bitmapTagId===bitmap.id)}/>}
         {!material&&!bitmap&&!related.error&&<p className="subtle">No shader or bitmap is indexed for this tag. Follow Dependencies or use a compatible native tag editor.</p>}
@@ -676,7 +691,7 @@ export default function Tags({
             </div>
             {selectedModel&&<section className="tag-model-preview" aria-label="Actual model preview">
               {selectedTag.references.some(reference=>reference.label==='Animation graph')&&<label className="tag-preview-animation-toggle checkbox-label"><input type="checkbox" checked={animatePreview} onChange={event=>setAnimatePreview(event.target.checked)}/> Native animation</label>}
-              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment} animate={animatePreview&&selectedTag.references.some(reference=>reference.label==='Animation graph')} surface={context==='Collision'&&related?.collision?'collision':'render'} onMaterials={captureMaterials}/>
+              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment} animate={animatePreview&&selectedTag.references.some(reference=>reference.label==='Animation graph')} surface={context==='Collision'&&related?.collision?'collision':'render'} onMaterials={captureMaterials} bitmapPreview={bitmapPreview}/>
             </section>}
           </div>
         ) : (

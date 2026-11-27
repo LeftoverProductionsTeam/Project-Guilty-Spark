@@ -36,7 +36,10 @@ export default function Features({
 }) {
   const [query, setQuery] = useState(''),
     [category, setCategory] = useState('All');
+  const [page,setPage]=useState(0);
+  const pageSize=9;
   const found = searchFeatures(query, category);
+  const lastPage=Math.max(0,Math.ceil(found.length/pageSize)-1);
   return (
     <div className="analysis-page gs-features">
       <PageTitle
@@ -44,7 +47,7 @@ export default function Features({
         title="What can Spark do?"
         description="One Halo. Every World. Every Tool. Together. Explore the flagships, check their limits and continue without closing your map."
       />
-      <FlagshipOverview navigate={navigate}/>
+      <details className="features-overview"><summary>Flagship features</summary><FlagshipOverview navigate={navigate}/></details>
       <div className="feature-journey" aria-label="Workbench workflow">
         <button onClick={() => navigate('get-started')}>1 · Connect your Halo &amp; tools</button>
         <button onClick={() => navigate('library')}>2 · Open or create maps</button>
@@ -68,7 +71,7 @@ export default function Features({
             type="search"
             aria-label="Find a Spark feature"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {setQuery(e.target.value);setPage(0);}}
             placeholder="animations, multiple maps, textures, undo…"
           />
         </label>
@@ -77,7 +80,7 @@ export default function Features({
           <select
             aria-label="Feature category"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {setCategory(e.target.value);setPage(0);}}
           >
             <option>All</option>
             {[...new Set(SPARK_FEATURES.map((f) => f.category))].map((c) => (
@@ -90,7 +93,7 @@ export default function Features({
         </span>
       </div>
       <div className="feature-catalog">
-        {found.map((f) => (
+        {found.slice(page*pageSize,(page+1)*pageSize).map((f) => (
           <article className="analysis-card feature-card" key={f.id}>
             <div className="section-heading">
               <span className="section-label">{f.category}</span>
@@ -115,6 +118,7 @@ export default function Features({
           </article>
         ))}
       </div>
+      {found.length>pageSize&&<nav className="feature-pagination" aria-label="Feature pages"><button disabled={page===0} onClick={()=>setPage(i=>i-1)}>Previous</button><span>Page {page+1} of {lastPage+1}</span><button disabled={page>=lastPage} onClick={()=>setPage(i=>i+1)}>Next</button></nav>}
       {!found.length && (
         <div className="analysis-card" role="status">
           <p>No features match this search.</p>

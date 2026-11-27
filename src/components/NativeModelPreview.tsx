@@ -1,5 +1,7 @@
 import SceneEffects from './SceneEffects';
 import {native} from '../api';
+import {readOwnedBitmapImage} from '../ownedBitmapPreview';
+import type { Project } from '../types';
 import { DEFAULT_RENDER_FEATURES } from '../renderFeatures';
 const showcaseFeatures = {
   ...DEFAULT_RENDER_FEATURES,
@@ -218,6 +220,7 @@ export default function NativeModelPreview({
   animate = showcase,
   surface = 'render',
   onMaterials,
+  bitmapPreview,
 }: {
   asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256' | 'modelVariant'>;
   live?: boolean;
@@ -226,6 +229,7 @@ export default function NativeModelPreview({
   animate?: boolean;
   surface?: 'render' | 'collision';
   onMaterials?: (shaderIds:number[]) => void;
+  bitmapPreview?: {project:Project;shaderTagId:number;bitmapTagId:number};
   environment?: EditorEnvironment | null;
   onSnapshot?: (url: string) => void;
 }) {
@@ -266,7 +270,25 @@ export default function NativeModelPreview({
     [animate,clip, playing, live, activity.active,asset.tagId, animationError],
   );
   const key = forgeModelKey(placement),
-    view = models[key];
+    original = models[key];
+  const [bitmapSwap,setBitmapSwap]=useState<{request:typeof bitmapPreview;texture?:THREE.Texture;error?:string}|null>(null);
+  useEffect(()=>{
+    if(!bitmapPreview||!activity.active)return;
+    let active=true,texture:THREE.DataTexture|undefined;
+    void readOwnedBitmapImage(bitmapPreview.project,bitmapPreview.bitmapTagId,0).then(({image})=>{
+      if(!active)return;
+      if(image.width>2048||image.height>2048)throw Error('Choose a bitmap 2048 pixels wide or smaller.');
+      texture=new THREE.DataTexture(image.pixels,image.width,image.height,THREE.RGBAFormat);
+      texture.colorSpace=THREE.SRGBColorSpace;
+      texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+      texture.minFilter=texture.magFilter=THREE.LinearFilter;
+      texture.needsUpdate=true;
+      setBitmapSwap({request:bitmapPreview,texture});
+    }).catch(error=>{if(active)setBitmapSwap({request:bitmapPreview,error:String(error)});});
+    return()=>{active=false;texture?.dispose();};
+  },[bitmapPreview,activity.active]);
+  const swap=activity.active&&bitmapSwap?.request===bitmapPreview?bitmapSwap:null;
+  const view=useMemo(()=>original&&swap?.texture&&bitmapPreview?{...original,shaderTextures:{...original.shaderTextures,[bitmapPreview.shaderTagId]:swap.texture}}:original,[original,swap?.texture,bitmapPreview]);
   const materialIds=useMemo(()=>view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])]:[],[view?.mesh]);
   const unassignedTriangles=useMemo(()=>view?unassignedNativeTriangles(view.mesh):null,[view?.mesh]);
   const missingShaderCount=view?materialIds.filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])||view.shaderMetadata[id]?.kind==='meter'&&!nativeMeterInputs(view.shaderMetadata[id],view.mesh.stationaryFunctionValues)).length:0;
@@ -335,6 +357,7 @@ export default function NativeModelPreview({
       data-native-self-illumination={view?Object.values(view.shaderMetadata).filter(m=>m.selfIllumination?.source===0&&[...m.selfIllumination.lower,...m.selfIllumination.upper].some(v=>v>0)).length:0}
       data-model-lighting={environment?'custom':sourceLighting?.key===key&&sourceLighting.value?.environment?'source':'inspection'}
       data-model-lighting-ready={!!environment||sourceLighting?.key===key}
+      data-model-preview-bitmap={swap?.texture?bitmapPreview?.bitmapTagId:undefined}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
       data-model-original-mips={view?JSON.stringify(Object.entries(view.shaderTextures).map(([shader,texture])=>({shader:Number(shader),levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps}))):undefined}
       data-model-original-cube-mips={view?JSON.stringify(Object.entries(view.extraTextures).filter(([,texture])=>texture instanceof THREE.CubeTexture).map(([key,texture])=>({key,bitmapTagId:texture.userData.sourceTagId,levels:texture.userData.originalMipLevels??0,generated:texture.generateMipmaps,rgbaBytes:texture.userData.rgbaBytes}))):undefined}
@@ -349,6 +372,7 @@ export default function NativeModelPreview({
           : 0
       }
     >
+      {bitmapPreview && !swap?.texture && <p className="subtle" role="status">{swap?.error??'Loading replacement bitmap…'}</p>}
       {view && (visible||live||onSnapshot) && activity.graphicsResident ? (
         <Canvas
           camera={{ fov: 42, up: [0, 0, 1] }}

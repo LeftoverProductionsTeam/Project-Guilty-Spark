@@ -54,6 +54,15 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onRe
       {busy && <p role="status">Reading bounded audio data…</p>}
       {error && <Notice>{error}</Notice>}
       {inspection&&!sample?.available&&<Notice>{sample?.reason??inspection.warnings[0]??'No playable sample. Connect this map’s original sound resources.'}</Notice>}
+          {onAssign && sample?.available && <div className="sound-assign">
+            <small>Assign to menu event</small>
+            {([['select', 'Navigate'], ['confirm', 'Confirm'], ['warning', 'Warning']] as const).map(([cue, label]) => (
+              <button key={cue} type="button" className="small-button" onClick={() => onAssign(cue, {
+                projectId, tagId, pitchRange: sample.pitchRange, permutation: sample.permutation,
+                sourceHash:sourceHash||inspection!.sourceSha256, label: `${sample.name || `Tag ${tagId}`} (${label})`,
+              })}>{label}</button>
+            ))}
+          </div>}
       <details className="sound-preview-details">
         <summary>Sample details &amp; options</summary>
         {sample&&<small>{sample.format} · {sample.channels} channel(s) · {sample.sampleRate} Hz · {sample.byteLength.toLocaleString()} bytes · {sample.embedded?'Embedded sample':'Verified shared resource'}</small>}
@@ -62,15 +71,6 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onRe
           <label>Preview volume <input aria-label="Sound preview volume" type="range" min="0" max="1" step=".01" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
         {onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}
-          {onAssign && sample?.available && sample.embedded && <div className="sound-assign">
-            <small>Assign local cue:</small>
-            {([['select', 'Navigate'], ['confirm', 'Confirm'], ['warning', 'Warning']] as const).map(([cue, label]) => (
-              <button key={cue} type="button" className="small-button" onClick={() => onAssign(cue, {
-                projectId, tagId, pitchRange: sample.pitchRange, permutation: sample.permutation,
-                sourceHash:sourceHash||inspection!.sourceSha256, label: `${sample.name || `Tag ${tagId}`} (${label})`,
-              })}>{label}</button>
-            ))}
-          </div>}
         {inspection?.warnings.map((value,i)=><p className="subtle" key={i}>{value}</p>)}
         <small>Audition is independent of map mute. Repeat and volume here do not change Halo’s sound tags, classes or looping tracks.</small>
       </details>

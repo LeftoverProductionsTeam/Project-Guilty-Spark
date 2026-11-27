@@ -28,6 +28,7 @@ export class UiCuePlayer {
         projectId: ref.projectId, tagId: ref.tagId,
         pitchRange: ref.pitchRange, permutation: ref.permutation,
       });
+      if (result.sourceSha256 !== ref.sourceHash) throw Error('The sound source changed. Choose the sound again.');
       if (!['audio/ogg', 'audio/wav', 'audio/mpeg'].includes(result.mime) || result.bytes.length > 2_000_000)
         throw new Error('Unsupported or oversized UI sound');
       if (this.disposed) throw new Error('Audio preferences closed');
@@ -44,12 +45,16 @@ export class UiCuePlayer {
     try { return await task; } finally { this.inflight.delete(key); }
   }
 
-  async play(cue: CueName, preferences: InterfacePreferences): Promise<void> {
-    if (this.disposed || !native || !preferences.uiAudioEnabled || preferences.uiVolume <= 0) return;
+  async play(cue: CueName, preferences: InterfacePreferences, audition = false): Promise<void> {
+    if (this.disposed || !native || (!audition && !preferences.uiAudioEnabled)) return;
+    if (preferences.uiVolume <= 0) {
+      if (audition) throw Error('Raise UI sound volume to hear the preview.');
+      return;
+    }
     const ref = preferences.cues[cue];
     if (!ref) return;
     const now = Date.now();
-    if (now - this.lastPlay < 110) return;
+    if (!audition && now - this.lastPlay < 110) return;
     this.lastPlay = now;
     try {
       const source = await this.url(ref);
@@ -59,8 +64,9 @@ export class UiCuePlayer {
       audio.volume = preferences.uiVolume;
       this.active = audio;
       await audio.play();
-    } catch {
-      // A removed project or unsupported codec should never block navigation.
+    } catch (error) {
+      if (audition) throw error;
+      // Background cues never block navigation.
     }
   }
 

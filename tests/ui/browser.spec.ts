@@ -20,25 +20,27 @@ test('Interface Studio keeps compact categories, keyboard navigation and saved p
   await expect(page.getByLabel('Whole window transparency',{exact:true})).toBeVisible();
   await categories.getByRole('tab',{name:'Menu sounds',exact:true}).click();
   await expect(page.getByLabel('UI sound volume',{exact:true})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Preview',exact:true})).toHaveCount(3);
+  await expect(page.getByRole('button',{name:/sound preview$/})).toHaveCount(3);
   expect(await page.locator('.interface-studio').evaluate(e=>e.scrollHeight-e.clientHeight)).toBeLessThanOrEqual(2);
   await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await expect(categories.getByRole('tab',{name:'Menu sounds',exact:true})).toHaveAttribute('aria-selected','true');
   await categories.getByRole('tab',{name:'Header art',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Local Halo bitmap · workbench header',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Workbench header image',exact:true})).toBeVisible();
   await page.setViewportSize({width:800,height:600});
   for(const name of ['Appearance','Window','Menu sounds','Header art'])await expect(categories.getByRole('tab',{name,exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(0);
 });
-test('runtime dock keeps all nine tools visible without a horizontal scrollbar',async({page})=>{
+test('runtime dock shows primary actions and keeps secondary actions one click away',async({page})=>{
   for(const size of [{width:1500,height:950},{width:1280,height:768},{width:1024,height:640}]){
     await page.setViewportSize(size);await page.goto('/');
     const dock=page.getByRole('contentinfo',{name:'Runtime & Tools Dock'});
     await expect(page.getByLabel('Active Halo runtime',{exact:true})).toHaveCount(1);
     await expect(dock.getByRole('combobox')).toHaveCount(0);
-    for(const name of ['Play Halo','Test Scene','Edit level','Edit tags','Build','Publish','Find games','Host','Legacy tools'])await expect(dock.getByRole('button',{name:new RegExp(`^${name}`)})).toBeVisible();
+    for(const name of ['Play Halo','Edit level','Edit tags','Build','Find games','More actions'])await expect(dock.getByRole('button',{name:new RegExp(`^${name}`)})).toBeVisible();
     const bounds=await dock.evaluate(element=>{const r=element.getBoundingClientRect();return {bottom:r.bottom,extra:element.scrollWidth-element.clientWidth,clipped:[...element.querySelectorAll('.runtime-dock-actions>button')].some(button=>button.getBoundingClientRect().right>r.right)};});
     expect(bounds.bottom).toBeLessThanOrEqual(size.height);expect(bounds.extra).toBe(0);expect(bounds.clipped).toBe(false);
+    await dock.getByRole('button',{name:'More actions',exact:true}).click();
+    for(const name of ['Test Scene','Publish','Host','Legacy tools'])await expect(dock.getByRole('button',{name:new RegExp('^'+name)})).toBeVisible();
   }
 });
 

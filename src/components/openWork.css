@@ -25,3 +25,5 @@
 .gs-work-sections>button{flex:1;}
 .gs-saved-project-row{display:grid;grid-template-columns:minmax(0,1fr)30px;gap:3px;align-items:center;}
 .gs-saved-project-row>button:last-child{padding:4px;min-height:28px;}
+
+.gs-open-work-groups { max-height: min(52vh,420px); overflow-y: auto; overscroll-behavior: contain; }

@@ -7,6 +7,8 @@ import { PageTitle, Pill } from './ui';
 import {useMapState} from '../mapSession';
 import {native} from '../api';
 import './interfaceStudio.css';
+import Sound from './Sound';
+import type { LocalCueReference } from '../interfacePreferences';
 
 const themes: { id: ThemeName; title: string; description: string }[] = [
   { id: 'halo-ce', title: 'Halo CE Classic', description: 'Original-game-inspired navy, blue and restrained cyan' },
@@ -19,18 +21,23 @@ const eventLabels: Record<CueName, string> = { select: 'Menu navigation', confir
 
 export default function InterfaceStudio({
   preferences, onChange, onPreview, onOpenTags, canBrowseSounds,
-  bitmapTags, bitmapStatus, bitmapLoading, bitmapActive, onChooseBitmap, onClearBitmap,
+  bitmapTags, bitmapStatus, bitmapLoading, bitmapUrl, onChooseBitmap, onClearBitmap,
+  soundSource, onAssignSound, onOpenMap, onSoundResources,
   homeModelSettings,scaleStatus,
 }: {
   preferences: InterfacePreferences;
   onChange: (next: InterfacePreferences) => void;
-  onPreview: (cue: CueName) => void;
+  onPreview: (cue: CueName) => Promise<void>;
+  onOpenMap: () => void;
+  soundSource?: { id: string; hash: string; title: string; tags: {id:number;path:string}[] };
+  onAssignSound: (cue:CueName, ref:LocalCueReference)=>void;
+  onSoundResources: ()=>void;
   onOpenTags: () => void;
   canBrowseSounds: boolean;
   bitmapTags: {id:number;path:string}[];
   bitmapStatus: string;
   bitmapLoading: boolean;
-  bitmapActive: boolean;
+  bitmapUrl?: string;
   onChooseBitmap: (id:number)=>void;
   onClearBitmap: ()=>void;
   homeModelSettings?:ReactNode;
@@ -42,7 +49,15 @@ export default function InterfaceStudio({
   const section=['appearance','window','sounds','art'].includes(savedSection)?savedSection:'appearance';
   const [bitmapQuery,setBitmapQuery]=useState('');
   const [chosenBitmap,setChosenBitmap]=useState<number|null>(preferences.bitmap?.bitmapTagId ?? null);
-  const eligible=bitmapTags.filter(tag=>tag.path.toLowerCase().includes(bitmapQuery.toLowerCase())).slice(0,100);
+  const [soundQuery,setSoundQuery]=useState('');
+  const [soundTag,setSoundTag]=useState<number|null>(null);
+  const [audioStatus,setAudioStatus]=useState('');
+  const matching = (tags: {id:number;path:string}[], query:string) => tags.filter(tag=>tag.path.toLowerCase().replaceAll('\\','/').includes(query.trim().toLowerCase().replaceAll('\\','/')));
+  const bitmaps=matching(bitmapTags,bitmapQuery);
+  const eligible=bitmaps.slice(0,100);
+  const selectedBitmap=eligible.find(tag=>tag.id===chosenBitmap) ?? (bitmapQuery.trim()?eligible[0]:undefined);
+  const sounds=matching(soundSource?.tags??[],soundQuery).slice(0,100);
+  const assignTag=sounds.find(tag=>tag.id===soundTag) ?? (soundQuery.trim()?sounds[0]:undefined);
   return <div className="analysis-page interface-studio interface-compact">
     <PageTitle eyebrow="INTERFACE STUDIO · LOCAL PROFILE"
       title="Make the workbench yours."
@@ -118,28 +133,37 @@ export default function InterfaceStudio({
       <small>Ctrl+Alt+O restores full opacity and clears the tint. These settings stay on this device.</small>
     </section>}
     {section==='art'&&<section className="analysis-card interface-bitmap-workshop">
-      <h2><ImageIcon size={19}/> Local Halo bitmap · workbench header</h2>
-      <p>Choose a <code>bitm</code> tag from a Halo map you imported. Spark reads its verified top mipmap, uses a temporary in-memory picture as a modern header accent, and remembers only the exact source hash and tag ID. It cannot ship or cache original Halo art in the editor.</p>
+      <h2><ImageIcon size={19}/> Workbench header image</h2>
+      <p>Search the open map for artwork. Choose a result to preview it in your header.</p>
       {bitmapTags.length ? <>
-        <input type="search" value={bitmapQuery} maxLength={160} onChange={e=>setBitmapQuery(e.target.value)} placeholder="Find your bitmap tag (e.g. ui, menu, forerunner)…" aria-label="Search local Halo bitmaps" />
-        <select aria-label="Select owned bitmap tag" value={chosenBitmap??''} onChange={e=>setChosenBitmap(e.target.value?Number(e.target.value):null)}>
-          <option value="">Select bitmap tag</option>
-          {eligible.map(tag=><option key={tag.id} value={tag.id}>{tag.path} · #{tag.id}</option>)}
+        <input type="search" value={bitmapQuery} maxLength={160} onChange={e=>setBitmapQuery(e.target.value)} placeholder="Search bitmap names…" aria-label="Search local Halo bitmaps" />
+        <select aria-label="Select owned bitmap tag" value={selectedBitmap?.id??''} onChange={e=>setChosenBitmap(e.target.value?Number(e.target.value):null)}>
+          <option value="">{eligible.length ? "Choose an image" : "No images match"}</option>
+          {eligible.map(tag=><option key={tag.id} value={tag.id}>{tag.path.split(/[\\/]/).at(-1)} · {tag.path}</option>)}
           {chosenBitmap!==null && !eligible.some(tag=>tag.id===chosenBitmap) &&
             <option value={chosenBitmap}>Current selected tag #{chosenBitmap} (outside filter)</option>}
         </select>
+        {bitmaps.length>100 && <small>Showing the first 100 of {bitmaps.length}. Type part of an image name to narrow the list.</small>}
         <div className="analysis-actions">
           <button type="button" className="primary" disabled={bitmapLoading || chosenBitmap===null || !bitmapTags.some(t=>t.id===chosenBitmap)}
             onClick={()=>chosenBitmap!==null&&onChooseBitmap(chosenBitmap)}>{bitmapLoading?'Reading local game bitmap…':'Use verified bitmap as header art'}</button>
           <button type="button" disabled={!preferences.bitmap} onClick={()=>{onClearBitmap();setChosenBitmap(null);}}>Clear local art</button>
         </div>
-      </> : <p className="subtle">Open a locally preserved Halo cache project to unlock compatible bitmap references. Unsupported/compressed/cubemap resources are intentionally refused.</p>}
-      <p role="status" className="interface-bitmap-status"><ShieldCheck size={14}/>{bitmapStatus} {bitmapActive?'· Applied to the app header':''}</p>
-      <p className="subtle">A bitmap used as a decorative banner is not necessarily a Halo UI atlas. Full bitmap panel/sprite composition will require an explicit layout editor and tag-verified cropping.</p>
+      </> : <p>Open a Halo map with bitmap tags to choose an image. <button onClick={onOpenMap}>Open a map</button></p>}
+      <p role="status" className="interface-bitmap-status"><ShieldCheck size={14}/>{bitmapStatus}</p>
+      {bitmapUrl && <img className="interface-art-thumbnail" src={bitmapUrl} alt="Applied header artwork preview"/>}
     </section>}
     {section==='sounds'&&<section className="analysis-card interface-sound-workshop">
       <h2><AudioLines size={19}/> Sound workshop · local Halo sources</h2>
-      <p>Choose a sound in the Tag editor and assign it to a menu event.</p>
+      <p>Choose a sound from the open map, play a sample, then assign it to a menu event.</p>
+      {soundSource?.tags.length ? <div className="interface-audio-picker">
+        <label>Find sounds in {soundSource.title}<input type="search" value={soundQuery} onChange={event=>setSoundQuery(event.target.value)} placeholder="Search sound names…" /></label>
+        <select aria-label="Map sound" value={assignTag?.id??''} onChange={event=>setSoundTag(event.target.value?Number(event.target.value):null)}>
+          <option value="">{sounds.length?'Choose a sound':'No sounds match'}</option>
+          {sounds.map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}
+        </select>
+        {assignTag && <Sound projectId={soundSource.id} tagId={assignTag.id} sourceHash={soundSource.hash} onResources={onSoundResources} onAssign={(cue,ref)=>{onAssignSound(cue,ref);setAudioStatus(eventLabels[cue]+' sound assigned.');}}/>}
+      </div> : <button onClick={onOpenMap}>Open a map with sounds</button>}
       <div className="interface-sound-options">
       <label className="interface-control"><input type="checkbox" aria-label="Character greeting on launch" checked={preferences.launchVoiceEnabled} onChange={e=>onChange({...preferences,launchVoiceEnabled:e.target.checked})}/>Character greeting on launch</label>
       <label className="interface-volume">Launch voice · {Math.round(preferences.launchVoiceVolume*100)}%<input aria-label="Launch voice volume" type="range" min={0} max={100} value={Math.round(preferences.launchVoiceVolume*100)} onChange={e=>onChange({...preferences,launchVoiceVolume:Number(e.target.value)/100})}/></label>
@@ -157,11 +181,12 @@ export default function InterfaceStudio({
       <div className="interface-cue-list">
         {cueNames.map((cue) => <div className="interface-cue-row" key={cue}>
           <span><strong>{eventLabels[cue]}</strong><small>{preferences.cues[cue]?.label ?? 'Silent · no sound assigned'}</small></span>
-          <button disabled={!preferences.uiAudioEnabled || !preferences.cues[cue]} onClick={() => onPreview(cue)} type="button">Preview</button>
+          <button aria-label={eventLabels[cue] + ' sound preview'} disabled={!preferences.cues[cue]} onClick={() => {setAudioStatus('Loading sound…');void onPreview(cue).then(()=>setAudioStatus('Playing '+eventLabels[cue].toLowerCase()+' sound.'),error=>setAudioStatus(String(error)));}} type="button">Preview</button>
           <button disabled={!preferences.cues[cue]} type="button" onClick={() => onChange({ ...preferences, cues: { ...preferences.cues, [cue]: undefined } })}>Clear</button>
         </div>)}
       </div>
-      <button className="primary" type="button" disabled={!canBrowseSounds} onClick={onOpenTags}>
+      {audioStatus && <p role="status">{audioStatus}</p>}
+      <button className="small-button" type="button" disabled={!canBrowseSounds} onClick={onOpenTags}>
         <ExternalLink size={14}/> Browse imported sound tags
       </button>
       {!canBrowseSounds && <p className="subtle">Open a map to assign its sounds. Menu sounds are opt-in.</p>}

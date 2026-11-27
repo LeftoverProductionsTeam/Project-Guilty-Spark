@@ -62,7 +62,7 @@ export default function Build({
   const [checking, setChecking] = useState(true);
   const [preparing,setPreparing]=useState(false);
   const [view,setView]=useMapState<'build'|'portability'>(project.id,'build.view','build');
-  const [inputsOpen,setInputsOpen]=useMapState(project.id,'build.inputsOpen',project.source?.cacheVersion!==13),
+  const [inputsOpen,setInputsOpen]=useMapState(project.id,'build.inputsOpen',false),
     [resourcesOpen,setResourcesOpen]=useMapState(project.id,'build.resourcesOpen',false),
     [reportOpen,setReportOpen]=useMapState(project.id,'build.reportOpen',false),
     [historyOpen,setHistoryOpen]=useMapState(project.id,'build.historyOpen',false);
@@ -126,8 +126,8 @@ export default function Build({
     <div className="build-page">
       <PageTitle
         eyebrow="BUILD & PLAYTEST"
-        title="From archive to in-game."
-        description="A traceable pipeline. A separate package. Your installation protected."
+        title="Build & playtest"
+        description={'Create a playable copy for ' + targetName + ' from ' + project.title + '.'}
         actions={
           <>
             {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>{['mcc-direct','ce-direct'].includes(validated.target)?'Open edited map copy':'Open compiled map'}</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
@@ -146,6 +146,11 @@ export default function Build({
       <div className="build-workflow-tabs" role="tablist" aria-label="Build workflows"><button role="tab" aria-selected={view==='build'} onClick={()=>setView('build')}>Build & playtest</button><button role="tab" aria-selected={view==='portability'} onClick={()=>setView('portability')}>Portability Lab</button></div>
       {view==='portability'&&<Suspense fallback={<p role="status">Loading Portability Lab…</p>}><PortabilityLab project={project} dirty={dirty} onSave={onSave} onBuild={()=>setView('build')} onSettings={onSettings}/></Suspense>}
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
+      {view==='build'&&report&&!report.ready&&report.blockers.length>0&&<section className="build-next-step" aria-label="What to fix before building">
+        <strong>Before you can build</strong><p>{report.blockers[0]}</p>
+        <button onClick={()=>setReportOpen(true)}>Show all {report.blockers.length} checks</button>
+        {/resource|sounds\.map|bitmaps\.map/i.test(report.blockers[0])&&<button onClick={onResources}>Locate original resources</button>}
+      </section>}
       <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
           <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and {targetName} toolchain</small></summary>

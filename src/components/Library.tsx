@@ -103,7 +103,7 @@ export default function Library({
           <HomeModel data={data} />
         </div>
       </section>
-      <FlagshipOverview compact navigate={onWorkspace}/>
+      <details className="library-creator-tools"><summary>Explore creator tools</summary><FlagshipOverview compact navigate={onWorkspace}/></details>
       {!native && (
         <Notice tone="info">
           {data.diagnostics[0] ??

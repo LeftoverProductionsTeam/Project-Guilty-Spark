@@ -175,12 +175,10 @@ export default function Registration({
   return (
     <details className="analysis-card registration" open={initialOpen}>
       <summary>
-        {installation ? 'Update' : 'Connect'} {report.name} folders
+        {installation ? 'Change' : 'Connect'} {report.id==='openCe'&&/^forerunner/i.test(draft.version??'')?'Forerunner':report.name} folders
       </summary>
       <p className="subtle">
-        Inspection reads paths and hashes the executable. Registration records a local configuration; it does
-        not install or run downloaded code. Use your installed runtime, not an executable from an untrusted
-        mod archive.
+        Choose your game folder and its executable, then check the paths before saving.
       </p>
       <fieldset disabled={busy}>
         {profiles.filter((item) => item.runtimeId === report.id).length > 0 && (
@@ -228,28 +226,24 @@ export default function Registration({
           Moved your game? Choose its installation folder. Paths inside that folder move together; separate
           data folders stay where you selected them. Inspect, then save.
         </p>
-        {(['root', 'executable', 'dataRoot'] as const).map((kind) => (
+        {(['root', 'executable'] as const).map((kind) => (
           <label key={kind}>
             {kind === 'root'
               ? 'Installation directory'
-              : kind === 'executable'
-                ? 'Installed executable'
-                : 'Runtime data root (contains maps / maps_ce / other runtime folders)'}
+              : 'Installed executable'}
             <div className="path-input">
               <input
                 aria-label={
                   kind === 'root'
                     ? 'Installation directory'
-                    : kind === 'executable'
-                      ? 'Installed executable'
-                      : 'Runtime data root'
+                    : 'Installed executable'
                 }
                 value={draft[kind] ?? ''}
                 onChange={(e) =>
                   setDraft((d) =>
                     kind === 'root'
                       ? relocateRuntimeRegistration(d, e.target.value)
-                      : { ...d, [kind]: e.target.value || (kind === 'dataRoot' ? null : '') },
+                      : { ...d, [kind]: e.target.value },
                   )
                 }
               />
@@ -257,6 +251,8 @@ export default function Registration({
             </div>
           </label>
         ))}
+        <details className="runtime-advanced-paths"><summary>Advanced folders and version</summary>
+        <label>Maps and resources folder<div className="path-input"><input aria-label="Runtime data root" value={draft.dataRoot??''} placeholder="Same as game folder" onChange={e=>setDraft(d=>({...d,dataRoot:e.target.value||null}))}/><button onClick={()=>void browse('dataRoot')}>Browse</button></div></label>
         {(report.id === 'openCe' || report.id === 'chupathingyCe') && (
           <div className="runtime-shared-content">
             <label>
@@ -319,6 +315,7 @@ export default function Registration({
             />
           </label>
         </div>
+        </details>
         <div className="analysis-actions">
           <button disabled={!draft.root || !draft.executable} onClick={() => void inspect()}>
             Inspect registration

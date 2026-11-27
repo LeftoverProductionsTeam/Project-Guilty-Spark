@@ -525,3 +525,58 @@ html[data-gs-reduced-motion=true] .gs-spark-emblem{transition:none;}@media(prefe
 
 .application .creator-studio .studio-radio-source > span {min-width:0;overflow-wrap:anywhere;}
 .application .creator-studio .studio-radio-source > button {white-space:normal;}
+
+/* Shared glass chrome keeps text readable over the work area. */
+.application :is(.gs-window-header,.runtime-dock,.editor-bar,.level-editor-context,.gs-open-work-popup),
+.application :is(.analysis-card,.surface):not(.map-thumbnail) {
+  border-color: color-mix(in srgb, var(--line) 80%, #a7c3ed 20%);
+  background: linear-gradient(180deg, #d0ebff12 0%, transparent 38%),
+    color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: inset 0 1px #e6f2ff15, 0 4px 14px #03121b2b;
+}
+.application :is(.gs-open-work-popup,.gs-tools-menu [role="menu"]) {
+  backdrop-filter: blur(10px);
+}
+.application .runtime-dock-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.application .runtime-dock-actions > button {
+  flex: 0 1 auto;
+  min-height: 29px;
+  min-width: 84px;
+  padding: 3px 9px;
+}
+.application .runtime-dock-actions > button > :is(span,small) { white-space: nowrap; }
+.application .runtime-dock-actions > .runtime-more-actions { font-size: 11px; }
+.application .firefight-page.firefight-new { grid-template-columns: minmax(0, min(100%, 870px)); }
+.application .firefight-preset-grid .forge-preset { min-width: 0; }
+.application :is(.firefight-preset-grid small,.property-projectile-path,.gs-credit p) {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.application .property-projectile-picker { min-height: 35px; align-items: center; }
+.application .property-projectile-path { font-size: 11px; }
+.application .compare-purpose { padding: 4px 8px; margin: 0; font-size: 12px; color: var(--muted); }
+.build-next-step,.community-archive-callout {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .3rem .65rem;
+  margin: .4rem 0; padding: .55rem .7rem;
+  border: 1px solid var(--line); border-radius: .55rem;
+  background: color-mix(in srgb, var(--panel) 90%, #6986af 10%);
+}
+.build-next-step > p { flex: 1 1 22rem; margin: 0; }
+.feature-pagination { display: flex; align-items: center; gap: .6rem; justify-content: end; margin-top: .55rem; }
+.features-overview > summary,.library-creator-tools > summary,.studio-guide > summary,.runtime-advanced-paths > summary {
+  cursor: pointer; font-weight: 650; padding: .35rem .45rem;
+}
+.application .gs-community .gs-credits-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%, 18rem),1fr)); gap: .5rem; }
+.application .gs-community .gs-credit { padding: .65rem; border-radius: .6rem; min-width: 0; align-content: start; }
+.application .gs-community .gs-thanks-intro { max-width: none; }
+.application .learning-guide-picker nav > button { text-align: left; }
+.application .learning-guide { padding: clamp(10px,1.3vw,20px); }
+.application .learning-guide ol > li { max-width: 100ch; margin-block: .45rem; padding-inline-start: .22rem; }
+.application .learning-guide-picker { position: sticky; top: 0; }
+@media(max-width: 600px){.application .learning-guide-picker{position: static;}}

@@ -309,10 +309,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     change({ ...studio, playtests: studio.playtests.map(p => p.id === id ? { ...p, ...patch } : p) }, 'Update manual playtest record');
   }
   return <div className="analysis-page creator-studio">
-    <PageTitle eyebrow="PROJECT GUILTY SPARK / CREATOR STUDIO" title="Direct the experience."
-      description="Design original mission beats, cinematic shots, dedicated-server rotations and manual QA evidence—all in your saved project."
+    <PageTitle eyebrow="PROJECT GUILTY SPARK / CREATOR STUDIO" title="Creator Studio"
+      description="Write mission objectives, set up cutscenes, or record what happened in a playtest."
       actions={<div className="analysis-actions"><button type="button" onClick={report}><Download size={15}/> Export evidence JSON</button><button className="primary" type="button" onClick={exportSourcePack}><Download size={15}/> Export CE script pack</button></div>} />
-    <section className="studio-guide" aria-label="Creator Studio quick start">
+    <details className="studio-guide" aria-label="Creator Studio quick start"><summary>How to get started</summary>
       <div><strong>Start with one objective</strong><ol><li>Add a mission beat or camera shot.</li><li>Bind existing encounters and areas, or author them below. Prepared intros create their camera points.</li><li>Prepare editable campaign source, Save, then Build & playtest. Use script-pack export for a separate external scenario.</li></ol></div>
       <nav aria-label="HaloScript learning resources"><strong>Learn HaloScript</strong>
         <ExternalBrowserLink href="https://c20.reclaimers.net/general/scripting/">Scripting basics</ExternalBrowserLink>
@@ -320,7 +320,7 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         <ExternalBrowserLink href="https://c20.reclaimers.net/h1/scripting/limits/">Common mistakes &amp; limits</ExternalBrowserLink>
         <ExternalBrowserLink href="https://c20.reclaimers.net/h1/h1-ek/h1-sapien/">Bind and compile in Sapien</ExternalBrowserLink>
       </nav>
-    </section>
+    </details>
     <details className="analysis-card studio-handoff"><summary>Export &amp; compile setup</summary><div>
       <h2>QuickForge → Editing Kit source handoff</h2>
       <p>Places your generated scripts under the matching <code>data/levels/quickforge/.../scripts/</code> folder inside a review-only ZIP. Requires a QuickForge Campaign / scripted solo, Firefight or Zombie source project and separately owned editing tools. No Halo files are modified.</p>
@@ -664,11 +664,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       <div className="analysis-actions"><button type="button" onClick={()=>exportScript('firefight')}><Download size={15}/> Export waves .hsc</button><button type="button" onClick={()=>exportScript('firefight',true)}>Export encounter binding list</button></div>
     </section>}
     {pane === 'playtest' && <section className="analysis-card">
-      <div className="studio-heading"><div><h2><ClipboardCheck size={18}/> Playtest lab</h2><p>Owner-recorded game tests tied to this project. No generated PASS badges, synthetic network claims or hidden uploads.</p></div>
+      <div className="studio-heading"><div><h2><ClipboardCheck size={18}/> Playtest lab</h2><p>Run the map in Halo first. Record what worked or failed here so you can revisit it after changes.</p></div>
         <div className="analysis-actions">
           <button type="button" disabled={!project.quickForge || studio.playtests.length >= 500}
             title="Add 20 stock Halo 1 source/Tool/game/network test cases without changing any existing manual results or pretending they passed."
-            onClick={seedStockModeTests}><ClipboardCheck size={15}/> Seed five-mode tests</button>
+            onClick={seedStockModeTests}><ClipboardCheck size={15}/> Add starter checklist</button>
           <button type="button" className="primary" disabled={studio.playtests.length >= 500} onClick={() => change({ ...studio,
             playtests: [...studio.playtests, { id:freshId(), caseId:'QA-001', target:'Halo Custom Edition', verdict:'notRun',
               performedAt:'', evidence:'', notes:'', manuallyReported:true }] }, 'Add playtest record')}><Plus size={15}/> Add test</button>
