@@ -48,7 +48,16 @@ try{
  await page.mouse.move(center[0]+40,center[1]-18,{steps:8});
  await page.mouse.up({button:'right'});
  await expect.poll(async()=>JSON.stringify((await camera()).target)).not.toBe(JSON.stringify(rotated.target));
- report.homePointerControls={follow:true,zoom:true,orbit:true,pan:true};
+ const pauseHome=home.getByRole('button',{name:'Pause showcase animation',exact:true});
+ if(await pauseHome.isVisible())await pauseHome.click();
+ await page.emulateMedia({reducedMotion:'reduce'});
+ const priorYaw=Number((await pose()).yaw);
+ await page.mouse.move(box.x+box.width*.12, center[1]);
+ await expect.poll(async()=>Math.abs(Number((await pose()).yaw)-priorYaw)).toBeGreaterThan(.25);
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ const playHome=home.getByRole('button',{name:'Play showcase animation',exact:true});
+ if(await playHome.isVisible())await playHome.click();
+ report.homePointerControls={follow:true,zoom:true,orbit:true,pan:true,reducedMotionFollow:true};
  const originalPages=new Set(browser.contexts().flatMap(context=>context.pages()));
  await page.getByLabel('File menu',{exact:true}).click();
  await page.getByRole('menuitem',{name:'New',exact:true}).click();

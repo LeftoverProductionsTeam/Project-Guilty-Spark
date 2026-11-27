@@ -18,6 +18,8 @@ export default function AnimatedBiped({
     elapsed = useRef(0),
     seek = useRef(-1),
     sampledClip = useRef<AnimationPreview['clip'] | undefined>(undefined),
+    lastSample = useRef<{time:number;loop:boolean;rootMotion:boolean;position:number[]} | null>(null),
+    lastPlaying = useRef<boolean | undefined>(undefined),
     failed = useRef(false);
   const { gl } = useThree();
   const prepared = useMemo(() => {
@@ -31,6 +33,7 @@ export default function AnimatedBiped({
   useEffect(() => {
     failed.current = false;
     seek.current = -1;
+    lastSample.current = null;
     group.current?.traverse(o=>{if(o instanceof ThreeMesh){const p=o.geometry.getAttribute('position') as BufferAttribute,n=o.geometry.getAttribute('normal') as BufferAttribute;if(p.array.length===model.mesh.positions.length){p.array.set(model.mesh.positions);p.needsUpdate=true;if(n?.array.length===model.mesh.normals?.length){n.array.set(model.mesh.normals);n.needsUpdate=true;}}}});
     if (prepared?.error) onError(prepared.error);
   }, [prepared]);
@@ -42,8 +45,11 @@ export default function AnimatedBiped({
         elapsed.current = animation.time;
         seek.current = animation.seek;
       } else if (animation.playing) elapsed.current += Math.min(delta, 0.1) * animation.speed;
-      const frame = prepared.player.sample(elapsed.current, animation.loop, animation.rootMotion);
-      group.current.traverse((o) => {
+      const before = lastSample.current;
+      const needsPose = !before || before.time !== elapsed.current || before.loop !== animation.loop || before.rootMotion !== animation.rootMotion;
+      if (!needsPose && lastPlaying.current === animation.playing) return;
+      const frame = needsPose ? prepared.player.sample(elapsed.current, animation.loop, animation.rootMotion) : null;
+      if (frame) group.current.traverse((o) => {
         if (o instanceof ThreeMesh) {
           const p = o.geometry.getAttribute('position') as BufferAttribute,
             n = o.geometry.getAttribute('normal') as BufferAttribute;
@@ -58,6 +64,8 @@ export default function AnimatedBiped({
           }
         }
       });
+      if (frame) lastSample.current = {time:elapsed.current,loop:animation.loop,rootMotion:animation.rootMotion,position:Array.from(frame.positions.subarray(0, 3))};
+      lastPlaying.current = animation.playing;
       gl.domElement.dataset.gsAnimation = JSON.stringify({
         name: animation.clip.name,
         time: elapsed.current,
@@ -65,7 +73,7 @@ export default function AnimatedBiped({
         bones: animation.clip.nodes.length,
         playing: animation.playing,
         source: 'verified-skeletal-animation',
-        samplePosition: Array.from(frame.positions.subarray(0, 3)),
+        samplePosition: lastSample.current?.position,
       });
     } catch (e) {
       failed.current = true;

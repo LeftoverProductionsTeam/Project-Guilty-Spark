@@ -3,11 +3,9 @@ import {native} from '../api';
 import { DEFAULT_RENDER_FEATURES } from '../renderFeatures';
 const showcaseFeatures = {
   ...DEFAULT_RENDER_FEATURES,
-  enabled: true,
-  quality: 'full' as const,
-  bloomStrength: 0.065,
-  bloomThreshold: 1.25,
-  bloomRadius: 0.16,
+  // Render the transparent Home model in one pass. Native materials still
+  // supply the Monitor eye color and reflections.
+  enabled: false,
   exposureEv: -0.15,
   normalMaps:false,
   specular:false,
@@ -90,6 +88,7 @@ function Model({
   const group = useRef<THREE.Group>(null),
     { camera, gl, invalidate } = useThree();
   const pointer=useRef({x:0,y:0});
+  const mouse=useRef<{x:number;y:number}|null>(null);
   const manipulating=useRef(false);
   const interactiveShowcase=showcase&&!portrait;
   const {active}=useWorkspaceActivity();
@@ -101,22 +100,26 @@ function Model({
     if(!showcase&&validModelPreviewCamera(value,identity.sourceHash,fit.radius))writeMapSession(identity.projectId,sessionKey,value);
     gl.domElement.dataset.gsPreviewCamera=JSON.stringify(value);invalidate();
   };
-  const poseSample = useRef(0);
-  const motionAllowed = useMemo(() => !matchMedia('(prefers-reduced-motion: reduce)').matches, []);
+  const lastPoseReport = useRef(0);
+  const poseVectors = useMemo(() => ({ origin: new THREE.Vector3(), front: new THREE.Vector3() }), []);
+  const [smoothMotion, setSmoothMotion] = useState(() => !matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => {
-    if (!interactiveShowcase || !live || !motionAllowed) return;
+    const preference = matchMedia('(prefers-reduced-motion: reduce)');
+    const changed = () => { setSmoothMotion(!preference.matches); invalidate(); };
+    preference.addEventListener('change', changed);
+    return () => preference.removeEventListener('change', changed);
+  }, [invalidate]);
+  useEffect(() => {
+    if (!interactiveShowcase || !live) return;
     const follow = (event: PointerEvent) => {
-      if (event.pointerType === 'touch' || manipulating.current) return;
-      const bounds=gl.domElement.getBoundingClientRect();
-      const x=(event.clientX-(bounds.left+bounds.width/2))/Math.max(1,bounds.width/2);
-      const y=((bounds.top+bounds.height/2)-event.clientY)/Math.max(1,bounds.height/2);
-      pointer.current.x=THREE.MathUtils.clamp(x,-1,1);
-      pointer.current.y=THREE.MathUtils.clamp(y,-1,1);
+      if (event.pointerType === 'touch' || manipulating.current || document.hidden) return;
+      mouse.current = {x: event.clientX, y: event.clientY};
       invalidate();
     };
-    window.addEventListener('pointermove', follow, { passive: true });
-    return () => window.removeEventListener('pointermove', follow);
-  }, [interactiveShowcase, live, motionAllowed, gl, invalidate]);
+    // Orbit controls and overlaid buttons may consume the same pointer event.
+    window.addEventListener('pointermove', follow, { passive: true, capture: true });
+    return () => window.removeEventListener('pointermove', follow, true);
+  }, [interactiveShowcase, live, invalidate]);
   const fit = useMemo(() => {
     let positions: ArrayLike<number> = view.mesh.positions;
     if (interactiveShowcase && framingClip) {
@@ -152,28 +155,33 @@ function Model({
     if(!portrait)remember();
   }, [camera, fit, invalidate, showcase,portrait,identity.projectId,identity.sourceHash,sessionKey,framing]);
   useFrame((_, dt) => {
-    if (!group.current || !active || manipulating.current) return;
-    // Keep the left-facing resting pose, but let the right half of the page
-    // turn the model far enough to face that side as well.
-    const followYaw = pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6);
-    const target = showcase&&!portrait ? -1.0 + (live && motionAllowed ? followYaw : 0) : 0;
-    group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
-    group.current.rotation.x = THREE.MathUtils.damp(
-      group.current.rotation.x,
-      interactiveShowcase && live && motionAllowed ? pointer.current.y * 0.18 : 0,
-      4,
-      dt,
-    );
-    if (showcase && (poseSample.current += dt) > 0.1) {
-      poseSample.current = 0;
-      group.current.updateWorldMatrix(true, false);
-      const origin = new THREE.Vector3().project(camera),
-        front = new THREE.Vector3(fit.radius, 0, 0).applyMatrix4(group.current.matrixWorld).project(camera);
-      gl.domElement.dataset.gsShowcasePose = JSON.stringify({
-        yaw: group.current.rotation.z,
-        pitch: group.current.rotation.x,
-        screenHeading: front.x - origin.x,
-      });
+    const model = group.current;
+    if (!model || !active || manipulating.current || !interactiveShowcase) return;
+    if (mouse.current) {
+      const bounds = gl.domElement.getBoundingClientRect();
+      pointer.current.x = THREE.MathUtils.clamp((mouse.current.x - bounds.left - bounds.width / 2) / Math.max(1, bounds.width / 2), -1, 1);
+      pointer.current.y = THREE.MathUtils.clamp((bounds.top + bounds.height / 2 - mouse.current.y) / Math.max(1, bounds.height / 2), -1, 1);
+      mouse.current = null;
+    }
+    const yaw = -1 + (live ? pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6) : 0);
+    const pitch = live ? pointer.current.y * 0.18 : 0;
+    const changed = Math.abs(model.rotation.z - yaw) + Math.abs(model.rotation.x - pitch);
+    const settling = smoothMotion && live && changed > 0.001;
+    const delta = Math.min(dt, 1 / 30);
+    model.rotation.z = settling ? THREE.MathUtils.damp(model.rotation.z, yaw, 10, delta) : yaw;
+    model.rotation.x = settling ? THREE.MathUtils.damp(model.rotation.x, pitch, 10, delta) : pitch;
+    if (settling) invalidate();
+    const now = performance.now();
+    if (!gl.domElement.dataset.gsShowcasePose || !settling || now - lastPoseReport.current >= 100) {
+      if (!gl.domElement.dataset.gsShowcasePose || changed > 0) {
+        model.updateWorldMatrix(true, false);
+        const origin = poseVectors.origin.set(0, 0, 0).project(camera);
+        const front = poseVectors.front.set(fit.radius, 0, 0).applyMatrix4(model.matrixWorld).project(camera);
+        gl.domElement.dataset.gsShowcasePose = JSON.stringify({
+          yaw: model.rotation.z, pitch: model.rotation.x, screenHeading: front.x - origin.x,
+        });
+      }
+      lastPoseReport.current = now;
     }
   });
   return (
@@ -278,9 +286,9 @@ export default function NativeModelPreview({
   }, [surface,identity.projectId,identity.sourceHash,identity.tagId,key,collisionRetry]);
   const collisionValue = collision?.key === key ? collision : null;
   const [sourceLighting,setSourceLighting]=useState<{key:string;value:ModelSourceAppearance|null}|null>(null);
-  useEffect(()=>{let alive=true;setSourceLighting(null);if(!native||!identity.projectId||!identity.sourceHash){setSourceLighting({key,value:null});return;}
+  useEffect(()=>{let alive=true;setSourceLighting(null);if(showcase&&environment||!native||!identity.projectId||!identity.sourceHash){setSourceLighting({key,value:null});return;}
     void modelSourceAppearance(identity.projectId,identity.sourceHash).then(value=>{if(alive)setSourceLighting({key,value});},()=>{if(alive)setSourceLighting({key,value:null});});return()=>{alive=false;};
-  },[identity.projectId,identity.sourceHash,key]);
+  },[identity.projectId,identity.sourceHash,key,showcase,environment]);
   const [visible, setVisible] = useState(false),
     host = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -300,6 +308,7 @@ export default function NativeModelPreview({
   const lightingReady=!!environment||sourceLighting?.key===key;
   const animationReady=surface==='collision'||!animate||!!animations.value||!!animations.error;
   const frameKey = `${key}:${surface}`;
+  const continuousFrames = !!onSnapshot || (surface === 'render' && !!animation?.playing);
   const usable=!!view?.ready&&!failures[key]&&lightingReady&&animationReady&&(surface!=='collision'||!!collisionValue?.mesh);
   const pendingPhase=failures[key]?null:!view?'Reading native geometry':surface==='collision'&&!collisionValue?'Reading native collision':surface==='collision'&&!collisionValue?.mesh?null:!view.ready?'Loading source textures & reflections':!lightingReady?'Reading source lighting':!animationReady?'Reading native animation':firstFrame!==frameKey?'Preparing first viewport frame':null;
   return (
@@ -350,13 +359,13 @@ export default function NativeModelPreview({
             premultipliedAlpha: false,
             preserveDrawingBuffer: !!onSnapshot,
           }}
-          frameloop={activity.active&&(visible||onSnapshot)&&(live||onSnapshot)?'always':'demand'}
+          frameloop={activity.active && (visible || onSnapshot) && continuousFrames ? 'always' : 'demand'}
           onCreated={({ gl }) => {
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.toneMapping = THREE.NoToneMapping;
           }}
         >
-          <ViewportActivity continuous={!!((live||onSnapshot)&&visible)}/>
+          <ViewportActivity continuous={continuousFrames && visible}/>
           <Suspense fallback={null}>
             <SceneEnvironment value={value} maximumFogDensity={sourceLighting?.key===key?sourceLighting.value?.fogMaximumDensity??1:1} overrideLighting transparentBackground={showcase} />
             {showcase && <SceneEffects settings={showcaseFeatures} transparentBackground />}
