@@ -24,7 +24,8 @@ const known: { id: string; pattern: RegExp; action: string; wrl: boolean; fatal?
   {id:'BSP_DIVIDING_EDGE',pattern:/dividing_edge->vertex_indices\[1\]\s*==\s*NONE/i,action:'Investigate near-coplanar or rounding-unstable collision source around the affected area. Recheck JMS scale; no automatic binary fix is safe.',wrl:false},
   {id:'BSP_TOO_SMALL',pattern:/not a valid structure_bsp_cluster_block index/i,action:'Examine tiny or degenerate level scale and overlapping source faces. Rebuild in an isolated staging location after repairing geometry.',wrl:false},
   {id:'PHANTOM_COLLISION',pattern:/\bphantom bsp\b/i,action:'Validate collision in a running game and rebuild source collision if phantom surfaces remain. A Tool option is not a guarantee of a fix.',wrl:false},
-  {id:'OPEN_EDGE', pattern:/\bopen edge\b|\bedge is open\b/i, action:'Seal the affected collision shell or use an appropriate render-only Halo material. Inspect red edges in Tool WRL.',wrl:true},
+  {id:'OPEN_EDGE', pattern:/\bopen edge\b|\bedge(?:\s+#\d+)?\s+is open\b/i, action:'Seal the affected collision shell or use an appropriate render-only Halo material. Inspect red edges in Tool WRL.',wrl:true},
+  {id:'RENDER_CLIPPED', pattern:/\bsurface clipped to no leaves\b/i, action:'Inspect cyan faces in the Halo Tool WRL. Move render-only faces inside the sealed BSP and check for coincident walls at the join before baking lighting.',wrl:true},
   {id:'NON_MANIFOLD', pattern:/\bcouldn.t update edge\b|\bmore than 2 faces\b/i, action:'Check edges shared by three faces, reversed normals and nearly coincident geometry. Use the WRL overlay.',wrl:true},
   {id:'INTERSECTING_FACES', pattern:/\bz-buffered triangle\b|\bintersecting surfaces?\b/i,action:'Rebuild overlapping collision polygons as connected, nonintersecting source topology. A visual snap is not a CSG union.',wrl:true},
   {id:'RADIOSITY_UVS',pattern:/\bdegenerate triangle or triangle with bad uvs\b/i,action:'Check degenerate lightmap UVs, particularly materials using simple parameterization; re-unwrap the affected source faces.',wrl:true},
@@ -52,7 +53,7 @@ export function analyzeHaloToolLog(input: string): ToolLogReview {
   const diagnostics:ToolDiagnostic[]=[];
   let unclassified=0, unclassifiedErrors=0;
   lines.forEach((line,index)=>{
-    const isError=/\b(?:###\s*)?(?:error|exception|fatal)\b/i.test(line);
+    const isError=!/^\s*(?:###\s*)?warning\b/i.test(line) && /\b(?:error|exception|fatal)\b/i.test(line);
     const isWarning=/\bwarning\b/i.test(line);
     const item=known.find(k=>k.pattern.test(line));
     if (!item && (isError || isWarning)) {unclassified++;if(isError)unclassifiedErrors++;}

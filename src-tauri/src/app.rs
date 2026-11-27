@@ -759,6 +759,49 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
         Ok(result)
     }).await.map_err(error)?
 }
+#[tauri::command]
+async fn check_bsp_assembly_structure(
+    app: tauri::AppHandle, project_id: String, draft: core::bsp_assembly::BspAssembly,
+) -> Reply<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        if !draft.separate_native_bsps
+            || serde_json::to_value(&project.bsp_assembly).map_err(error)? != serde_json::to_value(&draft).map_err(error)?
+        {
+            return Err("Apply and save the separate native BSP connection before checking it in Halo Tool.".into());
+        }
+        let inspection = inspect(&state, &project)?;
+        let messages = std::sync::Mutex::new(Vec::<String>::new());
+        let witnesses = std::sync::Mutex::new(Vec::<serde_json::Value>::new());
+        let result = core::megaworld_build::check_partition_structure(
+            &project, &inspection, &state.root.join("jobs"), Arc::new(AtomicBool::new(false)), |event| {
+                if event.phase == "bsp-structure-witness" {
+                    if let (Ok(witness), Ok(mut witnesses)) = (serde_json::from_str(&event.message), witnesses.lock()) {
+                        witnesses.push(witness);
+                    }
+                    return;
+                }
+                if event.phase != "bsp-structure" { return; }
+                let line = event.message.to_ascii_lowercase();
+                if !["error", "warning", "exception", "failed", "open (red)"].iter().any(|marker| line.contains(marker)) {
+                    return;
+                }
+                if let Ok(mut messages) = messages.lock() {
+                    let line: String = event.message.trim().chars().take(512).collect();
+                    if !messages.contains(&line) && messages.len() < 64 { messages.push(line); }
+                }
+            },
+        );
+        Ok(serde_json::json!({
+            "passed": result.is_ok(),
+            "issue": result.err().map(|reason| reason.to_string()),
+            "messages": messages.into_inner().map_err(error)?,
+            "witnesses": witnesses.into_inner().map_err(error)?,
+        }))
+    }).await.map_err(error)?
+}
+
 fn preview_project_bitmap_batch(
     state: &AppState,
     project: &Project,
@@ -3817,6 +3860,7 @@ pub fn run() {
             plan_bsp_assembly,
             create_megaworld_project,
             preview_bsp_assembly,
+            check_bsp_assembly_structure,
             inspect_native_bsp_transitions,
             inspect_native_bsp_placements,
             open_bsp_assembly_donor,

@@ -16,8 +16,16 @@ import { addOpenedAtlasBsp, alignAtlasDonor, atlasAdjacentRegions, type LayoutRe
 import MapSourceDrop from './MapSourceDrop';
 import {useRevealWorkspacePanel} from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
+import { analyzeHaloToolLog } from '../haloToolDiagnostics';
+import { parseHaloWrl } from '../haloWrl';
 import { volumeCenter } from '../nativeTriggerVolume';
 import type { NativeVolumeGeometry } from '../nativeOperations';
+type StructureCheck = {
+  passed: boolean;
+  issue?: string;
+  messages: string[];
+  witnesses: {name: string; text: string}[];
+};
 interface NativeBspTransitions {
   extractionHubStarts?: { name: string; volumeIndex: number; bspIndex: number; startIndices: number[]; terminalIndex?: number; services?: { service: string; controlIndex: number }[]; groundCall?: { name: string; controlIndex: number; volumeIndex: number; bspIndex: number }; returnPad?: { name: string; volumeIndex: number; bspIndex: number; geometry: NativeVolumeGeometry } }[];
   extractionHubIssue?: string;
@@ -235,6 +243,14 @@ export default function BspAssembly({
   const operation = useRef(0),
     mounted = useRef(false);
   const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex });
+  const [structureCheck, setStructureCheck] = useState<(StructureCheck & {key: string}) | null>(null);
+  const structureKey = JSON.stringify([project.id, project.source?.sha256, buildRuntime, assemblySignature(draft)]);
+  const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
+  const currentStructureCheck = structureCheck?.key === structureKey && applied ? structureCheck : null;
+  const structureActions = currentStructureCheck?.messages.length
+    ? [...new Set(analyzeHaloToolLog(currentStructureCheck.messages.join('\n')).diagnostics.map(issue => issue.action))]
+    : [];
+
   latest.current = { projectId: project.id, signature: assemblySignature(draft), donor, index, baseIndex };
   const options = sectionList?.donor === donor ? sectionList.values : [];
   const loadingOptions = native && open && !!donor && sectionList?.donor !== donor && !optionsError;
@@ -384,7 +400,6 @@ export default function BspAssembly({
     : [];
   const atlasDonor=atlasBase&&draft&&placedLayout&&atlasAdjacentRegions(placedLayout.regions,atlasBase)
     .find(region=>region.cacheSha256===draft.donorSource.sha256&&region.bspIndex===draft.donorBspIndex);
-  const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
@@ -445,6 +460,16 @@ export default function BspAssembly({
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
   }
   function armEdge(target:'base'|'donor', landing:typeof pickingLanding = null){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
+  async function checkNativeStructure() {
+    if (!draft || !applied || !selectionMatches || busy) return;
+    const key = structureKey;
+    setStructureCheck(null);
+    await perform(async current => {
+      const check = await call<StructureCheck>(
+        'check_bsp_assembly_structure', { projectId: project.id, draft });
+      if (current()) setStructureCheck({ ...check, key });
+    });
+  }
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
       <div className="bsp-vector">
@@ -1019,6 +1044,39 @@ export default function BspAssembly({
                   disabled={busy || (draft.separateNativeBsps && (!draft.preserveDonorBsp || !!draft.openRoad)) || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
                   onClick={() => {
                     const a = routeDraft!.tunnelPoints.at(-2)!,
+                  <button type="button" disabled={busy || !native || !selectionMatches || !applied}
+                    onClick={() => void checkNativeStructure()}>Check structure in Halo Tool</button>
+                  <small>Apply and save the connection first. This checks native collision and structure before lighting and map compilation.</small>
+                  {currentStructureCheck && (
+                    <div role={currentStructureCheck.passed ? 'status' : 'alert'}>
+                      <strong>{currentStructureCheck.passed
+                        ? (currentStructureCheck.messages.length ? 'Native structure passed with warnings' : 'Native structure passed')
+                        : 'Native structure check failed'}</strong>
+                      {currentStructureCheck.issue && <p>{currentStructureCheck.issue}</p>}
+                      {structureActions.length > 0 && <ul>{structureActions.map(action => <li key={action}>{action}</li>)}</ul>}
+                      {currentStructureCheck.witnesses.map(witness => {
+                        try {
+                          const geometry = parseHaloWrl(witness.text);
+                          const locations = [
+                            ...geometry.segments.slice(0, 4).map(edge => ['Edge', edge.start] as const),
+                            ...geometry.faces.slice(0, 4).map(face => ['Face', face.a] as const),
+                          ];
+                          return locations.length > 0 && <details key={witness.name}>
+                            <summary>Affected areas in {witness.name}</summary>
+                            <ul>{locations.map(([label, point], index) => (
+                              <li key={index}>{label} near {point.map(axis => axis.toFixed(3)).join(', ')} in Halo world units</li>
+                            ))}</ul>
+                          </details>;
+                        } catch {
+                          return <p key={witness.name}>Spark couldn’t display the geometry locations from {witness.name}.</p>;
+                        }
+                      })}
+                      {currentStructureCheck.messages.length > 0 && <details>
+                        <summary>Halo Tool messages</summary>
+                        <ul>{currentStructureCheck.messages.map(message => <li key={message}>{message}</li>)}</ul>
+                      </details>}
+                    </div>
+                  )}
                       b = routeDraft!.tunnelPoints.at(-1)!;
                     updateRoute({
                       tunnelPoints: [

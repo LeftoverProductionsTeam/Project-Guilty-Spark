@@ -217,7 +217,17 @@ pub fn preview_partitions(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
 ) -> Result<serde_json::Value> {
-    partition_preview(project, inspection, jobs, id, cancel, event, crate::bsp_compile::PartitionStage::Structure)
+    partition_preview(project, inspection, jobs, id, cancel, event, crate::bsp_compile::PartitionStage::Structure, false)
+}
+
+/// Test native structure compilation without retaining a build or baking lighting.
+pub fn check_partition_structure(
+    project: &Project, inspection: &MapInspection, jobs: &Path,
+    cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<()> {
+    let id = uuid::Uuid::new_v4().to_string();
+    partition_preview(project, inspection, jobs, &id, cancel, event,
+        crate::bsp_compile::PartitionStage::StructureCheck, true).map(|_| ())
 }
 
 /// Compile and inspect the staged scenario without advertising it as a playable build.
@@ -227,15 +237,16 @@ pub fn probe_partition_scenario(
 ) -> Result<serde_json::Value> {
     use crate::bsp_compile::PartitionStage;
     let stage = if bake { PartitionStage::Lighting } else { PartitionStage::Collision };
-    partition_preview(project, inspection, jobs, id, cancel, event, stage)
+    partition_preview(project, inspection, jobs, id, cancel, event, stage, false)
 }
 
 fn partition_preview(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
     cancel: Arc<AtomicBool>, event: impl Fn(JobEvent) + Send + Sync, stage: crate::bsp_compile::PartitionStage,
+    disposable: bool,
 ) -> Result<serde_json::Value> {
     use crate::bsp_compile::PartitionStage;
-    let bind = stage != PartitionStage::Structure;
+    let bind = matches!(stage, PartitionStage::Collision | PartitionStage::Lighting);
     let bake = stage == PartitionStage::Lighting;
     uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
     let tools = preflight(project, inspection)?;
@@ -248,41 +259,92 @@ fn partition_preview(
     crate::reject_links(jobs)?;
     fs::create_dir_all(jobs)?;
     let workspace = jobs.join(id);
-    let inputs = crate::native_staging::inventory(source_tags, &cancel)?;
-    let budget = crate::storage::estimate_copy(inputs.files.len(), inputs.bytes).saturating_add(2 * 1024 * 1024 * 1024);
+    let budget = if disposable {
+        // Each shader dependency closure has its own byte cap. Budget for
+        // both closures, their staging copies, and native output.
+        6 * 1024 * 1024 * 1024
+    } else {
+        let inputs = crate::native_staging::inventory(source_tags, &cancel)?;
+        crate::storage::estimate_copy(inputs.files.len(), inputs.bytes).saturating_add(2 * 1024 * 1024 * 1024)
+    };
     let lease = crate::storage::Store::for_output(&workspace)?.reserve(&workspace, Some(source_tags), budget,
         crate::storage::Category::Staging, "Owned native partition structure preview")?;
     fs::create_dir(&workspace)?;
     lease.mark_owned()?;
-    let workspace = fs::canonicalize(workspace)?;
-    let tags = workspace.join("tags");
-    let input_hashes = crate::forge_build::stage_tags(source_tags, &tags, &cancel, |_, _, _, _| {})?;
-    let runner = Runner { id, project: &project.id, cancel: &cancel, event: &event };
-    if bind {
-        if !crate::bsp_compile::connected_additions(project, inspection)?.is_empty() {
-            return invalid("Partition probes require an unchanged import list. Keep new authored assets in the source project.");
+    let result = (|| {
+        let workspace = fs::canonicalize(&workspace)?;
+        let tags = workspace.join("tags");
+        let input_hashes = if disposable {
+            fs::create_dir(&tags)?;
+            None
+        } else {
+            Some(crate::forge_build::stage_tags(source_tags, &tags, &cancel, |_, _, _, _| {})?)
+        };
+        let runner = Runner { id, project: &project.id, cancel: &cancel, event: &event };
+        if bind {
+            if !crate::bsp_compile::connected_additions(project, inspection)?.is_empty() {
+                return invalid("Partition probes require an unchanged import list. Keep new authored assets in the source project.");
+            }
+            let edit = build::tool_path(&tools, "invader-edit").unwrap();
+            crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
         }
-        let edit = build::tool_path(&tools, "invader-edit").unwrap();
-        crate::bsp_compile::apply_base_transforms(project, inspection, &edit, &runner, &workspace, &tags)?;
-    }
-    let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version, GameplayLimits::partition(cache_target(project).unwrap().version))?;
-    let receipt = if bind {
-        let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
-        serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
-            "donorEnvironment": prepared.donor_environment, "allRegionEnvironmentsVerified": false,
-            "donorPickups": prepared.pickups.as_ref().map(|pickups| pickups.donor_count()),
-            "pickupDependencies": prepared.pickups.as_ref().map(|pickups| pickups.dependency_summary()),
-            "gameplayVerified": false})
-    } else { prepared.receipt };
-    for input in [source, &plan.donor_source] {
-        if maps::hash_file(&input.preserved_path)? != input.sha256 {
-            return invalid("An original region changed during partition compilation");
+        let prepared = crate::bsp_compile::prepare_partition_structure(project, inspection, &tools, &runner, &workspace, &tags, stage, cache_target(project).unwrap().version, GameplayLimits::partition(cache_target(project).unwrap().version))?;
+        let receipt = if bind {
+            let caches = build_partition_probes(project, inspection, &prepared, &tools, &runner, &workspace, &tags, bake)?;
+            serde_json::json!({"partitions": prepared.receipt, "caches": caches, "lightingBaked": bake,
+                "donorEnvironment": prepared.donor_environment, "allRegionEnvironmentsVerified": false,
+                "donorPickups": prepared.pickups.as_ref().map(|pickups| pickups.donor_count()),
+                "pickupDependencies": prepared.pickups.as_ref().map(|pickups| pickups.dependency_summary()),
+                "gameplayVerified": false})
+        } else { prepared.receipt };
+        for input in [source, &plan.donor_source] {
+            if maps::hash_file(&input.preserved_path)? != input.sha256 {
+                return invalid("An original region changed during partition compilation");
+            }
         }
+        if let Some(input_hashes) = input_hashes {
+            if crate::tool_transaction::inventory(source_tags)? != input_hashes {
+                return invalid("Editable input tags changed during partition compilation");
+            }
+        }
+        if !disposable {
+            project::atomic_write(&workspace.join("partition-structure.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
+        }
+        Ok(receipt)
+    })();
+    if disposable {
+        // Tool puts its geometry witnesses beside the generated JMS. Send a
+        // bounded copy to the editor before disposing of the staging folder.
+        let models = workspace.join("data").join("levels").join("spark")
+            .join(format!("assembly_{}", &project.id[..8])).join("models");
+        if crate::reject_links(&models).is_ok() {
+            if let Ok(files) = fs::read_dir(models) {
+                let mut paths = files.flatten().map(|entry| entry.path())
+                    .filter(|path| path.extension().is_some_and(|extension| extension == "wrl"))
+                    .collect::<Vec<_>>();
+                paths.sort();
+                for path in paths.into_iter().take(4) {
+                    if crate::reject_links(&path).is_err() { continue; }
+                    let Ok(info) = fs::metadata(&path) else { continue };
+                    if !info.is_file() || info.len() > 256 * 1024 { continue; }
+                    let Ok(text) = fs::read_to_string(&path) else { continue };
+                    if text.len() > 256 * 1024 { continue; }
+                    event(JobEvent {
+                        job_id: id.into(), project_id: project.id.clone(), phase: "bsp-structure-witness".into(),
+                        message: serde_json::json!({"name": path.file_name().and_then(|name| name.to_str()), "text": text}).to_string(),
+                        progress: 90, severity: "info".into(), timestamp: chrono::Utc::now().to_rfc3339(),
+                    });
+                }
+            }
+        }
+        let disposal = lease.finish_disposable();
+        return match result {
+            Ok(receipt) => disposal.map(|_| receipt),
+            Err(error) if disposal.is_ok() => Err(error),
+            Err(error) => invalid(format!("{error}. Scratch cleanup also failed: {}", disposal.unwrap_err())),
+        };
     }
-    if crate::tool_transaction::inventory(source_tags)? != input_hashes {
-        return invalid("Editable input tags changed during partition compilation");
-    }
-    project::atomic_write(&workspace.join("partition-structure.json"), &serde_json::to_vec_pretty(&receipt)?, false)?;
+    let receipt = result?;
     lease.finish(true, Some(project.fingerprint()?))?;
     Ok(receipt)
 }

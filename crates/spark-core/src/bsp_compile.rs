@@ -748,6 +748,7 @@ fn compile_structure(
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PartitionStage {
     Structure,
+    StructureCheck,
     Collision,
     Lighting,
 }
@@ -1297,7 +1298,12 @@ pub(crate) fn prepare_partition_structure(
     project: &Project, inspection: &MapInspection, tools: &Toolchain,
     runner: &Runner, workspace: &Path, tags: &Path, stage: PartitionStage, cache_version: u32, limits: crate::megaworld_build::GameplayLimits,
 ) -> Result<PreparedPartitions> {
-    let bind = stage != PartitionStage::Structure;
+    let bind = matches!(stage, PartitionStage::Collision | PartitionStage::Lighting);
+    let base_tags = if stage == PartitionStage::StructureCheck {
+        tools.base_tags_directory.as_deref().ok_or_else(|| SparkError::Invalid("Missing editable base tags".into()))?
+    } else {
+        tags
+    };
     let plan = project.bsp_assembly.as_ref().ok_or_else(|| SparkError::Invalid("Author a connection first".into()))?;
     let tool = crate::conversion::native_tool(tools).ok_or_else(|| SparkError::Invalid("BSP structures require the H1A editing kit".into()))?;
     let (base_geometry, added_geometry, switches, overlap, overlap_samples, max_floor_delta, intact_overlaps) =
@@ -1320,14 +1326,14 @@ pub(crate) fn prepare_partition_structure(
     }
     let mut retained = Vec::new();
     if let Some(base) = &base_geometry {
-        namespace_materials(tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None, &[])?;
+        namespace_materials(base_tags, &original_structures[0], 0, base, &[], tools, runner, workspace, tags, None, &[])?;
     } else {
         for bsp in &original_structures {
-            let file = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
+            let file = base_tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
             let sha = maps::hash_file(&file)?;
             retained.push((file, sha));
         }
-        namespace_materials(tags, &original_structures[plan.base_bsp_index], 0, &added_geometry, &[], tools, runner, workspace, tags, None, &[])?;
+        namespace_materials(base_tags, &original_structures[plan.base_bsp_index], 0, &added_geometry, &[], tools, runner, workspace, tags, None, &[])?;
     }
     let scenery = if bind { crate::bsp_scenery::plan(plan, &donor)? } else { vec![] };
     let donor_source_bsp = bsp_tag(&plan.donor_source.preserved_path, &donor, plan.donor_bsp_index)?;

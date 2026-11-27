@@ -10,6 +10,10 @@ const toolLog=analyzeHaloToolLog([
   '### Warning found nearly coplanar surfaces',
   '### ERROR unexpected future compiler stage C:\\secret',
 ].join('\n'));
+const structureCheck=analyzeHaloToolLog('### ERROR edge #950 is open (red).\n### WARNING: a surface clipped to no leaves (see cyan in error geometry).');
+assert.deepEqual(structureCheck.diagnostics.map(item=>[item.code,item.level,item.wrlUseful]),[
+  ['OPEN_EDGE','error',true],['RENDER_CLIPPED','warning',true],
+]);
 const wrl=parseHaloWrl('#VRML 1.0 ascii\nSeparator { Coordinate3 { point [0 0 0,100 0 0] } IndexedLineSet { coordIndex [0,1,-1] } }');
 const association={sampledPrimitives:1,totalPrimitives:1,ambiguousPrimitives:0,unmatchedPrimitives:0,
   candidates:[{brushId:'C:\\do_not_export\\brush-name',diagnosticSamples:1,closestDistance:0}],note:'secret'};
