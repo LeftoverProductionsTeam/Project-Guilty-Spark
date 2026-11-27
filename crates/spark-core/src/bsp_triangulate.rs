@@ -35,22 +35,29 @@ fn affine(m: &MeshGL64, t: [u64; 3], d: u64, uv_tolerance: f64) -> bool {
     if m.num_prop == 3 {
         return true;
     }
-    let (a, b, c) = (at(m, t[0]), at(m, t[1]), at(m, t[2]));
+    let Some(weights) = chart_weights(m, t, at(m, d)) else { return false; };
+    (3..m.num_prop as usize).all(|k| {
+        let value = m.vert_properties[d as usize * m.num_prop as usize + k];
+        let projected = chart_property(m, t, weights, k);
+        (projected - value).abs() < uv_tolerance.max(1e-6 * (1. + value.abs()))
+    })
+}
+fn chart_weights(m: &MeshGL64, face: [u64; 3], point: V) -> Option<V> {
+    let [a, b, c] = face.map(|id| at(m, id));
     let u = sub(b, a);
     let v = sub(c, a);
-    let p = sub(at(m, d), a);
-    let (uu, uv, vv, pu, pv) = (dot(u, u), dot(u, v), dot(v, v), dot(p, u), dot(p, v));
-    let den = uu * vv - uv * uv;
-    if den.abs() < 1e-20 {
-        return false;
-    }
-    let x = (vv * pu - uv * pv) / den;
-    let y = (uu * pv - uv * pu) / den;
-    (3..m.num_prop as usize).all(|k| {
-        let value = |id: u64| m.vert_properties[id as usize * m.num_prop as usize + k];
-        let projected = value(t[0]) * (1. - x - y) + value(t[1]) * x + value(t[2]) * y;
-        (projected - value(d)).abs() < uv_tolerance.max(1e-6 * (1. + value(d).abs()))
-    })
+    let p = sub(point, a);
+    let n = cross(u, v);
+    let den = dot(n, n);
+    if den < 1e-20 { return None; }
+    let x = dot(cross(p, v), n) / den;
+    let y = dot(cross(u, p), n) / den;
+    Some([1. - x - y, x, y])
+}
+fn chart_property(m: &MeshGL64, face: [u64; 3], weights: V, property: usize) -> f64 {
+    face.into_iter().zip(weights).map(|(id, weight)| {
+        m.vert_properties[id as usize * m.num_prop as usize + property] * weight
+    }).sum()
 }
 pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m, None, false) }
 pub(crate) fn improve_at_native_precision(m: &mut MeshGL64) -> usize { improve_material(m, None, true) }
@@ -231,16 +238,22 @@ fn weld_generated_edge(
     if removed != 2 {
         return false;
     }
-    if incident.iter().any(|&(_, _, _, stock)| stock) {
-        let position = from.map(f64::from_bits);
-        if stock_points.iter().any(|p| {
-            let delta = sub(*p, position);
-            dot(delta, delta) <= SOURCE_PLANE_PRECISION * SOURCE_PLANE_PRECISION
-        }) {
-            return false;
-        }
+    let position = from.map(f64::from_bits);
+    let point = to.map(f64::from_bits);
+    // A generated intersection close to an anchor can move toward it.
+    // Never move an exact or numerically perturbed stock corner away.
+    if stock_points.iter().any(|p| {
+        let from_delta = sub(*p, position);
+        let to_delta = sub(*p, point);
+        let from_distance = dot(from_delta, from_delta);
+        from_distance <= SOURCE_PLANE_PRECISION * SOURCE_PLANE_PRECISION
+            && dot(to_delta, to_delta) >= from_distance
+    }) {
+        return false;
     }
     let mut changes = BTreeMap::new();
+    let mut chart_vertices = Vec::<Vec<f64>>::new();
+    let original_vertex_count = mesh.num_vert();
     for (index, corner, erase, stock) in incident {
         if erase {
             changes.insert(index, None);
@@ -252,24 +265,40 @@ fn weld_generated_edge(
             (mesh.vert_properties[target as usize * width + k]
                 - mesh.vert_properties[ids[corner] as usize * width + k]).abs()
         }).fold(0., f64::max);
-        let Some(target) = targets.get(&mesh.face_id[index]).and_then(|options| {
-            options.iter().copied().min_by(|&a, &b| property_distance(a).total_cmp(&property_distance(b)))
-        }) else { return false; };
-        if property_distance(target) > 0.025 {
-            return false;
-        }
+        let (normal, _) = face(mesh, ids);
+        let on_plane = dot(normal, sub(point, at(mesh, ids[corner]))).abs() <= SOURCE_PLANE_PRECISION;
+        if stock && !on_plane { return false; }
+        let mut positions = ids.map(|id| at(mesh, id));
+        positions[corner] = point;
+        let (new_normal, quality) = triangle_quality(positions);
+        if quality < 1e-5 || dot(normal, new_normal) < 0.98 { return false; }
+
+        // A geometric vertex may have no property vertex in this UV chart.
+        // Reuse a compatible alias or evaluate this face's own affine chart
+        // at the welded point. Keep its material and all other UVs exactly.
+        let alias = targets.get(&mesh.face_id[index]).and_then(|options| {
+            options.iter().copied().filter(|&id| {
+                property_distance(id) <= 0.025 && (!stock || affine(mesh, ids, id, 0.000002))
+            }).min_by(|&a, &b| property_distance(a).total_cmp(&property_distance(b)))
+        });
+        let target = if let Some(alias) = alias {
+            alias
+        } else {
+            if !on_plane { return false; }
+            let Some(weights) = chart_weights(mesh, ids, point) else { return false; };
+            let mut vertex = point.to_vec();
+            for property in 3..width {
+                let value = chart_property(mesh, ids, weights, property);
+                let old = mesh.vert_properties[ids[corner] as usize * width + property];
+                if !value.is_finite() || (value - old).abs() > 0.025 { return false; }
+                vertex.push(value);
+            }
+            let target = (original_vertex_count + chart_vertices.len()) as u64;
+            chart_vertices.push(vertex);
+            target
+        };
         let mut welded = ids;
         welded[corner] = target;
-        let (normal, _) = face(mesh, ids);
-        if stock && (dot(normal, sub(at(mesh, target), at(mesh, ids[corner]))).abs() > SOURCE_PLANE_PRECISION
-            || !affine(mesh, ids, target, 0.000002))
-        {
-            return false;
-        }
-        let (new_normal, quality) = face(mesh, welded);
-        if quality < 1e-5 || dot(normal, new_normal) < 0.98 {
-            return false;
-        }
         changes.insert(index, Some(welded));
     }
 
@@ -284,8 +313,13 @@ fn weld_generated_edge(
         for id in welded {
             let compact_id = *compact.entry(id).or_insert_with(|| {
                 let new_id = result.num_vert() as u64;
-                let start = id as usize * width;
-                result.vert_properties.extend_from_slice(&mesh.vert_properties[start..start + width]);
+                let index = id as usize;
+                if index < original_vertex_count {
+                    let start = index * width;
+                    result.vert_properties.extend_from_slice(&mesh.vert_properties[start..start + width]);
+                } else {
+                    result.vert_properties.extend_from_slice(&chart_vertices[index - original_vertex_count]);
+                }
                 new_id
             });
             result.tri_verts.push(compact_id);
@@ -315,6 +349,7 @@ fn refine_generated_faces(
         return crate::invalid("Native triangle refinement lost source properties");
     }
     let mut splits = 0;
+    let mut first_needle = None;
     loop {
         let selected = m.tri_verts.chunks_exact(3).enumerate().find_map(|(index,t)| {
             let vertices = [t[0],t[1],t[2]];
@@ -326,6 +361,7 @@ fn refine_generated_faces(
             (too_long || face(m,vertices).1 < QUALITY).then_some(vertices)
         });
         let Some(t) = selected else { return Ok(splits); };
+        let initial = first_needle.get_or_insert_with(|| t.map(|id| at(m, id)));
         let k = (0..3).max_by(|&a,&b| {
             let length = |k:usize| { let d=sub(at(m,t[k]),at(m,t[(k+1)%3]));dot(d,d) };
             length(a).total_cmp(&length(b))
@@ -340,7 +376,7 @@ fn refine_generated_faces(
         }).collect();
         if adjacent.is_empty() || adjacent.len()>2 { return crate::invalid("Native refinement found a non-manifold edge; repair the source surface"); }
         if m.num_tri().saturating_add(adjacent.len()) > maximum || splits >= 256 {
-            return crate::invalid(format!("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material {generated_material}, {} triangles, {splits} refinements, quality {:.8}, points {:?})",m.num_tri(),face(m,t).1,t.map(|id|at(m,id))));
+            return crate::invalid(format!("Native triangle conditioning exceeds the existing BSP budget; simplify the source connection (material {generated_material}, {} triangles, {splits} refinements, quality {:.8}, points {:?}; first unsplit face {initial:?})",m.num_tri(),face(m,t).1,t.map(|id|at(m,id))));
         }
         // Identical geometric edges can have distinct UV vertex identities.
         // Interpolate each identity separately and preserve every face's slot.
@@ -440,6 +476,39 @@ mod tests {
         let (tri, _) = mesh.tri_verts.chunks_exact(3).zip(&mesh.face_id)
             .filter(|(_, slot)| **slot == 29).last().unwrap();
         assert_eq!([tri[0], tri[1], tri[2]].map(|id| at(&mesh, id)), stock);
+    }
+
+    #[test]
+    fn micron_scale_intersection_is_not_an_authored_anchor() {
+        let points = [
+            [1., 0., 0.], [1., 0.000003, 0.], [1., 1., 0.],
+            [-1., 1., 0.], [-1., -1., 0.], [1., -1., 0.],
+            [0., 0., 1.], [0., 0., -1.],
+        ];
+        let mut mesh = MeshGL64 { num_prop: 5, ..Default::default() };
+        for point in points {
+            mesh.vert_properties.extend(point);
+            mesh.vert_properties.extend(point[..2].iter().copied());
+        }
+        for edge in 0..6 {
+            let next = (edge + 1) % 6;
+            mesh.tri_verts.extend([6, edge, next, 7, next, edge]);
+            mesh.face_id.extend([17, 17]);
+        }
+        // The stock face at the generated corner has no target alias in its
+        // material. The weld must carry that face's chart onto the anchor.
+        mesh.face_id[2] = 29;
+        mesh.face_id[10] = 30;
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &points[..2]), 0);
+        assert_eq!(weld_generated_slivers(&mut mesh, &[17], &points[..1]), 1);
+        assert!((0..mesh.num_vert() as u64).any(|id| at(&mesh, id) == points[0]));
+        assert!((0..mesh.num_vert() as u64).all(|id| at(&mesh, id) != points[1]));
+        let stock_face = mesh.face_id.iter().position(|&id| id == 29).unwrap();
+        for &id in &mesh.tri_verts[stock_face * 3..stock_face * 3 + 3] {
+            let properties = &mesh.vert_properties[id as usize * 5..][..5];
+            assert!((properties[0] - properties[3]).abs() < 1e-12);
+            assert!((properties[1] - properties[4]).abs() < 1e-12);
+        }
     }
 
     fn needle() -> MeshGL64 {
