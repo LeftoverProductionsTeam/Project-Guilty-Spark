@@ -467,6 +467,20 @@ fn build_partition_cache(
     {
         return invalid("Compiled native BSP slots differ from the staged structure tag identities");
     }
+    if bake && map.header.version == 13 {
+        let structures = prepared.receipt["structures"].as_array()
+            .ok_or_else(|| SparkError::Invalid("Missing compiled structure identities for visibility readback".into()))?;
+        let slots = structures.iter().map(|row| {
+            let tag = row["nativeTag"].as_str()
+                .ok_or_else(|| SparkError::Invalid("Missing native structure tag for visibility readback".into()))?;
+            transitions.bsp_tag_paths.iter().position(|path| path.eq_ignore_ascii_case(tag))
+                .ok_or_else(|| SparkError::Invalid(format!("Could not find compiled structure {tag} for visibility readback")))
+        }).collect::<Result<Vec<_>>>()?;
+        maps::verify_mcc_bsp_render_coverage(&path, &map, &slots)?;
+        runner.emit("partition-visibility-readback", format!(
+            "{} rebuilt BSP(s) have complete environment render membership", slots.len()
+        ), 92, "success");
+    }
     if volumes.len() != existing.len() + prepared.switches.len() || volumes[..existing.len()] != existing[..]
         || transitions.bsp_count != expected_count
         || transitions.transitions.len() != old_switches.len() + prepared.switches.len()

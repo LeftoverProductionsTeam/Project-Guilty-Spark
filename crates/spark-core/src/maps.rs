@@ -2517,6 +2517,21 @@ pub(crate) fn scenery_parameters(path: &Path, inspection: &MapInspection) -> Res
     }
     Ok(parameters)
 }
+pub(crate) fn verify_mcc_bsp_render_coverage(path: &Path, inspection: &MapInspection, slots: &[usize]) -> Result<()> {
+    if inspection.header.version != 13 || slots.is_empty() {
+        return Ok(());
+    }
+    let (header, bytes, hash) = read_cache_snapshot(path)?;
+    if hash != inspection.sha256 {
+        return invalid("Compiled render source changed after inspection");
+    }
+    let scenario = inspection.tags.iter()
+        .find(|tag| tag.class == "scnr" && tag.path == inspection.scenario_path)
+        .and_then(|tag| tag.data_offset)
+        .ok_or_else(|| SparkError::Invalid("Compiled scenario is unavailable for render readback".into()))?;
+    crate::render::verify_mcc_subcluster_surfaces(&bytes, &header, scenario as usize, slots, &inspection.tags)
+}
+
 pub(crate) fn render_bsp_source(path:&Path,inspection:&MapInspection,index:usize)->Result<MeshData>{let(header,bytes,hash)=read_cache_snapshot(path)?;if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;crate::render::bsp_render_geometry_selected(&bytes,&header,scenario,Some(index))}
 fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<MeshData> {
     collision_mesh_record(r,space,sc,tags,None,false)

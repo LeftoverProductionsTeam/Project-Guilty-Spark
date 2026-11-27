@@ -92,6 +92,68 @@ fn scene_bsps(r: &Reader, tag_region: Region, scenario_at: usize) -> Result<Vec<
     Ok(found)
 }
 
+pub(crate) fn verify_mcc_subcluster_surfaces(bytes: &[u8], header: &MapHeader, scenario_at: usize,
+    slots: &[usize], tags: &[Tag]) -> Result<()> {
+    if header.version != 13 || slots.is_empty() {
+        return Ok(());
+    }
+    let reader = Reader(bytes);
+    let bsps = scene_bsps(&reader, tag_space(&reader, header)?, scenario_at)?;
+    let environment: HashSet<_> = tags.iter().filter(|tag| tag.class == "senv").map(|tag| tag.id).collect();
+    for &slot in slots {
+        let (region, _, root) = bsps.get(slot).ok_or_else(|| {
+            crate::SparkError::Invalid(format!("Missing compiled render BSP {slot}"))
+        })?;
+        verify_environment_surface_membership(&reader, *region, *root, slot, &environment)?;
+    }
+    Ok(())
+}
+
+fn verify_environment_surface_membership(r: &Reader, region: Region, root: usize, slot: usize,
+    environment: &HashSet<u32>) -> Result<()> {
+    let (_, face_count) = region.block(r, root + 0xf8, 6, 500_000)?;
+    let (clusters, cluster_count) = region.block(r, root + 0x134, 104, 8192)?;
+    let mut visible = vec![false; face_count];
+    let mut remaining_lists = 131_072usize;
+    for cluster in 0..cluster_count {
+        let (subclusters, count) = region.block(r, clusters + cluster * 104 + 52, 36, 4096)?;
+        remaining_lists = remaining_lists.checked_sub(count)
+            .ok_or_else(|| crate::SparkError::Invalid("BSP render subcluster limit exceeded".into()))?;
+        for cell in 0..count {
+            let (list, entries) = region.block(r, subclusters + cell * 36 + 24, 4, 128)?;
+            for i in 0..entries {
+                let surface = r.u32(list + i * 4)? as usize;
+                let reference = visible.get_mut(surface).ok_or_else(|| {
+                    crate::SparkError::Invalid(format!("Compiled BSP {slot} subcluster references missing render surface {surface}"))
+                })?;
+                *reference = true;
+            }
+        }
+    }
+    let (lightmaps, page_count) = region.block(r, root + 0x104, 32, 256)?;
+    for page in 0..page_count {
+        let (materials, material_count) = region.block(r, lightmaps + page * 32 + 20, 256, 2048)?;
+        for i in 0..material_count {
+            let material = materials + i * 256;
+            if !environment.contains(&r.u32(material + 12)?) {
+                continue;
+            }
+            let first = r.u32(material + 20)? as usize;
+            let count = r.u32(material + 24)? as usize;
+            let membership = first.checked_add(count).and_then(|end| visible.get(first..end))
+                .ok_or_else(|| crate::SparkError::Invalid("Environment material render range exceeds its BSP".into()))?;
+            let mut missing = membership.iter().enumerate().filter(|(_, present)| !**present);
+            if let Some((index, _)) = missing.next() {
+                return invalid(format!(
+                    "Compiled BSP {slot} has {} environment render surfaces without visibility references for one material, starting at surface {}. Review the entrance render partition before playtesting.",
+                    1 + missing.count(), first + index
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Render triangles from material vertex streams, independent of collision BSP.
 /// Limited to uncompressed rendered vertices of PC-derived caches. This is
 /// actual geometry, but the accompanying Halo shaders/bitmaps still need a
@@ -830,6 +892,38 @@ mod geometry_tests {
         putf(&mut b,532,f32::INFINITY);assert!(object_colors(&Reader(&b),region,0).is_err());putf(&mut b,532,0.3);
         put32(&mut b,436,base+1020);assert!(object_colors(&Reader(&b),region,0).is_err());
     }
+    #[test]
+    fn compiled_environment_faces_need_bounded_subcluster_membership() {
+        let mut bytes = vec![0; 0x1000];
+        let base = 0x5000_0000;
+        let region = Region { begin: 0, end: bytes.len(), address: base };
+        let root = 0;
+        put32(&mut bytes, root + 0xf8, 2);
+        put32(&mut bytes, root + 0xfc, base + 0x300);
+        put32(&mut bytes, root + 0x134, 1);
+        put32(&mut bytes, root + 0x138, base + 0x400);
+        put32(&mut bytes, 0x400 + 52, 1);
+        put32(&mut bytes, 0x400 + 56, base + 0x480);
+        put32(&mut bytes, 0x480 + 24, 1);
+        put32(&mut bytes, 0x480 + 28, base + 0x520);
+        put32(&mut bytes, root + 0x104, 1);
+        put32(&mut bytes, root + 0x108, base + 0x600);
+        put32(&mut bytes, 0x600 + 20, 1);
+        put32(&mut bytes, 0x600 + 24, base + 0x640);
+        put32(&mut bytes, 0x640 + 12, 7);
+        put32(&mut bytes, 0x640 + 24, 2);
+        let environment = HashSet::from([7]);
+        let check = |bytes: &[u8]| verify_environment_surface_membership(
+            &Reader(bytes), region, root, 11, &environment
+        );
+        assert!(check(&bytes).unwrap_err().to_string().contains("starting at surface 1"));
+        put32(&mut bytes, 0x480 + 24, 2);
+        put32(&mut bytes, 0x524, 1);
+        check(&bytes).unwrap();
+        put32(&mut bytes, 0x524, 2);
+        assert!(check(&bytes).unwrap_err().to_string().contains("missing render surface 2"));
+    }
+
     #[test]
     fn uncompressed_render_bsp_reads_real_surfaces_not_collision_edges() {
         let mut b=vec![0u8;0x5000];
