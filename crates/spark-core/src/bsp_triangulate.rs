@@ -89,7 +89,18 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             // Check the fourth UV against the better-conditioned chart.
             // Projecting from a nearly collinear triangle magnifies rounding
             // and can reject a valid diagonal in the same affine chart.
-            if dot(n, n2) < 1. - 1e-10 || dot(sub(at(m, d), at(m, a)), n).abs() > 1e-7 {
+            // A collapsed render triangle has no normal after float narrowing.
+            // Use its nondegenerate neighbor's plane to check the replacement.
+            let reference = if native_render && q == 0. && q2 > 0. {
+                n2
+            } else if native_render && q2 == 0. && q > 0. {
+                n
+            } else if dot(n, n2) >= 1. - 1e-10 {
+                n
+            } else {
+                continue;
+            };
+            if [c, d].into_iter().any(|id| dot(sub(at(m, id), at(m, a)), reference).abs() > 1e-7) {
                 continue;
             }
             // Only exported render slivers may vary slightly within the same
@@ -107,8 +118,8 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             let right = [d, c, a];
             let (nl, ql) = face(m, left);
             let (nr, qr) = face(m, right);
-            if dot(n, nl) < 1. - 1e-10
-                || dot(n, nr) < 1. - 1e-10
+            if dot(reference, nl) < 1. - 1e-10
+                || dot(reference, nr) < 1. - 1e-10
                 || ql.min(qr) <= q.min(q2) * 1.01 + 1e-10
             {
                 continue;
@@ -340,6 +351,27 @@ fn refine_generated_faces(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_render_recovers_a_vertex_on_the_shared_diagonal() {
+        let mut mesh = MeshGL64 {
+            num_prop: 5,
+            tri_verts: vec![0, 1, 2, 1, 0, 3],
+            face_id: vec![17, 17],
+            vert_properties: vec![
+                0., 0., 0., 0., 0.,
+                4., 0., 0., 1., 0.,
+                2., 0., 0., 0.5, 0.,
+                2., -4., 0., 0.5, -1.,
+            ],
+            ..Default::default()
+        };
+        let original = mesh.vert_properties.clone();
+        assert_eq!(improve_native_render(&mut mesh), 1);
+        assert_eq!(mesh.vert_properties, original);
+        assert_eq!(mesh.face_id, [17, 17]);
+        assert_eq!(mesh.tri_verts, [2, 3, 1, 3, 2, 0]);
+    }
 
     #[test]
     fn native_render_retriangulates_the_danger_canyon_radiosity_sliver() {

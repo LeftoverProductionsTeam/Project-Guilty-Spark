@@ -404,6 +404,15 @@ fn coplanar_overlap(face: [V; 3], normal: V, other: [V; 3], other_normal: V,
     double_area.abs() > perimeter * PREFLIGHT_PLANE_EPSILON
 }
 
+// JMS writes world positions as centimeters with six decimal places.
+fn native_export_point(point: V) -> V {
+    point.map(|coordinate| (f64::from(coordinate as f32) * 1e8).round() / 1e8)
+}
+
+fn triangle_area_normal([a, b, c]: [V; 3]) -> V {
+    cross(sub(b, a), sub(c, a))
+}
+
 impl AssemblyGeometry {
     /// Check the precision passed to Tool, before namespace extraction or compilation.
     /// Collision and render layers can intentionally cover the same footprint.
@@ -431,16 +440,13 @@ impl AssemblyGeometry {
             let material = &self.materials[slot];
             let points: [V; 3] = std::array::from_fn(|corner| {
                 let start = ids[corner] as usize * 3;
-                std::array::from_fn(|axis| {
-                    // Tool reads positions in centimeters, rounded to six decimals by JMS.
-                    (f64::from(mesh.positions[start + axis]) * 1e8).round() / 1e8
-                })
+                native_export_point(std::array::from_fn(|axis| mesh.positions[start + axis].into()))
             });
             let [a, b, c] = points;
             let ab = sub(b, a);
             let ac = sub(c, a);
             let bc = sub(c, b);
-            let area_normal = cross(ab, ac);
+            let area_normal = triangle_area_normal(points);
             let twice_area = dot(area_normal, area_normal).sqrt();
             let uv: [[f64; 2]; 3] = std::array::from_fn(|corner| {
                 let start = ids[corner] as usize * 2;
@@ -1544,6 +1550,12 @@ fn append_render_faces(
         let points: [V; 3] = std::array::from_fn(|n| {
             std::array::from_fn(|k| gl.vert_properties[order[n] as usize * 5 + k])
         });
+        // A Boolean can leave render fragments with no area at JMS precision.
+        // Collision was emitted separately. These fragments cover no surface in
+        // the export, even if their original double-precision coordinates differ.
+        if triangle_area_normal(points.map(native_export_point)) == [0.; 3] {
+            continue;
+        }
         let n = normal(points[0], points[1], points[2]);
         for (v, p) in points.iter().enumerate() {
             mesh.positions.extend(p.map(|x| x as f32));
@@ -3852,6 +3864,32 @@ mod tests {
         assert_eq!(report.examples[0].triangle, 2);
         assert_eq!(report.examples[0].overlaps_triangle, Some(0));
         assert!(report.require_buildable().unwrap_err().to_string().contains("with triangle 0"));
+    }
+
+    #[test]
+    fn native_render_emits_only_faces_with_area_at_jms_precision() {
+        let gl = MeshGL64 {
+            num_prop: 5,
+            tri_verts: vec![0, 1, 2, 0, 1, 3],
+            face_id: vec![0, 0],
+            vert_properties: vec![
+                0., 0., 0., 0., 0.,
+                4., 0., 0., 1., 0.,
+                2., 2e-9, 0., 0.5, 0.,
+                2., 2e-8, 0., 0.5, 1.,
+            ],
+            ..Default::default()
+        };
+        let material = AssemblyMaterial {
+            name: "donor".into(), source: 1, shader_path: Some("stock/floor".into()),
+            shader_class: Some("senv".into()), flags: 0, collision_only: false,
+        };
+        let (mut mesh, mut slots) = (MeshData::default(), Vec::new());
+        append_render_faces(&gl, &[material], &mut mesh, &mut slots, None).unwrap();
+        assert_eq!(mesh.indices, [0, 1, 2]);
+        assert_eq!(slots, [0]);
+        assert_eq!(mesh.positions, [0., 0., 0., 2., 2e-8, 0., 4., 0., 0.]);
+        assert_eq!(mesh.uvs, [0., 0., 0.5, 1., 1., 0.]);
     }
 
     #[test]
