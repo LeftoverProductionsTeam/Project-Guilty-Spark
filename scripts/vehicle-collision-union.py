@@ -58,9 +58,11 @@ def combine_collision(source, destination):
         raise ValueError("The composed collider is not closed")
     # The blade grid contains planar strips and the union can leave pieces of
     # those strips at the mount. Remove their internal edges before selecting
-    # diagonals for Tool. Keep distinct collision materials and the curved rows.
+    # diagonals for Tool. The bent box-plow strips produce small Boolean
+    # variations. Merge those within 0.25 degrees, keeping material boundaries.
     bmesh.ops.dissolve_limit(
-        topology, angle_limit=0.00001, verts=list(topology.verts),
+        topology, angle_limit=0.00436 if doc.get("mergeNearlyPlanar") is True else 0.00001,
+        verts=list(topology.verts),
         edges=list(topology.edges), delimit={'MATERIAL'},
     )
     bmesh.ops.triangulate(topology, faces=list(topology.faces))

@@ -71,7 +71,7 @@ if(process.env.SPARK_LIFECYCLE_SEAM_ROUTES==='1')await finishStorage.createScrat
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
 process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
-let child,browser,main;
+let child,browser,main,debugPort;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
 async function launchNative(){
@@ -81,6 +81,7 @@ async function launchNative(){
     report.applicationIcon=JSON.parse(readback.stdout);expect(report.applicationIcon.matchesExpectedMonitor).toBe(true);
   }
   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
+  debugPort=port;
   child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
   await finishStorage.trackProcess(child);
   await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
@@ -2048,6 +2049,10 @@ finally{
   if(child?.exitCode===null)try{await stopQaProcess(child);}catch(error){report.complete=false;report.errors.push('Owned QA process stop failed: '+String(error));process.exitCode=1;await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));}
   if(finishStorage){try{
     if(child)await waitForQaExit(child);
+    // The app can exit before the embedded browser that writes this QA profile.
+    if(debugPort)await expect.poll(()=>
+      fetch('http://127.0.0.1:'+debugPort+'/json/version',{signal:AbortSignal.timeout(1000)})
+        .then(()=>true,()=>false),{timeout:10000}).toBe(false);
     // Tests own these fresh namespaces, on failure too. A deliberate geometry
     // fixture is the only large retained payload; source recipes/receipts live
     // outside scratch. No abandoned browser profile or full library is kept.

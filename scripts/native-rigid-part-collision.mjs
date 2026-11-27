@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 // Rebuild a seed copy through Halo Tool after welding a rigid part into an
 // existing hull. Other collision nodes and damage metadata must match the seed.
 export async function buildNativeRigidPartCollision({
-  context, tags, data, run, launch, compiler, blender, originalTag, source, blade, mount, contactSamples,
+  context, tags, data, run, launch, compiler, blender, originalTag, source, blade, mount, contactSamples, mergeNearlyPlanar = false,
 }) {
  const call = run;
  const dump=tag=>call('edit',['-t',tags,'-L',tag]);
@@ -82,7 +82,7 @@ export async function buildNativeRigidPartCollision({
    for(let offset=0;offset<blade.positions.length;offset+=3)points.push(blade.positions.slice(offset,offset+3).map((value,axis)=>value*100+position[axis]));
    for(let offset=0;offset<blade.indices.length;offset+=3)faces.push({corners:blade.indices.slice(offset,offset+3),material:metal});
    const source=path.join(context.directory,'union-input.json'),destination=path.join(context.directory,'union-output.json');
-   await fs.writeFile(source,JSON.stringify({stock,blade:{points,faces},materials:baseline.materials.map(m=>m.name)}),{flag:'wx'});
+   await fs.writeFile(source,JSON.stringify({stock,blade:{points,faces},mergeNearlyPlanar,materials:baseline.materials.map(m=>m.name)}),{flag:'wx'});
    const log=await launch(blender,['--background','--factory-startup','--disable-autoexec','--python-exit-code','5','--python',script,'--',source,destination]);
    const output=JSON.parse(await fs.readFile(destination,'utf8'));
    console.log(JSON.stringify({stockFaces:stock.faces.length,bladeFaces:faces.length,bakedFaces:output.faces.length,blender:log.trim().split(/\r?\n/).slice(-2)}));

@@ -205,10 +205,11 @@ if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the install
       context,tags,data,run,launch,compiler:kit,blender,originalTag:sourceCollision,source:stock,
       blade:plowMesh(dimensions,curl,sweep,bladeProfile,'collision'),mount:{...mount,material:'metal'},
       contactSamples:[[0,0],[contactWidth,0],[-contactWidth,0]],
+      mergeNearlyPlanar:bladeProfile==='box-plow',
     });
   }
-  if((bladeProfile==='moldboard'||retainOutput)&&collision?.warnings.length)
-    throw Error('Road blade collision compiler warning: '+collision.warnings.join('; '));
+  if((bladeProfile==='moldboard'||bladeProfile==='box-plow'||retainOutput)&&collision?.warnings.length)
+    throw Error('Blade collision compiler warning: '+collision.warnings.join('; '));
   const references=[['model',candidate]];
   if(collision)references.push(['collision_model',collision.tag]);
   await run('edit',['-t',tags,...references.flatMap(([field,tag])=>['-S',field,tag]),'-O',variant,vehicle]);
