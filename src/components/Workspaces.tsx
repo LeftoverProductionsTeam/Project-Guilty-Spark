@@ -6,6 +6,7 @@ import SourceRecovery from './SourceRecovery';
 import {useMapState} from '../mapSession';
 import GeometryToolHandoff from './GeometryToolHandoff';
 import MeshPartEditor from './MeshPartEditor';
+import type { ShapeDraft } from '../plowMesh';
 import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -72,17 +73,19 @@ export function Assets({
   meshes,
   onImport,
   onImportRevised,
+  onApplyShapeDraft,
   onWorld,
 }: {
   project: Project;
   meshes: Record<string, MeshData>;
   onImport: () => void;
   onImportRevised:(handoffId:string,sha256:string)=>Promise<number>;
+  onApplyShapeDraft: (draft: ShapeDraft) => boolean;
   onWorld: () => void;
 }) {
   const activity=useWorkspaceActivity();
   const modelAssets=project.assets.filter(asset=>asset.kind==='obj');
-  const [partOpen,setPartOpen]=useState<boolean|null>(null);
+  const [partOpen,setPartOpen]=useState<boolean|null>(project.shapeDraft?true:null);
   const [chosen, setChosen] = useState<string | null>(modelAssets[0]?.id ?? null);
   const [exchangeFeedback, setExchangeFeedback] = useState('');
   const [movingAssetId,setMovingAssetId] = useState('');
@@ -142,7 +145,8 @@ export function Assets({
         OBJ import now preserves vertex normals, UV seams and material-group boundaries in the preview mesh.
         QuickForge/Workshop can build closed OBJ meshes as native static scenery: place the model, assign its Halo materials in the Custom model drawer, then Build & check playtest. External MTL textures, rigging and glTF are not imported. Add WAV/OGG sounds through the Level editor’s Asset library.
       </Notice>
-      {partOpen!==null && <MeshPartEditor selectedMesh={mesh} visible={partOpen}/> }
+      {partOpen!==null && <MeshPartEditor key={project.shapeDraft?.id ?? "new"} selectedMesh={mesh} visible={partOpen}
+        draft={project.shapeDraft} onApplyDraft={onApplyShapeDraft} /> }
       {modelAssets.length ? (
         <div className="asset-layout">
           <div className="surface asset-list">

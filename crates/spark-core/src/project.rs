@@ -15,6 +15,43 @@ use uuid::Uuid;
 pub const PROJECT_VERSION: u32 = 1;
 pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 0;
 pub const MAX_AUTOMATIC_BACKUP_RETENTION: usize = 100;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShapeDraft {
+    pub id: Uuid,
+    pub shape: String,
+    pub dimensions: [f64; 3],
+    pub profile: String,
+    pub curl: f64,
+    pub sweep: f64,
+    pub paint_png: String,
+}
+impl ShapeDraft {
+    fn validate(&self) -> Result<()> {
+        if !matches!(self.shape.as_str(), "plow" | "box" | "wedge")
+            || !matches!(self.profile.as_str(), "moldboard" | "rounded" | "v")
+            || self.dimensions.iter().any(|n| !(0.05..=32.).contains(n))
+            || !(0.0..=100.).contains(&self.curl)
+            || !(0.0..=100.).contains(&self.sweep)
+        {
+            return invalid("Invalid Workshop shape or dimensions");
+        }
+        // The fixed PNG header includes the signature and 512 x 512 dimensions.
+        // The browser decodes this bounded Canvas image when a draft reopens.
+        const HEADER: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIA";
+        let paint = &self.paint_png;
+        let encoded = paint.strip_prefix("data:image/png;base64,").unwrap_or_default();
+        if !paint.starts_with(HEADER) || encoded.len() < 72 || encoded.len() > 1_500_000
+            || encoded.len() % 4 != 0
+            || !encoded.trim_end_matches('=').bytes().all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/')
+            || encoded.len() - encoded.trim_end_matches('=').len() > 2
+        {
+            return invalid("Workshop paint must be a bounded 512 × 512 PNG");
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Provenance {
@@ -199,6 +236,8 @@ pub struct Project {
     /// Saved authoring only; compilation still requires a separate reviewed attachment.
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub scenario_script_draft:Option<ScenarioScriptDraft>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub shape_draft: Option<ShapeDraft>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub build_targets:Vec<EngineBuildTarget>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -251,6 +290,7 @@ impl Project {
             firefight: None,
             studio: None,
             scenario_script_draft:None,
+            shape_draft: None,
             forge_sidecar:None,
             build_targets:vec![],active_build_target:None,
             megaworld_runtime_registration_id:None,
@@ -270,6 +310,7 @@ impl Project {
     }
     pub fn validate(&self) -> Result<()> {
         if let Some(draft)=&self.scenario_script_draft{draft.validate()?;}
+        if let Some(draft) = &self.shape_draft { draft.validate()?; }
         if self.automatic_backup_retention.is_some_and(|value|value>MAX_AUTOMATIC_BACKUP_RETENTION) {
             return invalid("Automatic backup retention must be None (0) or 1–100");
         }

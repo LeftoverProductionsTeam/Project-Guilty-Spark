@@ -248,6 +248,7 @@ export interface NativeAssetImport {
   fileCount: number;
 }
 export interface Project {
+  shapeDraft?: import("./plowMesh").ShapeDraft | null;
   forgeSidecar?: import("./forgeSidecar").ForgeSidecar | null;
   /** Spark metadata only: 0 disables automatic backups; absent inherits the saved legacy preference. */
   automaticBackupRetention?: number | null;

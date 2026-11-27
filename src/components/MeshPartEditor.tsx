@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { boxBrush, rampBrush, worldVertex } from '../bspWorkshop';
 import { exportMeshObj } from '../haloObj';
 import { exportMeshJms } from '../haloJms';
-import { plowMesh, type PlowProfile } from '../plowMesh';
+import { plowMesh, type PlowProfile, type ShapeDraft } from '../plowMesh';
 import { downloadLocalBlob, downloadLocalText } from '../exportHelpers';
 import type { MeshData, Vec3 } from '../types';
 import { NumberField } from './ui';
@@ -88,13 +88,18 @@ function PaintablePart({ mesh, texture, painting, onPaint }: {
   </mesh>;
 }
 
-export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh?: MeshData; visible: boolean }) {
+export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDraft }: {
+  selectedMesh?: MeshData;
+  visible: boolean;
+  draft?: ShapeDraft | null;
+  onApplyDraft: (draft: ShapeDraft) => boolean;
+}) {
   const activity = useWorkspaceActivity();
-  const [shape, setShape] = useState<Shape | 'selected'>('plow');
-  const [size, setSize] = useState<Vec3>([0.22, 2.5, 0.72]);
-  const [scoop, setScoop] = useState(80);
-  const [wrap, setWrap] = useState(0);
-  const [profile, setProfile] = useState<PlowProfile>('moldboard');
+  const [shape, setShape] = useState<Shape | 'selected'>(draft?.shape ?? 'plow');
+  const [size, setSize] = useState<Vec3>(draft?.dimensions ?? [0.22, 2.5, 0.72]);
+  const [scoop, setScoop] = useState(draft?.curl ?? 80);
+  const [wrap, setWrap] = useState(draft?.sweep ?? 0);
+  const [profile, setProfile] = useState<PlowProfile>(draft?.profile ?? 'moldboard');
   const [painting, setPainting] = useState(false);
   const [color, setColor] = useState('#701b17');
   const [radius, setRadius] = useState(18);
@@ -125,7 +130,35 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
   useEffect(() => () => texture.dispose(), [texture]);
   const history = useRef<ImageData[]>([]);
   const lastStamp = useRef<{ x: number; y: number; chart: number } | null>(null);
-  useEffect(() => { history.current = []; setRevision(0); }, [canvas]);
+  useEffect(() => { history.current = []; lastStamp.current = null; setRevision(0); }, [canvas]);
+  const retainedPaint = draft?.shape === form ? draft.paintPng : null;
+  const [paintLoad, setPaintLoad] = useState<{ canvas: HTMLCanvasElement; loaded: boolean } | null>(null);
+  const restoringPaint = !!retainedPaint && paintLoad?.canvas !== canvas;
+  const paintLoadFailed = !!retainedPaint && paintLoad?.canvas === canvas && !paintLoad.loaded;
+  useEffect(() => {
+    if (!retainedPaint) return;
+    const image = new Image();
+    image.onload = () => {
+      ctx.drawImage(image, 0, 0);
+      texture.needsUpdate = true;
+      setPaintLoad({ canvas, loaded: true });
+    };
+    image.onerror = () => setPaintLoad({ canvas, loaded: false });
+    image.src = retainedPaint;
+    return () => { image.onload = null; image.onerror = null; };
+  }, [canvas, ctx, retainedPaint, texture]);
+
+  function applyDraft() {
+    if (form === 'selected' || restoringPaint || paintLoadFailed) return;
+    const paintPng = canvas.toDataURL('image/png');
+    const next = { shape: form, dimensions: size, profile, curl: scoop, sweep: wrap, paintPng };
+    if (draft && draft.shape === form && draft.profile === profile && draft.curl === scoop && draft.sweep === wrap
+      && draft.dimensions.every((value, axis) => value === size[axis]) && draft.paintPng === paintPng) {
+      setMessage('This shape and paint are already in the project.');
+      return;
+    }
+    onApplyDraft({ id: crypto.randomUUID(), ...next });
+  }
 
   function stamp(uv: THREE.Vector2, start: boolean) {
     if (start) {
@@ -175,7 +208,7 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
 
   return <section className="asset-part-editor" aria-label="Shape and paint" hidden={!visible}>
     <div className="asset-part-viewport">
-      {visible && activity.active && activity.graphicsResident && <Canvas frameloop="demand" camera={{ position: [3.4, -4, 2.5], up: [0, 0, 1], fov: 42 }} dpr={[1, 1.5]}>
+      {visible && activity.active && activity.graphicsResident && !restoringPaint && <Canvas frameloop="demand" camera={{ position: [3.4, -4, 2.5], up: [0, 0, 1], fov: 42 }} dpr={[1, 1.5]}>
         <color attach="background" args={['#101c2a']} />
         <ambientLight intensity={1.35} />
         <directionalLight position={[4, -2, 6]} intensity={2} />
@@ -224,7 +257,13 @@ export default function MeshPartEditor({ selectedMesh, visible }: { selectedMesh
         <button type="button" onClick={() => exportPart('jms')}>Export JMS</button>
         <button type="button" onClick={() => exportPart('png')}>Export paint PNG</button>
       </div>
-      <small>Export the part and paint before leaving this tool. A moving vehicle part also needs the vehicle’s native model and collision to be rebuilt.</small>
+      <small>Vehicle mounting requires a native model and collision build.</small>
+      {form !== 'selected' && <div className="button-row">
+        <button type="button" className="primary" disabled={restoringPaint || paintLoadFailed} onClick={applyDraft}>Apply shape &amp; paint</button>
+        {draft && <small>Save the project to keep the applied draft.</small>}
+      </div>}
+      {restoringPaint && <small role="status">Loading the saved paint…</small>}
+      {paintLoadFailed && <small role="alert">Spark couldn’t open the saved paint.</small>}
       {message && <p role="status">{message}</p>}
     </div>
   </section>;

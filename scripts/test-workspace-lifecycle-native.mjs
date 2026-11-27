@@ -940,8 +940,45 @@ try{
     await expect(undo).toBeEnabled();
     await undo.click();
     await expect(undo).toBeDisabled();
-    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: 65, width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true };
-    step('Shaped and painted the plow with the Windows app, hid the tool and undid the retained stroke', report.shapePaint);
+    const changed = await canvas.boundingBox();
+    await main.mouse.click(changed.x + changed.width / 2, changed.y + changed.height / 2);
+    await expect(undo).toBeEnabled();
+    const apply = editor.getByRole('button', { name: 'Apply shape & paint', exact: true });
+    await apply.click();
+    await expect(editor.getByText('Save the project to keep the applied draft.')).toBeVisible();
+    await main.keyboard.press('Control+z');
+    await expect(width).toHaveValue('2.5');
+    await main.keyboard.press('Control+y');
+    await expect(width).toHaveValue('3');
+    await main.keyboard.press('Control+s');
+    await expect(main.getByRole('button',{name:'Saved',exact:true}).first()).toBeVisible();
+    const entry=(await invoke(main,'bootstrap')).entries.find(entry=>entry.title==='Native shape and paint');
+    expect(entry).toBeTruthy();
+    const saved=(await invoke(main,'open_project',{id:entry.id})).project.shapeDraft;
+    expect(saved).toMatchObject({shape:'plow',profile:'moldboard',curl:65,dimensions:[.22,3,.72]});
+    const painted=await main.evaluate(async url=>{
+      const image=new Image();image.src=url;await image.decode();
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
+      const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+      const pixels=ctx.getImageData(0,0,512,512).data;
+      return pixels.some((red,index)=>index%4===0&&red>pixels[index+1]+20);
+    },saved.paintPng);
+    expect(painted).toBe(true);
+    const priorPid=child.pid;
+    for(const page of [...pages()].reverse())if(!page.isClosed())await close(page,'save');
+    await waitForQaExit(child);await browser.close();await launchNative();
+    expect(child.pid).not.toBe(priorPid);
+    await chooseTool(main,'Map library');
+    await main.locator('.map-card[data-project-id="'+entry.id+'"]').click();
+    await chooseTool(main,'Asset workshop');
+    const reopened=main.getByRole('region',{name:'Shape and paint'});
+    await expect(reopened.getByRole('spinbutton',{name:'Width',exact:true})).toHaveValue('3');
+    await expect(reopened.getByRole('spinbutton',{name:'Blade curl (%)',exact:true})).toHaveValue('65');
+    await reopened.getByRole('button',{name:'Apply shape & paint',exact:true}).click();
+    await expect(reopened.getByRole('status')).toHaveText('This shape and paint are already in the project.');
+    expect((await invoke(main,'open_project',{id:entry.id})).project.shapeDraft).toEqual(saved);
+    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: 65, width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
+    step('Shaped and painted the plow, undid and redid the project draft, then restored the same paint after a native app restart', report.shapePaint);
   }
   if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){
     if(!launchOnly)throw Error('Setup flavor acceptance uses the existing launch-only fixture');

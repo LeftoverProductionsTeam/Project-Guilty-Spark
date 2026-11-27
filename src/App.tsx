@@ -1657,6 +1657,7 @@ export default function App() {
             project={current}
             meshes={meshes}
             onImport={() => void importAsset()}
+            onApplyShapeDraft={draft=>edit({...current,shapeDraft:draft}, "Apply Workshop shape and paint")}
             onImportRevised={(id,sha256)=>applyGeometryRevision(current.id,id,sha256)}
             onWorld={() => setWorkspace('world')}
           />

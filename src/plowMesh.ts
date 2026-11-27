@@ -2,6 +2,16 @@ import type { MeshData, Vec3 } from './types';
 
 export type PlowProfile = 'moldboard' | 'rounded' | 'v';
 
+export interface ShapeDraft {
+  id: string;
+  shape: 'plow' | 'box' | 'wedge';
+  dimensions: Vec3;
+  profile: PlowProfile;
+  curl: number;
+  sweep: number;
+  paintPng: string;
+}
+
 export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile,
   detail: 'render' | 'collision' = 'render'): MeshData {
   // A straight blade is constant across its width. One collision column
