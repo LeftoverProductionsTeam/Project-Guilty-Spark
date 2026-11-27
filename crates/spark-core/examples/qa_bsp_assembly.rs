@@ -19,6 +19,56 @@ fn main() -> Result<()> {
         if !offset.is_finite() || offset.abs() > 64. { return spark_core::invalid("Section offset must be finite and within 64 units"); }
         a.remove(1); Some(offset)
     } else { None };
+    if a.len() == 9 && a[1] == "--review-render-rays" {
+        let file = Path::new(&a[2]);
+        let read = |value: &str| value.parse::<f64>().ok().filter(|p| p.is_finite() && p.abs() <= 32768.)
+            .ok_or_else(|| spark_core::SparkError::Invalid("Expected a finite camera coordinate or angle".into()));
+        let slot = a[3].parse::<usize>().map_err(|_| spark_core::SparkError::Invalid("Expected native BSP slot".into()))?;
+        let eye = [read(&a[4])?, read(&a[5])?, read(&a[6])?];
+        let yaw = read(&a[7])?.to_radians();
+        let pitch = read(&a[8])?.to_radians();
+        let direction = [yaw.cos() * pitch.cos(), yaw.sin() * pitch.cos(), pitch.sin()];
+        let right = [-yaw.sin(), yaw.cos(), 0.];
+        let cross = |a: [f64; 3], b: [f64; 3]| [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+        let dot = |a: [f64; 3], b: [f64; 3]| a.into_iter().zip(b).map(|(x,y)|x*y).sum::<f64>();
+        let sub = |a: [f64; 3], b: [f64; 3]| std::array::from_fn(|i|a[i]-b[i]);
+        let up = cross(direction, right);
+        let map = maps::inspect_map(file, file.parent())?;
+        let mesh = map.render_mesh.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Compiled render BSP is unavailable".into()))?;
+        let ranges = mesh.material_ranges.iter().filter(|row| row.bsp_index==slot).collect::<Vec<_>>();
+        let collision = map.mesh.parts.get(slot).ok_or_else(|| spark_core::SparkError::Invalid("Compiled collision BSP is unavailable".into()))?;
+        if ranges.is_empty() { return spark_core::invalid("No native render material ranges for the chosen BSP"); }
+        let mut hits = Vec::new();
+        for [lateral,elevation] in [[0.,0.],[-0.2,0.],[0.2,0.],[0.,-0.1],[-0.2,-0.1],[0.2,-0.1],[0.,-0.25],[-0.2,-0.25],[0.2,-0.25],[0.,0.15]] {
+            let ray: [f64; 3] = std::array::from_fn(|i|direction[i]+right[i]*lateral+up[i]*elevation);
+            let ray = ray.map(|p| p / dot(ray,ray).sqrt());
+            let find = |mesh: &maps::MeshData, start: usize, count: usize| {
+                mesh.indices[start..start+count].chunks_exact(3).enumerate().filter_map(|(i,tris)| {
+                    let point = |index: usize| -> [f64; 3] {
+                        let base = tris[index] as usize*3;
+                        std::array::from_fn(|i| f64::from(mesh.positions[base+i]))
+                    };
+                    let a=point(0);let ab=sub(point(1),a);let ac=sub(point(2),a);
+                    let p=cross(ray,ac);let det=dot(ab,p);if det.abs()<1e-10{return None;}
+                    let t=sub(eye,a);let u=dot(t,p)/det;let q=cross(t,ab);let v=dot(ray,q)/det;let d=dot(ac,q)/det;
+                    (u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001&&(0.001..=64.).contains(&d)).then_some((d,start/3+i,det>0.))
+                }).min_by(|a,b|a.0.total_cmp(&b.0))
+            };
+            let rendered = ranges.iter().filter_map(|range| find(mesh,range.index_start,range.index_count).map(|hit| (hit,*range)))
+                .min_by(|a,b| a.0.0.total_cmp(&b.0.0)).map(|((distance,triangle,front),range)| {
+                    let shader=map.tags.iter().find(|tag|tag.id==range.shader_tag_id);
+                    serde_json::json!({ "distance":distance,"triangle":triangle,"front":front,
+                        "shader":shader.map(|tag|&tag.path),"class":shader.map(|tag|&tag.class),
+                        "lightmapPage":range.lightmap_page,"hasLightmapUvs":range.has_lightmap_uvs,
+                        "point":std::array::from_fn::<_,3,_>(|i|eye[i]+distance*ray[i])})
+                });
+            hits.push(serde_json::json!({"offset":[lateral,elevation],"render":rendered,
+                "collision":find(&map.mesh,collision.index_start,collision.index_count).map(|(distance,triangle,front)|
+                    serde_json::json!({"distance":distance,"triangle":triangle,"front":front}))}));
+        }
+        println!("{}",serde_json::json!({"cacheSha256":map.sha256,"bsp":slot,"eye":eye,"hits":hits}));
+        return Ok(());
+    }
     if a.len() >= 3 && a[1] == "--review-pickup-support" {
         for source in &a[2..] {
             let path = Path::new(source);
