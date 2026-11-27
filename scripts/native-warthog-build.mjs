@@ -38,7 +38,17 @@ async function readShapeProject(file, originalMapHash){
   const encoded=draft.paintPng.slice(prefix.length);
   const png=Buffer.from(encoded,'base64');
   if(png.toString('base64')!==encoded)throw Error('Saved shape paint has malformed PNG encoding');
-  return {draft,png,sourceSha256:createHash('sha256').update(bytes).digest('hex')};
+  const vehicleRules = (project.tagEdits ?? []).map(edit => {
+    const row = /^vehicle-spawn-flags-(0|[1-9]\d{0,3})$/.exec(edit.fieldKey)?.[1];
+    if (row === undefined || !Number.isInteger(edit.value) || edit.value < 0 || edit.value > 0xffff) {
+      throw Error('Vehicle attachment builds support only reviewed multiplayer vehicle placement rules');
+    }
+    return { row, flags: edit.value };
+  });
+  if (new Set(vehicleRules.map(rule => rule.row)).size !== vehicleRules.length) {
+    throw Error('A vehicle placement has multiple edits');
+  }
+  return {draft,png,vehicleRules,sourceSha256:createHash('sha256').update(bytes).digest('hex')};
 }
 export async function buildWarthogAttachment(context,{map,kit,invader,vehicleArg,blender,paintSource,projectFile,buildPrivate,roadBlade,runtimePath,retainOutput=false}){
   for(const file of [map,kit,...['extract','recover','edit'].map(tool=>path.join(invader,'invader-'+tool+'.exe'))])
@@ -223,6 +233,13 @@ if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the install
     // Update only the vehicle in the disposable tag tree. The original scenario
     // still uses the same palette index and placement data.
     await fs.copyFile(variantSource,vehicleSource);
+    const scenarioTag = scenario + '.scenario';
+    for (const { row, flags } of supplied?.vehicleRules ?? []) {
+      const fields = ['slayer', 'ctf', 'king', 'oddball'].flatMap((mode, bit) =>
+        ['default', 'allowed'].flatMap((kind, column) =>
+          ['-S', 'vehicles[' + row + '].multiplayer_spawn_flags.' + mode + '_' + kind, String(flags >> (bit + column * 8) & 1)]));
+      await run('edit', ['-t', tags, ...fields, scenarioTag]);
+    }
     const maps=path.join(context.directory,'maps');
     await fs.mkdir(maps);
     // The official H1A compiler preserves the authored 3.0 melee flash;

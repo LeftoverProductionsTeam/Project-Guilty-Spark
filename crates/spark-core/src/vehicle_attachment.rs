@@ -35,7 +35,8 @@ pub fn prepare(project: &Project, inspection: &MapInspection, toolchain: &Toolch
     {
         return invalid("Vehicle attachment builds require a preserved MCC multiplayer map within 256 MiB");
     }
-    if !project.tag_edits.is_empty() || !project.assets.is_empty() || !project.powerups.is_empty()
+    if project.tag_edits.iter().any(|edit| !edit.field_key.starts_with(maps::VEHICLE_SPAWN_FLAGS_KEY_PREFIX))
+        || !project.assets.is_empty() || !project.powerups.is_empty()
         || project.bsp_assembly.is_some() || project.native_lighting.is_some() || project.firefight.is_some()
         || project.conversion_profile.as_deref().is_some_and(|profile| profile != "faithful")
         || !project.animation_assignments.is_empty() || !project.tag_duplicates.is_empty()
@@ -43,7 +44,7 @@ pub fn prepare(project: &Project, inspection: &MapInspection, toolchain: &Toolch
         || !crate::native_audio::fingerprint_inputs(project).is_empty()
         || serde_json::to_value(&project.scene)? != serde_json::to_value(&inspection.objects)?
     {
-        return invalid("Build the other native edits and open their compiled map before attaching a plow. The attachment build preserves the selected cache’s existing tags and placements.");
+        return invalid("Build the other native edits and open their compiled map before attaching a plow. Vehicle attachments can be built with multiplayer vehicle placement rules.");
     }
     if project.active_build_target.as_ref().is_some_and(|id| !project.build_targets.iter().any(|target| {
         &target.id == id && target.runtime_id == crate::runtime::RuntimeId::MccSteam
@@ -71,6 +72,26 @@ pub fn prepare(project: &Project, inspection: &MapInspection, toolchain: &Toolch
 fn physical_arg(path: &Path) -> Result<String> {
     let path = path.to_str().ok_or_else(|| missing("Native attachment inputs need valid Unicode paths"))?;
     Ok(path.strip_prefix(r"\\?\").unwrap_or(path).to_owned())
+}
+
+fn verify_vehicle_rules(project: &Project, source: &MapInspection, compiled: &MapInspection) -> Result<()> {
+    fn rules(inspection: &MapInspection) -> Result<impl Iterator<Item = (&str, &Value)>> {
+        let scenario = inspection.tags.iter().find(|tag| tag.class == "scnr" && tag.path == inspection.scenario_path)
+            .ok_or_else(|| missing("Missing native scenario placement rules"))?;
+        Ok(scenario.fields.iter().filter(|field| field.key.starts_with(maps::VEHICLE_SPAWN_FLAGS_KEY_PREFIX))
+            .map(|field| (field.key.as_str(), &field.value)))
+    }
+    let mut expected: std::collections::BTreeMap<_, _> = rules(source)?.collect();
+    for edit in &project.tag_edits {
+        let value = expected.get_mut(edit.field_key.as_str())
+            .ok_or_else(|| missing("The reviewed vehicle placement is missing from the source"))?;
+        *value = &edit.value;
+    }
+    let actual: std::collections::BTreeMap<_, _> = rules(compiled)?.collect();
+    if actual != expected {
+        return invalid("Rebuilt vehicle placement rules differ from the reviewed settings");
+    }
+    Ok(())
 }
 
 pub fn run(
@@ -154,6 +175,10 @@ pub fn run(
         }
         if !cache["scenario"].as_str().is_some_and(|scenario| scenario.eq_ignore_ascii_case(&inspection.scenario_path)) {
             return invalid("The attachment was compiled for a different scenario");
+        }
+        if !project.tag_edits.is_empty() {
+            let compiled = maps::inspect_map(&built, None)?;
+            verify_vehicle_rules(project, inspection, &compiled)?;
         }
         for (file, expected) in &tools.identities {
             if maps::hash_file(file)? != *expected { return invalid("An attachment build tool changed during compilation"); }

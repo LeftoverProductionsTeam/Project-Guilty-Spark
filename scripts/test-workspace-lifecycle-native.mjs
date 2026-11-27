@@ -1011,6 +1011,24 @@ try{
     report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: Number(expectedCurl), width: Number(expectedWidth), pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
     step('Shaped and painted the plow, undid and redid the project draft, then restored the same paint after a native app restart', report.shapePaint);
     if(nativeKit){
+      let editedVehicleRule;
+      if (process.env.SPARK_WARTHOG_SPAWN_REVIEW === '1') {
+        const {inspection} = await invoke(main,'open_project',{id:entry.id});
+        const scenario = inspection.tags.find(tag=>tag.class==='scnr'&&tag.path===inspection.scenarioPath);
+        const rule = scenario.fields.find(field=>field.key.startsWith('vehicle-spawn-flags-')&&/undead demolisher/i.test(field.label));
+        expect(rule.value & 0x0101).toBe(0x0100);
+        editedVehicleRule = {tagId:scenario.id,fieldKey:rule.key,value:rule.value | 1};
+        await chooseTool(main,'Tag editor');
+        await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('scnr');
+        await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(scenario.path);
+        await main.locator('.tag-row').click();
+        const placement = main.getByRole('group',{name:'Multiplayer vehicle placement'});
+        await placement.getByRole('combobox',{name:'Vehicle placement'}).selectOption(rule.key);
+        await placement.getByRole('checkbox',{name:'Slayer default',exact:true}).check();
+        await main.keyboard.press('Control+s');
+        await expect.poll(async()=> (await invoke(main,'open_project',{id:entry.id})).project.tagEdits).toEqual([editedVehicleRule]);
+        step('Edited a reviewed vehicle placement alongside the saved plow');
+      }
       const projectFile=path.resolve(entry.projectPath);
       const relative=path.relative(path.join(root,'library'),projectFile);
       if(!relative||relative.startsWith('..')||path.isAbsolute(relative))throw Error('Saved Workshop draft escaped its isolated library');
@@ -1047,6 +1065,11 @@ try{
         expect(JSON.parse(await fs.readFile(snap,'utf8')).id).toBe(build.id);
         const artifact=await invoke(main,'open_built_map',{projectId:entry.id,buildId:build.id});
         expect(artifact.inspection.sha256).toBe(build.sha256);
+        if (editedVehicleRule) {
+          const scenario = artifact.inspection.tags.find(tag=>tag.class==='scnr'&&tag.path===artifact.inspection.scenarioPath);
+          expect(scenario.fields.find(field=>field.key===editedVehicleRule.fieldKey)?.value).toBe(editedVehicleRule.value);
+          step('Read back the edited Slayer default and retained allowed flag in the rebuilt cache');
+        }
         step('Built the reviewed Warthog attachment using Spark’s normal Build button and recorded the isolated native cache');
         if (process.env.SPARK_WARTHOG_FORERUNNER_ROOT) {
           const rootRuntime = path.resolve(process.env.SPARK_WARTHOG_FORERUNNER_ROOT);

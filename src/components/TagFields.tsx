@@ -19,6 +19,7 @@ function VehicleRules({ project, tag, rules, change }: {
   const value = fieldValue(project, tag, field);
   return <fieldset className="vehicle-placement-rules">
     <legend>Multiplayer vehicle placement</legend>
+    <p className="subtle">Standard variants use Default. Forerunner’s MCC Survival menu includes Allowed placements from the map’s authored roster.</p>
     <label>Vehicle placement <select value={field.key} onChange={event => select(event.target.value)}>
       {rules.map(rule => <option key={rule.key} value={rule.key}>{rule.label}</option>)}
     </select></label>
