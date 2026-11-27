@@ -1204,6 +1204,8 @@ export default function BspAssembly({
                   <button type="button" disabled={busy || !native || !selectionMatches || !applied}
                     onClick={() => void checkNativeStructure()}>Check structure in Halo Tool</button>
                   <small>Apply and save the connection first. This checks native collision and structure before lighting and map compilation.</small>
+                  {visibleWitness?.sourceSha256 === project.source?.sha256 && visibleWitness?.assemblySignature === assemblySignature(draft) &&
+                    <button type="button" onClick={() => setVisibleWitness(null)}>Clear native error overlay</button>}
                   {currentStructureCheck && (
                     <div role={currentStructureCheck.passed ? 'status' : 'alert'}>
                       <strong>{currentStructureCheck.passed
@@ -1211,8 +1213,6 @@ export default function BspAssembly({
                         : 'Native structure check failed'}</strong>
                       {currentStructureCheck.issue && <p>{currentStructureCheck.issue}</p>}
                       {structureActions.length > 0 && <ul>{structureActions.map(action => <li key={action}>{action}</li>)}</ul>}
-                      {visibleWitness?.sourceSha256 === project.source?.sha256 && visibleWitness?.assemblySignature === assemblySignature(draft) &&
-                        <button type="button" onClick={() => setVisibleWitness(null)}>Clear native error overlay</button>}
                       {currentStructureCheck.witnesses.map(witness => {
                         try {
                           const geometry = parseHaloWrl(witness.text);

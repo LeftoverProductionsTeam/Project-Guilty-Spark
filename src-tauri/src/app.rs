@@ -2129,7 +2129,24 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let jobs = state.root.join("jobs");
     let returned = job_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let record = if let Some(attachment)=&attachment{core::vehicle_attachment::run(&project,&inspection,attachment,&jobs,&job_id,&cancel,&|e|event(&app,e))}else if core::megaworld_build::selected(&project){core::megaworld_build::run_with_reviewed_runtime(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e),megaworld_review.as_ref())}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
+        let record = if let Some(attachment) = &attachment {
+            core::vehicle_attachment::run(&project, &inspection, attachment, &jobs, &job_id, &cancel, &|e| event(&app, e))
+        } else if core::megaworld_build::selected(&project) {
+            core::megaworld_build::run_with_reviewed_runtime(&project, &inspection, &jobs, &job_id, cancel, |mut e| {
+                if e.phase == "bsp-structure-witness" {
+                    let Ok(mut witness) = serde_json::from_str::<serde_json::Value>(&e.message) else { return };
+                    witness["sourceSha256"] = serde_json::json!(&inspection.sha256);
+                    witness["assembly"] = serde_json::json!(&project.bsp_assembly);
+                    e.message = witness.to_string();
+                    // The viewport uses this transient geometry. Keep compiler text in job history.
+                    let _ = app.emit("spark:job", &e);
+                } else {
+                    event(&app, e);
+                }
+            }, megaworld_review.as_ref())
+        } else {
+            build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e| event(&app, e))
+        };
         let state = app.state::<AppState>();
         match record {
             Ok(record) => {

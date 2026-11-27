@@ -106,6 +106,8 @@ import RetainedLevelView from './components/RetainedLevelView';
 import type { MapDocument } from './mapDocuments';
 import WorkspacePanels,{WorkspacePanel,closeOtherHeaderMenus,headerMenuKeyDown}from'./components/WorkspacePanels';
 import NavigationSettings from'./components/NavigationSettings';
+import { assemblySignature, type BspAssembly } from './bspAssembly';
+import { BSP_STRUCTURE_WITNESS, parseHaloWrl, type BspStructureWitness } from './haloWrl';
 import {readMapSession,writeMapSession,useMapState,copyMapViewSession,configureMapViewWindow,rememberCompiledSource} from './mapSession';
 import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
@@ -746,6 +748,23 @@ export default function App() {
     const unsubs: Promise<() => void>[] = [];
     unsubs.push(
       listen<JobEvent>('spark:job', ({ payload }) => {
+        if (payload.phase === 'bsp-structure-witness') {
+          try {
+            const witness = JSON.parse(payload.message) as { sourceSha256: string; assembly: BspAssembly | null; text: string };
+            if (!witness.assembly || typeof witness.sourceSha256 !== 'string' || typeof witness.text !== 'string') return;
+            const diagnostics = parseHaloWrl(witness.text);
+            if (diagnostics.segments.length || diagnostics.faces.length) {
+              writeMapSession<BspStructureWitness>(payload.projectId, BSP_STRUCTURE_WITNESS, {
+                sourceSha256: witness.sourceSha256,
+                assemblySignature: assemblySignature(witness.assembly),
+                diagnostics,
+              });
+            }
+          } catch {
+            // The compiler failure still arrives through the normal job log.
+          }
+          return;
+        }
         setLogs((v) => [...v, payload].slice(-2000));
         if (payload.progress > 0 && payload.progress < 100) setActiveJob(payload.jobId);
         if (payload.progress === 100) {

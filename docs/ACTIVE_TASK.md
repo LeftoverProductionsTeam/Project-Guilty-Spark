@@ -5,7 +5,7 @@ Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 4f28d8f8 / bf4c156e includes the curved Box plow. Previous 42c19e04 / d0135aaa. Earlier 42c19e04 / d0135aaa built the plow and reviewed spawn rules together, reopened MCC13 8a2c2c22 and staged it on Forerunner deaca69b.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier plow 901cacc5 through Host Zombie Apocalypse. Spark normal Build proved project a3a62b39 / paint bbd1dfd9 / MCC13 61f8d17b, native CRC, dependencies and road-plow collision. Exact 61f8d17b appeared in Forerunner’s Zombies chooser. Windows blocked Host before map load. Latest guides users to Play Solo and keeps Stop available after edits.
-Next action: localize structure open edges 1329–1331 on Sidewinder source aea17d8e before any full retry. d0 foot and Ghost loops passed. Verify Warthog clearance with a stock Spartan before merging Extraction pools.
+Next action: repair the isolated Sidewinder sky triangle at (63.32,24.68,-12.67) identified by native edges 1329–1331. Verify Warthog clearance with a stock Spartan before merging Extraction pools.
 
 ## Acceptance
 

@@ -354,30 +354,6 @@ fn partition_preview(
         Ok(receipt)
     })();
     if disposable {
-        // Tool puts its geometry witnesses beside the generated JMS. Send a
-        // bounded copy to the editor before disposing of the staging folder.
-        let models = workspace.join("data").join("levels").join("spark")
-            .join(format!("assembly_{}", &project.id[..8])).join("models");
-        if crate::reject_links(&models).is_ok() {
-            if let Ok(files) = fs::read_dir(models) {
-                let mut paths = files.flatten().map(|entry| entry.path())
-                    .filter(|path| path.extension().is_some_and(|extension| extension == "wrl"))
-                    .collect::<Vec<_>>();
-                paths.sort();
-                for path in paths.into_iter().take(4) {
-                    if crate::reject_links(&path).is_err() { continue; }
-                    let Ok(info) = fs::metadata(&path) else { continue };
-                    if !info.is_file() || info.len() > 256 * 1024 { continue; }
-                    let Ok(text) = fs::read_to_string(&path) else { continue };
-                    if text.len() > 256 * 1024 { continue; }
-                    event(JobEvent {
-                        job_id: id.into(), project_id: project.id.clone(), phase: "bsp-structure-witness".into(),
-                        message: serde_json::json!({"name": path.file_name().and_then(|name| name.to_str()), "text": text}).to_string(),
-                        progress: 90, severity: "info".into(), timestamp: chrono::Utc::now().to_rfc3339(),
-                    });
-                }
-            }
-        }
         let disposal = lease.finish_disposable();
         return match result {
             Ok(receipt) => disposal.map(|_| receipt),

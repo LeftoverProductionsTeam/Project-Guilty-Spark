@@ -10,6 +10,7 @@ use crate::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 fn find_tool(tools: &Toolchain, name: &str) -> Result<PathBuf> {
@@ -810,6 +811,22 @@ fn restore_collision_flags(
     }
     Ok(values.len())
 }
+fn structure_witness(path: &Path) -> Option<String> {
+    const MAX_BYTES: u64 = 256 * 1024;
+    reject_links(path).ok()?;
+    let file = fs::File::open(path).ok()?;
+    let metadata = file.metadata().ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_BYTES {
+        return None;
+    }
+    let mut text = String::new();
+    file.take(MAX_BYTES + 1).read_to_string(&mut text).ok()?;
+    if text.len() as u64 > MAX_BYTES || !text.starts_with("#VRML V1.0") && !text.starts_with("#VRML 1.0") {
+        return None;
+    }
+    Some(serde_json::json!({"name": path.file_name()?.to_str()?, "text": text}).to_string())
+}
+
 fn compile_structure(
     tool: &Path, runner: &Runner, workspace: &Path, tags: &Path,
     parent: &str, name: &str, geometry: &AssemblyGeometry,
@@ -817,7 +834,14 @@ fn compile_structure(
     let source = workspace.join("data").join(safe_relative(&format!("{parent}/models/{name}.jms"))?);
     fs::create_dir_all(source.parent().unwrap())?;
     project::atomic_write(&source, bsp_assembly::export_jms(geometry)?.as_bytes(), false)?;
-    native_step(tool, runner, workspace, &["structure".into(), parent.into(), name.into(), "true".into()], "bsp-structure")?;
+    if let Err(error) = native_step(tool, runner, workspace, &["structure".into(), parent.into(), name.into(), "true".into()], "bsp-structure") {
+        // Read only the witness for this invocation before the owned job is retired.
+        let witness = source.with_file_name(format!("{name}_errors.wrl"));
+        if let Some(payload) = structure_witness(&witness) {
+            runner.emit("bsp-structure-witness", payload, 90, "info");
+        }
+        return Err(error);
+    }
     let bsp = format!("{parent}\\{name}");
     let compiled = tags.join(safe_relative(&format!("{bsp}.scenario_structure_bsp"))?);
     if !compiled.is_file() || fs::metadata(&compiled)?.len() < 648 {
