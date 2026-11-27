@@ -3,10 +3,10 @@
 Task: Product Completion V2.1. P0 compact MegaWorld, P1 creator toolchain, P2 flagship game creation, P3 quality and compatibility.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Win64 Spark 16e43940. Native Map Library, Dependencies and Games & tools detected and connected Forerunner F9907675 through the normal controls. Previous 075c77f8 preserves the verified Demo carrier/rules app. Forerunner F9907675 keeps exact 12649191 and fcfe9d44 ground preview.
+Latest verified revision: Win64 Spark b1392c32. Native QuickForge created a CE map and selected the actual Forerunner installation without changing its build target; compact layout passed at 800×600 through ultrawide. Previous 16e43940 preserves the earlier Forerunner UI release.
 Creator tooling: Bulk drops queue in Library, Construction and Batch Editing. Editable Workshop geometry has spherical and box cutouts.
 Be Native is a retained regression fixture. The 8ef8f62 checkpoint has the physical seat, flight and HUD evidence.
-Next action: apply the compact runtime controls to QuickForge and remaining scroll-heavy editors. Continue operation-level Forge, guarded reload and the compact Timberland–Blood Gulch join. Preserve Demo b38f3550 and its banks while checking Evolved rollover and the two missing original cues.
+Next action: extend BSP preflight for partial coplanar overlaps using the existing face clipping helper and a bounded candidate search. Continue operation-level Forge, guarded reload and compact Timberland–Blood Gulch. Preserve Demo and its banks while checking Evolved rollover and missing original cues.
 
 PRODUCT COMPLETION V2.1 sets the current priorities. P0 is reliable compact world construction. P1 is the full creator toolchain. P2 is flagship game creation. P3 is product quality and compatibility. Preserve Operation 110%, the 475 historical requirements, M1–M6 and subsequent owner requests. Existing Be Native and stand-alone tests are retained regression fixtures. Reuse the existing Spark and Forerunner contracts and keep the current Latest ground preview playable.
 
