@@ -17,6 +17,15 @@ pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 0;
 pub const MAX_AUTOMATIC_BACKUP_RETENTION: usize = 100;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct VehicleMount {
+    pub source_sha256: String,
+    pub vehicle_tag_id: u32,
+    pub vehicle_path: String,
+    pub position: [f64; 3],
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ShapeDraft {
     pub id: Uuid,
     pub shape: String,
@@ -25,6 +34,8 @@ pub struct ShapeDraft {
     pub curl: f64,
     pub sweep: f64,
     pub paint_png: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vehicle_mount: Option<VehicleMount>,
 }
 impl ShapeDraft {
     fn validate(&self) -> Result<()> {
@@ -310,7 +321,20 @@ impl Project {
     }
     pub fn validate(&self) -> Result<()> {
         if let Some(draft)=&self.scenario_script_draft{draft.validate()?;}
-        if let Some(draft) = &self.shape_draft { draft.validate()?; }
+        if let Some(draft) = &self.shape_draft {
+            draft.validate()?;
+            if let Some(mount) = &draft.vehicle_mount {
+                if draft.shape != "plow"
+                    || !self.source.as_ref().is_some_and(|source| source.cache_version == 13 && source.sha256 == mount.source_sha256)
+                    || mount.vehicle_path.len() > 240
+                    || !mount.vehicle_path.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b' ' | b'\\'))
+                    || mount.position.iter().any(|n| !(-4.0..=4.0).contains(n))
+                {
+                    return invalid("Review the plow mount on a vehicle from this project’s preserved MCC map");
+                }
+                crate::safe_relative(&mount.vehicle_path)?;
+            }
+        }
         if self.automatic_backup_retention.is_some_and(|value|value>MAX_AUTOMATIC_BACKUP_RETENTION) {
             return invalid("Automatic backup retention must be None (0) or 1–100");
         }
@@ -1044,6 +1068,14 @@ fn decode_project(bytes: &[u8]) -> Result<Project> {
 
 /// A renderer supplies semantic edits, never arbitrary offsets. Re-resolve every field from the cache.
 pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<()> {
+    if let Some(mount) = project.shape_draft.as_ref().and_then(|draft| draft.vehicle_mount.as_ref()) {
+        if mount.source_sha256 != inspection.sha256 || !inspection.tags.iter().any(|tag| {
+            tag.id == mount.vehicle_tag_id && tag.class == "vehi" && !tag.external
+                && tag.path.eq_ignore_ascii_case(&mount.vehicle_path)
+        }) {
+            return invalid("The reviewed vehicle tag differs from this map. Preview the mount again.");
+        }
+    }
     crate::tag_renames::validate_source(project, inspection)?;
     for edit in &project.tag_edits {
         let field = inspection

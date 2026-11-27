@@ -43,6 +43,13 @@ async function readShapeProject(file){
      !Array.isArray(draft.dimensions)||draft.dimensions.length!==3||
      !draft.dimensions.every(value=>Number.isFinite(value)&&value>=.05&&value<=32)||
      !percent(draft.curl)||!percent(draft.sweep))throw Error('Apply and save an editable plow draft in Spark first');
+  const mount=draft.vehicleMount;
+  if(mount&&(
+    mount.sourceSha256!==originalMapHash||project.source?.sha256!==originalMapHash||project.source?.cacheVersion!==13||
+    !Number.isSafeInteger(mount.vehicleTagId)||mount.vehicleTagId<0||mount.vehicleTagId>0xffffffff||
+    typeof mount.vehiclePath!=='string'||mount.vehiclePath.length>240||!Array.isArray(mount.position)||
+    mount.position.length!==3||mount.position.some(value=>!Number.isFinite(value)||Math.abs(value)>4)
+  ))throw Error('The saved vehicle mount differs from the selected MCC source');
   const prefix='data:image/png;base64,';
   if(typeof draft.paintPng!=='string'||!draft.paintPng.startsWith(prefix)||draft.paintPng.length>prefix.length+1_500_000)
     throw Error('Saved shape paint must be a bounded PNG');
@@ -96,7 +103,9 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const mesh=plowMesh(dimensions,curl,sweep,bladeProfile);
   // Seat the road blade farther into the hood so the rear face crosses the
   // hull decisively instead of leaving a barely intersecting strip.
-  const origin=[front+(bladeProfile==='moldboard'?13:15),0,bottom+5],proof=[];
+  const reviewedMount=supplied?.draft.vehicleMount;
+  const origin=reviewedMount?.position.map(value=>value*100)??[front+(bladeProfile==='moldboard'?13:15),0,bottom+5];
+  const proof=[];
   let paintPath=paintSource?path.resolve(paintSource):null;
   if(supplied){
     paintPath=path.join(context.directory,'saved-shape-paint.png');
@@ -174,7 +183,10 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const tune=originalCutoffs.split(/\r?\n/);
   await run('edit',['-t',tags,...fields.flatMap((field,i)=>['-S',field,tune[i]]),candidate]);
   if(await get(candidate)!==originalCutoffs)throw Error('Native cutoff restore failed');
-  const vehicle=vehicleArg??'mgm\\rerout\\tags\\vehicles\\the undead demolisher.vehicle';
+  const reviewedVehicle=reviewedMount?reviewedMount.vehiclePath+'.vehicle':null;
+  if(reviewedVehicle&&vehicleArg&&vehicleArg.toLowerCase()!==reviewedVehicle.toLowerCase())
+    throw Error('Override differs from the reviewed vehicle');
+  const vehicle=reviewedVehicle??vehicleArg??'mgm\\rerout\\tags\\vehicles\\the undead demolisher.vehicle';
   if(!/^[a-z0-9_ -]+(?:\\[a-z0-9_ -]+)+\.vehicle$/i.test(vehicle))throw Error('Expected a cache-relative vehicle tag');
   const variant='spark_workshop\\warthog_plow_probe.vehicle';
   await run('extract',['-G','-t',tags,'-s',vehicle,map]);
@@ -254,7 +266,7 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   if(supplied&&await hash(path.resolve(projectFile))!==supplied.sourceSha256)
     throw Error('Saved project changed during the native proof. Save your changes and try again.');
   console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,paint,privateMap,proof,bladeTriangles:mesh.indices.length/3,bladeProfile,curl,sweep,bladeDimensions:dimensions,mountCentimeters:origin,
-    shapeDraft:supplied?{id:supplied.draft.id,savedProjectSha256:supplied.sourceSha256}:null,
+    shapeDraft:supplied?{id:supplied.draft.id,savedProjectSha256:supplied.sourceSha256,...(reviewedMount?{vehicleMount:reviewedMount}:{})}:null,
     compilerOutput:raw.slice(-250),scope:'Compiled vehicle tag readback; gameplay requires separate validation.'}));
   if(!proof.every(p=>p.after===p.expected&&p.matchedBlade===mesh.indices.length/3&&p.matchedStock===p.original&&p.checksum===stock.checksum&&p.rigIdentical&&p.markersIdentical))throw Error('H1A stock rig or blade failed exact readback');
   if(runtimePath){

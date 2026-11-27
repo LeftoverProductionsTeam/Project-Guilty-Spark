@@ -911,7 +911,14 @@ try{
     const expectedWidth=nativeKit?'1.03':'3';
     const expectedCurl=nativeKit?'80':'65';
     const expectedHeight=nativeKit?'0.65':'0.72';
-    await createMultiplayerMap(main, 'Native shape and paint', 'haloCustomEdition');
+    let opened=null,vehicle=null;
+    if(nativeKit){
+      [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
+      vehicle=opened.inspection.tags.find(tag=>tag.class==='vehi'&&tag.path.toLowerCase().endsWith('the undead demolisher'));
+      expect(vehicle).toBeTruthy();
+      await main.reload();await chooseTool(main,'Map library');
+      await main.locator('.map-card[data-project-id="'+opened.project.id+'"]').click();
+    }else await createMultiplayerMap(main, 'Native shape and paint', 'haloCustomEdition');
     await chooseTool(main, 'Asset workshop');
     const toggle = main.getByRole('button', { name: 'Shape & paint', exact: true, includeHidden: true });
     await revealPagedControl(toggle);
@@ -959,6 +966,12 @@ try{
     await undo.click();
     await expect(undo).toBeDisabled();
     await paintBlade();
+    if(vehicle){
+      await editor.getByText('Review Warthog mount',{exact:true}).click();
+      await editor.getByRole('combobox',{name:'Mount vehicle',exact:true}).selectOption(String(vehicle.id));
+      await editor.getByRole('button',{name:'Fit road plow',exact:true}).click();
+      await expect(editor.getByRole('spinbutton',{name:'Mount X',exact:true})).toHaveValue('1.098');
+    }
     const apply = editor.getByRole('button', { name: 'Apply shape & paint', exact: true });
     await apply.click();
     await expect(editor.getByText('Save the project to keep the applied draft.')).toBeVisible();
@@ -968,11 +981,12 @@ try{
     await expect(width).toHaveValue(expectedWidth);
     await main.keyboard.press('Control+s');
     await expect(main.getByRole('button',{name:'Saved',exact:true}).first()).toBeVisible();
-    const entry=(await invoke(main,'bootstrap')).entries.find(entry=>entry.title==='Native shape and paint');
+    const entry=(await invoke(main,'bootstrap')).entries.find(entry=>opened?entry.id===opened.project.id:entry.title==='Native shape and paint');
     expect(entry).toBeTruthy();
     const saved=(await invoke(main,'open_project',{id:entry.id})).project.shapeDraft;
     const dimensions=[.22,Number(expectedWidth),Number(expectedHeight)];
     expect(saved).toMatchObject({shape:'plow',profile:'moldboard',curl:Number(expectedCurl),dimensions});
+    if(vehicle)expect(saved.vehicleMount).toEqual({sourceSha256:opened.inspection.sha256,vehicleTagId:vehicle.id,vehiclePath:vehicle.path,position:[1.098,0,.127]});
     const painted=await main.evaluate(async url=>{
       const image=new Image();image.src=url;await image.decode();
       const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
@@ -1009,7 +1023,8 @@ try{
           SPARK_WARTHOG_SHAPE_PROJECT:projectFile,SPARK_WARTHOG_PRIVATE_MAP:'1'}
       });
       const receipt=stdout.trim().split(/\r?\n/).map(line=>JSON.parse(line)).find(row=>row.privateMap);
-      expect(receipt.shapeDraft).toEqual({id:saved.id,savedProjectSha256:projectSha256});
+      expect(receipt.shapeDraft).toEqual({id:saved.id,savedProjectSha256:projectSha256,vehicleMount:saved.vehicleMount});
+      expect(receipt.mountCentimeters).toEqual(saved.vehicleMount.position.map(value=>value*100));
       expect(receipt.bladeDimensions).toEqual(dimensions);
       expect(receipt.curl).toBe(saved.curl);
       expect(receipt.sweep).toBe(saved.sweep);

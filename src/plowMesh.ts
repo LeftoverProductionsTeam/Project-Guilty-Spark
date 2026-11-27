@@ -2,6 +2,13 @@ import type { MeshData, Vec3 } from './types';
 
 export type PlowProfile = 'moldboard' | 'rounded' | 'v';
 
+export interface VehicleMount {
+  sourceSha256: string;
+  vehicleTagId: number;
+  vehiclePath: string;
+  position: Vec3;
+}
+
 export interface ShapeDraft {
   id: string;
   shape: 'plow' | 'box' | 'wedge';
@@ -10,6 +17,7 @@ export interface ShapeDraft {
   curl: number;
   sweep: number;
   paintPng: string;
+  vehicleMount?: VehicleMount;
 }
 
 export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: number, profile: PlowProfile,

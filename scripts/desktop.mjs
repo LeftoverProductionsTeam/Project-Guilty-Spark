@@ -64,9 +64,15 @@ async function validateAndPromote(context, releaseDir, verification) {
   if (verification === '--verify-monitor') await runDevelopmentCommand(process.execPath, [
     'scripts/test-native-monitor-portrait.mjs', executable, path.join(context.directory, 'playtest-monitor'),
   ], context);
-  if (['--verify-shape-paint', '--verify-creator'].includes(verification)) await runDevelopmentCommand(process.execPath, [
-    'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-shape-paint'),
-  ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_LAUNCH_ONLY: '1', SPARK_LIFECYCLE_SHAPE_PAINT: '1' } });
+  if (['--verify-shape-paint', '--verify-creator'].includes(verification)) {
+    const { SPARK_WARTHOG_ACCEPTANCE_MAP: map, SPARK_WARTHOG_ACCEPTANCE_INVADER: invader } = context.env;
+    if (context.env.SPARK_WARTHOG_NATIVE_KIT && (!map || !invader))
+      throw Error('The optional Warthog acceptance needs its owned MCC map and verified Invader directory');
+    await runDevelopmentCommand(process.execPath, [
+      'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-shape-paint'),
+      ...(map && invader ? [map, invader] : []),
+    ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_LAUNCH_ONLY: '1', SPARK_LIFECYCLE_SHAPE_PAINT: '1' } });
+  }
   if (verification === '--verify-creator') await runDevelopmentCommand(process.execPath, [
     'scripts/test-workspace-lifecycle-native.mjs', executable, path.join(context.directory, 'playtest-blender-geometry'),
   ], { ...context, env: { ...context.env, SPARK_LIFECYCLE_GEOMETRY: '1', SPARK_GEOMETRY_HANDOFF_ONLY: '1' } });

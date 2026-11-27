@@ -70,6 +70,7 @@ function PreviewMesh({ mesh }: { mesh: MeshData }) {
 }
 export function Assets({
   project,
+  inspection,
   meshes,
   onImport,
   onImportRevised,
@@ -77,6 +78,7 @@ export function Assets({
   onWorld,
 }: {
   project: Project;
+  inspection?: MapInspection | null;
   meshes: Record<string, MeshData>;
   onImport: () => void;
   onImportRevised:(handoffId:string,sha256:string)=>Promise<number>;
@@ -146,7 +148,7 @@ export function Assets({
         QuickForge/Workshop can build closed OBJ meshes as native static scenery: place the model, assign its Halo materials in the Custom model drawer, then Build & check playtest. External MTL textures, rigging and glTF are not imported. Add WAV/OGG sounds through the Level editor’s Asset library.
       </Notice>
       {partOpen!==null && <MeshPartEditor key={project.shapeDraft?.id ?? "new"} selectedMesh={mesh} visible={partOpen}
-        draft={project.shapeDraft} onApplyDraft={onApplyShapeDraft} /> }
+        draft={project.shapeDraft} projectId={project.id} inspection={inspection} onApplyDraft={onApplyShapeDraft} /> }
       {modelAssets.length ? (
         <div className="asset-layout">
           <div className="surface asset-list">

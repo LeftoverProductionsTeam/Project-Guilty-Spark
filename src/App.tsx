@@ -1655,6 +1655,7 @@ export default function App() {
           <Assets
             key={current.id}
             project={current}
+            inspection={inspection}
             meshes={meshes}
             onImport={() => void importAsset()}
             onApplyShapeDraft={draft=>edit({...current,shapeDraft:draft}, "Apply Workshop shape and paint")}

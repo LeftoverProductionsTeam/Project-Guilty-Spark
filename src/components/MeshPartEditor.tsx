@@ -7,7 +7,9 @@ import { exportMeshObj } from '../haloObj';
 import { exportMeshJms } from '../haloJms';
 import { plowMesh, type PlowProfile, type ShapeDraft } from '../plowMesh';
 import { downloadLocalBlob, downloadLocalText } from '../exportHelpers';
-import type { MeshData, Vec3 } from '../types';
+import type { MapInspection, MeshData, Vec3 } from '../types';
+import { nativePreviewResource } from '../nativePreviewResources';
+import { renderIndices } from '../haloGeometry';
 import { NumberField } from './ui';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 
@@ -88,10 +90,24 @@ function PaintablePart({ mesh, texture, painting, onPaint }: {
   </mesh>;
 }
 
-export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDraft }: {
+function VehicleReference({mesh}: {mesh: MeshData}) {
+  const geometry=useMemo(()=>{
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(mesh.positions,3));
+    geometry.setIndex(renderIndices(mesh));
+    geometry.computeVertexNormals();
+    return geometry;
+  },[mesh]);
+  useEffect(()=>()=>geometry.dispose(),[geometry]);
+  return <mesh geometry={geometry}><meshStandardMaterial color="#586b66" roughness={.88} /></mesh>;
+}
+
+export default function MeshPartEditor({ selectedMesh, visible, draft, projectId, inspection, onApplyDraft }: {
   selectedMesh?: MeshData;
   visible: boolean;
   draft?: ShapeDraft | null;
+  projectId: string;
+  inspection?: MapInspection | null;
   onApplyDraft: (draft: ShapeDraft) => boolean;
 }) {
   const activity = useWorkspaceActivity();
@@ -105,6 +121,25 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDr
   const [radius, setRadius] = useState(18);
   const [revision, setRevision] = useState(0);
   const [message, setMessage] = useState('');
+  const [vehicleChoice, setVehicleChoice] = useState(draft?.vehicleMount?.vehicleTagId.toString() ?? '');
+  const [mountPosition, setMountPosition] = useState<Vec3>(draft?.vehicleMount?.position ?? [1.098,0,.127]);
+  const [vehiclePreview, setVehiclePreview] = useState<{tagId:number;sha256:string;mesh?:MeshData;error?:string} | null>(null);
+  const vehicles=useMemo(()=>inspection?.header.version===13 ? inspection.tags.filter(tag=>tag.class==='vehi'&&!tag.external) : [],[inspection]);
+  const vehicle=vehicles.find(tag=>String(tag.id)===vehicleChoice);
+  const sourceSha=inspection?.sha256;
+  const stockModel=useMemo(()=>inspection?.tags.find(tag=>tag.class==='mod2' && tag.path.toLowerCase()==='vehicles\\warthog\\warthog'),[inspection]);
+  const reference=vehiclePreview?.tagId===vehicle?.id&&vehiclePreview?.sha256===sourceSha ? vehiclePreview : null;
+  useEffect(()=>{
+    if(!vehicle||!sourceSha||!stockModel||!visible)return;
+    let current=true;
+    void nativePreviewResource<{objectTagId:number;modelTagId:number;mesh:MeshData}>('preview_owned_object_model',
+      {projectId,tagId:vehicle.id,sourceSha256:sourceSha},sourceSha).then(result=>{
+      if(result.modelTagId!==stockModel.id)throw Error('Choose a vehicle that uses the classic Warthog model.');
+      if(!result.mesh.rig?.nodes.some(node=>node.name.toLowerCase()==='frame hull'))throw Error('The vehicle’s hull mount is unavailable.');
+      if(current)setVehiclePreview({tagId:vehicle.id,sha256:sourceSha,mesh:result.mesh});
+    }).catch(error=>{if(current)setVehiclePreview({tagId:vehicle.id,sha256:sourceSha,error:String(error)});});
+    return ()=>{current=false;};
+  },[projectId,vehicle,sourceSha,stockModel,visible]);
   const selectedHasUv = !!selectedMesh?.uvs && selectedMesh.uvs.length * 3 === selectedMesh.positions.length * 2 &&
     selectedMesh.uvs.every(value => Number.isFinite(value) && value >= 0 && value <= 1);
   const form = shape === 'selected' && !selectedHasUv ? 'plow' : shape;
@@ -149,11 +184,14 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDr
   }, [canvas, ctx, retainedPaint, texture]);
 
   function applyDraft() {
-    if (form === 'selected' || restoringPaint || paintLoadFailed) return;
+    if (form === 'selected' || restoringPaint || paintLoadFailed || (form==='plow'&&vehicleChoice&&!reference?.mesh)) return;
     const paintPng = canvas.toDataURL('image/png');
-    const next = { shape: form, dimensions: size, profile, curl: scoop, sweep: wrap, paintPng };
+    const vehicleMount=form==='plow'&&vehicle&&sourceSha&&reference?.mesh
+      ? {sourceSha256:sourceSha,vehicleTagId:vehicle.id,vehiclePath:vehicle.path,position:mountPosition} : undefined;
+    const next = { shape: form, dimensions: size, profile, curl: scoop, sweep: wrap, paintPng, vehicleMount };
     if (draft && draft.shape === form && draft.profile === profile && draft.curl === scoop && draft.sweep === wrap
-      && draft.dimensions.every((value, axis) => value === size[axis]) && draft.paintPng === paintPng) {
+      && draft.dimensions.every((value, axis) => value === size[axis]) && draft.paintPng === paintPng
+      && JSON.stringify(draft.vehicleMount)===JSON.stringify(vehicleMount)) {
       setMessage('This shape and paint are already in the project.');
       return;
     }
@@ -212,7 +250,12 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDr
         <color attach="background" args={['#101c2a']} />
         <ambientLight intensity={1.35} />
         <directionalLight position={[4, -2, 6]} intensity={2} />
-        <Bounds fit clip observe margin={1.35}><PaintablePart mesh={mesh} texture={texture} painting={painting} onPaint={stamp}/></Bounds>
+        <Bounds key={form==='plow'&&reference?.mesh ? reference.tagId : 'part'} fit clip observe margin={1.35}>
+          {form==='plow'&&reference?.mesh&&<VehicleReference mesh={reference.mesh} />}
+          <group position={form==='plow'&&reference?.mesh ? mountPosition : [0,0,0]}>
+            <PaintablePart mesh={mesh} texture={texture} painting={painting} onPaint={stamp}/>
+          </group>
+        </Bounds>
         <OrbitControls makeDefault enabled={!painting} />
       </Canvas>}
     </div>
@@ -257,9 +300,27 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, onApplyDr
         <button type="button" onClick={() => exportPart('jms')}>Export JMS</button>
         <button type="button" onClick={() => exportPart('png')}>Export paint PNG</button>
       </div>
-      <small>Vehicle mounting requires a native model and collision build.</small>
+      {form==='plow'&&stockModel&&vehicles.length>0&&<details open={vehicleChoice?true:undefined}>
+        <summary>Review Warthog mount</summary>
+        <label>Mount vehicle <select value={vehicleChoice} onChange={event=>setVehicleChoice(event.target.value)}>
+          <option value="">No vehicle</option>
+          {vehicles.map(tag=><option value={tag.id} key={tag.id}>{tag.path.replace(/^.*[\\/]/,'')}</option>)}
+        </select></label>
+        {vehicleChoice&&!reference&&<small role="status">Loading vehicle model…</small>}
+        {reference?.error&&<small role="alert">{reference.error}</small>}
+        {reference?.mesh&&<>
+          <div className="asset-part-dimensions">
+            {['X','Y','Z'].map((axis,index)=><label key={axis}>Mount {axis}
+              <NumberField label={'Mount '+axis} value={mountPosition[index]} min={-4} max={4} step={.01}
+                onCommit={value=>setMountPosition(previous=>previous.map((old,i)=>i===index?value:old) as Vec3)} />
+            </label>)}
+          </div>
+          <button type="button" onClick={()=>{setSize([.22,1.03,.65]);setScoop(80);setWrap(0);setProfile('moldboard');setMountPosition([1.098,0,.127]);}}>Fit road plow</button>
+          <small>Apply and save this position. A native build is required for vehicle collision.</small>
+        </>}
+      </details>}
       {form !== 'selected' && <div className="button-row">
-        <button type="button" className="primary" disabled={restoringPaint || paintLoadFailed} onClick={applyDraft}>Apply shape &amp; paint</button>
+        <button type="button" className="primary" disabled={restoringPaint || paintLoadFailed || (form==='plow'&&!!vehicleChoice&&!reference?.mesh)} onClick={applyDraft}>Apply shape &amp; paint</button>
         {draft && <small>Save the project to keep the applied draft.</small>}
       </div>}
       {restoringPaint && <small role="status">Loading the saved paint…</small>}
