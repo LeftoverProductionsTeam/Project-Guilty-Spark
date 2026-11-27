@@ -245,6 +245,13 @@ export default function BspAssembly({
   const canExtend = !!nativePartitioned && inspection.header.version === 13
     && inspection.header.scenarioType === 1 && baseParts.length < 16
     && !!project.inheritedBspConnections?.some(plan => plan.separateNativeBsps);
+  const routes = project.inheritedBspConnections ?? [];
+  const stockAtlasSeed = routes.length === 0 && inspection?.header.version === 609;
+  const mergedAtlasSeed = !!routes[0]?.atlasOrigin && routes.every(plan => !plan.separateNativeBsps);
+  const canPreserveBsp = canExtend || (sourceSha256 && inspection?.sha256 === sourceSha256
+    && !inspection.header.extended && [609,13].includes(inspection.header.version)
+    && inspection.header.scenarioType === 1 && baseParts.length === 1
+    && (stockAtlasSeed || mergedAtlasSeed));
   const buildRuntime = project.buildTargets?.find(target => target.id === project.activeBuildTarget)?.runtimeId;
   const [baseIndex, setBaseIndex] = useMapState(project.id, 'bsp.baseSection', project.bspAssembly?.baseBspIndex ?? 0);
   const [viewedBsp, setViewedBsp] = useMapState(project.id, 'world.bsp', 0);
@@ -447,7 +454,7 @@ export default function BspAssembly({
     : region.cacheSha256===sourceSha256&&region.bspIndex===baseIndex);
   const inherited=project.inheritedBspConnections??[];
   const atlasOrigin=inherited[0]?.atlasOrigin;
-  const atlasBuilt=atlasOrigin&&!inherited.some(plan=>plan.separateNativeBsps)
+  const atlasBuilt=atlasOrigin&&(!nativePartitioned||canExtend)
     ? placedLayout?.regions.filter(region=>region.regionId===atlasOrigin.regionId||inherited.some(plan=>
         plan.atlasOrigin?.regionId===atlasOrigin.regionId&&plan.donorSource.sha256===region.cacheSha256
         &&plan.donorSource.cacheVersion===region.cacheVersion&&plan.donorBspIndex===region.bspIndex))??[]
@@ -592,7 +599,7 @@ export default function BspAssembly({
         <div className="bsp-assembly-body">
           {report?.connectorTriangles!==undefined&&<p className="subtle" aria-label="Connector triangle budget">Connector: {report.connectorTriangles.toLocaleString()} triangles · {report.viewport?.retainsDonor ? 'connector export' : 'full source'}: {report.outputTriangles.toLocaleString()}. Native compilation and gameplay remain separate.</p>}
           {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
-          <MegaworldAtlas projectId={project.id} project={project} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
+          <MegaworldAtlas projectId={project.id} project={project} assembly={project.bspAssembly} sourceSha={project.source?.sha256} baseBspIndex={baseIndex} compiledRegions={atlasBuilt} allowTerrainSeam={!nativePartitioned} onPrepareConnection={native && active && (!nativePartitioned || canExtend) ? prepareAtlasConnection : undefined} layout={project.megaworldLayout} onLayout={(layout,description)=>onEdit({...project,megaworldLayout:layout},description)}/>
           {nativePartitioned && <NativeBspTransitionReport key={project.id+':'+sourceSha256} projectId={project.id} sourceSha256={sourceSha256!} partCount={baseParts.length} mcc={inspection?.header.version===13} onViewBsp={setViewedBsp}/>}
           {nativePartitioned && native && inherited.some(plan => plan.preserveDonorBsp) && (
             <details className="bsp-help">
@@ -1122,17 +1129,28 @@ export default function BspAssembly({
               </div>
               <fieldset>
                 <legend>Build layout</legend>
-                <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy || canExtend}
+                {canPreserveBsp && draft.terrainSeam && draft.atlasFromRegionId && draft.yawDegrees === 0
+                  && draft.donorBspIndex === 0 && draft.tunnelPoints.length === 2
+                  && !draft.infantryTunnel && !draft.highGround && !draft.archSegments
+                  && !draft.sections?.length && !draft.visibilityZones?.length && !draft.nativeSeals?.length && (
+                  <button type="button" disabled={busy} onClick={() => update({
+                    separateNativeBsps: true, preserveDonorBsp: true, openRoad: true,
+                    terrainSeam: undefined, restoreDonorSkyPortals: false, tunnelBakeFill: false,
+                    tunnelWidth: Math.max(6, draft.tunnelWidth), tunnelHeight: Math.max(4, draft.tunnelHeight),
+                    tunnelShaderPath: draft.terrainSeam!.baseShaderPath,
+                  })}>Keep both BSPs and build the crossing</button>
+                )}
+                <label><input type="checkbox" checked={draft.separateNativeBsps ?? false} disabled={busy || canExtend || !!draft.terrainSeam}
                   onChange={event => update({ separateNativeBsps: event.target.checked, restoreDonorSkyPortals: event.target.checked ? false : draft.restoreDonorSkyPortals, preserveDonorBsp: event.target.checked && draft.preserveDonorBsp, tunnelBakeFill: event.target.checked && draft.tunnelBakeFill })} /> Separate native BSPs</label>
                 {!draft.separateNativeBsps && <label title="Restore original donor portal outlines that separate native sky regions. Check portal source and rebuild to confirm that the doorway geometry still seals.">
                   <input type="checkbox" checked={draft.restoreDonorSkyPortals ?? false} disabled={busy}
                     onChange={event => update({ restoreDonorSkyPortals: event.target.checked })} /> Restore donor sky portals
                 </label>}
                 {draft.separateNativeBsps && <>
-                  <p>{canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
-                  {canExtend && baseParts.length <= 14 && <div>
+                  <p>{draft.preserveDonorBsp ? 'Spark keeps both native BSPs and builds only the connector. Choose MCC13.' : canExtend ? 'Spark keeps the existing BSPs and prepares the donor and its passage for preview. Native build verifies the new switch volumes, clearance, and regional placements.' : 'Use one straight enclosed passage. Spark builds paired switch volumes and bakes each BSP. Choose MCC13 for donor starts and teleporters.'}</p>
+                  {canPreserveBsp && (!stockAtlasSeed || !!draft.atlasFromRegionId) && baseParts.length <= 14 && <div>
                     <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends before changing BSP preservation.' : undefined}><input type="checkbox" checked={draft.preserveDonorBsp ?? false} disabled={busy || draft.tunnelPoints.length > 2 || (!draft.preserveDonorBsp && (draft.yawDegrees !== 0 || !!draft.nativeSeals?.length))}
-                      onChange={event => update({ preserveDonorBsp: event.target.checked, openRoad: event.target.checked && draft.openRoad, tunnelBakeFill: event.target.checked && !draft.openRoad })} /> Preserve donor BSP in native build</label>
+                      onChange={event => update({ preserveDonorBsp: event.target.checked, openRoad: event.target.checked && draft.openRoad, tunnelBakeFill: event.target.checked && !draft.openRoad })} /> Preserve both BSPs in native build</label>
                     {draft.preserveDonorBsp && <label title={draft.tunnelPoints.length > 2 ? 'Remove the bends to use a straight land bridge.' : undefined}>
                       <input type="checkbox" checked={draft.openRoad ?? false} disabled={busy || draft.tunnelPoints.length > 2}
                         onChange={event => update(event.target.checked ? {

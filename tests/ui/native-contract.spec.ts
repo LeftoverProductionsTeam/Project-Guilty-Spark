@@ -7912,6 +7912,47 @@ test('Forerunner transfer review presents paired native switch observations', as
   await expect(page.getByRole('combobox',{name:'Visible BSP',exact:true})).toHaveValue('1');
 });
 
+test('creator converts an Atlas seam draft to a road that retains both BSPs', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(async () => {
+    const w = window as any, mock = w.__sparkMock;
+    const base = mock.projects.a, donor = mock.projects.b;
+    for (const source of [base, donor]) {
+      source.project.source.cacheVersion = 609;
+      source.inspection.header.version = 609;
+      source.inspection.header.scenarioType = 1;
+    }
+    base.inspection.mesh.parts = [
+      { name: 'Atlas seed', indexStart: 0, indexCount: base.inspection.mesh.indices.length },
+    ];
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    const plan = await invoke('plan_bsp_assembly', { projectId: 'a', donorProjectId: 'b', donorBspIndex: 0 });
+    base.project.bspAssembly = { ...plan, atlasFromRegionId: 'atlas-seed',
+      terrainSeam: { shoulderWidth: 2, bankHeight: 1, baseShaderPath: 'synthetic/road', donorShaderPath: 'synthetic/soil' } };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'preview_bsp_assembly') w.__atlasRoadPreview = args;
+      return invoke(command, args);
+    };
+  });
+
+  await openFixture(page);
+  await chooseTool(page, 'Level editor');
+  if (!await page.getByRole('region', { name: 'Construction panel', exact: true }).isVisible()) await openDrawer(page, 'Construction');
+  const assembly = page.locator('.bsp-assembly:visible');
+  await revealPagedControl(assembly.locator('summary').first());
+  await assembly.locator('summary').first().click();
+
+  await (await constructionControl(page, 'button', 'Keep both BSPs and build the crossing')).click();
+  await expect(await constructionControl(page, 'checkbox', 'Preserve both BSPs in native build')).toBeChecked();
+  await expect(await constructionControl(page, 'checkbox', 'Open land bridge')).toBeChecked();
+  await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__atlasRoadPreview?.draft)).toMatchObject({
+    separateNativeBsps: true, preserveDonorBsp: true, openRoad: true,
+    tunnelWidth: 6, tunnelHeight: 4, tunnelShaderPath: 'synthetic/road',
+  });
+  expect(await page.evaluate(() => (window as any).__atlasRoadPreview?.draft.terrainSeam)).toBeUndefined();
+});
+
 test('creator intact BSP preview preserves both sources and reports only connector triangles', async ({ page }) => {
   await mockDesktop(page);
   await page.evaluate(async () => {
@@ -8007,7 +8048,7 @@ test('creator intact BSP preview preserves both sources and reports only connect
   await (await constructionControl(page, 'button', 'Preview connector with donor intact')).click();
   await expect(assembly.getByLabel('Connector triangle budget')).toContainText('28 triangles · connector export: 56');
   expect(await page.evaluate(() => (window as any).__intactPreviewArgs.intactConnector)).toBe(true);
-  const preserve = await constructionControl(page, 'checkbox', 'Preserve donor BSP in native build');
+  const preserve = await constructionControl(page, 'checkbox', 'Preserve both BSPs in native build');
   await preserve.check();
   const tunnelLighting = await constructionControl(page, 'checkbox', 'Bake tunnel lighting');
   await expect(tunnelLighting).toBeChecked();

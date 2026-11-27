@@ -17,7 +17,7 @@ type BurialReview={
   coverZ:number|null;
   suggestedTranslationZ:number|null;
 };
-export default function MegaworldAtlas({projectId,project,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+export default function MegaworldAtlas({projectId,project,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],allowTerrainSeam=true,layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];allowTerrainSeam?:boolean;layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [open,setOpen]=useMapState(projectId,'megaworld.atlas',false);
   const [atlas,setAtlas]=useState<Atlas|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [search,setSearch]=useState(''),[runtime,setRuntime]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null);
@@ -36,7 +36,7 @@ export default function MegaworldAtlas({projectId,project,assembly,sourceSha,bas
   return <details className="megaworld-atlas" open={open} onToggle={e=>setOpen(e.currentTarget.open)}>
     <summary>Megaworld Atlas <small>{atlas?`${atlas.regions.length} source regions`:'owned map regions'}</small></summary>
     {open&&<><div className="atlas-controls"><button disabled={!native||busy} onClick={()=>void scan()}>{busy?'Inspecting complete source caches…':atlas?'Rescan installed maps':'Scan installed maps'}</button><input aria-label="Find Atlas region" placeholder="Map or BSP…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/><select aria-label="Atlas runtime" value={runtime} onChange={e=>{setRuntime(e.target.value);setPage(0);}}><option value="all">All installed Halos</option>{[...new Set(atlas?.regions.flatMap(r=>r.runtimes)??[])].map(r=><option key={r}>{r}</option>)}</select></div>
-    <LayoutEditor project={project} layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
+    <LayoutEditor project={project} layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} allowTerrainSeam={allowTerrainSeam} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
     {atlas&&<div className="atlas-controls">
       <button onClick={addOriginals} disabled={busy||readOnly}>Add originals to layout</button>
       <button disabled={busy||readOnly} onClick={()=>{
@@ -54,7 +54,7 @@ export default function MegaworldAtlas({projectId,project,assembly,sourceSha,bas
   </details>;
 }
 
-function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegions,allowTerrainSeam,onPrepareConnection,readOnly=false}:{project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];allowTerrainSeam:boolean;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
   const [connectionOrigin,setConnectionOrigin]=useState('');
   const [coverSelection,setCoverSelection]=useState<{roomId:string;surfaceId:string}|null>(null);
@@ -211,7 +211,7 @@ function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegion
       <label>Connection from {base.mapName} <select aria-label="Atlas connection neighbor" value={selectedNeighbor?.regionId??''} onChange={event=>setSelection(event.target.value)}>
         <option value="">Choose linked or adjacent region</option>{adjacent.map(region=><option key={region.regionId} value={region.regionId}>{region.mapName}</option>)}
       </select></label>
-      <button disabled={readOnly||preparing||!selectedNeighbor||base.underground||selectedNeighbor.underground} onClick={()=>void prepare(true)}>Draft terrain seam</button>
+      <button disabled={readOnly||preparing||!allowTerrainSeam||!selectedNeighbor||base.underground||selectedNeighbor.underground} title={allowTerrainSeam?undefined:"A merged terrain seam needs one BSP. Draft a native passage to keep the current BSPs intact."} onClick={()=>void prepare(true)}>Draft terrain seam</button>
       <button disabled={readOnly||preparing||!selectedNeighbor} onClick={()=>void prepare(false)}>Draft passage</button>
     </div>}
     <p className="atlas-note">{originalMultiplayerCount(originalNames)}/19 original maps · {regions.filter(region=>region.underground).length} underground · {overlaps.length} bounding-box overlaps.</p>
