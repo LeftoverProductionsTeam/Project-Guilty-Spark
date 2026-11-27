@@ -3,13 +3,13 @@ import stockCompactAtlas from './stockCompactAtlas.json';
 export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'] as const;
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
 export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean;surfaceAccess?:{surfaceRegionId:string;roofClearance:number;headingDegrees:number}}
-export interface ExtractionPool {playerStarts:number[];weapons:number[];vehicles:number[]}
+export interface ExtractionPool {playerStarts:number[];weapons:number[];vehicles:number[];authoredVehicleIds?:string[]}
 export interface ExtractionPoint {row:number;label:string;position:Vec3;teamIndex?:number}
-export type ExtractionPoints = Record<keyof ExtractionPool, ExtractionPoint[]>;
+export type ExtractionPoints = Record<"playerStarts"|"weapons"|"vehicles", ExtractionPoint[]>;
 export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[];extraction?:Record<string, ExtractionPool>}
 
-export function selectedExtractionPoints(pool:ExtractionPool, candidates:ExtractionPoints):ExtractionPoints {
-  const select = (kind:keyof ExtractionPool, minimum:number, maximum=Infinity) => {
+export function selectedExtractionPoints(pool:ExtractionPool, candidates:ExtractionPoints, authoredVehicles:ReadonlyMap<string,ExtractionPoint>=new Map()):ExtractionPoints {
+  const select = (kind:keyof ExtractionPoints, minimum:number, maximum=Infinity) => {
     const rows = pool[kind];
     if (rows.length<minimum || rows.length>maximum || new Set(rows).size!==rows.length)
       throw Error('Choose two player starts, at least three weapon points and at least one vehicle point.');
@@ -19,8 +19,17 @@ export function selectedExtractionPoints(pool:ExtractionPool, candidates:Extract
       return point;
     });
   };
-  const playerStarts=select('playerStarts',2,2), weapons=select('weapons',3), vehicles=select('vehicles',1);
-  const occupied=new Set([...weapons,...vehicles].map(point=>point.position.join(',')));
+  const playerStarts=select('playerStarts',2,2), weapons=select('weapons',3), vehicles=select('vehicles',0);
+  const authoredIds=pool.authoredVehicleIds??[];
+  if(new Set(authoredIds).size!==authoredIds.length) throw Error('Choose distinct placed vehicles.');
+  for(const id of authoredIds){
+    const vehicle=authoredVehicles.get(id);
+    if(!vehicle) throw Error('A saved vehicle placement is unavailable. Review the selected vehicles.');
+    vehicles.push(vehicle);
+  }
+  if(!vehicles.length) throw Error('Choose at least one stock or placed vehicle point.');
+  // Stock points use source coordinates. Editor placements use built-map coordinates.
+  const occupied=new Set([...weapons,...vehicles].map(point=>(point.row<0?'placed:':'stock:')+point.position.join(',')));
   if (occupied.size!==weapons.length+vehicles.length) throw Error('Choose separate weapon and vehicle points.');
   return {playerStarts,weapons,vehicles};
 }

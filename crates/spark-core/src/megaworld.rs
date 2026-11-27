@@ -59,6 +59,8 @@ pub struct ExtractionPool {
     pub player_starts: [u16; 2],
     pub weapons: Vec<u16>,
     pub vehicles: Vec<u16>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authored_vehicle_ids: Vec<String>,
 }
 
 impl ExtractionPool {
@@ -67,7 +69,7 @@ impl ExtractionPool {
         for (rows, minimum, limit) in [
             (self.player_starts.as_slice(), 2, maps::player_start_read_limit(cache_version)),
             (self.weapons.as_slice(), 3, maps::netgame_equipment_read_limit(cache_version)),
-            (self.vehicles.as_slice(), 1, crate::bsp_vehicles::limit(cache_version)),
+            (self.vehicles.as_slice(), 0, crate::bsp_vehicles::limit(cache_version)),
         ] {
             if !(minimum..=limit).contains(&rows.len())
                 || rows.iter().any(|&row| usize::from(row) >= limit)
@@ -75,6 +77,13 @@ impl ExtractionPool {
             {
                 return invalid("Extraction needs two distinct starts and enough distinct native points for three weapons and one vehicle");
             }
+        }
+        if self.vehicles.len() + self.authored_vehicle_ids.len() == 0
+            || self.authored_vehicle_ids.len() > crate::bsp_vehicles::limit(13) - self.vehicles.len()
+            || self.authored_vehicle_ids.iter().any(|id| uuid::Uuid::parse_str(id).is_err())
+            || self.authored_vehicle_ids.iter().collect::<BTreeSet<_>>().len() != self.authored_vehicle_ids.len()
+        {
+            return invalid("Extraction needs distinct eligible vehicle points");
         }
         Ok(())
     }
@@ -304,19 +313,43 @@ pub fn compiled_extraction_pools(
         let starts = selected_extraction_points(&original.player_starts, &pool.player_starts, &region.map_name, "player start")?;
         let weapons = selected_extraction_points(&original.weapons, &pool.weapons, &region.map_name, "weapon")?;
         let vehicles = selected_extraction_points(&original.vehicles, &pool.vehicles, &region.map_name, "vehicle")?;
-        if maps::hash_file(&path)? != region.cache_sha256 {
-            return invalid(format!("{} source cache changed during pool readback", region.map_name));
-        }
-
         let mut native_region = region.clone();
         if let Some(origin) = origin {
             let translated = std::array::from_fn(|axis| region.translation[axis] - origin.translation[axis]);
             native_region.translation = crate::bsp_assembly::transform(translated, [0.; 3], -origin.yaw_degrees);
             native_region.yaw_degrees = region.yaw_degrees - origin.yaw_degrees;
         }
+        let authored_vehicles = pool.authored_vehicle_ids.iter().map(|id| {
+            let placement = project.scene.iter().find(|object| &object.id == id)
+                .filter(|object| object.visible && object.scale == [1.; 3] && object.source_offset.is_none()
+                    && object.rotation_offset.is_none() && object.asset_id.is_none())
+                .ok_or_else(|| crate::SparkError::Invalid(format!("{} pool vehicle is missing or no longer an unchanged native placement", region.map_name)))?;
+            let binding = placement.source_model.as_ref()
+                .and_then(|model| crate::native_asset_imports::find(project, model))
+                .filter(|binding| binding.tag_class == "vehi")
+                .ok_or_else(|| crate::SparkError::Invalid(format!("{} pool vehicle has no verified native vehicle tag", region.map_name)))?;
+            Ok((placement.position, crate::native_asset_imports::root_file(binding)?))
+        }).collect::<Result<Vec<_>>>()?;
+        let local_poses = authored_vehicles.iter().map(|(point, _)| {
+            let relative = std::array::from_fn(|axis| f64::from(point[axis]) - native_region.translation[axis]);
+            crate::bsp_assembly::transform(relative, [0.; 3], -native_region.yaw_degrees).map(|axis| axis as f32)
+        }).collect::<Vec<_>>();
+        for chunk in local_poses.chunks(1024) {
+            for location in maps::bsp_point_locations(&path, &source, chunk, None)? {
+                if location.bsps != [region.bsp_index as u16]
+                    || !location.supports.iter().any(|surface| surface.bsp as usize == region.bsp_index)
+                {
+                    return invalid(format!("{} has an authored vehicle outside its supported source region", region.map_name));
+                }
+            }
+        }
+        if maps::hash_file(&path)? != region.cache_sha256 {
+            return invalid(format!("{} source cache changed during pool readback", region.map_name));
+        }
         let poses = starts.iter().chain(&weapons).chain(&vehicles).map(|point|
             crate::bsp_assembly::transform(point.position.map(f64::from), native_region.translation, native_region.yaw_degrees)
-                .map(|axis| axis as f32)).collect::<Vec<_>>();
+                .map(|axis| axis as f32))
+            .chain(authored_vehicles.iter().map(|(point, _)| *point)).collect::<Vec<_>>();
         let mut occupied = BTreeSet::new();
         for position in &poses[starts.len()..] {
             // Normalize signed zero so equal native coordinates share a key.
@@ -349,11 +382,23 @@ pub fn compiled_extraction_pools(
             }
         };
         let start_rows = compiled_extraction_rows(&starts, &target.player_starts, &native_region, "player start", false, &mut seen_starts)?;
+        let mut vehicle_rows = compiled_extraction_rows(&vehicles, &target.vehicles, &native_region, "vehicle", true, &mut seen_vehicles)?;
+        for (position, tag) in authored_vehicles {
+            let mut matches = target.vehicles.iter().filter(|point| point.label.eq_ignore_ascii_case(&tag)
+                && point.position.iter().zip(position).all(|(actual, expected)| (actual - expected).abs() <= 0.0002));
+            let Some(point) = matches.next() else {
+                return invalid(format!("{} authored pool vehicle is missing from the compiled map. Rebuild this project before exporting.", region.map_name));
+            };
+            if matches.next().is_some() || !seen_vehicles.insert(point.row) {
+                return invalid(format!("{} authored pool vehicle matches ambiguous or shared compiled rows", region.map_name));
+            }
+            vehicle_rows.push(point.row);
+        }
         result.push(CompiledExtractionPool {
             region_id: native_region.region_id.clone(), bsp_index,
             player_starts: [start_rows[0], start_rows[1]],
             weapons: compiled_extraction_rows(&weapons, &target.weapons, &native_region, "weapon", true, &mut seen_weapons)?,
-            vehicles: compiled_extraction_rows(&vehicles, &target.vehicles, &native_region, "vehicle", true, &mut seen_vehicles)?,
+            vehicles: vehicle_rows,
         });
     }
     if seen_weapons.iter().chain(&seen_vehicles).any(|row| *row >= 1024) {
@@ -403,10 +448,14 @@ impl Layout {
                 return invalid("Atlas layout has invalid bounds or transform");
             }
         }
+        let mut authored_vehicle_ids = BTreeSet::new();
         for (id, pool) in &self.extraction {
             let region = self.regions.iter().find(|row| &row.region_id == id)
                 .ok_or_else(|| crate::SparkError::Invalid("Extraction pool refers to a removed Atlas region".into()))?;
             pool.validate(region.cache_version)?;
+            if pool.authored_vehicle_ids.iter().any(|id| !authored_vehicle_ids.insert(id)) {
+                return invalid("An authored vehicle can belong to only one Extraction pool");
+            }
         }
         for room in &self.regions {
             let Some(access) = &room.surface_access else { continue; };
@@ -626,7 +675,7 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
 #[cfg(test)]mod tests{
     #[test]
     fn rejects_conflicting_atlas_extraction_rows() {
-        let mut pool = ExtractionPool { player_starts: [1, 2], weapons: vec![3, 5, 9], vehicles: vec![4] };
+        let mut pool = ExtractionPool { player_starts: [1, 2], weapons: vec![3, 5, 9], vehicles: vec![4], authored_vehicle_ids: vec![] };
         assert!(pool.validate(609).is_ok());
         pool.player_starts = [1, 1];
         assert!(pool.validate(609).is_err());
@@ -657,6 +706,54 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
         let bindings = bind_extraction_rows(&source, &[wrong_team, right_team], &region, false);
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].compiled_row, 8);
+    }
+
+    #[test]
+    #[ignore = "requires owned Timberland and released MegaWorld"]
+    fn verifies_authored_vehicle_pool_against_native_rows() {
+        let stock = PathBuf::from(std::env::var_os("SPARK_REVIEW_STOCK_TIMBERLAND").unwrap());
+        let output = PathBuf::from(std::env::var_os("SPARK_ATLAS_COMPILED").unwrap());
+        let source = std::sync::Arc::new(maps::inspect_map(&stock, stock.parent()).unwrap());
+        let compiled = maps::inspect_map(&output, None).unwrap();
+        let region = LayoutRegion {
+            region_id: format!("{}:0", source.sha256), cache_sha256: source.sha256.clone(),
+            cache_version: 609, bsp_index: 0, map_name: "timberland".into(),
+            bsp_name: source.mesh.parts[0].name.clone(), minimum: [0.; 3], maximum: [0.; 3],
+            translation: [0.; 3], yaw_degrees: 0., hex_slot: None, underground: false, surface_access: None,
+        };
+        let bindings = review_compiled_extraction_bindings(&region, (&stock, &source), (&output, &compiled), 0).unwrap();
+        let expected = bindings.vehicles[0].compiled_row;
+        // Use a known native row to exercise exact readback without changing Latest.
+        let native = maps::scenario_vehicles(&output, &compiled).unwrap().remove(expected as usize);
+        let path = native.tag.unwrap().strip_suffix(".vehicle").unwrap().to_owned();
+        let id = uuid::Uuid::new_v4().to_string();
+        let mut project = crate::project::Project::new("Verified editor vehicle pool");
+        let model = maps::SourceModelReference {
+            project_id: project.id.clone(), source_sha256: source.sha256.clone(), tag_id: 0,
+            path: path.clone(), class: "vehi".into(),
+        };
+        project.native_asset_imports.push(crate::native_asset_imports::Binding {
+            id: uuid::Uuid::new_v4().to_string(), source_project_id: model.project_id.clone(),
+            source_sha256: source.sha256.clone(), tag_id: 0, tag_class: "vehi".into(),
+            tag_path: path.clone(), native_path: path, receipt_sha256: "0".repeat(64), file_count: 1,
+        });
+        project.scene.push(maps::SceneObject {
+            id: id.clone(), name: "Pool vehicle".into(), kind: "Vehicle".into(), tag_id: None,
+            position: native.position, rotation: native.rotation, scale: [1.; 3], visible: true,
+            source_offset: None, rotation_offset: None, asset_id: None, source_model: Some(model),
+        });
+        project.megaworld_layout = Some(Layout {
+            schema_version: 1, regions: vec![region.clone()], extraction: BTreeMap::from([(region.region_id, ExtractionPool {
+                player_starts: [bindings.player_starts[0].source_row, bindings.player_starts[1].source_row],
+                weapons: bindings.weapons.iter().take(3).map(|row| row.source_row).collect(),
+                vehicles: vec![], authored_vehicle_ids: vec![id],
+            })]),
+        });
+        let source_for = |_: &LayoutRegion| Ok((stock.clone(), source.clone()));
+        let pools = compiled_extraction_pools(&project, &output, &compiled, source_for).unwrap();
+        assert_eq!(pools[0].vehicles, [expected]);
+        project.scene[0].position = [4000.; 3];
+        assert!(compiled_extraction_pools(&project, &output, &compiled, source_for).unwrap_err().to_string().contains("outside its supported source region"));
     }
 
     #[test]

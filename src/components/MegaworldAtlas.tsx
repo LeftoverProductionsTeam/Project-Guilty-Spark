@@ -17,7 +17,7 @@ type BurialReview={
   coverZ:number|null;
   suggestedTranslationZ:number|null;
 };
-export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+export default function MegaworldAtlas({projectId,project,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;project?:Pick<Project,'scene'|'nativeAssetImports'>;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [open,setOpen]=useMapState(projectId,'megaworld.atlas',false);
   const [atlas,setAtlas]=useState<Atlas|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [search,setSearch]=useState(''),[runtime,setRuntime]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null);
@@ -36,7 +36,7 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
   return <details className="megaworld-atlas" open={open} onToggle={e=>setOpen(e.currentTarget.open)}>
     <summary>Megaworld Atlas <small>{atlas?`${atlas.regions.length} source regions`:'owned map regions'}</small></summary>
     {open&&<><div className="atlas-controls"><button disabled={!native||busy} onClick={()=>void scan()}>{busy?'Inspecting complete source caches…':atlas?'Rescan installed maps':'Scan installed maps'}</button><input aria-label="Find Atlas region" placeholder="Map or BSP…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/><select aria-label="Atlas runtime" value={runtime} onChange={e=>{setRuntime(e.target.value);setPage(0);}}><option value="all">All installed Halos</option>{[...new Set(atlas?.regions.flatMap(r=>r.runtimes)??[])].map(r=><option key={r}>{r}</option>)}</select></div>
-    <LayoutEditor layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
+    <LayoutEditor project={project} layout={layout} atlas={atlas} onLayout={onLayout} readOnly={readOnly} compiledRegions={compiledRegions} sourceRegion={layout?.regions.find(r=>r.cacheSha256===sourceSha&&r.bspIndex===baseBspIndex)} onPrepareConnection={onPrepareConnection}/>
     {atlas&&<div className="atlas-controls">
       <button onClick={addOriginals} disabled={busy||readOnly}>Add originals to layout</button>
       <button disabled={busy||readOnly} onClick={()=>{
@@ -54,7 +54,7 @@ export default function MegaworldAtlas({projectId,assembly,sourceSha,baseBspInde
   </details>;
 }
 
-function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{project?:Pick<Project,'scene'|'nativeAssetImports'>;layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
   const [connectionOrigin,setConnectionOrigin]=useState('');
   const [coverSelection,setCoverSelection]=useState<{roomId:string;surfaceId:string}|null>(null);
@@ -169,7 +169,7 @@ function LayoutEditor({layout,atlas,onLayout,sourceRegion,compiledRegions,onPrep
     {selected&&<label><input type="checkbox" checked={selected.underground??false} disabled={readOnly}
       onChange={event=>setUnderground(event.target.checked)}/> Underground region</label>}
     {layout&&selected&&[13,609].includes(selected.cacheVersion)&&
-      <AtlasExtraction key={selected.regionId} region={selected} layout={layout} readOnly={readOnly} onLayout={onLayout}/>}
+      <AtlasExtraction key={selected.regionId} region={selected} layout={layout} project={project} readOnly={readOnly} onLayout={onLayout}/>}
     {selected?.underground&&<details className="atlas-region"><summary>Review terrain cover</summary>
       <div className="atlas-controls">
         <label>Surface region <select aria-label="Atlas cover surface" value={surface?.regionId??''}

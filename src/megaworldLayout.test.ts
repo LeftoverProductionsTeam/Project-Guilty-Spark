@@ -120,6 +120,10 @@ it('draws exactly one vehicle and three distinct weapons from reviewed points wi
  expect(last.vehicles.map(point=>point.row)).toEqual([2]);
  expect(last.playerStarts.map(point=>point.row)).toEqual([2]);
  expect(pool.weapons).toEqual([0,3,4,6]);
+ const placed:ExtractionPoint={row:-1,label:'Placed Ghost',position:[40,0,0]};
+ const authoredPool={...pool,vehicles:[],authoredVehicleIds:['ghost']};
+ expect(previewExtractionRoll(selectedExtractionPoints(authoredPool,candidates,new Map([['ghost',placed]])),()=>0).vehicles).toEqual([placed]);
+ expect(()=>selectedExtractionPoints(authoredPool,candidates)).toThrow('vehicle placement is unavailable');
  expect(()=>selectedExtractionPoints({...pool,playerStarts:[1,1]},candidates)).toThrow('two player starts');
  expect(()=>selectedExtractionPoints({...pool,weapons:[0,3,9]},candidates)).toThrow('unavailable');
  expect(()=>selectedExtractionPoints(pool,{...candidates,vehicles:[{...candidates.vehicles[0],position:candidates.weapons[0].position},candidates.vehicles[1]]})).toThrow('separate');

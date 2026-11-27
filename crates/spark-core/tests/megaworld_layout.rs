@@ -153,6 +153,7 @@ fn exports_two_authored_pools_in_the_same_native_bsp() {
             player_starts: starts.map(|binding| binding.source_row),
             weapons: weapons.iter().map(|binding| binding.source_row).collect(),
             vehicles: vehicles.iter().map(|binding| binding.source_row).collect(),
+            authored_vehicle_ids: Vec::new(),
         });
         expected.push(serde_json::json!({
             "regionId": region.region_id, "bspIndex": 0,

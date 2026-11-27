@@ -616,10 +616,12 @@ pub fn verify_compiled(project: &Project, compiled: &maps::MapInspection) -> Res
         if !used {
             continue;
         }
-        if matches!(binding.tag_class.as_str(), "mach" | "ctrl" | "scen") {
+        if matches!(binding.tag_class.as_str(), "mach" | "ctrl" | "scen" | "vehi") {
             let requested:Vec<_>=project.scene.iter().filter(|object|object.source_model.as_ref().and_then(|source|find(project,source)).is_some_and(|value|value.id==binding.id)).collect();
             if !requested.is_empty() {
-                let kind = match binding.tag_class.as_str() { "mach" => "Machine", "ctrl" => "Control", _ => "Scenery" };
+                let kind = match binding.tag_class.as_str() {
+                    "mach" => "Machine", "ctrl" => "Control", "vehi" => "Vehicle", _ => "Scenery",
+                };
                 let native=compiled.tags.iter().find(|tag|tag.class==binding.tag_class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&binding.native_path));
                 let placed:Vec<_>=compiled.objects.iter().filter(|object|object.kind==kind&&object.tag_id==native.map(|tag|tag.id)).collect();
                 if native.is_none()||placed.len()!=requested.len() {
