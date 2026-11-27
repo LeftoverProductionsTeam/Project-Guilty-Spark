@@ -259,6 +259,21 @@ fn stage_forerunner(state:&AppState,reg:&runtime::RuntimeRegistration,build:Buil
     for(name,sha)in &result.ce_resource_sha256{result.staged_sha256.insert(format!("data/maps_ce/{name}"),sha.clone());}
     result.budget.check().map_err(error)?;Ok(result)
 }
+fn seal_vehicle_mode(stage: &mut Stage, project: &Project) -> Reply<()> {
+    let relative = format!("data/mcc_maps/{}.map", stage.map);
+    let sha256 = stage.staged_sha256.get(&relative).ok_or("Missing verified staged map")?.clone();
+    let output = stage.root.join(&relative);
+    let bytes = fs::metadata(&output).map_err(error)?.len();
+    let export = core::build::MapExport {
+        project_id: project.id.clone(), build_id: stage.build.id.clone(),
+        project_fingerprint: stage.build.project_fingerprint.clone(), output, sha256, bytes,
+        cache_version: 13, runtime_id: runtime::RuntimeId::OpenCe, reused: false,
+    };
+    let mode = core::build::write_vehicle_playtest_mode(&export, project).map_err(error)?;
+    stage.staged_sha256.insert(format!("data/mcc_maps/{}.spark-mode.json", stage.map), maps::hash_file(&mode).map_err(error)?);
+    stage.budget.check().map_err(error)
+}
+
 fn apply_forerunner_startup(command:&mut Command,selector:Option<String>)->Reply<Option<String>>{
     command.env_remove("HALO_START_MAP");
     if let Some(selector)=&selector{command.env("HALO_START_MAP",selector);}
@@ -573,7 +588,9 @@ pub(crate) async fn runtime_rebuild_start(app: tauri::AppHandle, window: tauri::
         let view=View{id:uuid::Uuid::new_v4().to_string(),runtime_id,staged_map:String::new(),startup_map:None,vehicle_test,required_native_features,engine_sha256:Default::default(),project_id,phase:"preparing".into(),source_fingerprint:project.fingerprint().map_err(error)?,compiled_build_id:build.id.clone(),compiled_sha256:build.sha256.clone().ok_or("Missing build hash")?,game_build_id:None,game_sha256:None,process_id:None,pending_job_id:None,detail:"Preparing an isolated native playtest".into(),error:None,console_tail:String::new(),ce_resource_sha256:Default::default()};
         let session=Arc::new(Session{view:Mutex::new(view),pending:Mutex::new(None),stopping:AtomicBool::new(false)});
         workbench.rebuilds.insert(owner.clone(),session.clone());drop(workbench);
-        let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
+        let result=(||{let mut staged=stage(&state,&reg,build)?;staged.forerunner_extraction=compiled_extraction;
+            if vehicle_test { seal_vehicle_mode(&mut staged, &project)?; }
+            if app.get_webview_window(&owner).is_none()||session.stopping.load(Ordering::Relaxed){return Err("The requesting window closed".into());}check_document_owner(&state,&project.id,&owner)?;if lock(&state.library)?.get(&project.id).map_err(error)?.fingerprint().map_err(error)?!=project.fingerprint().map_err(error)?{return Err("Source changed while staging; prepare the saved revision again".into());}if runtime_id==runtime::RuntimeId::OpenCe{forerunner_registration(&state,expected_registration.as_ref(),expected_executable_sha256.as_deref())?;}let run=launch(&state,&reg,staged)?;publish(&session,&run)?;Ok::<_,String>(run)})();
         match result {
             Ok(run)=>{let answer=lock(&session.view)?.clone();std::thread::spawn(move||{let result=drive(app,owner,reg,session.clone(),run);finish_session(&session,result);});Ok(answer)}
             Err(problem)=>{let mut view=lock(&session.view)?;view.phase="failed".into();view.error=Some(problem.clone());Err(problem)}

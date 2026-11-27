@@ -1072,7 +1072,11 @@ try{
           const ownedStage = candidates[0].name;
           const staged = path.join(stages,ownedStage,'data','mcc_maps',session.stagedMap+'.map');
           expect(crypto.createHash('sha256').update(await fs.readFile(staged)).digest('hex')).toBe(build.sha256);
-          expect(await fs.stat(path.join(stages,ownedStage,'data','maps_ce')).then(()=>true,()=>false)).toBe(false);
+          const mode = JSON.parse(await fs.readFile(staged.replace(/\.map$/,'.spark-mode.json'),'utf8'));
+          expect(mode).toMatchObject({mode:'zombieSurvival',cacheSha256:build.sha256,fileName:path.basename(staged),cacheVersion:13,scenarioType:1,requiredResourceBanks:[],runtimeSettings:{'network.firefight_encounter':false}});
+          for (const bank of ['bitmaps.map','sounds.map','loc.map']) {
+            expect(await fs.stat(path.join(stages,ownedStage,'data','maps_ce',bank)).then(()=>true,()=>false)).toBe(false);
+          }
           await controls.getByRole('button',{name:'Stop playtest'}).click();
           await expect.poll(async()=> (await invoke(main,'runtime_rebuild_status'))?.phase,{timeout:30000}).toBe('stopped');
           expect(await fs.stat(path.join(stages,ownedStage)).then(()=>true,()=>false)).toBe(false);

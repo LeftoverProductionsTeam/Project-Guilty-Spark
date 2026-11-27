@@ -157,6 +157,22 @@ pub fn write_map_export_mode_with_atlas_sources(
     project: &Project,
     source_for: impl FnMut(&crate::megaworld::LayoutRegion) -> Result<(PathBuf, Arc<MapInspection>)>,
 ) -> Result<(PathBuf, &'static str)> {
+    write_map_mode(export, project, source_for, false)
+}
+
+/// The creator explicitly selected a private Zombie Apocalypse vehicle test.
+/// Publish the same hash-bound mode metadata beside the staged MCC copy.
+pub fn write_vehicle_playtest_mode(export: &MapExport, project: &Project) -> Result<PathBuf> {
+    write_map_mode(export, project, |_| invalid("A private vehicle test cannot publish Extraction pools"), true)
+        .map(|(path, _)| path)
+}
+
+fn write_map_mode(
+    export: &MapExport,
+    project: &Project,
+    source_for: impl FnMut(&crate::megaworld::LayoutRegion) -> Result<(PathBuf, Arc<MapInspection>)>,
+    vehicle_playtest: bool,
+) -> Result<(PathBuf, &'static str)> {
     if export.project_id != project.id || export.project_fingerprint != project.fingerprint()? {
         return invalid("Mode metadata belongs to a different authoring revision");
     }
@@ -176,9 +192,13 @@ pub fn write_map_export_mode_with_atlas_sources(
         crate::firefight::verify_native_round(&plan, &map, output)?;
         if !round { return invalid("Reviewed Firefight output is missing its compiled controller"); }
     }
+    if vehicle_playtest && (map.header.version != 13 || map.header.scenario_type != 1 || extraction.is_some()
+        || !project.shape_draft.as_ref().is_some_and(|draft| draft.vehicle_mount.is_some())) {
+        return invalid("Zombie Apocalypse vehicle tests require a reviewed MCC multiplayer attachment");
+    }
     let mode = if extraction.is_some() {
         "extraction"
-    } else if reviewed_recovery || (authored_survival && round) {
+    } else if vehicle_playtest || reviewed_recovery || (authored_survival && round) {
         "zombieSurvival"
     } else if round {
         "firefight"
