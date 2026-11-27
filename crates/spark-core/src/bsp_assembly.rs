@@ -1541,6 +1541,13 @@ fn exclude_passage_volume(triangle: [V; 3], volumes: &[PassagePlanes]) -> Vec<Ve
     polygons
 }
 
+fn clipped_stock_face_survives(surface: [V; 3], expected_normal: V) -> bool {
+    // Float rounding can reflect a very thin clipped fragment across its
+    // edge. Its native projection then has no area in the original facing.
+    let area = triangle_area_normal(surface.map(native_export_point));
+    dot(area, expected_normal) > 0.
+}
+
 // Preserve noncolliding water and illuminated panels with their native materials.
 fn append_source_surface_effects(
     inspection: &MapInspection,
@@ -1624,7 +1631,9 @@ fn append_stock_render(
             }
             let volumes = if all_faces || tag.class == "swat" { exclusions } else { &[] };
             let source = RenderTri { p: points, n: normal(points[0], points[1], points[2]), uv: uvs };
+            let expected_normal = if all_faces { mul(source.n, -1.) } else { source.n };
             for mut polygon in exclude_passage_volume(points, volumes) {
+                let clipped = polygon.as_slice() != points.as_slice();
                 if polygon.len() > 3 {
                     let anchor = crate::bsp_triangulate::clipped_render_fan(&polygon);
                     polygon.rotate_left(anchor);
@@ -1635,9 +1644,7 @@ fn append_stock_render(
                     // their JMS order without changing stock normals or UVs.
                     let surface = if all_faces { [polygon[0], pair[1], pair[0]] }
                         else { [polygon[0], pair[0], pair[1]] };
-                    let exported = surface.map(|point| point.map(|axis| f64::from(axis as f32)));
-                    let edge = cross(sub(exported[1], exported[0]), sub(exported[2], exported[0]));
-                    if !volumes.is_empty() && surface != points && dot(edge, edge) <= 1e-16 {
+                    if clipped && !clipped_stock_face_survives(surface, expected_normal) {
                         continue;
                     }
                     if slots.len() >= MAX_OUTPUT_TRIANGLES {
@@ -5446,6 +5453,20 @@ mod tests {
         assert_eq!(report.examples[0].triangle, 2);
         assert_eq!(report.examples[0].overlaps_triangle, Some(0));
         assert!(report.require_buildable().unwrap_err().to_string().contains("with triangle 0"));
+    }
+
+    #[test]
+    fn clipped_render_rejects_a_native_foldback_without_reversing_source_faces() {
+        let mut face = [
+            [789.203125, -14.398978, -29.704373],
+            [789.129219, -14.325110, -29.704373],
+            [789.188672, -14.384513, -29.704373],
+        ];
+        assert!(!clipped_stock_face_survives(face, [0., 0., 1.]));
+        assert!(clipped_stock_face_survives(face, [0., 0., -1.]));
+        face[2] = [789.119219, -14.285507, -29.704373];
+        face.swap(0, 2);
+        assert!(clipped_stock_face_survives(face, [0., 0., 1.]));
     }
 
     #[test]
