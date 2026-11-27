@@ -25,14 +25,15 @@ let sourceTags = input;
 const preserved = {};
 const report = { schemaVersion:1, testOnly:true, complete:false, nativeCompiled:false, playerConfirmed:false,
   sourceTags, fallbackTags, originalHashes:preserved, nativeTools:{}, steps:[], error:null };
-let drive;
-const workspace = driving ? path.dirname(outputFolder) : path.resolve('.');
-const short = value => drive && (value === workspace || value.startsWith(workspace + path.sep)) ? drive + '\\' + path.relative(workspace,value) : value;
 const run = async (tool, args, label) => {
   const binary = path.join(toolFolder, `${tool}.exe`);
   report.nativeTools[tool] ??= await hash(binary);
   const began = performance.now();
-  const result = spawnSync(binary, args.map(short), {cwd:short(outputFolder),encoding:'utf8',windowsHide:true,maxBuffer:16*1024*1024});
+  const result = spawnSync(binary, args.map(value => {
+    const relative = path.isAbsolute(value) ? path.relative(outputFolder,value) : null;
+    return relative !== null && !path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(".."+path.sep)
+      ? relative || "." : value;
+  }), {cwd:outputFolder,encoding:'utf8',windowsHide:true,maxBuffer:16*1024*1024});
   await fs.writeFile(path.join(outputFolder, `${label}.log`), (result.stdout ?? '') + (result.stderr ?? ''));
   report.steps.push({label,tool,args,exitCode:result.status,elapsedMs:performance.now()-began});
   if (result.error || result.status !== 0) throw Error(`${label}: ${result.error ?? result.stderr}`);
@@ -162,17 +163,6 @@ async function planVehicles(trial) {
   return targets;
 }
 try {
-  if (process.platform === 'win32') {
-    for (const letter of 'ZYXWVUTSRQPONMLKJIHGFED') {
-      try { await fs.stat(`${letter}:/`); continue; } catch(error) { if (error.code !== 'ENOENT') continue; }
-      const mapped = spawnSync('subst.exe',[`${letter}:`,workspace],{encoding:'utf8',windowsHide:true});
-      if (mapped.status === 0) { drive=`${letter}:`; break; }
-    }
-    if (!drive) throw Error('No free, owned native workspace alias is available. Existing mappings were not changed.');
-    const [original,alias] = await Promise.all([fs.stat(workspace),fs.stat(drive+'\\')]);
-    if (original.ino !== alias.ino || original.dev !== alias.dev) throw Error('Native workspace alias identity differs.');
-    report.nativeWorkspaceAlias = { drive, target:workspace, verified:true };
-  }
   const trial = driving ? await readTrial() : null;
   if (!driving && input.endsWith('.map')) {
     const sourceHash = await hash(input);
@@ -283,8 +273,5 @@ try {
     ? 'Start beside a Warthog at one end of the road. Drive across, turn around and drive back. Check road approaches, vehicle clearance and collision in both directions.'
     : 'You start inside the metal tunnel facing snowy Sidewinder. Walk forward until you enter Sidewinder, turn around and walk the entire tunnel into Timberland, then return. Check both mouths, floor and head clearance.';
 } catch(error) {report.error=String(error);process.exitCode=1;}
-finally {
-  if (drive) { const removed=spawnSync('subst.exe',[drive,'/d'],{windowsHide:true}); report.nativeWorkspaceAliasRemoved=removed.status===0; if(removed.status!==0){report.error ??= 'Owned native workspace alias cleanup failed.';process.exitCode=1;} }
-}
 await fs.writeFile(path.join(outputFolder,'walkthrough.json'),JSON.stringify(report,null,2));
 console.log(JSON.stringify({complete:report.complete,nativeCompiled:report.nativeCompiled,cache:report.cache,error:report.error}));

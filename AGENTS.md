@@ -1,5 +1,7 @@
 # Permanent Spark repository policy
 
+- Use existing physical project directories for builds and tests. Never create or map drive letters, SUBST drives, virtual disks, or network mounts. Remove only exact mappings from our completed tests after verifying target and process ownership. Never remove user drives or delete mapped contents.
+
 - The canonical development directory is `D:\Project Guilty Spark`. Work on local `master` there. Existing registered worktrees may be inspected solely to complete the explicitly authorized consolidation; do not start new feature work in them.
 - Never create a branch or worktree automatically. Never clone Spark inside Spark or make a disposable full-project source copy. User instructions can explicitly authorize a different operation.
 - Preserve every unique source edit, research result, meaningful commit, original map/tag and previous-good build. Verify provenance and hashes before changing storage. Do not reset, force-delete branches, indiscriminately clean Git, rewrite history or weaken repository rules.

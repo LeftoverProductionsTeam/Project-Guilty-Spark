@@ -144,14 +144,14 @@ pub fn workshop_playtest_with_debug(receipt:&QuickForgeBuildReceipt,kit:&Path,de
     let scenario=workshop_playtest_scenario(project.quick_forge.as_ref().unwrap(),&sources.scenario_path)?;
     h1a_scene_preflight(&sources.directory.join("tags"),quickforge::native_scenario_type(project.quick_forge.as_ref().unwrap()))?;
     let exe=kit.join("halo_tag_test.exe");crate::reject_links(&exe)?;
-    let alias=crate::native_workspace::Alias::new(&sources.directory)?;
+    crate::reject_links(&sources.directory)?;
     let init_name=format!("spark-workshop-{}.txt",uuid::Uuid::new_v4());
     let debug_commands=if debug {"debug_trigger_volumes true\r\ndebug_scripting true\r\n"}else{""};
     project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n{}",scenario,debug_commands).as_bytes(),false)?;
     let mut command=std::process::Command::new(exe);
-    command.current_dir(kit).args(["-window","-vidmode","1280,720","-tags_dir"]).arg(alias.path().join("tags")).arg("-data_dir").arg(alias.path().join("data")).arg("-exec").arg(alias.path().join(init_name));
+    command.current_dir(kit).args(["-window","-vidmode","1280,720","-tags_dir"]).arg(sources.directory.join("tags")).arg("-data_dir").arg(sources.directory.join("data")).arg("-exec").arg(sources.directory.join(init_name));
     use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);
-    let mut child=command.spawn()?;eprintln!("Workshop Standalone process {}. Walk from Room A through the corridor to Room B and up the ramp. Close the game to release the temporary content path.",child.id());
+    let mut child=command.spawn()?;eprintln!("Workshop Standalone process {}. Walk from Room A through the corridor to Room B and up the ramp. Close the game when the review is complete.",child.id());
     let status=child.wait()?;if !status.success(){return invalid(format!("Standalone exited with {status}; inspect its reports/debug.txt. This is not gameplay acceptance"));}Ok(())
 }
 /// Strictly versioned Tool argument prefix. Legacy HEK does not support

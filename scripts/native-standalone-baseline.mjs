@@ -88,16 +88,8 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
     root=path.dirname(tags);report.preparedInputReuse={files:seedPreparation.source.files,bytes:seedPreparation.source.bytes,manifestSha256:seedPreparation.source.manifestSha256,rehashVerified:true};
   }
   const manifest=preparedTags?structuredClone(seedPreparation.source.manifest):[],staged=new Set(manifest.map(row=>row.path.toLowerCase())),bindings=new Map(),queries=[];
-  let wave=preparedTags?[]:nextNativeDependencies([...roots,...seeds],archiveIndex,staged,bindings),bytes=preparedTags?seedPreparation.source.bytes:0,drive,child;
-  const aliases=await run('subst.exe',[]);report.existingAliases=aliases.stdout.split(/\r?\n/).filter(Boolean).length;
+  let wave=preparedTags?[]:nextNativeDependencies([...roots,...seeds],archiveIndex,staged,bindings),bytes=preparedTags?seedPreparation.source.bytes:0,child;
   try{
-    for(const letter of 'ZYXWVUTSRQP'){
-      try{await fs.stat(letter+':/');continue;}catch(error){if(error.code!=='ENOENT')continue;}
-      try{await run('subst.exe',[letter+':',root]);drive=letter+':';break;}catch{}
-    }
-    if(!drive)throw Error('No free owned short native workspace alias');
-    const [real,alias]=await Promise.all([fs.stat(root),fs.stat(drive+'/')]);if(real.dev!==alias.dev||real.ino!==alias.ino)throw Error('Native workspace alias differs');
-    report.alias={drive,owned:true};
     while(wave.length){
       if(staged.size+wave.length>4096||queries.length>4096)throw Error('Native baseline exceeds dependency file budget');
       const list=path.join(root,'extract-list.txt');await fs.writeFile(list,wave.join('\n')+'\n');await run('tar.exe',['-xf',archive,'-C',root,'-T',list]);
@@ -106,7 +98,7 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
       const queryRoots=new Set([...roots,...bindings.values()]);
       for(const tag of queryRoots){
         if(!staged.has(tag.toLowerCase()))continue;
-        const query=await run(path.join(invader,'invader-dependency.exe'),['-t',drive+bs+'tags','-r',tag.replaceAll('/',bs)]);
+        const query=await run(path.join(invader,'invader-dependency.exe'),['-t','tags','-r',tag.replaceAll('/',bs)],{cwd:root});
         if(/ERROR:|Failed to/i.test(query.stdout+'\n'+query.stderr))throw Error('Native dependency query failed: '+tag+' '+query.stderr.slice(0,512));
         queries.push(tag);const references=query.stdout.split(/\r?\n/).filter(Boolean);next.push(...references);
         nextNativeDependencies(references,archiveIndex,staged,bindings);
@@ -117,13 +109,13 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
       wave=nextNativeDependencies(next,archiveIndex,staged,bindings);console.log('STANDALONE_BASELINE_DEPENDENCIES',JSON.stringify({files:staged.size,bytes,next:wave.length}));
     }
     const verifiedRoots=new Set([...roots,...bindings.values()]);
-    for(const tag of verifiedRoots){const verified=await run(path.join(invader,'invader-dependency.exe'),['-t',drive+bs+'tags','-r',tag.replaceAll('/',bs)]);if(/ERROR:|Failed to/i.test(verified.stdout+' '+verified.stderr)||nextNativeDependencies(verified.stdout.split(/\r?\n/).filter(Boolean),archiveIndex,staged,bindings).length)throw Error('Complete SDK dependency closure did not validate: '+tag);for(const provider of bindings.values())verifiedRoots.add(provider);}
+    for(const tag of verifiedRoots){const verified=await run(path.join(invader,'invader-dependency.exe'),['-t','tags','-r',tag.replaceAll('/',bs)],{cwd:root});if(/ERROR:|Failed to/i.test(verified.stdout+' '+verified.stderr)||nextNativeDependencies(verified.stdout.split(/\r?\n/).filter(Boolean),archiveIndex,staged,bindings).length)throw Error('Complete SDK dependency closure did not validate: '+tag);for(const provider of bindings.values())verifiedRoots.add(provider);}
     for(const [requested,actual] of bindings){const header=Buffer.alloc(64),handle=await fs.open(path.join(root,'tags',actual));try{await handle.read(header,0,64,0);}finally{await handle.close();}if(header.toString('ascii',36,40)!=='mod2'||header.toString('ascii',60,64)!=='blam')throw Error('H1A provider is not the exact native GBX class: '+requested);}
     report.nativeModelClassBindings=Object.fromEntries(bindings);
     manifest.sort((a,b)=>a.path.localeCompare(b.path));report.source={scenario,archiveSha256:spec.sourceArchive.sha256,files:manifest.length,bytes,dependencyQueries:queries.length,manifestSha256:crypto.createHash('sha256').update(JSON.stringify(manifest)).digest('hex'),fullSdkCopied:false,manifest};
     if(prepareOnly){
       if(typeof onPrepared!=='function')throw Error('Prepared native scene requires its explicit bounded acceptance callback');
-      try{await onPrepared({root,drive,run,tags:path.join(root,'tags')});}
+      try{await onPrepared({root,run,tags:path.join(root,'tags')});}
       finally{
         // Failed gameplay/review is still required to leave publisher inputs
         // intact. Check after the callback has stopped its owned native writers
@@ -134,12 +126,12 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
       }
       report.complete=true;report.scope='Bounded owner-installed SDK closure supplied to the existing native source builder; no original inputs changed';return;
     }
-    const nativeRead=await run(path.join(invader,'invader-edit.exe'),['-t',drive+bs+'tags','-G','type','-C','player_starting_locations',scenario.replaceAll('/',bs)]);report.scenarioReadback=nativeRead.stdout.trim();
+    const nativeRead=await run(path.join(invader,'invader-edit.exe'),['-t','tags','-G','type','-C','player_starting_locations',scenario.replaceAll('/',bs)],{cwd:root});report.scenarioReadback=nativeRead.stdout.trim();
     const resources=[];for(const relative of ['shaders/fx.bin','shaders/psh.bin','shaders/vsh.bin','steam_appid.txt']){const input=path.join(kit,relative),buffer=await fs.readFile(input);if(buffer.length>16*1024**2||!buffer.length)throw Error('Invalid native launch resource');if(relative==='steam_appid.txt'&&buffer.toString('utf8').trim()!=='1532190')throw Error('Unexpected official tool identity');await fs.mkdir(path.dirname(path.join(root,relative)),{recursive:true});await fs.writeFile(path.join(root,relative),buffer,{flag:'wx'});resources.push({relative,sha256:await hash(input),bytes:buffer.length});}
     const executable=path.join(kit,'halo_tag_test.exe');report.executable={sha256:await hash(executable),bytes:(await fs.stat(executable)).size};
     const script='; Unmodified publisher SDK control; not an authored map\r\ngame_variant slayer\r\nmap_name "'+scenario.replace(/[.]scenario$/,'').replaceAll('/',bs)+'"\r\n';await fs.writeFile(path.join(root,'spark-baseline.txt'),script,{flag:'wx'});
-    const args=['-tags_dir','tags','-window','-data_dir','data','-exec','spark-baseline.txt'];report.launch={arguments:args,workingDirectory:'owned short alias',startupScript:script,resources,stdout:'owned diagnostic file',windowsHide:false,environment:'Inherited user environment; no security/profile/authentication changes'};
-    const out=await fs.open(path.join(root,'native-process.txt'),'wx');child=spawn(executable,args,{cwd:drive+bs,windowsHide:false,stdio:['ignore',out.fd,out.fd],env:context.env});await context.trackProcess(child);await out.close();
+    const args=['-tags_dir','tags','-window','-data_dir','data','-exec','spark-baseline.txt'];report.launch={arguments:args,workingDirectory:root,startupScript:script,resources,stdout:'owned diagnostic file',windowsHide:false,environment:'Inherited user environment; no security/profile/authentication changes'};
+    const out=await fs.open(path.join(root,'native-process.txt'),'wx');child=spawn(executable,args,{cwd:root,windowsHide:false,stdio:['ignore',out.fd,out.fd],env:context.env});await context.trackProcess(child);await out.close();
     report.process={pid:child.pid,startedAt:new Date().toISOString(),exitCode:null,timedOut:false};console.log('STANDALONE_BASELINE_REVIEW',JSON.stringify({pid:child.pid,executable,sha256:report.executable.sha256,scenario,seconds:reviewSeconds}));
     const outcome=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>resolve({timedOut:true}),reviewSeconds*1000);child.once('error',error=>{clearTimeout(timer);reject(error);});child.once('exit',(code,signal)=>{clearTimeout(timer);resolve({code,signal,timedOut:false});});});
     if(outcome.timedOut){child.kill();await new Promise(resolve=>child.once('close',resolve));}
@@ -151,6 +143,5 @@ export async function nativeStandaloneBaseline({context,archive,kit,invader,repo
     if(outcome.timedOut||outcome.code!==0)throw Error('Standalone SDK baseline did not close normally: '+JSON.stringify(outcome));report.complete=true;
   }finally{
     if(child&&child.exitCode===null&&child.signalCode===null){child.kill();await new Promise(resolve=>child.once('close',resolve));}
-    if(drive){const [current,real]=await Promise.all([fs.stat(drive+'/'),fs.stat(root)]);if(current.dev!==real.dev||current.ino!==real.ino)throw Error('Owned native alias changed; leave unrelated mapping untouched');await run('subst.exe',[drive,'/d']);report.alias.removed=true;}
   }
 }

@@ -582,7 +582,7 @@ impl Runner<'_> {
         );
         let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
         #[cfg(windows)]
-        let native_alias = if executable.file_name().is_some_and(|s|{
+        let relative_native_paths = executable.file_name().is_some_and(|s|{
             let name=s.to_string_lossy();
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
                 || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"|"tag-renaming"|"xbox-model-references"))
@@ -592,17 +592,13 @@ impl Runner<'_> {
                 || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"|"bsp-scenery-model"|"bsp-scenery-model-check"|"model-adaptation-readback"))
                 || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"dependencies"|"asset-dependencies"|"tag-renaming"|"bsp-dependencies"))
                 || (matches!(phase,"recovery-readback"|"recovery-dependencies"|"recovery-data") && ["invader-edit.exe","invader-dependency.exe","invader-recover.exe"].contains(&name.as_ref()))
-        }) {
-            Some(crate::native_workspace::Alias::new(cwd)?)
-        } else {None};
+        });
         #[cfg(windows)]
-        let extraction_args = if matches!(phase,"compile-ce"|"bsp-dependencies"|"bsp-scenery-model"|"bsp-scenery-model-check"|"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data"|"xbox-model-to-pc"|"xbox-model-references"|"model-adaptation-readback") {
-            native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
+        let extraction_args = if relative_native_paths && matches!(phase,"compile-ce"|"bsp-dependencies"|"bsp-scenery-model"|"bsp-scenery-model-check"|"dependencies"|"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming"|"recovery-readback"|"recovery-dependencies"|"recovery-data"|"xbox-model-to-pc"|"xbox-model-references"|"model-adaptation-readback") {
+            Some(crate::native_workspace::extraction_arguments(args,cwd)?)
         } else {None};
         #[cfg(windows)]
         let args=extraction_args.as_deref().unwrap_or(args);
-        #[cfg(windows)]
-        let cwd = native_alias.as_ref().map_or(cwd,|a|a.path());
         let mut child = cmd
             .args(args)
             .current_dir(cwd)

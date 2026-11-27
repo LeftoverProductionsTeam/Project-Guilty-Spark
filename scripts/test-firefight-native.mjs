@@ -109,7 +109,7 @@ const report={scope:snapshotRestore?'native-project-snapshot-restore':recoveryFa
 let browser,page,child,call,ceScenario;
 try{await withDevelopmentWorkspace('firefight-native-ui',async context=>{
  const fixtureRoot=path.join(output,'native-fixture');await fs.mkdir(fixtureRoot);
- const exercise=async ({root:sourceRoot,drive,run,tags})=>{
+ const exercise=async ({root:sourceRoot,run,tags})=>{
    const resumeFile=ceMissionReview?process.env.SPARK_NATIVE_CE_MISSION_RESUME:process.env.SPARK_NATIVE_AI_START_RESUME;
    let prior;
    if(resumeFile){

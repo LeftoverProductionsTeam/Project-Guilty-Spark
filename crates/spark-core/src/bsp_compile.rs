@@ -115,11 +115,7 @@ fn namespace_materials(
         );
     }
     crate::reject_links(source)?;
-    // Native read-only dependency lookup also has legacy filename buffers.
-    // Keep the exact input root alive under its own short alias for this scope.
-    #[cfg(windows)] let source_alias=crate::native_workspace::Alias::new(source)?;
-    #[cfg(windows)] let source_arg=source_alias.path().to_string_lossy().into_owned();
-    #[cfg(not(windows))] let source_arg=source.to_string_lossy().into_owned();
+    let source_arg=source.to_string_lossy().into_owned();
     let dependency = find_tool(tools, "invader-dependency")?;
     let reuse_base = source_index == 0 && source == destination && scenery.is_empty() && recovery.is_none();
     let working = workspace.join(format!("bsp-dependencies-{source_index}"));

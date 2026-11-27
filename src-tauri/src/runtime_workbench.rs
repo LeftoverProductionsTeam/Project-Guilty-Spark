@@ -172,16 +172,13 @@ struct ToolProcess {
     child: Child,
     view: ToolProcessView,
     owner:String,
-    #[cfg(windows)]
-    workspace_alias:Option<core::native_workspace::Alias>,
 }
 impl Drop for ToolProcess {
     fn drop(&mut self) {
-        // Only the owned Standalone preview uses a process-lifetime short path.
-        // Stop it before releasing that mapping; external editing tools keep
-        // their existing independent lifetime and editable source ownership.
+        // Stop the owned Standalone preview. External editors retain their
+        // independent lifetime and editable source ownership.
         #[cfg(windows)]
-        if self.workspace_alias.is_some()&&self.child.try_wait().ok().flatten().is_none(){let _=self.child.kill();let _=self.child.wait();}
+        if self.view.action_id == "testScene"&&self.child.try_wait().ok().flatten().is_none(){let _=self.child.kill();let _=self.child.wait();}
     }
 }
 
@@ -817,8 +814,6 @@ fn processes(state: &AppState) -> Reply<Vec<ToolProcessView>> {
         if process.view.status == "running" {
             match process.child.try_wait() {
                 Ok(Some(exit)) => {
-                    #[cfg(windows)]
-                    process.workspace_alias.take();
                     process.view.status = "exited".into();
                     process.view.exit_code = exit.code();
                     process.view.detail = "Process exited. Exit status alone does not establish scene loading, connection or gameplay acceptance.".into();
@@ -1128,14 +1123,10 @@ pub(super) async fn launch_runtime_tool(
         if plan.view.action_id!="editTags"{let data=context.workspace.join("data");core::reject_links(&data).map_err(error)?;fs::create_dir_all(data).map_err(error)?;}
         let mut command=Command::new(&executable);command.current_dir(&context.workspace).args(&plan.view.arguments).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
         #[cfg(windows)]{use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
-        #[cfg(windows)]
-        let workspace_alias=if plan.view.action_id=="testScene"{Some(core::native_workspace::Alias::new(&context.workspace).map_err(error)?)}else{None};
-        #[cfg(windows)]
-        if let Some(alias)=&workspace_alias{command.current_dir(alias.path());}
         let child=command.spawn().map_err(error)?;
         let detail=if plan.view.action_id=="testScene"{"Standalone preview launched with owned source and native path support. It stops when Spark closes. Scene loading and gameplay await acceptance."}else{"Process launch observed. Scene loading and gameplay await acceptance. Save and close this tool, then choose Build working tag edits in dock details."};
         let view=ToolProcessView{id:plan.view.id,action_id:plan.view.action_id,project_id:project.id,process_id:child.id(),status:"running".into(),exit_code:None,detail:detail.into(),executable:plan.view.executable,executable_sha256:plan.view.executable_sha256,tags_directory:context.tags};
-        lock(&state.runtime_workbench)?.processes.push(ToolProcess{child,view:view.clone(),owner,#[cfg(windows)]workspace_alias});
+        lock(&state.runtime_workbench)?.processes.push(ToolProcess{child,view:view.clone(),owner});
         Ok(view)
     }).await.map_err(error)?
 }

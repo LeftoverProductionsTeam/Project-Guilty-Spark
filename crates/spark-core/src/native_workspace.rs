@@ -1,166 +1,40 @@
-//! Short, temporary DOS alias for native compiler, extraction and rename filename buffers. Only the
-//! exact mapping created here is removed. The owned job remains the data root.
+//! Relative paths for legacy native tools running inside an owned physical project directory.
+
 #[cfg(windows)]
-mod windows {
-    use crate::{invalid, Result};
-    use std::{
-        path::{Path, PathBuf},
-        sync::Mutex,
-    };
-    static LOCK: Mutex<()> = Mutex::new(());
-    #[link(name = "kernel32")]
-    extern "system" {
-        fn DefineDosDeviceW(flags: u32, device: *const u16, target: *const u16) -> i32;
-        fn QueryDosDeviceW(device: *const u16, target: *mut u16, length: u32) -> u32;
-        fn GetLogicalDrives() -> u32;
-    }
-    fn wide(s: &str) -> Vec<u16> {
-        s.encode_utf16().chain(Some(0)).collect()
-    }
-    fn query(device: &[u16]) -> Option<String> {
-        let mut out = vec![0u16; 32768];
-        let n = unsafe { QueryDosDeviceW(device.as_ptr(), out.as_mut_ptr(), out.len() as u32) };
-        if n == 0 {
-            return None;
-        }
-        let end = out.iter().position(|v| *v == 0).unwrap_or(n as usize);
-        Some(String::from_utf16_lossy(&out[..end]))
-    }
-    /// Rebase only existing absolute arguments inside this owned job. External
-    /// resource folders and non-path tool flags retain their original identity.
-    pub(crate) fn extraction_arguments(args: &[String], workspace: &Path, alias: &Path) -> Result<Vec<String>> {
-        let root = workspace.canonicalize()?;
-        args.iter().map(|arg| {
-            let path = Path::new(arg);
-            if !path.is_absolute() { return Ok(arg.clone()); }
-            let resolved = path.canonicalize()?;
-            Ok(match resolved.strip_prefix(&root) {
-                Ok(relative) => alias.join(relative).to_string_lossy().into_owned(),
-                Err(_) => arg.clone(),
-            })
-        }).collect()
-    }
-    pub struct Alias {
-        path: PathBuf,
-        device: Vec<u16>,
-        target: Vec<u16>,
-    }
-    impl Alias {
-        pub fn new(workspace: &Path) -> Result<Self> {
-            crate::reject_links(workspace)?;
-            let canonical = workspace.canonicalize()?;
-            let name = canonical.to_string_lossy();
-            let target_name = format!("\\??\\{}", name.strip_prefix("\\\\?\\").unwrap_or(&name));
-            let target = wide(&target_name);
-            let lock = LOCK.lock().map_err(|_| {
-                crate::SparkError::Invalid("Native workspace alias lock failed".into())
-            })?;
-            let drives = unsafe { GetLogicalDrives() };
-            for letter in (b'P'..=b'Z').rev() {
-                if drives & (1 << (letter - b'A')) != 0 {
-                    continue;
-                }
-                let device = wide(&format!("{}:", letter as char));
-                if query(&device).is_some() {
-                    continue;
-                }
-                if unsafe { DefineDosDeviceW(0x1 | 0x8, device.as_ptr(), target.as_ptr()) } == 0 {
-                    continue;
-                }
-                // Each lease owns an exact mapping. Serialize allocation, not
-                // its entire lifetime: another compiler may need a different
-                // letter while a native preview is still running.
-                drop(lock);
-                let alias = Self {
-                    path: PathBuf::from(format!("{}:\\", letter as char)),
-                    device,
-                    target: target.clone(),
-                };
-                if query(&alias.device).as_deref() != Some(&target_name) {
-                    return invalid("Native workspace alias readback differed");
-                }
-                return Ok(alias);
-            }
-            invalid("Native Halo tools need a free temporary drive letter P-Z to avoid filename limits; close an unused mapping and retry")
-        }
-        pub fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-    impl Drop for Alias {
-        fn drop(&mut self) {
-            let _lock=LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            unsafe {
-                DefineDosDeviceW(
-                    0x1 | 0x2 | 0x4 | 0x8,
-                    self.device.as_ptr(),
-                    self.target.as_ptr(),
-                );
-            }
-        }
-    }
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        #[test]
-        fn alias_reads_owned_files_and_removes_only_its_mapping() {
-            let dir = tempfile::tempdir().unwrap();
-            std::fs::write(dir.path().join("owned.txt"), b"owned").unwrap();
-            let alias = Alias::new(dir.path()).unwrap();
-            assert_eq!(
-                std::fs::read(alias.path().join("owned.txt")).unwrap(),
-                b"owned"
-            );
-            let device = alias.device.clone();
-            let target = alias.target.clone();
-            drop(alias);
-            // Another tool/test may acquire this letter as soon as our lock is released.
-            // Check the complete target stack for our mapping, not whether the letter is free.
-            let mut remaining = vec![0u16; 32768];
-            let count = unsafe {
-                QueryDosDeviceW(device.as_ptr(), remaining.as_mut_ptr(), remaining.len() as u32)
-            } as usize;
-            assert!(!remaining[..count]
-                .split(|value| *value == 0)
-                .any(|mapping| mapping == &target[..target.len() - 1]));
-        }
-        #[test]
-        fn simultaneous_native_leases_keep_distinct_mapping_and_source_identity() {
-            let left=tempfile::tempdir().unwrap();let right=tempfile::tempdir().unwrap();
-            std::fs::write(left.path().join("owned.txt"),b"left").unwrap();
-            std::fs::write(right.path().join("owned.txt"),b"right").unwrap();
-            let a=Alias::new(left.path()).unwrap();let b=Alias::new(right.path()).unwrap();
-            assert_ne!(a.path(),b.path());
-            assert_eq!(std::fs::read(a.path().join("owned.txt")).unwrap(),b"left");
-            drop(a);
-            assert_eq!(std::fs::read(b.path().join("owned.txt")).unwrap(),b"right");
-        }
-        #[test]
-        fn extraction_rebases_long_owned_paths_and_preserves_external_resources() {
-            let temp = tempfile::tempdir().unwrap();
-            let root = temp.path().join("an owned workspace with spaces".repeat(4));
-            std::fs::create_dir_all(root.join("tags")).unwrap();
-            let input = root.join("original input.map");
-            std::fs::write(&input,b"source").unwrap();
-            let external = temp.path().join("classic resources");
-            std::fs::create_dir(&external).unwrap();
-            let alias=Alias::new(&root).unwrap();
-            let args=vec!["-t".into(),root.join("tags").display().to_string(),"-m".into(),external.display().to_string(),"-O".into(),"-G".into(),input.display().to_string()];
-            let actual=extraction_arguments(&args,&root,alias.path()).unwrap();
-            assert_eq!(actual[1],alias.path().join("tags").display().to_string());
-            assert_eq!(actual[3],args[3]);
-            assert_eq!(&actual[4..6],&args[4..6]);
-            assert_eq!(std::fs::read(&actual[6]).unwrap(),b"source");
-            let long_tag="ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/horizontal_sensitivity_spinner.ui_widget_definition";
-            let target=alias.path().join("tags").join(long_tag);
-            assert!(root.join("tags").join(long_tag).as_os_str().len()>260);
-            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-            std::fs::write(&target,b"new owned tag").unwrap();
-            assert_eq!(std::fs::read(root.canonicalize().unwrap().join("tags").join(long_tag)).unwrap(),b"new owned tag");
-        }
+pub(crate) fn extraction_arguments(args: &[String], workspace: &std::path::Path) -> crate::Result<Vec<String>> {
+    use std::path::Path;
+    crate::reject_links(workspace)?;
+    let root = workspace.canonicalize()?;
+    args.iter().map(|arg| {
+        let path = Path::new(arg);
+        if !path.is_absolute() { return Ok(arg.clone()); }
+        let resolved = path.canonicalize()?;
+        Ok(match resolved.strip_prefix(&root) {
+            Ok(relative) if relative.as_os_str().is_empty() => ".".into(),
+            Ok(relative) => relative.to_string_lossy().into_owned(),
+            Err(_) => arg.clone(),
+        })
+    }).collect()
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_arguments_use_physical_workspace_relative_paths() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("owned project");
+        std::fs::create_dir_all(root.join("tags")).unwrap();
+        let input = root.join("original input.map");
+        std::fs::write(&input, b"source").unwrap();
+        let external = temp.path().join("classic resources");
+        std::fs::create_dir(&external).unwrap();
+        let args = vec!["-t".into(), root.join("tags").display().to_string(),
+            "-m".into(), external.display().to_string(), "-O".into(),
+            input.display().to_string(), root.display().to_string()];
+        let actual = extraction_arguments(&args, &root).unwrap();
+        assert_eq!(actual, ["-t", "tags", "-m", &args[3], "-O", "original input.map", "."]);
+        assert_eq!(std::fs::read(root.join(&actual[5])).unwrap(), b"source");
     }
 }
-#[cfg(windows)]
-pub use windows::Alias;
-#[cfg(windows)]
-pub(crate) use windows::extraction_arguments;

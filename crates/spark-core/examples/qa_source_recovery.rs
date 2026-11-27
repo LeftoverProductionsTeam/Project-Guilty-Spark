@@ -86,11 +86,6 @@ fn cache_build(args: &[PathBuf]) -> Result<()> {
         &cancel,
         |_, _, _, _| {},
     )?;
-    #[cfg(windows)]
-    let alias = spark_core::native_workspace::Alias::new(&stage)?;
-    #[cfg(windows)]
-    let cwd = alias.path();
-    #[cfg(not(windows))]
     let cwd = stage.as_path();
     let global_source = spark_core::native_logic::ensure_h1a_global_source(&stage)?;
     let tool = args[3].join(if cfg!(windows) { "tool.exe" } else { "tool" });
@@ -379,11 +374,6 @@ fn run() -> Result<()> {
         &cancel,
         |_, _, _, _| {},
     )?;
-    #[cfg(windows)]
-    let alias = spark_core::native_workspace::Alias::new(&stage)?;
-    #[cfg(windows)]
-    let cwd = alias.path();
-    #[cfg(not(windows))]
     let cwd = stage.as_path();
     let model_folder = Path::new(&model.path)
         .parent()
