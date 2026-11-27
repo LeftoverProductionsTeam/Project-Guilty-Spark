@@ -1822,25 +1822,66 @@ fn add_portals(
     let mut native_cuts:Vec<Vec<[u32;3]>>=vec![];
     let mut generated_cuts:Vec<([[f64;3];4],bool)>=vec![];
     for (route_index, route) in assembly.connection_routes().into_iter().enumerate() {
-    let inside_route_source=|p|{
-        if let Some(boundary)=terrain_boundary.filter(|_|route.terrain_seam.as_ref().is_some_and(|seam|seam.bearing_degrees.is_some())){
-            let along=dot(p,boundary.axis);
-            along<=boundary.base_max+0.1||along>=boundary.donor_min-0.1
-        }else{inside_retained_source(p)}
+    // Every route crosses the same trimmed terrain. The donor's original
+    // invisible sky buffer does not define the available portal interval.
+    let placed_boundary = terrain_boundary.filter(|_| {
+        assembly.terrain_seam.as_ref().is_some_and(|seam| seam.bearing_degrees.is_some())
+    });
+    let inside_route_source = |p| {
+        placed_boundary.map_or_else(
+            || inside_retained_source(p),
+            |boundary| {
+                let along = dot(p, boundary.axis);
+                along <= boundary.base_max + 0.1 || along >= boundary.donor_min - 0.1
+            },
+        )
     };
     let before = count;let mut covered_by_shared_cut=false;
     for (segment,end) in portal_spans(&route) {
         let (a,b)=(route.tunnel_points[segment],route.tunnel_points[end]);
         let d = sub(b, a);
-        let candidates: Vec<_> = route.tunnel_points[segment..=end].windows(2).flat_map(|pair|{
-            let delta=sub(pair[1],pair[0]);let steps=(delta[0].hypot(delta[1])/0.4).ceil() as usize;
-            (1..steps).map(move|n|add(pair[0],mul(delta,n as f64/steps as f64)))
-        }).filter(|p| !inside_route_source(*p)).collect();
         let authored = crate::bsp_visibility::authored_centers(&route.visibility_zones, &route.tunnel_points, segment)?;
-        if authored.is_none() && candidates.len() < 4 {
+        let automatic = || {
+            let candidates: Vec<_> = route.tunnel_points[segment..=end].windows(2).flat_map(|pair|{
+                let delta=sub(pair[1],pair[0]);let steps=(delta[0].hypot(delta[1])/0.4).ceil() as usize;
+                (1..steps).map(move|n|add(pair[0],mul(delta,n as f64/steps as f64)))
+            }).filter(|p| !inside_route_source(*p)).collect();
+            if candidates.len() >= 4 {
+                let [first, last] = if route.terrain_seam.is_some() {
+                    [candidates[0], *candidates.last().unwrap()]
+                } else {
+                    [candidates[candidates.len() / 3], candidates[candidates.len() * 2 / 3]]
+                };
+                if dot(sub(first, last), sub(first, last)) >= 0.25 {
+                    return Some([first, last]);
+                }
+            }
+            // Fixed-interval samples can miss a short but usable terrain gap.
+            // Clip each real route segment to the certified strip before choosing cuts.
+            let boundary = placed_boundary?;
+            route.tunnel_points[segment..=end].windows(2).find_map(|pair| {
+                let delta = sub(pair[1], pair[0]);
+                let slope = dot(delta, boundary.axis);
+                if slope.abs() < 1e-8 {
+                    return None;
+                }
+                let origin = dot(pair[0], boundary.axis);
+                let left = (boundary.base_max + 0.15 - origin) / slope;
+                let right = (boundary.donor_min - 0.15 - origin) / slope;
+                let lo = left.min(right).max(0.);
+                let hi = left.max(right).min(1.);
+                if hi <= lo || boundary.donor_min - boundary.base_max <= 0.3 {
+                    return None;
+                }
+                let inset = (hi - lo) * 0.1;
+                let first = add(pair[0], mul(delta, lo + inset));
+                let last = add(pair[0], mul(delta, hi - inset));
+                (dot(sub(first, last), sub(first, last)) >= 0.25).then_some([first, last])
+            })
+        };
+        let Some([first, last]) = authored.or_else(automatic) else {
             continue;
-        }
-        let [first, last] = authored.unwrap_or_else(||if route.terrain_seam.is_some(){[candidates[0],*candidates.last().unwrap()]}else{[candidates[candidates.len() / 3],candidates[candidates.len() * 2 / 3]]});
+        };
         if [first,last].iter().any(|p|inside_route_source(*p)) {
             return invalid("Authored visibility cuts must lie in an isolated tunnel segment outside both source BSP bounds; move the portal handles or choose a longer segment");
         }
