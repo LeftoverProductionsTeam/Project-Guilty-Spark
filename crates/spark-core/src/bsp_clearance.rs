@@ -325,6 +325,68 @@ impl ConnectorFloor {
     }
 }
 
+const NATIVE_SWITCH_UPHILL_LIMIT: f64 = 0.001;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SwitchFloorReadback {
+    switch: String,
+    samples: usize,
+    min_rise: f64,
+    pub max_rise: f64,
+    max_rise_location: V,
+    within_native_floor_tolerance: bool,
+}
+
+impl SwitchFloorReadback {
+    pub(crate) fn require_native_contact(&self) -> Result<()> {
+        if !self.within_native_floor_tolerance {
+            let [x, y, z] = self.max_rise_location;
+            return invalid(format!(
+                "Switch {} rises {:.6} units beyond the native {:.3} limit at ({x:.3}, {y:.3}, {z:.3}). Level the destination landing across the full playable lane.",
+                self.switch, self.max_rise, NATIVE_SWITCH_UPHILL_LIMIT,
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn review_native_switch_floor(
+    name: &str, shape: &crate::maps::ScenarioLogicVolumeGeometry, from: &RouteChecker, to: &RouteChecker,
+) -> Result<SwitchFloorReadback> {
+    const LONGITUDINAL_MARGIN: f64 = 0.02;
+    const LATERAL_MARGIN: f64 = 0.22;
+    if !shape.valid() || f64::from(shape.dimensions[0]) <= 2. * LONGITUDINAL_MARGIN
+        || f64::from(shape.dimensions[1]) <= 2. * LATERAL_MARGIN {
+        return invalid(format!("Switch {name} needs a valid native volume and a playable interior lane"));
+    }
+    let forward = shape.forward.map(f64::from);
+    let side = cross(shape.up.map(f64::from), forward);
+    let mut floor = shape.corner.map(f64::from);
+    // The existing authored partition switch starts 0.2 units below its landing.
+    floor[2] += 0.2;
+    let mut max_rise = f64::NEG_INFINITY;
+    let mut min_rise = f64::INFINITY;
+    let mut max_rise_location = floor;
+    for station in 0..=8 {
+        for lane in 0..=16 {
+            let x = LONGITUDINAL_MARGIN + (f64::from(shape.dimensions[0]) - 2. * LONGITUDINAL_MARGIN) * f64::from(station) / 8.;
+            let y = LATERAL_MARGIN + (f64::from(shape.dimensions[1]) - 2. * LATERAL_MARGIN) * f64::from(lane) / 16.;
+            let point = add(add(floor, mul(forward, x)), mul(side, y));
+            let sample = |route: &RouteChecker| route.native_surface_z(point.map(|v| v as f32)).map(f64::from)
+                .ok_or_else(|| SparkError::Invalid(format!("Switch {name} has no shared floor at {point:?}")));
+            let rise = sample(to)? - sample(from)?;
+            if rise > max_rise {
+                max_rise = rise;
+                max_rise_location = point;
+            }
+            min_rise = min_rise.min(rise);
+        }
+    }
+    Ok(SwitchFloorReadback { switch: name.into(), samples: 9 * 17, min_rise, max_rise, max_rise_location,
+        within_native_floor_tolerance: max_rise <= NATIVE_SWITCH_UPHILL_LIMIT })
+}
+
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
     pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh, &mesh.indices)? }) }
@@ -394,6 +456,12 @@ impl RouteChecker {
     }
     /// The triangulated miter keeps the same floor on both sides of a turn.
     pub(crate) fn mitered_connector_intrusion(&self, floor: &[ConnectorFloor], height: f64, shift: V) -> Option<V> {
+        self.mitered_connector_intrusion_ignoring(floor, height, shift, |_| false)
+    }
+
+    pub(crate) fn mitered_connector_intrusion_ignoring(&self, floor: &[ConnectorFloor], height: f64, shift: V,
+        ignore_face: impl Fn(Tri) -> bool,
+    ) -> Option<V> {
         const CONTACT: f64 = 0.002;
         let mut candidates = Vec::new();
         let mut polygon = Vec::with_capacity(8);
@@ -412,7 +480,9 @@ impl RouteChecker {
             self.index.root.query(sub(low, shift), sub(high, shift), &mut candidates);
             for &index in &candidates {
                 polygon.clear();
-                polygon.extend(self.index.triangles[index].map(|p| add(p, shift)));
+                let triangle = self.index.triangles[index].map(|p| add(p, shift));
+                if ignore_face(triangle) { continue; }
+                polygon.extend(triangle);
                 for (a, b) in face.edges() {
                     clip_connector_face(&mut polygon, &mut clipped, |p| face.side_distance(p, a, b));
                 }
@@ -1048,6 +1118,23 @@ mod tests {
         assert!(thin.verify_one(&route, true).unwrap_err().to_string().contains("lateral floor support"));
         route.tunnel_points.reverse();
         assert!(thin.verify_one(&route, true).is_err());
+    }
+
+    #[test]
+    fn native_switch_checks_the_outer_lane_before_accepting_its_floor() {
+        let checker = |edge: f32| RouteChecker::new(&MeshData {
+            positions: vec![-1., -1., 0., 3., -1., 0., -1., 7., edge, 3., 7., edge],
+            indices: vec![0, 1, 2, 1, 3, 2], ..Default::default()
+        }).unwrap();
+        let shape = crate::maps::ScenarioLogicVolumeGeometry {
+            forward: [1., 0., 0.], up: [0., 0., 1.], corner: [0., 0., -0.2], dimensions: [0.9, 6., 4.4],
+        };
+        let flat = checker(0.);
+        let lip = checker(0.002);
+        let incoming = review_native_switch_floor("bsp10,11", &shape, &flat, &lip).unwrap();
+        assert!(incoming.require_native_contact().unwrap_err().to_string().contains("bsp10,11"));
+        assert!(incoming.max_rise_location[1] > 5.7);
+        review_native_switch_floor("bsp11,10", &shape, &lip, &flat).unwrap().require_native_contact().unwrap();
     }
 
     #[test]
