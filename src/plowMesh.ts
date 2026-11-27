@@ -46,9 +46,9 @@ export function plowMesh([depth, width, height]: Vec3, scoop: number, wrap: numb
       : 0;
     if (box) {
       // The straight center retains its circular section. The outer quarters
-      // turn forward, reaching farther at the cutting edge than at the top.
+      // turn forward without twisting the blade or its collision strips.
       const returnWing = Math.max(0, 2 * Math.abs(center) - 1);
-      return [side * depth / 2 - arc + wingDepth * returnWing * (1 - 0.5 * up),
+      return [side * depth / 2 - arc + wingDepth * returnWing,
         width * (across - 0.5), height * up];
     }
     const recess = profile === 'moldboard' ? arc : 4 * scoopDepth * up * (1 - up);

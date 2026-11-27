@@ -970,8 +970,8 @@ try{
     if(vehicle){
       await editor.getByText('Review Warthog mount',{exact:true}).click();
       await editor.getByRole('combobox',{name:'Mount vehicle',exact:true}).selectOption(String(vehicle.id));
-      await editor.getByRole('button',{name:'Fit road plow',exact:true}).click();
-      await profile.selectOption(expectedProfile);
+      await editor.getByRole('button',{name:'Fit to Warthog',exact:true}).click();
+      await expect(profile).toHaveValue(expectedProfile);
       await expect(editor.getByRole('spinbutton',{name:'Mount X',exact:true})).toHaveValue('1.098');
     }
     const apply = editor.getByRole('button', { name: 'Apply shape & paint', exact: true });

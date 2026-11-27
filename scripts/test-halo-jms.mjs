@@ -57,7 +57,7 @@ for(let row=0;row<=24;row++){
 }
 assert.equal(boxBlade.positions[4*3],boxBlade.positions[12*3]);
 assert.ok(boxBlade.positions[0]>boxBlade.positions[8*3]);
-assert.ok(boxBlade.positions[0]-boxBlade.positions[8*3] >
+assert.equal(boxBlade.positions[0]-boxBlade.positions[8*3],
   boxBlade.positions[24*17*3]-boxBlade.positions[(24*17+8)*3]);
 for(const blade of [boxBlade,plowMesh([.22,3,.72],85,60,'box-plow','collision')]){
   const topology=auditQuickForgeMesh(blade);

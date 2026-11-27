@@ -320,7 +320,7 @@ export default function MeshPartEditor({ selectedMesh, visible, draft, projectId
                 onCommit={value=>setMountPosition(previous=>previous.map((old,i)=>i===index?value:old) as Vec3)} />
             </label>)}
           </div>
-          <button type="button" onClick={()=>{setSize([.22,1.03,.65]);setScoop(80);setWrap(0);setProfile('moldboard');setMountPosition([1.098,0,.127]);}}>Fit road plow</button>
+          <button type="button" onClick={()=>{setSize([.22,1.03,.65]);setMountPosition([1.098,0,.127]);}}>Fit to Warthog</button>
           <small>Apply and save this position. A native build is required for vehicle collision.</small>
         </>}
       </details>}
