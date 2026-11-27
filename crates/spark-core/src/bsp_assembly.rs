@@ -1455,6 +1455,11 @@ fn generate_end(
     portal_count += append_exact_portals(
         &exact_sky_portals, &mut mesh, &mut materials, &mut triangle_materials,
     )?;
+    let discarded_sky_faces = if terrain_ribbon.is_some() && partition.is_none() {
+        discard_isolated_sky_triangles(&mut mesh, &materials, &mut triangle_materials)
+    } else {
+        0
+    };
     let base_input = if matches!(partition, Some((_, PartitionEnd::Donor))) { 0 } else { base_mesh.indices.len() / 3 };
     let donor_input = if matches!(partition, Some((_, PartitionEnd::Base))) { 0 } else { donor_mesh.parts[assembly.donor_bsp_index].index_count / 3 };
     let donor_scenery = if donor_input == 0 { 0 } else { donor_scenery };
@@ -1465,6 +1470,9 @@ fn generate_end(
         "This rebuild regenerates collision, portals and lightmaps. Original per-cluster weather, sound and render-only details require review. Donor scenery is optional. Campaign actors, scripts and gameplay objects are outside this build."
     };
     let mut warnings = vec!["Route samples check a standing biped against BSP triangles. Vehicle turning, scenery collision, exposed ridge access and cross-region sniper visibility require separate native game tests.".into(),rebuild_scope.into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()];
+    if discarded_sky_faces > 0 {
+        warnings.push(format!("Removed {discarded_sky_faces} isolated sky triangles from the native terrain shell. The surrounding stock surfaces were retained."));
+    }
     if welded > 0 {
         warnings.push(format!("Welded {welded} short intersection edges at the connection while keeping its stock vertices and material seams. Review the repaired join before building."));
     }
@@ -1737,6 +1745,79 @@ fn portal_spans(route:&BspAssembly)->Vec<(usize,usize)>{
     }
     spans
 }
+// Halo Tool omits two-sided faces from the structural shell. A lone sky
+// triangle bounded on all three edges by such faces is an exposed island.
+// Keep the full manifold for visibility slicing and filter the export afterward.
+fn discard_isolated_sky_triangles(
+    mesh: &mut MeshData,
+    materials: &[AssemblyMaterial],
+    slots: &mut Vec<usize>,
+) -> usize {
+    type Edge = [[u32; 3]; 2];
+    let edges = |triangle: &[u32]| {
+        let points: [[u32; 3]; 3] = std::array::from_fn(|i| {
+            vertex(mesh, triangle[i]).map(|value| {
+                if value == 0. { 0 } else { (value as f32).to_bits() }
+            })
+        });
+        std::array::from_fn::<Edge, 3, _>(|i| {
+            let mut edge = [points[i], points[(i + 1) % 3]];
+            edge.sort_unstable();
+            edge
+        })
+    };
+    let mut sky_edges = BTreeMap::<Edge, (usize, usize)>::new();
+    let faces = || mesh.indices.chunks_exact(3).zip(slots.iter().map(|slot| &materials[*slot]));
+    for (triangle, _) in faces().filter(|(_, material)| material.name == "+sky") {
+        for edge in edges(triangle) {
+            sky_edges.entry(edge).or_default();
+        }
+    }
+    if sky_edges.is_empty() {
+        return 0;
+    }
+    for (triangle, material) in faces().filter(|(_, material)| {
+        (material.collision_only || material.name == "+sky")
+            && !matches!(material.name.as_str(), "+portal" | "+exactportal")
+    }) {
+        for edge in edges(triangle) {
+            if let Some((structural, two_sided)) = sky_edges.get_mut(&edge) {
+                if material.flags & 1 != 0 {
+                    *two_sided += 1;
+                } else {
+                    *structural += 1;
+                }
+            }
+        }
+    }
+    let omitted: BTreeSet<_> = faces().enumerate().filter_map(|(index, (triangle, material))| {
+        (material.name == "+sky" && edges(triangle).iter().all(|edge| sky_edges[edge] == (1, 1)))
+            .then_some(index)
+    }).collect();
+    if omitted.is_empty() {
+        return 0;
+    }
+    for part in &mut mesh.parts {
+        let first = part.index_start / 3;
+        let end = first + part.index_count / 3;
+        part.index_start -= omitted.range(..first).count() * 3;
+        part.index_count -= omitted.range(first..end).count() * 3;
+    }
+    let mut index = 0;
+    mesh.indices.retain(|_| {
+        let keep = !omitted.contains(&(index / 3));
+        index += 1;
+        keep
+    });
+    let mut face = 0;
+    slots.retain(|_| {
+        let keep = !omitted.contains(&face);
+        face += 1;
+        keep
+    });
+    omitted.len()
+}
+
 fn visibility_solid(mesh:&MeshData,slots:&[usize],materials:&[AssemblyMaterial])->Result<Manifold>{
     let mut gl=MeshGL64{num_prop:3,..Default::default()};
     for (face,t) in mesh.indices.chunks_exact(3).enumerate(){
