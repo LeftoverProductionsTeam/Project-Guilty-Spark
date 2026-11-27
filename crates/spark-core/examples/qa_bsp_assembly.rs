@@ -65,6 +65,73 @@ fn main() -> Result<()> {
         if report.starts.iter().any(|s| s.issue.is_some()) { std::process::exit(2); }
         return Ok(());
     }
+    if a.len() == 6 && a[1] == "--review-extraction-start-clearance" {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Review {
+            cache_sha256: String,
+            points: Vec<[u16; 2]>,
+        }
+        let cache = Path::new(&a[2]);
+        let compiled = maps::inspect_map(cache, None)?;
+        let file = Path::new(&a[3]);
+        spark_core::reject_links(file)?;
+        if fs::metadata(file)?.len() > 65536 {
+            return spark_core::invalid("Extraction body review exceeds 64 KiB");
+        }
+        let review: Review = serde_json::from_slice(&fs::read(file)?)?;
+        if review.cache_sha256 != compiled.sha256 || review.points.is_empty() {
+            return spark_core::invalid("Extraction body review does not match the compiled cache or start budget");
+        }
+        let biped_tags = [a[4].as_str(), a[5].as_str()];
+        let pills = [maps::compiled_biped_standing_pill(cache, &compiled, biped_tags[0])?,
+            maps::compiled_biped_standing_pill(cache, &compiled, biped_tags[1])?];
+        let starts = spark_core::megaworld::review_extraction_start_clearance(cache, &compiled, biped_tags, &review.points)?;
+        println!("{}", serde_json::json!({"cacheSha256":compiled.sha256,"pills":pills,"starts":starts}));
+        return Ok(());
+    }
+    if a.len() == 4 && a[1] == "--review-extraction-layout" {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct RegionInput {
+            path: std::path::PathBuf,
+            sha256: String,
+            translation: [f64; 3],
+            yaw_degrees: f64,
+        }
+
+        let cache = Path::new(&a[2]);
+        let compiled = maps::inspect_map(cache, None)?;
+        let input = Path::new(&a[3]);
+        spark_core::reject_links(input)?;
+        if fs::metadata(input)?.len() > 65536 {
+            return spark_core::invalid("Extraction layout review exceeds 64 KiB");
+        }
+        let rows: Vec<RegionInput> = serde_json::from_slice(&fs::read(input)?)?;
+        if rows.is_empty() || rows.len() > 64 {
+            return spark_core::invalid("Review between one and 64 owned regions");
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        let mut results = Vec::new();
+        for row in rows {
+            spark_core::reject_links(&row.path)?;
+            let source = maps::inspect_map(&row.path, row.path.parent())?;
+            if source.sha256 != row.sha256 || !seen.insert(row.sha256) || source.mesh.parts.len() != 1
+                || !row.translation.into_iter().chain([row.yaw_degrees]).all(|value| value.is_finite() && value.abs() <= 1500.) {
+                return spark_core::invalid(format!("Unreviewed or repeated source {}", row.path.display()));
+            }
+            let region = spark_core::megaworld::LayoutRegion {
+                region_id: format!("{}:0", source.sha256), cache_sha256: source.sha256.clone(),
+                cache_version: source.header.version, bsp_index: 0, map_name: source.header.name.clone(),
+                bsp_name: source.mesh.parts[0].name.clone(), minimum: [0.; 3], maximum: [0.; 3],
+                translation: row.translation, yaw_degrees: row.yaw_degrees, hex_slot: None,
+                underground: false, surface_access: None,
+            };
+            results.push(spark_core::megaworld::review_extraction_layout_region(&region, &row.path, &source, cache, &compiled)?);
+        }
+        println!("{}", serde_json::json!({"cacheSha256":compiled.sha256,"regions":results}));
+        return Ok(());
+    }
     if a.len() == 9 && a[1] == "--review-extraction-bindings" {
         let cache = Path::new(&a[2]);
         let stock = Path::new(&a[3]);

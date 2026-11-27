@@ -488,6 +488,26 @@ impl RouteChecker {
         }
         Ok(floor)
     }
+    /// Check the authored deployment origin using the selected biped's full
+    /// standing pill. Native object occupancy still requires Forerunner.
+    pub(crate) fn verify_biped_start(&self, position: V, pill: crate::maps::NativeStandingPill) -> Result<()> {
+        if position.iter().any(|v| !v.is_finite() || v.abs() > 4096.) {
+            return invalid("Player start has nonfinite or unsupported coordinates");
+        }
+        let mut scratch = vec![];
+        let floor = self.index.floor(position, &mut scratch)
+            .ok_or_else(|| SparkError::Invalid("Player start has no nearby supporting BSP floor".into()))?;
+        if position[2] < floor - 0.02 || position[2] - floor > 0.25 {
+            return invalid("Player start is embedded in or too far above its supporting BSP floor");
+        }
+        let base = add(position, [0., 0., pill.origin_offset]);
+        let top = add(base, [0., 0., pill.axis_height]);
+        if !self.index.clear_segment(base, top, pill.radius, &mut scratch) {
+            return invalid("Native standing biped pill intersects BSP geometry");
+        }
+        Ok(())
+    }
+
     /// Sample the same world points in each separately resident BSP.
     pub(crate) fn floor_profile(&self, [start, end]: [V; 2]) -> Result<Vec<f64>> {
         let delta = sub(end, start);

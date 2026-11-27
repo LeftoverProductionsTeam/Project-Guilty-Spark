@@ -246,6 +246,90 @@ pub fn review_compiled_extraction_bindings(
     })
 }
 
+
+pub fn review_extraction_layout_region(
+    region: &LayoutRegion,
+    source_path: &Path,
+    source: &MapInspection,
+    cache: &Path,
+    compiled: &MapInspection,
+) -> Result<serde_json::Value> {
+    let stock_starts = maps::scenario_region_starts(source_path, source)?;
+    let positions = stock_starts.iter().map(|start| {
+        crate::bsp_assembly::transform(start.position.map(f64::from), region.translation, region.yaw_degrees)
+            .map(|value| value as f32)
+    }).collect::<Vec<_>>();
+    let mut owners = std::collections::BTreeMap::<u16, usize>::new();
+    for chunk in positions.chunks(1024) {
+        for point in maps::bsp_point_locations(cache, compiled, chunk, None)? {
+            if let [owner] = point.bsps.as_slice() {
+                *owners.entry(*owner).or_default() += 1;
+            }
+        }
+    }
+    let mut candidates = owners.into_iter().collect::<Vec<_>>();
+    candidates.sort_unstable_by_key(|&(slot, count)| (std::cmp::Reverse(count), slot));
+    let best = candidates.first().filter(|&&(_, count)|
+        count * 2 > positions.len() && candidates.get(1).is_none_or(|other| other.1 != count));
+    let Some(&(slot, _)) = best else {
+        return Ok(serde_json::json!({"region":region,"issue":"Most transformed stock starts do not identify a single native owner"}));
+    };
+    let bindings = review_compiled_extraction_bindings(
+        region, (source_path, source), (cache, compiled), usize::from(slot))?;
+    let stock_starts = &stock_starts;
+    let eligible = |team| bindings.player_starts.iter().filter(move |point| {
+        matches!(stock_starts[usize::from(point.source_row)].team_index, -1)
+            || stock_starts[usize::from(point.source_row)].team_index == team
+    });
+    let starts = eligible(0).find_map(|a| eligible(1).find(|b| b.compiled_row != a.compiled_row)
+        .map(|b| [a.source_row, b.source_row]));
+    let weapons = bindings.weapons.iter().map(|point| point.source_row).collect::<Vec<_>>();
+    let vehicles = bindings.vehicles.iter().map(|point| point.source_row).collect::<Vec<_>>();
+    let pool = starts.filter(|_| weapons.len() >= 3 && !vehicles.is_empty()).map(|player_starts|
+        ExtractionPool { player_starts, weapons, vehicles, authored_vehicle_ids: vec![] });
+    Ok(serde_json::json!({"region":region,"bindings":bindings,"factionStarts":starts,"stockPool":pool}))
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionStartClearance {
+    pub bsp_index: u16,
+    pub player_start: u16,
+    pub position: [f32; 3],
+    pub unsc: bool,
+    pub covenant: bool,
+}
+
+pub fn review_extraction_start_clearance(
+    path: &Path, map: &MapInspection, biped_tags: [&str; 2], points: &[[u16; 2]],
+) -> Result<Vec<ExtractionStartClearance>> {
+    let [unsc, covenant] = [maps::compiled_biped_standing_pill(path, map, biped_tags[0])?,
+        maps::compiled_biped_standing_pill(path, map, biped_tags[1])?];
+    let starts = maps::scenario_region_starts(path, map)?;
+    if points.len() > starts.len() { return invalid("Extraction capsule review exceeds the native start roster"); }
+    let mut checkers = std::collections::BTreeMap::new();
+    let mut result = Vec::with_capacity(points.len());
+    for &[bsp_index, player_start] in points {
+        let row = starts.get(usize::from(player_start))
+            .ok_or_else(|| crate::SparkError::Invalid("Extraction capsule review references an invalid start row".into()))?;
+        if row.bsp_index >= 0 && row.bsp_index as u16 != bsp_index {
+            return invalid("Extraction capsule review disagrees with the native start BSP");
+        }
+        let checker = match checkers.entry(bsp_index) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => entry.insert(
+                crate::bsp_clearance::RouteChecker::for_part(&map.mesh, usize::from(bsp_index))?),
+        };
+        let point = row.position.map(f64::from);
+        result.push(ExtractionStartClearance {
+            bsp_index, player_start, position: row.position,
+            unsc: matches!(row.team_index, -1 | 0) && checker.verify_biped_start(point, unsc).is_ok(),
+            covenant: matches!(row.team_index, -1 | 1) && checker.verify_biped_start(point, covenant).is_ok(),
+        });
+    }
+    Ok(result)
+}
+
 pub const REGIONAL_EXTRACTION_POOLS_FEATURE: &str = "extraction.regional_pools.v1";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]

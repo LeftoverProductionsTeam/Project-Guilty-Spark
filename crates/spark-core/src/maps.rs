@@ -2202,6 +2202,12 @@ pub struct BspFlightCrossing {
 pub fn compiled_biped_uses_player_physics(
     path: &Path, map: &MapInspection, biped: &str,
 ) -> Result<bool> {
+    let (bytes, offset) = compiled_biped_span(path, map, biped, 760)?;
+    Ok(Reader(&bytes).u32(offset + 756)? & 2 != 0)
+}
+
+fn compiled_biped_span(path: &Path, map: &MapInspection, biped: &str, size: usize)
+    -> Result<(Arc<[u8]>, usize)> {
     if !matches!(map.header.version, 609 | 13) || map.header.extended {
         return invalid("Compiled player physics readback requires standard CE609 or MCC13");
     }
@@ -2216,10 +2222,37 @@ pub fn compiled_biped_uses_player_physics(
     if tags.next().is_some() { return invalid("Compiled playable biped path is ambiguous"); }
     let reader = Reader(&bytes);
     let space = cache_tag_space(&reader, &header)?;
-    if offset < space.begin || offset.checked_add(760).is_none_or(|end| end > space.end) {
+    if offset < space.begin || offset.checked_add(size).is_none_or(|end| end > space.end) {
         return invalid("Compiled playable biped data is outside native tag space");
     }
-    Ok(reader.u32(offset + 756)? & 2 != 0)
+    Ok((bytes, offset))
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeStandingPill {
+    pub origin_offset: f64,
+    pub axis_height: f64,
+    pub radius: f64,
+}
+
+/// Read the same standing segment and radius used by Forerunner's player pill.
+pub fn compiled_biped_standing_pill(
+    path: &Path, map: &MapInspection, biped: &str,
+) -> Result<NativeStandingPill> {
+    let (bytes, offset) = compiled_biped_span(path, map, biped, 1072)?;
+    let reader = Reader(&bytes);
+    let flags = reader.u32(offset + 756)?;
+    let standing = f64::from(reader.f32(offset + 1060)?);
+    let radius = f64::from(reader.f32(offset + 1068)?);
+    if !standing.is_finite() || standing <= 0. || !radius.is_finite() || radius <= 0. {
+        return invalid("Compiled playable biped has invalid standing collision dimensions");
+    }
+    Ok(NativeStandingPill {
+        origin_offset: if flags & 8 == 0 { radius } else { 0. },
+        axis_height: if flags & 16 == 0 { (standing - 2. * radius).max(0.) } else { 0. },
+        radius,
+    })
 }
 
 pub fn bsp_point_locations(path:&Path,inspection:&MapInspection,points:&[[f32;3]],ground_drop:Option<f32>)->Result<Vec<BspPointLocation>>{
