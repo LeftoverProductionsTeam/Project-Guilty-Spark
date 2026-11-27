@@ -105,6 +105,8 @@ pub struct ExtractionPoints {
     player_starts: Vec<ExtractionPoint>,
     weapons: Vec<ExtractionPoint>,
     vehicles: Vec<ExtractionPoint>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub authored_vehicle_support: Vec<bool>,
 }
 
 /// Resolve authored stock positions against the exact source region. The
@@ -174,6 +176,7 @@ fn read_supported_extraction_points(region: &LayoutRegion, path: &Path, map: &Ma
         player_starts,
         weapons: supported(weapons)?,
         vehicles: supported(vehicles)?,
+        authored_vehicle_support: Vec::new(),
     })
 }
 #[derive(Debug, Serialize)]
@@ -279,6 +282,36 @@ fn compiled_extraction_rows(
     }).collect()
 }
 
+fn extraction_native_region(region: &LayoutRegion, origin: Option<&LayoutRegion>) -> LayoutRegion {
+    let Some(origin) = origin else { return region.clone(); };
+    let delta = std::array::from_fn(|axis| region.translation[axis] - origin.translation[axis]);
+    LayoutRegion {
+        translation: crate::bsp_assembly::transform(delta, [0.; 3], -origin.yaw_degrees),
+        yaw_degrees: region.yaw_degrees - origin.yaw_degrees,
+        ..region.clone()
+    }
+}
+
+/// Return support in the authored region at each vehicle pose, in input order.
+pub fn review_extraction_vehicle_support(
+    region: &LayoutRegion, origin: Option<&LayoutRegion>, path: &Path, source: &MapInspection,
+    positions: &[[f32; 3]],
+) -> Result<Vec<bool>> {
+    if positions.len() > 1024 || positions.iter().flatten().any(|axis| !axis.is_finite()) {
+        return invalid("Regional vehicle review exceeds the supported position bounds");
+    }
+    if positions.is_empty() { return Ok(Vec::new()); }
+    let native = extraction_native_region(region, origin);
+    let local = positions.iter().map(|point| {
+        let relative = std::array::from_fn(|axis| f64::from(point[axis]) - native.translation[axis]);
+        crate::bsp_assembly::transform(relative, [0.; 3], -native.yaw_degrees).map(|axis| axis as f32)
+    }).collect::<Vec<_>>();
+    Ok(maps::bsp_point_locations(path, source, &local, None)?.into_iter().map(|location| {
+        location.bsps == [region.bsp_index as u16]
+            && location.supports.iter().any(|surface| surface.bsp as usize == region.bsp_index)
+    }).collect())
+}
+
 /// Bind exact authored source rows to the exported scenario. Determine each
 /// physical owner from the compiled geometry so merged logical regions can
 /// share a BSP and reviewed same-slot replacements keep their native index.
@@ -313,12 +346,7 @@ pub fn compiled_extraction_pools(
         let starts = selected_extraction_points(&original.player_starts, &pool.player_starts, &region.map_name, "player start")?;
         let weapons = selected_extraction_points(&original.weapons, &pool.weapons, &region.map_name, "weapon")?;
         let vehicles = selected_extraction_points(&original.vehicles, &pool.vehicles, &region.map_name, "vehicle")?;
-        let mut native_region = region.clone();
-        if let Some(origin) = origin {
-            let translated = std::array::from_fn(|axis| region.translation[axis] - origin.translation[axis]);
-            native_region.translation = crate::bsp_assembly::transform(translated, [0.; 3], -origin.yaw_degrees);
-            native_region.yaw_degrees = region.yaw_degrees - origin.yaw_degrees;
-        }
+        let native_region = extraction_native_region(region, origin);
         let authored_vehicles = pool.authored_vehicle_ids.iter().map(|id| {
             let placement = project.scene.iter().find(|object| &object.id == id)
                 .filter(|object| object.visible && object.scale == [1.; 3] && object.source_offset.is_none()
@@ -330,18 +358,9 @@ pub fn compiled_extraction_pools(
                 .ok_or_else(|| crate::SparkError::Invalid(format!("{} pool vehicle has no verified native vehicle tag", region.map_name)))?;
             Ok((placement.position, crate::native_asset_imports::root_file(binding)?))
         }).collect::<Result<Vec<_>>>()?;
-        let local_poses = authored_vehicles.iter().map(|(point, _)| {
-            let relative = std::array::from_fn(|axis| f64::from(point[axis]) - native_region.translation[axis]);
-            crate::bsp_assembly::transform(relative, [0.; 3], -native_region.yaw_degrees).map(|axis| axis as f32)
-        }).collect::<Vec<_>>();
-        for chunk in local_poses.chunks(1024) {
-            for location in maps::bsp_point_locations(&path, &source, chunk, None)? {
-                if location.bsps != [region.bsp_index as u16]
-                    || !location.supports.iter().any(|surface| surface.bsp as usize == region.bsp_index)
-                {
-                    return invalid(format!("{} has an authored vehicle outside its supported source region", region.map_name));
-                }
-            }
+        let authored_positions = authored_vehicles.iter().map(|(point, _)| *point).collect::<Vec<_>>();
+        if review_extraction_vehicle_support(region, origin, &path, &source, &authored_positions)?.contains(&false) {
+            return invalid(format!("{} has an authored vehicle outside its supported source region", region.map_name));
         }
         if maps::hash_file(&path)? != region.cache_sha256 {
             return invalid(format!("{} source cache changed during pool readback", region.map_name));
@@ -725,6 +744,13 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
         let expected = bindings.vehicles[0].compiled_row;
         // Use a known native row to exercise exact readback without changing Latest.
         let native = maps::scenario_vehicles(&output, &compiled).unwrap().remove(expected as usize);
+        let mut shifted = region.clone();
+        shifted.translation = [17., -11., 3.];
+        shifted.yaw_degrees = 90.;
+        let world = crate::bsp_assembly::transform(native.position.map(f64::from), shifted.translation, shifted.yaw_degrees)
+            .map(|coordinate| coordinate as f32);
+        assert_eq!(review_extraction_vehicle_support(&shifted, Some(&region), &stock, &source, &[world, [4000.; 3]]).unwrap(),
+            [true, false]);
         let path = native.tag.unwrap().strip_suffix(".vehicle").unwrap().to_owned();
         let id = uuid::Uuid::new_v4().to_string();
         let mut project = crate::project::Project::new("Verified editor vehicle pool");

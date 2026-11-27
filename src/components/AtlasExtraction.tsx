@@ -14,13 +14,14 @@ const pointLabel=(point:ExtractionPoints['weapons'][number])=>point.row<0?point.
 export default function AtlasExtraction({region,layout,project,readOnly,onLayout}:{
   region:LayoutRegion;
   layout:MegaworldLayout;
-  project?:Pick<Project,'scene'|'nativeAssetImports'>;
+  project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;
   readOnly:boolean;
   onLayout:(layout:MegaworldLayout,description:string)=>void;
 }){
   const saved=layout.extraction?.[region.regionId];
   const savedKey=JSON.stringify(saved??null);
-  const [candidates,setCandidates]=useState<ExtractionPoints|null>(null);
+  const [review,setReview]=useState<{key:string;points:ExtractionPoints;support:boolean[]}|null>(null);
+  const candidates=review?.points??null;
   const [draft,setDraft]=useState<{savedKey:string;pool:ExtractionPool}|null>(null);
   const [preview,setPreview]=useState<{key:string;draw:ExtractionPoints}|null>(null);
   const [working,setWorking]=useState(false);
@@ -29,27 +30,36 @@ export default function AtlasExtraction({region,layout,project,readOnly,onLayout
   const poolKey=JSON.stringify(pool);
   const assignedElsewhere=new Set(Object.entries(layout.extraction??{}).filter(([id])=>id!==region.regionId)
     .flatMap(([,entry])=>entry.authoredVehicleIds??[]));
-  const placedVehicles=new Map<string,ExtractionPoints['vehicles'][number]>();
+  const editorVehicles=new Map<string,ExtractionPoints['vehicles'][number]>();
   for(const object of project?.scene??[]){
     const source=object.sourceModel;
     if(!object.visible||source?.class!=='vehi'||object.sourceOffset!=null||object.rotationOffset!=null
       ||object.assetId!=null||!object.scale.every(n=>n===1)||assignedElsewhere.has(object.id)) continue;
     const binding=project?.nativeAssetImports?.find(item=>item.tagClass==='vehi'&&item.sourceProjectId===source.projectId
       &&item.sourceSha256===source.sourceSha256&&item.tagId===source.tagId&&item.tagPath===source.path);
-    if(binding) placedVehicles.set(object.id,{row:-1,label:object.name,position:object.position});
+    if(binding) editorVehicles.set(object.id,{row:-1,label:object.name,position:object.position});
   }
+  const origin=[...(project?.inheritedBspConnections??[]),project?.bspAssembly].find(route=>route?.atlasOrigin)?.atlasOrigin;
+  const editorRows=[...editorVehicles];
+  const reviewKey=JSON.stringify([region.translation,region.yawDegrees,origin,editorRows.map(([id,point])=>[id,point.position])]);
+  const currentReview=review?.key===reviewKey;
+  const placedVehicles=new Map(editorRows.filter((_,index)=>currentReview&&review.support[index]));
   let selection:ExtractionPoints|null=null, feedback='';
   if(candidates){
-    try { selection=selectedExtractionPoints(pool,candidates,placedVehicles); }
+    if(pool.authoredVehicleIds?.length&&!currentReview) feedback='Read native points again to verify the current vehicle positions.';
+    else try { selection=selectedExtractionPoints(pool,candidates,placedVehicles); }
     catch(problem){ feedback=problem instanceof Error?problem.message:String(problem); }
   }
   async function readPoints(){
     setWorking(true);
     setError('');
     setPreview(null);
-    setCandidates(null);
+    setReview(null);
     try {
-      setCandidates(await call<ExtractionPoints>('review_atlas_extraction_points',{layout,regionId:region.regionId}));
+      const points=await call<ExtractionPoints&{authoredVehicleSupport?:boolean[]}>('review_atlas_extraction_points',{
+        layout,regionId:region.regionId,atlasOrigin:origin,authoredPositions:editorRows.map(([,point])=>point.position),
+      });
+      setReview({key:reviewKey,points,support:points.authoredVehicleSupport??[]});
     }catch(problem){setError(String(problem));}
     finally{setWorking(false);}
   }
@@ -86,6 +96,9 @@ export default function AtlasExtraction({region,layout,project,readOnly,onLayout
           </select>
         </label>)}
       </div>
+      {!!editorVehicles.size&&!placedVehicles.size&&<p className="atlas-note">{currentReview
+        ? 'None of the editor-placed vehicles has supported ground in this region.'
+        : 'Read native points again after moving a vehicle or this region.'}</p>}
       {(placedVehicles.size>0||!!pool.authoredVehicleIds?.length)&&<label>Editor-placed vehicle points
         <select multiple size={3} aria-label="Editor-placed vehicle points" value={pool.authoredVehicleIds??[]} disabled={readOnly}
           onChange={event=>{
@@ -94,9 +107,9 @@ export default function AtlasExtraction({region,layout,project,readOnly,onLayout
             setPreview(null);
           }}>
           {[...placedVehicles].map(([id,point])=><option key={id} value={id}>{point.label} · {point.position.map(n=>n.toFixed(1)).join(', ')}</option>)}
-          {(pool.authoredVehicleIds??[]).filter(id=>!placedVehicles.has(id)).map(id=><option key={id} value={id}>Unavailable placement</option>)}
+          {(pool.authoredVehicleIds??[]).filter(id=>!placedVehicles.has(id)).map(id=><option key={id} value={id}>{editorVehicles.get(id)?.label??'Unavailable placement'} · unsupported or unreviewed</option>)}
         </select>
-        <small>Choose vehicles on this region’s terrain. Export checks their native BSP and placement.</small>
+        <small>Spark checks the source terrain here and verifies the final vehicle row when you export.</small>
       </label>}
       {feedback&&<p role="status" className="atlas-note">{feedback}</p>}
       <div className="atlas-controls">

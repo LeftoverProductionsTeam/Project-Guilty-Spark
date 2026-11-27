@@ -71,6 +71,7 @@ pub(super) async fn review_atlas_burial(
 #[tauri::command]
 pub(super) async fn review_atlas_extraction_points(
     app: tauri::AppHandle, layout: core::megaworld::Layout, region_id: String,
+    atlas_origin: Option<core::megaworld::LayoutRegion>, authored_positions: Option<Vec<[f32; 3]>>,
 ) -> Reply<core::megaworld::ExtractionPoints> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
@@ -80,7 +81,15 @@ pub(super) async fn review_atlas_extraction_points(
             .ok_or("Choose a region from the saved layout")?;
         let atlas = cached(&state)?;
         let (path, map) = region_source(&state, atlas.as_ref(), region)?;
-        core::megaworld::review_extraction_points(region, &path, &map).map_err(error)
+        let mut points = core::megaworld::review_extraction_points(region, &path, &map).map_err(error)?;
+        if let Some(origin) = &atlas_origin {
+            core::megaworld::Layout { schema_version: 1, regions: vec![origin.clone()], extraction: Default::default() }
+                .validate().map_err(error)?;
+        }
+        points.authored_vehicle_support = core::megaworld::review_extraction_vehicle_support(
+            region, atlas_origin.as_ref(), &path, &map, authored_positions.as_deref().unwrap_or_default(),
+        ).map_err(error)?;
+        Ok(points)
     }).await.map_err(error)?
 }
 

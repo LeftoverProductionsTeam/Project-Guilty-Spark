@@ -17,7 +17,7 @@ type BurialReview={
   coverZ:number|null;
   suggestedTranslationZ:number|null;
 };
-export default function MegaworldAtlas({projectId,project,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;project?:Pick<Project,'scene'|'nativeAssetImports'>;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+export default function MegaworldAtlas({projectId,project,assembly,sourceSha,baseBspIndex=0,compiledRegions=[],layout,onLayout,onPrepareConnection,readOnly=false}:{projectId:string;project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;assembly?:Project['bspAssembly'];sourceSha?:string;baseBspIndex?:number;compiledRegions?:LayoutRegion[];layout?:MegaworldLayout|null;onLayout:(layout:MegaworldLayout,description:string)=>void;onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [open,setOpen]=useMapState(projectId,'megaworld.atlas',false);
   const [atlas,setAtlas]=useState<Atlas|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [search,setSearch]=useState(''),[runtime,setRuntime]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState<string|null>(null);
@@ -54,7 +54,7 @@ export default function MegaworldAtlas({projectId,project,assembly,sourceSha,bas
   </details>;
 }
 
-function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{project?:Pick<Project,'scene'|'nativeAssetImports'>;layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
+function LayoutEditor({project,layout,atlas,onLayout,sourceRegion,compiledRegions,onPrepareConnection,readOnly=false}:{project?:Pick<Project,'scene'|'nativeAssetImports'|'inheritedBspConnections'|'bspAssembly'>;layout?:MegaworldLayout|null;atlas:Atlas|null;onLayout:(layout:MegaworldLayout,description:string)=>void;sourceRegion?:LayoutRegion;compiledRegions:LayoutRegion[];onPrepareConnection?:PrepareConnection;readOnly?:boolean}){
   const [selection,setSelection]=useState(''),[error,setError]=useState(''),[preparing,setPreparing]=useState(false);
   const [connectionOrigin,setConnectionOrigin]=useState('');
   const [coverSelection,setCoverSelection]=useState<{roomId:string;surfaceId:string}|null>(null);
