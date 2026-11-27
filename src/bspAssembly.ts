@@ -266,6 +266,32 @@ export function assemblyRoutePoints(plan: BspAssembly, route: AssemblyRouteKey):
   return plan.sections?.find(section => `section:${section.id}` === route)?.points;
 }
 
+export function retainedConnectorAnchor(count: number, index: number): boolean {
+  return index < 2 || index >= count - 2;
+}
+
+/** Add an editable interior point without rotating either retained switch. */
+export function addRetainedConnectorBend(points: Vec3[]): Vec3[] | null {
+  if (points.length < 2 || points.length >= 16) return null;
+  const between = (a: Vec3, b: Vec3, rate: number): Vec3 =>
+    a.map((value, i) => value + (b[i] - value) * rate) as Vec3;
+  const run = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (points.length === 2) {
+    const [a, b] = points, length = run(a, b);
+    if (length < 2) return null;
+    const shoulder = Math.min(4 / length, 0.25);
+    return [a, between(a,b,shoulder), between(a,b,0.5), between(a,b,1-shoulder), b];
+  }
+  if (points.length === 3) {
+    const [a, bend, b] = points;
+    if (run(a,bend) < 1 || run(bend,b) < 1) return null;
+    return [a, between(a,bend,0.5), bend, between(bend,b,0.5), b];
+  }
+  const index = points.length - 2;
+  if (run(points[index-1], points[index]) < 1) return null;
+  return [...points.slice(0,index), between(points[index-1], points[index],0.5), ...points.slice(index)];
+}
+
 export function editAssemblyRoutePoints(plan: BspAssembly, route: AssemblyRouteKey, points: Vec3[]): BspAssembly {
   if (points.length < 2 || points.length > 16 || !assemblyRoutePoints(plan, route)
       || points.some(point => point.some(axis => !Number.isFinite(axis) || Math.abs(axis) > 2048))) return plan;

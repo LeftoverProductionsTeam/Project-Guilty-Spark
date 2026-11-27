@@ -7,7 +7,7 @@ import type { LibraryEntry, MapInspection, OpenProject, Project, RuntimeRegistra
 import { reviewedMcc13Target, runtimeProfileLabel } from '../runtimeWorkbench';
 import BitmapPreview from './BitmapPreview';
 import type { AssemblyRouteKey } from '../bspAssembly';
-import { assemblyRouteIssuePoint, addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
+import { addRetainedConnectorBend, retainedConnectorAnchor, assemblyRouteIssuePoint, addInfantryTunnel, addHighGroundRoute, addFlatLandBridge, makeThreeRouteSeam, flattenTerrainConnector,fillTerrainToRidge, assemblySignature, nativeSealVertices, rotateAssemblyAtEntrance, moveDonorToLandingDistance, transformAssembly, NATIVE_BSP_SWITCH_PREVIEW } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport, SeamEdge, NativeBspSwitchPreview } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -484,8 +484,25 @@ export default function BspAssembly({
   function previewSliderKey(event: KeyboardEvent<HTMLInputElement>) {
     if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) void previewDraft();
   }
+  function addRouteBend() {
+    if (!routeDraft) return;
+    const points = routeDraft.tunnelPoints;
+    if (editingRetained && routeView === 'primary') {
+      const next = addRetainedConnectorBend(points);
+      if (!next) {
+        setError('The last editable segment needs at least one unit to add a bend.');
+        return;
+      }
+      updateRoute({tunnelPoints: next});
+      setRoutePointSelection(next.length - 3);
+      return;
+    }
+    const last = points.at(-1)!, before = points.at(-2)!;
+    const bend = last.map((value, i) => (value + before[i]) / 2) as Vec3;
+    updateRoute({tunnelPoints: [...points.slice(0, -1), bend, last]});
+  }
   function armEdge(target:'base'|'donor', landing:typeof pickingLanding = null){setPickedSurface(null);setPickingLanding(landing);setEdgeTarget(target);}
-  function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
+  function vector(value: Vec3, onChange: (v: Vec3) => void, label: string, disabled = false) {
     return (
       <div className="bsp-vector">
         <span>{label}</span>
@@ -497,6 +514,7 @@ export default function BspAssembly({
               min={-2048}
               max={2048}
               step={0.05}
+              disabled={disabled}
               label={`${label} ${axis}`}
               onCommit={(v) => onChange(value.map((old, k) => (k === i ? v : old)) as Vec3)}
             />
@@ -869,7 +887,7 @@ export default function BspAssembly({
                 {draft.tunnelPoints.length>=2&&<label>Distance between landings
                   <NumberField
                     value={Math.hypot(draft.tunnelPoints.at(-1)![0]-draft.tunnelPoints[0][0], draft.tunnelPoints.at(-1)![1]-draft.tunnelPoints[0][1])}
-                    min={0.5} max={6000} step={0.5} label="Distance between BSP landings" disabled={busy}
+                    min={0.5} max={6000} step={0.5} label="Distance between BSP landings" disabled={busy || editingRetained}
                     onCommit={distance=>{
                       const next=moveDonorToLandingDistance(draft,distance);
                       if(next!==draft){update(next);void previewDraft(next);}
@@ -881,6 +899,7 @@ export default function BspAssembly({
                   draft.translation,
                   (v) => update(transformAssembly(draft, v, draft.yawDegrees)),
                   'Section position',
+                  editingRetained,
                 )}
                 <label>
                   Yaw
@@ -890,6 +909,7 @@ export default function BspAssembly({
                     max={360}
                     step={1}
                     label="BSP section yaw"
+                    disabled={editingRetained}
                     onCommit={(v) =>
                       update(
                         entrancePivot
@@ -907,6 +927,7 @@ export default function BspAssembly({
                     max={routeDraft!.archSegments?8:16}
                     step={0.1}
                     label={routeDraft!.archSegments?'Tunnel arch radius':'Tunnel width'}
+                    disabled={editingRetained && routeView === 'primary'}
                     onCommit={(v) => updateRoute({ tunnelWidth:routeDraft!.archSegments?v*2:v })}
                   />
                   {routeDraft!.archSegments&&<small>Horizontal radius. Clear height controls the roof above the route.</small>}
@@ -919,6 +940,7 @@ export default function BspAssembly({
                     max={16}
                     step={0.1}
                     label="Tunnel clear height"
+                    disabled={editingRetained && routeView === 'primary'}
                     onCommit={(v) => updateRoute({ tunnelHeight: v })}
                   />
                 </label>
@@ -962,7 +984,7 @@ export default function BspAssembly({
                 the section transform; matching editable tags are required. Donor weapons, vehicles,
                 objectives, scripts and named-object bindings are separate.
               </p>
-              {!ridge && (!draft.separateNativeBsps || canExtend && baseParts.length <= 14) && (
+              {!editingRetained && !ridge && (!draft.separateNativeBsps || canExtend && baseParts.length <= 14) && (
                 <div className="bsp-actions" aria-label="Pick connection landings">
                   <button type="button" disabled={busy || !selectionMatches} aria-pressed={pickingLanding === 'connector' && edgeTarget === 'base'}
                     onClick={() => { setViewedBsp(draft.baseBspIndex ?? 0); armEdge('base', 'connector'); }}>Pick current BSP landing</button>
@@ -980,22 +1002,16 @@ export default function BspAssembly({
                   {showRouteHandles && moveDonorHandle ? 'Hide BSP handle' : 'Move neighboring BSP'}
                 </button>
                 {!draft.terrainSeam && (!draft.separateNativeBsps || draft.preserveDonorBsp && !draft.openRoad) &&
-                  <button type="button" disabled={busy || routeDraft!.tunnelPoints.length >= 16} onClick={() => {
-                    const points = routeDraft!.tunnelPoints;
-                    const endIndex = points.length - 1;
-                    const last = points[endIndex];
-                    const before = points[endIndex - 1];
-                    const bend = last.map((axis, i) => (axis + before[i]) / 2) as Vec3;
-                    updateRoute({tunnelPoints: [...points.slice(0, endIndex), bend, last]});
-                  }}>Add bend before imported floor</button>}
+                  <button type="button" disabled={busy || routeDraft!.tunnelPoints.length >= 16} onClick={addRouteBend}>Add bend before imported floor</button>}
               </div>
               {showRouteHandles && <p className="subtle">{moveDonorHandle
   ? 'Drag the donor entrance handle to move the entire BSP and its landings. Apply after checking the gap.'
   : 'Select a point and drag an axis. Use snap for half-unit moves. Red vehicle segments exceed a 25% grade. Preview for floor and clearance checks before Apply.'}</p>}
               <div className="bsp-waypoints">
-                {routeDraft!.tunnelPoints.map((point, i) => (
-                  <div key={i}>
-                    {showRouteHandles && !moveDonorHandle && <button type="button" disabled={busy}
+                {routeDraft!.tunnelPoints.map((point, i) => {
+                  const fixed = editingRetained && routeView === 'primary' && retainedConnectorAnchor(routeDraft!.tunnelPoints.length, i);
+                  return <div key={i}>
+                    {showRouteHandles && !moveDonorHandle && !fixed && <button type="button" disabled={busy}
                       onClick={() => setRoutePointSelection(i)}>Select {i === 0 ? "destination floor" : i === routeDraft!.tunnelPoints.length - 1 ? "imported floor" : "bend " + i}</button>}
                     {vector(
                       point,
@@ -1006,16 +1022,17 @@ export default function BspAssembly({
                         : i === routeDraft!.tunnelPoints.length - 1
                           ? 'Imported floor'
                           : `Bend ${i}`,
+                      fixed,
                     )}
-                    {i > 0 && i < routeDraft!.tunnelPoints.length - 1 && (
+                    {!fixed && i > 0 && i < routeDraft!.tunnelPoints.length - 1 && (
                       <button
                         onClick={() => updateRoute({ tunnelPoints: routeDraft!.tunnelPoints.filter((_, k) => k !== i) })}
                       >
                         Remove bend
                       </button>
                     )}
-                  </div>
-                ))}
+                  </div>;
+                })}
               </div>
               <div className="bsp-settings">
                 <label>
@@ -1140,17 +1157,7 @@ export default function BspAssembly({
               <div className="bsp-actions">
                 <button
                   disabled={busy || (draft.separateNativeBsps && (!draft.preserveDonorBsp || !!draft.openRoad)) || !!draft.terrainSeam&&!routeKey&&!selectedSection || routeDraft!.tunnelPoints.length >= 16}
-                  onClick={() => {
-                    const a = routeDraft!.tunnelPoints.at(-2)!,
-                      b = routeDraft!.tunnelPoints.at(-1)!;
-                    updateRoute({
-                      tunnelPoints: [
-                        ...routeDraft!.tunnelPoints.slice(0, -1),
-                        a.map((v, i) => (v + b[i]) / 2) as Vec3,
-                        b,
-                      ],
-                    });
-                  }}
+                  onClick={addRouteBend}
                 >
                   Add tunnel bend
                 </button>

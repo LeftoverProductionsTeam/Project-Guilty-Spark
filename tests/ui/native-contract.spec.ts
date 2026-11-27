@@ -4243,12 +4243,17 @@ test('an inherited connector can be applied and saved as an in-place native edit
   await revealPagedControl(existing); await existing.click();
   await (await constructionControl(page, 'button', 'Edit Test island connector')).click();
   await (await constructionControl(page, 'button', 'Add bend before imported floor')).click();
+  await expect(panel.getByRole('spinbutton', {name: 'Destination floor X', exact: true, includeHidden: true})).toBeDisabled();
+  await expect(panel.getByRole('spinbutton', {name: 'Bend 1 X', exact: true, includeHidden: true})).toBeDisabled();
+  const interior = await constructionControl(page, 'spinbutton', 'Bend 2 Y');
+  await interior.fill('0.5');
+  await interior.press('Tab');
   await (await constructionControl(page, 'button', 'Apply connection')).click();
   await page.keyboard.press('Control+s');
   const saved = () => page.evaluate(() => (window as any).__sparkMock.saved);
   await expect.poll(async () => (await saved())?.bspAssembly?.rebuildNativeConnector).toBe(true);
   const project = await saved();
-  expect(project.bspAssembly.tunnelPoints).toEqual([[0,0,0],[10,0,0],[20,0,0]]);
+  expect(project.bspAssembly.tunnelPoints).toEqual([[0,0,0],[4,0,0],[10,0.5,0],[16,0,0],[20,0,0]]);
   expect(project.inheritedBspConnections).toHaveLength(1);
   expect(project.inheritedBspConnections[0].rebuildNativeConnector).toBeUndefined();
   await page.keyboard.press('Control+z');

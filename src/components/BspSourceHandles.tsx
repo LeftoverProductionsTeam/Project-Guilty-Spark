@@ -120,19 +120,19 @@ export function BspPartGizmo({
 }
 
 /** Manipulate draft route points in the same snapped world-space controls as brush edits. */
-export function BspRouteGizmo({ points, selected, onSelect, snap, enabled, gradeLimit, onChange, onDrag }: {
+export function BspRouteGizmo({ points, selected, onSelect, snap, enabled, gradeLimit, fixedEnds, onChange, onDrag }: {
   points: Vec3[]; selected: number; onSelect: (index: number) => void;
-  snap: boolean; enabled: boolean; gradeLimit?: number;
+  snap: boolean; enabled: boolean; gradeLimit?: number; fixedEnds?: boolean;
   onChange: (index: number, point: Vec3) => void; onDrag: (dragging: boolean) => void;
 }) {
   const [movingPoint, setMovingPoint] = useState<Vec3 | null>(null);
   const group = useRef<THREE.Group>(null);
   const moving = useRef(false);
-  const index = Math.min(selected, points.length - 1);
-  const pivot = points[index];
+  const fixed = (i: number) => fixedEnds && (i < 2 || i >= points.length - 2);
+  const index = fixedEnds ? Math.max(2, Math.min(selected, points.length - 3)) : Math.min(selected, points.length - 1);
+  const pivot = fixed(index) ? undefined : points[index];
   const display = movingPoint ? points.map((point, i) => i === index ? movingPoint : point) : points;
   useEffect(() => () => { if (moving.current) onDrag(false); }, []);
-  if (!pivot) return null;
   return <>
     {display.slice(1).map((end, i) => {
       const start = display[i];
@@ -142,11 +142,11 @@ export function BspRouteGizmo({ points, selected, onSelect, snap, enabled, grade
         lineWidth={excessive ? 4 : 2} depthTest={false} renderOrder={1001} raycast={() => null} />;
     })}
     {display.map((point, i) => <mesh key={i} position={point} renderOrder={1002}
-      onClick={event => { if (enabled && event.button === 0 && event.delta <= 5) { event.stopPropagation(); onSelect(i); }}}>
+      onClick={event => { if (enabled && !fixed(i) && event.button === 0 && event.delta <= 5) { event.stopPropagation(); onSelect(i); }}}>
       <sphereGeometry args={[i === index ? 0.24 : 0.18, 12, 8]} />
-      <meshBasicMaterial color={i === index ? '#fff098' : '#66ddc8'} depthTest={false} />
+      <meshBasicMaterial color={fixed(i) ? '#778d92' : i === index ? '#fff098' : '#66ddc8'} depthTest={false} />
     </mesh>)}
-    <group ref={group} position={pivot} />
+    {pivot && <><group ref={group} position={pivot} />
     <TransformControls object={group as React.RefObject<THREE.Object3D>}
       enabled={enabled} mode='translate' space='world' translationSnap={snap ? 0.5 : null}
       onMouseDown={() => { if (enabled) { moving.current = true; onDrag(true); } }}
@@ -159,6 +159,6 @@ export function BspRouteGizmo({ points, selected, onSelect, snap, enabled, grade
         setMovingPoint(null);
         onDrag(false);
         if (Math.hypot(...point.map((axis, i) => axis - pivot[i])) > 1e-6) onChange(index, point);
-      }} />
+      }} /></>}
   </>;
 }

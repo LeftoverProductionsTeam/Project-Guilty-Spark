@@ -380,7 +380,7 @@ function Scene({
   onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
   ownedModels,assembly,assemblyPlan,joinedPreview,additionalBounds,focusBounds,pickTarget,surfacePick,sourceScope,transformLocked=false,
-  routePoints,onRoutePoint,routeKey,routeGradeLimit,routeFailure,routePointSelection=0,onSelectRoutePoint,
+  routePoints,onRoutePoint,routeKey,routeGradeLimit,routeFixedEnds,routeFailure,routePointSelection=0,onSelectRoutePoint,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -412,7 +412,7 @@ function Scene({
   assembly:AssemblyViewportSource|null;
   assemblyPlan:Project['bspAssembly'];
   routePoints?:Vec3[];onRoutePoint?:(index:number,point:Vec3)=>void;routeKey?:string;
-  routeGradeLimit?:number;routeFailure?:Vec3;routePointSelection?:number;onSelectRoutePoint?:(index:number)=>void;
+  routeGradeLimit?:number;routeFixedEnds?:boolean;routeFailure?:Vec3;routePointSelection?:number;onSelectRoutePoint?:(index:number)=>void;
   joinedPreview?:import('../bspAssembly').AssemblyReport['viewport'];
   additionalBounds:{min:Vec3;max:Vec3}|null;
   focusBounds?:THREE.Box3|null;
@@ -546,7 +546,7 @@ function Scene({
       })()}
       {joinedPreview&&assembly&&joinedPreview.surfaces.map(surface=>{const donor=surface.source===1,view=ownedModels[forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId})];return <group key={surface.source} name="gs-joined-source" userData={{assetSurface:true}}><Mesh data={surface.mesh} greenScreen={greenScreen} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?(donor?view?.shaderTextures:shaderTextures):EMPTY_SHADER_TEXTURES} shaderMetadata={donor?view?.shaderMetadata:shaderMetadata} extraTextures={donor?view?.extraTextures:extraTextures}/></group>;})}
       {routePoints && onRoutePoint && onSelectRoutePoint && !cinematic && !pickTarget &&
-        <BspRouteGizmo key={routeKey} points={routePoints} selected={routePointSelection} onSelect={onSelectRoutePoint} snap={snap} enabled={!fly && !cameraLocked} gradeLimit={routeGradeLimit}
+        <BspRouteGizmo key={routeKey} points={routePoints} selected={routePointSelection} onSelect={onSelectRoutePoint} snap={snap} enabled={!fly && !cameraLocked} gradeLimit={routeGradeLimit} fixedEnds={routeFixedEnds}
           onChange={onRoutePoint} onDrag={moving=>moving ? onSceneDragStart?.() : onSceneDragEnd?.()} />}
       {routeFailure && !cinematic && <mesh position={routeFailure} renderOrder={1003} raycast={() => null}>
         <sphereGeometry args={[0.35, 12, 8]} /><meshBasicMaterial color="#ff617a" depthTest={false} />
@@ -1878,7 +1878,7 @@ export default function World({
                     cinematic,greenScreen,
                     cameraLocked:cameraLocked||xrActive,
                     externalCameraAuthority:externalCameraAuthority||xrActive,
-                    routePoints,routeFailure,routeGradeLimit,routePointSelection,onSelectRoutePoint:setRoutePointSelection,onRoutePoint:changeRoutePoint,routeKey:project.id+':'+(moveDonorHandle?'donor':routeKey),ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
+                    routePoints,routeFailure,routeGradeLimit,routeFixedEnds:!!currentRouteDraft?.rebuildNativeConnector&&routeKey==='primary',routePointSelection,onSelectRoutePoint:setRoutePointSelection,onRoutePoint:changeRoutePoint,routeKey:project.id+':'+(moveDonorHandle?'donor':routeKey),ownedModels,assembly,assemblyPlan,joinedPreview:pickTarget||!assembly?undefined:assemblyDonor.preview,additionalBounds:donorBounds,focusBounds:switchPose?.bounds,pickTarget,surfacePick,
                   }}
                   inspection={inspection}
                   onSnapError={notify}
