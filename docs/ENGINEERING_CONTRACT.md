@@ -57,6 +57,8 @@ Use version-pinned adapters and explicit compatibility contracts. Do not bypass 
 
 ## Engineering expectations
 
+Product Completion V3 is the active product goal. The [active checkpoint](ACTIVE_TASK.md) carries current gates and links to historical requirements. Advance ordinary editor-to-runtime workflows and continue independent implementation whenever a separate gate is blocked. Reuse accepted evidence and keep scope-specific compatibility claims separate from release status.
+
 For every initiative:
 
 1. Inspect current code and determine which requirements are already met.

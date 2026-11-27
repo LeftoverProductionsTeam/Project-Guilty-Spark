@@ -3,8 +3,8 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark source 967300f79d93dd4c08f6506e0a9698bde96c0ac8 for route editing and retained geometry repairs. Spark Latest remains 356ec94f / d75b353d. No promotion for this increment.
-Next action: Forerunner compares Ice Fields opacity and the Carousel ramp from normal spawn using the retained controls and combined repair below. Require rendered inspection and on-foot/Warthog traversal both ways. In Spark, connect reviewed retained-slot repairs to the existing normal editor build, then reproduce edit, save, reopen, build/bake, and native traversal before publishing.
+Latest verified revision: Spark source 598fcd59 for inherited connector authoring and native build integration. The browser edit/Save/Undo check passed. Native bake and playtest remain open. Spark Latest remains 356ec94f / d75b353d. No promotion for this increment.
+Next action: Forerunner completes wide visual and normal-spawn foot/Warthog traversal for the compact repair pair. In Spark, bake, reopen and traverse one saved in-place edit, then bring the reviewed ramp and floor entrance repairs into the same ordinary workflow.
 
 ## Acceptance
 
@@ -34,9 +34,9 @@ Folder prefix is `megaworld-compact-native-`. Keep f5a4ca22 / 4a095213 as the re
 
 ## Failures and blockers
 
-- Ice Fields visible native comparison is open. Use the existing f5 camera at (928.6,183.1,-15.1), BSP 11, yaw -92°, Win64 OpenGL 800×600. The old rejected frame is `compact-corrected-route/screens/window21286.bmp` including white terrain and missing opaque walls. Keep snow/prop comparisons and ambience restoration open.
+- The previously missing Ice Fields wall passed the exact matched native view on b5178c77 / 4a7f6920 and Win64 2beae96a at tick 4350. Forerunner retained `compact-native-diagnostics/screens/window16560.bmp` at BSP 11, yaw −92°, OpenGL 800×600. Wider visual and traversal checks remain open. Use the existing f5 camera at (928.6,183.1,-15.1), BSP 11, yaw -92°, Win64 OpenGL 800×600. The old rejected frame is `compact-corrected-route/screens/window21286.bmp` including white terrain and missing opaque walls. Keep snow/prop comparisons and ambience restoration open.
 - The Sidewinder–Timberland exposed stone seam remains unresolved. Owner screenshot `codex-clipboard-add9a910-829b-49ee-903f-9aae117ae160.png` and region attribution are retained in the owner thread; prior evidence is in 74db6049.
-- The editor can author and preview route changes. Real desktop reopen and the normal native build of a reviewed repair to an existing BSP slot remain unverified. The retained exact b517 map was built by the existing native repair harness.
+- Construction can select and save an in-place edit to an inherited isolated connector. Preview and Build require its original landings, switch volumes and BSP slot identities. The actual editor-led native bake/reopen and traversal remain unverified. This path edits the connector alone. The entrance ramp and floor patches in b517 still use the retained native repair harness.
 - Actual two-way Warthog use and final receipt regeneration await native acceptance. Do not infer either from sampled clearance.
 
 ## Operations and safe checkpoint

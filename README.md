@@ -102,9 +102,9 @@ There's a **Learning Center** with searchable workflow guides and an in-app glos
 
 These are the big ambitions, **not a list of magically finished features**:
 
-- **MegaWorld:** nineteen planned Halo regions connected by real terrain, caves, mountains and Warthog roads. Prototypes compile and load; the complete world and verified two-way gameplay aren't done.
+- **MegaWorld:** Forerunner Latest includes a playable 19-region ground Extraction preview. The compact world is still in private acceptance. Ice Fields wall opacity has passed one matched native view. Wider visual checks and two-way vehicle traversal remain open.
 - **Zombie Apocalypse and Firefight:** original zombie mechanics, native AI encounters, proper wave survival, sounds, scoring and co-op. Authoring tools and native experiments exist; full accepted player combat isn't done.
-- **Extraction:** Halo PvPvE with loot, banked inventory, actual extraction and persistence, without forcing a raid timer. Not a finished playable mode.
+- **Extraction:** The released ground preview supports faction deployment, field pickups, evacuation calls and banking. The full regional loot-pool package and the compact geometry are separate private candidates. Synchronized hunts and aircraft extraction remain unfinished.
 - **More ways to play together:** multiplayer AI, expanded co-op, more peers, runtime bridges and split-screen. Real engine/peer acceptance is still ahead.
 - **VR and more platforms:** OpenH1 headset editing, native Linux and macOS releases, and keeping the old Mac/Demo stuff alive. Those are separate unfinished hardware and release gates.
 

@@ -23,6 +23,11 @@
 
 ## Permanent engineering contract
 
+- Product Completion V3 governs current work. Preserve all 475 historical requirements, M1–M6, Operation 110%, V2/V2.1 and subsequent owner directives. Earlier priority labels remain historical. Use the existing active checkpoint and open only relevant requirement, source and evidence sections.
+- Prioritize completed, ordinary creator workflows over documentation churn. Every supported creator operation must be available through Spark. Keep active checkpoints under 8 KiB where practical and retain historical evidence in existing records and Git history.
+- Reuse existing implementations, compatible upstream tools, verified dependencies, accepted native evidence and incremental builds. Batch changes and test proportionately. After a failure, change the approach based on evidence before retrying. Continue independent engineering when a separate gate is blocked.
+- Reconcile user guides, compatibility and integration records alongside substantial milestones. Keep source implementation, automated testing, actual native gameplay and Latest release status distinct. Preserve exact licenses and upstream provenance.
+
 - Read and apply `docs/ENGINEERING_CONTRACT.md` for every initiative. Preserve the complete requirements/research ledger and current implementations; inspect actual HEAD and unfinished work first.
 - Keep implemented source, automated tests, native readback, native compilation, game loading, human gameplay, real game-peer acceptance and clean-machine release acceptance distinct. Select the highest-impact missing native gate within the active task and use existing components and available native tools.
 - Standard exported Halo tags/maps must remain independently compatible. Do not invent native fields/classes, disguise cache formats, force Spark extensions or silently discard data. Optional authoring sidecars are separate.

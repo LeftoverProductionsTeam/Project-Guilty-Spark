@@ -2,6 +2,17 @@
 
 8 November private dedicated milestone: [Windows Chupathingy v0.9.0c](CHUPATHINGY_DEDICATED_20261108.md) now installs through the existing downloader, stages verified CE banks/native content and runs an isolated private server. R184 proves two separate game clients spawning, guarded native map restart, changed-cache rejection, original-input preservation, eight scaled native window sizes and full Spark restart persistence. Ordinary multiplayer is separate from AI Apocalypse/persistent Extraction or human gameplay acceptance.
 
+## Current MegaWorld and regional playtest scope
+
+| Workflow | Verified status | Remaining gate |
+| --- | --- | --- |
+| Forerunner Latest MCC13 ground Extraction | Released map `fcfe9d44`; normal-menu gameplay and ground banking accepted | Compact terrain and the full regional pool package remain separate |
+| Compact Ice Fields and Carousel `b5178c77 / 4a7f6920` | Private Win64 `2beae96a` normal-menu load. Matched native Ice Fields view at BSP 11, yaw −92°, recovered opaque walls | Wider visuals, two-way foot/Warthog and final pooled cache |
+| Spark Construction route handles and in-place MCC13 connector edits | Browser workflow exercises drag, Preview, Apply, Save and Undo; inherited connector selection and Save/Undo passed separately in source `598fcd59` | Desktop reopen, actual native bake and runtime traversal require workflow acceptance. In-place entrance repair remains separate |
+| Forerunner `playtest.regional_transition_log.v1` | Advertised on private Win64 `2beae96a`. Use the existing staged native log and match the cache identity before interpreting indices | This is an optional diagnostic, with no map-receipt requirement or independent gameplay guarantee |
+
+See the [active checkpoint](ACTIVE_TASK.md) for exact artifacts. The existing Forerunner Spark integration contract defines the runtime diagnostic fields.
+
 ## November 7 — source-native asset transfer acceptance
 
 | Exact source → destination | Asset / required native closure | Proven endpoint | Remaining gate |

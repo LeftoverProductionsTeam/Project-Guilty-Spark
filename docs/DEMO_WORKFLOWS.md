@@ -4,6 +4,12 @@ Open **Menu → Learning center → Guides**. Search for a demo or choose a cate
 
 The catalog currently contains **63 workflows**. It is maintained in `src/featureCatalog.ts`, rather than a separate help-only list. Opening a guide never inserts example geometry, changes your source, launches Halo, or marks a test passed. A source-only operation directs you to create/open an editable source map when the current map is compiled-only.
 
+## Edit a BSP route in Construction
+
+Open **Level editor → Construction → BSP Assembly**. Plan a route or open your saved draft. Select the tunnel, cave, or ridge path, add a bend if needed, then click **Drag route points**. Select a route point and move an axis with the viewport handle. Use the snap toggle for half-unit steps or the numeric fields for exact placement.
+
+Run **Preview draft & triangles** to see the draft and inspect clearance or facing warnings. **Apply connection** creates an Undo step and **Save** persists it. For native output, use the existing **Build settings → Build & check playtest** with matching tools and source tags. The interaction has passed browser testing. On an eligible compiled MCC13 project, open **Edit a compiled connector**, select the inherited route, and edit its interior bends. Keep the landings and switch positions fixed. Spark’s in-place build targets the connector’s existing slot. This path still needs an end-to-end desktop bake and traversal check.
+
 ## Make your own named rooms and hallway
 
 1. **Map library → Create a map → Custom blank → Level editor → BSP Workshop**. Choose **Start with one room**, or inspect **Two rooms + corridor + ramp** in a separate source project. Loading that example replaces its source geometry as one Undo step.
