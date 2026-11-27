@@ -1,6 +1,6 @@
 import {expect,it} from 'vitest';
 import {gzipSync} from 'node:zlib';
-import {hrecCameraShots,readHrecTake} from './hrecTake';
+import {hrecCameraShots,readHrecTake,trimHrecCameraTrack} from './hrecTake';
 
 const u32=(value:number)=>[value&255,value>>>8&255,value>>>16&255,value>>>24];
 const record=(kind:number,bytes:number[])=>[kind,...u32(bytes.length),...bytes];
@@ -71,4 +71,17 @@ it('imports the detached operator lens and roll with explicit cuts and gaps',asy
   expect(still[0].lookAt).toEqual([5,1,3]);
   await expect(readHrecTake(file([...header,...frame(10,3),...frame(9,4)]))).rejects.toThrow('out of order');
   await expect(readHrecTake(file([...header,...frame(10,3,[1,0,0],[1,0,0])]))).rejects.toThrow('invalid operator camera pose');
+});
+
+it('reserves a short zoom cut when thinning and can trim into the key budget', () => {
+  const track = {player:0,start:0,end:600,samples:Array.from({length:61},(_,index) => ({
+    tick:index*10,eye:[index,0,1] as [number,number,number],yaw:0,pitch:0,zoom:index===19,
+  }))};
+  const source={rate:60,mapName:'timberland',mapSha256:'',tracks:[track]};
+  expect(() => hrecCameraShots(source,0,'Lens',4)).toThrow('cannot preserve all lens cuts');
+  const trimmed=trimHrecCameraTrack(source,0,180,200);
+  expect(hrecCameraShots(trimmed,0,'Lens',4).map(row => [row.cameraPosition[0],row.fov,row.easing]))
+    .toEqual([[18,70,'cut'],[19,30,'cut'],[20,70,'linear']]);
+  expect(() => trimHrecCameraTrack(source,0,181,189)).toThrow('no recorded camera samples');
+  expect(source.tracks[0].samples).toHaveLength(61);
 });

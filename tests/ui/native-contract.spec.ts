@@ -7405,14 +7405,14 @@ test('Forerunner HREC camera keys enter the normal Machinima timeline and Undo',
   const u32=(v:number)=>{const b=Buffer.alloc(4);b.writeUInt32LE(v);return b;};
   const text=(v:string)=>Buffer.concat([Buffer.from([Buffer.byteLength(v)]),Buffer.from(v)]);
   const record=(kind:number,data:Buffer)=>Buffer.concat([Buffer.from([kind]),u32(data.length),data]);
-  const frame=(tick:number,x:number)=>{
-    const sample=Buffer.alloc(26);
+  const frame=(tick:number,x:number,zoom=false)=>{
+    const sample=Buffer.alloc(26); sample[1]=zoom?8:0;
     sample.writeFloatLE(x,2);sample.writeInt16LE(1600,14);sample[20]=255;
     return record(4,Buffer.concat([u32(tick),Buffer.from([1]),sample]));
   };
   const map=record(1,Buffer.concat([u32(0),Buffer.from([60,0,0]),text(identity.map),Buffer.from([0])]));
   const exact=record(16,Buffer.concat([Buffer.from([1,0]),Buffer.from(identity.sha,'hex')]));
-  const payload=Buffer.concat([map,exact,frame(0,2),frame(15,4)]);
+  const payload=Buffer.concat([map,exact,frame(0,0),frame(15,2),frame(30,4,true),frame(45,6)]);
   const hrec=Buffer.concat([Buffer.from('HREC'),u32(2),Buffer.from('R'),u32(payload.length),u32(payload.length),payload]);
   await chooseTool(page,'Machinima');
   await openDrawer(page,'Camera keys');
@@ -7421,10 +7421,14 @@ test('Forerunner HREC camera keys enter the normal Machinima timeline and Undo',
   await revealPagedControl(summary);await summary.click();
   await box.locator('input[type=file][accept^=".hrec"]').setInputFiles({name:'Opening.hrec',mimeType:'application/octet-stream',buffer:hrec});
   await expect(box.getByRole('textbox',{name:'Take name'})).toHaveValue('Opening');
+  const start=box.getByRole('spinbutton',{name:'Start tick',exact:true});
+  const end=box.getByRole('spinbutton',{name:'End tick',exact:true});
+  await revealPagedControl(start); await start.fill('15');
+  await revealPagedControl(end); await end.fill('30');
   await box.getByRole('button',{name:'Append camera take',exact:true}).click();
   await page.keyboard.press('Control+s');
   const keys=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.shots);
-  await expect.poll(keys).toMatchObject([{name:'Opening · 1',cameraPosition:[2,0,1.6],durationMs:250},{name:'Opening · 2',cameraPosition:[4,0,1.6]}]);
+  await expect.poll(keys).toMatchObject([{name:'Opening · 1',cameraPosition:[2,0,1.6],durationMs:250,fov:70,easing:'cut'},{name:'Opening · 2',cameraPosition:[4,0,1.6],fov:30}]);
   const imported=await keys();
   const ranges=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.cameraTakes??[]);
   await expect.poll(ranges).toMatchObject([{name:'Opening',firstShotId:imported[0].id,lastShotId:imported[1].id}]);

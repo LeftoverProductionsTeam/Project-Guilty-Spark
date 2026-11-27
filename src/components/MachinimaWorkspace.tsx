@@ -27,7 +27,7 @@ import {
 } from '../machinima';
 import type { MachinimaSettings } from '../machinima';
 import { captureFrame, recordViewport } from '../machinimaCapture';
-import {HREC_INPUT_LIMIT,hrecCameraShots,readHrecTake,type HrecTakeSource} from '../hrecTake';
+import {HREC_INPUT_LIMIT,hrecCameraShots,readHrecTake,trimHrecCameraTrack,type HrecTakeSource} from '../hrecTake';
 import { downloadLocalText } from '../exportHelpers';
 import { Notice, NumberField } from './ui';
 import MachinimaRig from './MachinimaRig';
@@ -186,6 +186,7 @@ export default function MachinimaWorkspace({
     mounted = useRef(true);
   const [animation,setAnimation]=useState<AnimationPreview|null>(null);
   const [replay,setReplay]=useState<HrecTakeSource|null>(null),[replayTrack,setReplayTrack]=useState(0),[replayName,setReplayName]=useState('');
+  const [replayRange,setReplayRange]=useState<[string,string]>(['','']);
   const [nativeResolution,setNativeResolution]=useState('desktop'),[launching,setLaunching]=useState(false);
   const actorSources=data.entries.filter(entry=>typeof entry.version==='number'&&entry.version>0);
   const [sourceId, setSourceId] = useMapState(project.id,'director.source',
@@ -567,6 +568,7 @@ export default function MachinimaWorkspace({
                   if(take.mapSha256 ? take.mapSha256!==inspection.sha256 : take.mapName!==name)
                     throw Error('Open the matching preserved map before importing this recording.');
                   setReplayTrack(0);
+                  setReplayRange([String(take.tracks[0].start),String(take.tracks[0].end)]);
                   setReplayName(file.name.replace(/\.hrec$/i,'').slice(0,90));
                   setReplay(take);
                 }catch(error){if(ticket===replayEpoch.current)notify(String(error));}
@@ -575,16 +577,30 @@ export default function MachinimaWorkspace({
               <label className="field-label">Take name<input value={replayName} maxLength={90}
                 onChange={event=>setReplayName(event.target.value)}/></label>
               <label className="field-label">Recorded view<select value={replayTrack}
-                onChange={event=>setReplayTrack(Number(event.target.value))}>
+                onChange={event=>{
+                  const index=Number(event.target.value),track=replay.tracks[index];
+                  setReplayTrack(index);setReplayRange([String(track.start),String(track.end)]);
+                }}>
                 {replay.tracks.map((track,index)=><option key={index} value={index}>
                   {track.player===null ? 'Operator camera' : 'Player '+(track.player+1)} · {((track.end-track.start)/replay.rate).toFixed(1)} s · start tick {track.start}
                 </option>)}
               </select></label>
+              <div className="compact-action-row">
+                <label className="field-label">Start tick<input type="number" step={1} value={replayRange[0]}
+                  min={replay.tracks[replayTrack].start} max={replay.tracks[replayTrack].end}
+                  onChange={event=>setReplayRange([event.target.value,replayRange[1]])}/></label>
+                <label className="field-label">End tick<input type="number" step={1} value={replayRange[1]}
+                  min={replay.tracks[replayTrack].start} max={replay.tracks[replayTrack].end}
+                  onChange={event=>setReplayRange([replayRange[0],event.target.value])}/></label>
+              </div>
+              <small>Trim long views to keep recorded lens cuts within the camera key limit.</small>
               {!replay.mapSha256 && <small>This recording identifies the map by name. Review the keys against the open map.</small>}
               <button type="button" disabled={playing||recording} onClick={()=>{
                 try{
                   const name = replayName.trim();
-                  const imported = hrecCameraShots(replay, replayTrack, name, Math.min(256 - shots.length, 64));
+                  const [start,end] = replayRange.map(tick => tick.trim() ? Number(tick) : Number.NaN);
+                  const range = trimHrecCameraTrack(replay,replayTrack,start,end);
+                  const imported = hrecCameraShots(range, 0, name, Math.min(256 - shots.length, 64));
                   const row: CameraTake = {id: crypto.randomUUID(), name,
                     firstShotId: imported[0].id, lastShotId: imported[imported.length - 1].id};
                   if (save([...shots, ...imported], 'Import camera take · ' + name, settings, {cameraTakes: [...takes, row]})) {

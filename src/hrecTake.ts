@@ -181,21 +181,51 @@ function samplePose(sample: Sample):CameraPose {
   return {position,lookAt,fov:zoom?30:70,roll:0};
 }
 
+export function trimHrecCameraTrack(
+  source: HrecTakeSource, trackIndex: number, start: number, end: number,
+): HrecTakeSource {
+  const track = source.tracks[trackIndex];
+  requireRecording(track && Number.isInteger(start) && Number.isInteger(end)
+    && track.start <= start && start <= end && end <= track.end,
+  'choose start and end ticks inside the recorded view.');
+  const trim = <T extends Sample>(recorded: Track<T>) => {
+    const samples = recorded.samples.filter(sample => sample.tick >= start && sample.tick <= end);
+    requireRecording(samples.length > 0, 'the selected range has no recorded camera samples.');
+    return {start: samples[0].tick, end, samples};
+  };
+  return {...source, tracks: [track.player === null
+    ? {player: null, ...trim(track)}
+    : {player: track.player, ...trim(track)}]};
+}
+
 export function hrecCameraShots(source:HrecTakeSource, trackIndex:number, title:string, limit=64):CameraShot[] {
   const track=source.tracks[trackIndex];
   requireRecording(track&&Number.isInteger(limit)&&limit>=Math.min(track.samples.length,2)&&limit<=64,
     'choose a take with room for its camera keys.');
   requireRecording(title.trim()&&title.length<=90&&!/[\x00-\x1f\x7f]/.test(title),'enter a take name up to 90 characters.');
   const rate=source.rate,samples=track.samples;
-  // Keep a discrete cut when zoom changes. The editable take uses the existing
-  // Spark keyframes and their native camera-script limits.
-  const step=Math.max(Math.ceil(rate/4),Math.ceil((samples.at(-1)!.tick-track.start)/Math.max(1,limit-1)));
-  const selected:Sample[]=[samples[0]];
-  for(let i=1;i<samples.length-1&&selected.length<limit-1;i++){
-    if(samples[i].tick-selected.at(-1)!.tick>=step)selected.push(samples[i]);
+  // Reserve the samples on both sides of each lens cut before spending the
+  // key budget on motion. Subsampling alone can erase a short zoom completely.
+  const retained = new Set([0, samples.length - 1]);
+  for (let index = 1; index < samples.length; index++) {
+    const previous = samples[index - 1], current = samples[index];
+    if ('zoom' in previous && 'zoom' in current && previous.zoom !== current.zoom) {
+      retained.add(index - 1);
+      retained.add(index);
+    }
   }
-  const tail=samples.at(-1)!;
-  if(tail.tick>selected[0].tick)selected.push(tail);
+  requireRecording(retained.size <= limit,
+    'the camera key budget cannot preserve all lens cuts. Choose a shorter recorded range.');
+  const steps = Math.max(1, limit - retained.size + 1);
+  const interval = Math.max(Math.ceil(rate / 4), Math.ceil((samples.at(-1)!.tick-track.start) / steps));
+  let previousTick = samples[0].tick;
+  for (let index = 1; index < samples.length - 1 && retained.size < limit; index++) {
+    if (retained.has(index) || samples[index].tick - previousTick >= interval) {
+      retained.add(index);
+      previousTick = samples[index].tick;
+    }
+  }
+  const selected = [...retained].sort((a, b) => a - b).map(index => samples[index]);
   return selected.map((sample,index)=>{
     const following=selected[index+1];
     const boundary=following?.tick??track.end;

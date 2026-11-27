@@ -1,5 +1,9 @@
 # Canonical cumulative feature and evidence ledger
 
+Original Master Engineering Prompts #04–#28 remain in scope alongside Product Completion V3. Preserve all 475 CSV requirement IDs. Current priorities belong to the active checkpoint. Continue independent implementation while another workflow awaits native or human acceptance.
+
+Prompt #13 now has bounded HREC range import that preserves zoom cuts when reducing recorded samples to editable keys. The existing camera timeline passed import, Save and Undo/Redo in the browser. Native cinematic playback, physical multi-monitor operation and verified audio/video export remain open.
+
 17Nov native build-history persistence: compiler results and deliberate failure now survive actual embedded app restart without post-build Save, preserving previous-good output and exact saved descriptor. Library15/API2 pass; c40 nativeBuildHistoryPersistence20261117 records native hashes/evidence. This closes the metadata-loss gate, not37944/full mission/gameplay/physical input or M1–M6.
 
 17Nov recovered actor import: existing source browser/importer/native writer/reconciliation now complete Prepare → Preview/Accept/Restore → Save/restart → CE609 compile → independent four-tag byte readback → UI export.426-tag Spirit pilot closure retained in candidate ef98e780; deferred AI/controller/gameplay remain OPEN. Large-field Source Guardian validation fixed without weakening bounds. Embedded saved-profile recovery also passes; physical input blocked by owner Firewall gate. Exact evidence:c40 recoveredActorImport20261117/nativeProfileRecovery20261117 and RUNTIME_INTEGRATION_20261107.475CSV IDs/M1–M6 unchanged.

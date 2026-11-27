@@ -23,7 +23,7 @@
 
 ## Permanent engineering contract
 
-- Product Completion V3 governs current work. Preserve all 475 historical requirements, M1–M6, Operation 110%, V2/V2.1 and subsequent owner directives. Earlier priority labels remain historical. Use the existing active checkpoint and open only relevant requirement, source and evidence sections.
+- Product Completion V3 governs current work. Preserve all 475 historical requirements, original Master Engineering Prompts #04–#28, M1–M6, Operation 110%, V2/V2.1 and subsequent owner directives. Earlier priority labels remain historical. Use the existing active checkpoint and open only relevant requirement, source and evidence sections.
 - Prioritize completed, ordinary creator workflows over documentation churn. Every supported creator operation must be available through Spark. Keep active checkpoints under 8 KiB where practical and retain historical evidence in existing records and Git history.
 - Reuse existing implementations, compatible upstream tools, verified dependencies, accepted native evidence and incremental builds. Batch changes and test proportionately. After a failure, change the approach based on evidence before retrying. Continue independent engineering when a separate gate is blocked.
 - Reconcile user guides, compatibility matrices, upstream integration records and runtime discovery alongside substantial milestones. Distinguish implemented source, tested behavior, playable workflows and what is installed in Latest. Keep discovery claims tied to the executable that advertises them. Preserve exact upstream revisions, licenses and attribution.
