@@ -5,7 +5,8 @@ import NativeAiStartOverlay from './NativeAiStartOverlay';
 import {NATIVE_AI_START_VIEW} from '../nativeAiStart';
 import type {NativeAiStartView} from '../nativeAiStart';
 import {beginProjectMutation} from '../projectMutation';
-import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
+import {PREFERRED_RUNTIME, runtimeNames, type OpenCeFlavor} from '../runtimeWorkbench';
+import HeaderRuntime from './HeaderRuntime';
 import { isHmvPlacementGroup, type HmvPlacementProperties } from '../forgeHmv';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import {openMapPreviewSource} from '../mapPreviewSource';
@@ -195,6 +196,7 @@ interface Props {
   onBuild: () => Promise<void>;
   onRuntimes: () => void;
   onSettings: () => void;
+  onSetupFlavor: (flavor: OpenCeFlavor) => void;
   onLive?: () => void;
   onReviewAiStart?:()=>void;
   onReviewTrigger?:()=>void;
@@ -340,6 +342,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const activity=useWorkspaceActivity();
   const { project, document: doc, data, edit, notify } = props;
   const activeBuildTarget = project.buildTargets?.find((target) => target.id === project.activeBuildTarget);
+  const [playRuntime,setPlayRuntime]=useMapState<RuntimeId>(project.id,'hosting.runtime',props.document.runtimeId);
+  const buildRuntime = activeBuildTarget?.runtimeId ?? props.document.runtimeId;
   const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
@@ -2817,11 +2821,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             )}
               <div className="forge-build-config">
                 <label>
-                  Runtime target
+                  Build target
                   <select
                     aria-label="Build runtime target"
-                    disabled={!!project?.activeBuildTarget}
-                    value={doc.runtimeId}
+                    disabled={!!activeBuildTarget}
+                    value={buildRuntime}
                     onChange={(e) =>
                       commit(
                         { ...doc, runtimeId: e.target.value as RuntimeId },
@@ -2829,6 +2833,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       )
                     }
                   >
+                    {!forgeTargets[buildRuntime] && <option value={buildRuntime}>{runtimeNames[buildRuntime]}</option>}
                     {Object.entries(forgeTargets).map(([id, title]) => (
                       <option key={id} value={id}>
                         {title}
@@ -2837,7 +2842,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   </select>
                 </label>
                 <label>
-                  Build quality
+                  Quality
                   <select
                     value={doc.buildQuality}
                     onChange={(e) =>
@@ -2851,6 +2856,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     <option value="final">Final</option>
                   </select>
                 </label>
+                <HeaderRuntime label="Play / host engine" ariaLabel="QuickForge play and host runtime"
+                  className="forge-play-runtime" value={playRuntime} onChange={setPlayRuntime} onSetupFlavor={props.onSetupFlavor}/>
               </div>
               <div className="analysis-actions">
                 <button className="small-button" onClick={() => {

@@ -4616,15 +4616,30 @@ for(const configured of [true,false])test(`QuickForge build paths and configure 
  await page.evaluate(configured=>{
   const w=window as any,p=w.__sparkMock.projects.a.project;
   p.quickForge={schemaVersion:1,name:p.title,template:'customBlank',runtimeId:'chupathingyCe',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]};
-  p.activeBuildTarget='map-ce';p.buildTargets=[{id:'map-ce',name:'Map CE source',runtimeId:'chupathingyCe',builder:'invader-ce',hekFlavor:'legacyHek',hekDirectory:'C:/Map/Kit',tagsDirectory:configured?'C:/Map/Tags':null,invaderDirectory:'C:/Map/Invader',ceCompatibleTagset:true,openSauce:false}];
+  p.activeBuildTarget='map-ce';p.buildTargets=[{id:'map-ce',name:'Map CE source',runtimeId:'haloCustomEdition',builder:'invader-ce',hekFlavor:'legacyHek',hekDirectory:'C:/Map/Kit',tagsDirectory:configured?'C:/Map/Tags':null,invaderDirectory:'C:/Map/Invader',ceCompatibleTagset:true,openSauce:false}];
+  const invoke=w.__TAURI_INTERNALS__.invoke;
+  const forerunner={id:'quickforge-forerunner',runtimeId:'openCe',root:'D:/Project Forerunner/Latest',executable:'D:/Project Forerunner/Latest/halo.exe',version:'Forerunner'};
+  w.__TAURI_INTERNALS__.invoke=async (command:string,args:any)=>{
+   if(command==='list_runtime_registrations')return [forerunner];
+   if(command==='activate_runtime_registration'){w.__sparkMock.calls.push({command,args});return [];}
+   return invoke(command,args);
+  };
  },configured);
  await openFixture(page);await chooseTool(page,'Level editor');
  await page.locator('.forge-build-summary').click();
+ const playRuntime=page.getByRole('combobox',{name:'QuickForge play and host runtime',exact:true});
+ const buildRuntime=page.getByRole('combobox',{name:'Build runtime target',exact:true});
+ await expect(buildRuntime).toHaveValue('haloCustomEdition');
+ await expect(playRuntime.locator('optgroup[label="Flagship"] option[value="profile:quickforge-forerunner"]')).toHaveText('Forerunner · Latest');
+ await playRuntime.selectOption('profile:quickforge-forerunner');
+ await expect(playRuntime).toHaveValue('profile:quickforge-forerunner');
+ await expect(buildRuntime).toHaveValue('haloCustomEdition');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='activate_runtime_registration').at(-1)?.args.registrationId)).toBe('quickforge-forerunner');
  const details=page.locator('.forge-build-details');await expect(details).not.toHaveAttribute('open','');
  if(configured)for(const [width,height] of [[800,600],[1280,720],[1366,768],[1500,950],[1920,1080],[2560,1080],[3440,1440],[5120,1440]]){
   await page.setViewportSize({width,height});
   const toolbar=page.locator('.forge-build-toolbar');await expect(toolbar).toBeVisible();
-  for(const control of [page.getByRole('combobox',{name:'Build runtime target',exact:true}),page.getByRole('button',{name:'Configure build tools',exact:true}),page.getByRole('button',{name:'Runtime & host options',exact:true})]){
+  for(const control of [buildRuntime,playRuntime,page.getByRole('button',{name:'Configure build tools',exact:true}),page.getByRole('button',{name:'Runtime & host options',exact:true})]){
    await expect(control).toBeVisible();const box=await control.boundingBox();expect(box).not.toBeNull();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(width+1);
   }
   expect((await toolbar.boundingBox())!.height).toBeLessThan(120);
@@ -4640,6 +4655,7 @@ for(const configured of [true,false])test(`QuickForge build paths and configure 
  await tags.fill('C:/Map/Updated Tags');await tags.press('Tab');await page.getByRole('button',{name:'Close Project setup',exact:true}).click();await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project.buildTargets[0].tagsDirectory)).toBe('C:/Map/Updated Tags');
  await expect(paths).toContainText('Source tag root: C:/Map/Updated Tags');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.quickForge.runtimeId)).toBe('chupathingyCe');
  await page.getByRole('button',{name:'Configure build tools',exact:true}).click();await revealPagedControl(tags);await expect(tags).toHaveValue('C:/Map/Updated Tags');
 });
 
