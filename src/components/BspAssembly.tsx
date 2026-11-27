@@ -1224,7 +1224,7 @@ export default function BspAssembly({
                             <summary>Affected areas in {witness.name}</summary>
                             <button type="button" onClick={() => {
                               if (project.source) setVisibleWitness({ sourceSha256: project.source.sha256,
-                                assemblySignature: assemblySignature(draft), diagnostics: geometry });
+                                assemblySignature: assemblySignature(draft), diagnostics: geometry, frameRequested: true });
                             }}>Show native errors in viewport</button>
                             <ul>{locations.map(([label, point], index) => (
                               <li key={index}>{label} near {point.map(axis => axis.toFixed(3)).join(', ')} in Halo world units</li>
