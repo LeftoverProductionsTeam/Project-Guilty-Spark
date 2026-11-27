@@ -22,9 +22,12 @@ pub(crate) fn prepare_command(
         _ => false,
     };
     let normalized = (extended || relative).then(|| extraction_arguments(args, workspace, extended)).transpose()?;
-    let working_directory = if tool == "invader-refactor.exe" {
-        short_physical_directory(workspace)
-    } else { None };
+    // Halo Tool still opens relative tag names through a legacy Windows file
+    // API. Its reported missing dependency can be a combined path over
+    // MAX_PATH even when Invader already verified the file.
+    let prefers_short_root = tool == "invader-refactor.exe"
+        || matches!(phase, "bsp-structure" | "bsp-lightmaps" | "bsp-isolated-lightmaps");
+    let working_directory = prefers_short_root.then(|| short_physical_directory(workspace)).flatten();
     Ok((normalized, working_directory))
 }
 
