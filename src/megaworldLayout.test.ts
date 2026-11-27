@@ -125,6 +125,10 @@ it('draws exactly one vehicle and three distinct weapons from reviewed points wi
  expect(previewExtractionRoll(selectedExtractionPoints(authoredPool,candidates,new Map([['ghost',placed]])),()=>0).vehicles).toEqual([placed]);
  expect(()=>selectedExtractionPoints(authoredPool,candidates)).toThrow('vehicle placement is unavailable');
  expect(()=>selectedExtractionPoints({...pool,playerStarts:[1,1]},candidates)).toThrow('two player starts');
+ const starts = candidates.playerStarts.map(point => ({...point,teamIndex:0}));
+ expect(()=>selectedExtractionPoints(pool,{...candidates,playerStarts:starts})).toThrow('both UNSC and Covenant');
+ starts[0].teamIndex = -1;
+ expect(selectedExtractionPoints(pool,{...candidates,playerStarts:starts}).playerStarts).toHaveLength(2);
  expect(()=>selectedExtractionPoints({...pool,weapons:[0,3,9]},candidates)).toThrow('unavailable');
  expect(()=>selectedExtractionPoints(pool,{...candidates,vehicles:[{...candidates.vehicles[0],position:candidates.weapons[0].position},candidates.vehicles[1]]})).toThrow('separate');
 });

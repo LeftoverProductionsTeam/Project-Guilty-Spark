@@ -344,6 +344,9 @@ pub fn compiled_extraction_pools(
         }
         let original = review_extraction_points(region, &path, &source)?;
         let starts = selected_extraction_points(&original.player_starts, &pool.player_starts, &region.map_name, "player start")?;
+        if ![0, 1].into_iter().all(|team| starts.iter().any(|start| matches!(start.team_index, Some(-1)) || start.team_index == Some(team))) {
+            return invalid(format!("{} needs an Extraction start for both UNSC and Covenant. Choose a start usable by either faction or one for each faction.", region.map_name));
+        }
         let weapons = selected_extraction_points(&original.weapons, &pool.weapons, &region.map_name, "weapon")?;
         let vehicles = selected_extraction_points(&original.vehicles, &pool.vehicles, &region.map_name, "vehicle")?;
         let native_region = extraction_native_region(region, origin);

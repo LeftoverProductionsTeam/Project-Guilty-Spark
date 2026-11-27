@@ -20,6 +20,9 @@ export function selectedExtractionPoints(pool:ExtractionPool, candidates:Extract
     });
   };
   const playerStarts=select('playerStarts',2,2), weapons=select('weapons',3), vehicles=select('vehicles',0);
+  if (playerStarts.every(point => point.teamIndex !== undefined) &&
+      ![0, 1].every(team => playerStarts.some(point => point.teamIndex === team || point.teamIndex === -1)))
+    throw Error('Choose starts that cover both UNSC and Covenant, or include a start usable by either faction.');
   const authoredIds=pool.authoredVehicleIds??[];
   if(new Set(authoredIds).size!==authoredIds.length) throw Error('Choose distinct placed vehicles.');
   for(const id of authoredIds){
