@@ -101,7 +101,8 @@ pub fn needs_runtime_review(project: &Project) -> bool {
 
 pub fn compatibility(project: &Project, inspection: &MapInspection) -> build::CompatibilityReport {
     let target = cache_target(project).expect("selected connected-region target");
-    let blockers = preflight(project, inspection).err().map(|e| vec![e.to_string()]).unwrap_or_default();
+    let blockers = preflight(project, inspection).and_then(|tools| check_preserved_sky_compiler(project, inspection, &tools))
+        .err().map(|error| vec![error.to_string()]).unwrap_or_default();
     let separate = project.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps);
     let mut warnings = vec![if separate {
         "Native BSPs with paired corridor switches. Independent regional occupancy requires runtime verification.".into()
@@ -219,6 +220,26 @@ pub fn preflight(project:&Project,inspection:&MapInspection)->Result<Toolchain>{
     }
     Ok(tools)
 }
+fn check_preserved_sky_compiler(project: &Project, inspection: &MapInspection, tools: &Toolchain) -> Result<()> {
+    if inspection.header.version != MCC.version || !project.bsp_assembly.as_ref().is_some_and(|plan| plan.separate_native_bsps) {
+        return Ok(());
+    }
+    let compiler = build::tool_path(tools, "invader-build").expect("compiler checked by preflight");
+    // Scope the limit to the exact executable that produced the native
+    // eight-sky rejection. A filename or platform is not capability evidence.
+    if maps::hash_file(&compiler)? != "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a" {
+        return Ok(());
+    }
+    let source = &project.source.as_ref().expect("source checked by preflight").preserved_path;
+    let count = maps::mcc13_sky_reference_count(source, inspection)?;
+    if count > STANDARD_SKY_SLOTS {
+        return invalid(format!(
+            "The selected Invader compiler supports {STANDARD_SKY_SLOTS} sky references and this source uses {count}. Select a verified expanded-sky compiler in Build & playtest to preserve the existing skies."
+        ));
+    }
+    Ok(())
+}
+
 /// Compile partition structure tags for owner review without publishing a map.
 pub fn preview_partitions(
     project: &Project, inspection: &MapInspection, jobs: &Path, id: &str,
@@ -268,6 +289,7 @@ fn partition_preview(
     let bake = stage == PartitionStage::Lighting;
     uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid build identity".into()))?;
     let tools = preflight(project, inspection)?;
+    if bind { check_preserved_sky_compiler(project, inspection, &tools)?; }
     if bind && build::tool_path(&tools, "invader-extract").is_none() {
         return invalid("Native partition environment readback requires invader-extract");
     }
@@ -579,7 +601,9 @@ pub fn run_with_reviewed_runtime(
     event: impl Fn(JobEvent) + Send + Sync, review: Option<&crate::runtime::CompanionReview>,
 ) -> Result<BuildRecord> {
     uuid::Uuid::parse_str(id).map_err(|_|SparkError::Invalid("Invalid build identity".into()))?;
-    let tools=preflight(project,inspection)?;let started=Instant::now();
+    let tools = preflight(project,inspection)?;
+    check_preserved_sky_compiler(project, inspection, &tools)?;
+    let started = Instant::now();
     let target = cache_target(project).expect("preflight checked the connected-region target");
     let limits = if needs_runtime_review(project) {
         GameplayLimits::for_review(review.ok_or_else(|| SparkError::Invalid("Review the selected Forerunner profile before building".into()))?)?
