@@ -57,9 +57,19 @@ interface ScenarioPlacementBudget {
 interface AssemblySourceIssue {
   triangle: number;
   material: string;
-  center: [number, number, number];
+  center: Vec3;
+  vertices: [Vec3, Vec3, Vec3];
   reason: string;
   overlapsTriangle?: number;
+  overlappingVertices?: [Vec3, Vec3, Vec3];
+}
+
+interface AssemblySourcePreflight {
+  blockedFaces: number;
+  overlapCheckIncomplete?: boolean;
+  lightingRisks: number;
+  examples: AssemblySourceIssue[];
+  lightingExamples: AssemblySourceIssue[];
 }
 
 export interface AssemblyReport {
@@ -85,14 +95,8 @@ export interface AssemblyReport {
   nativePartitions?: { selected: number; overlapSamples: number; maxFloorDelta: number };
   routeClearance?: {label:string;width:number;clearHeight:number;walkSamples:number;lateralSamples?:number}[];
   warnings: string[];
-  sourcePreflight?: {
-    blockedFaces: number;
-    overlapCheckIncomplete?: boolean;
-    lightingRisks: number;
-    examples: AssemblySourceIssue[];
-    lightingExamples: AssemblySourceIssue[];
-  };
-  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;surfaces:{source:number;mesh:import('./types').MeshData}[]};
+  sourcePreflight?: AssemblySourcePreflight;
+  viewport?: {projectId:string;sourceSha256:string;donorSha256:string;assembly:BspAssembly;retainsBase?:boolean;retainsDonor?:boolean;sourcePreflight?:AssemblySourcePreflight;surfaces:{source:number;mesh:import('./types').MeshData}[]};
 }
 /** Semantic identity across IPC object-key ordering and old omitted options. */
 export function assemblySignature(plan: BspAssembly | null): string {

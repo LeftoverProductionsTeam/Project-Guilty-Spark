@@ -539,6 +539,19 @@ function Scene({
         </group>;
       })()}
       {joinedPreview&&assembly&&joinedPreview.surfaces.map(surface=>{const donor=surface.source===1,view=ownedModels[forgeModelKey({sourceProjectId:assembly.open.project.id,sourceSha256:assembly.open.inspection!.sha256,tagId:assembly.surfaces[0].tagId})];return <group key={surface.source} name="gs-joined-source" userData={{assetSurface:true}}><Mesh data={surface.mesh} greenScreen={greenScreen} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?(donor?view?.shaderTextures:shaderTextures):EMPTY_SHADER_TEXTURES} shaderMetadata={donor?view?.shaderMetadata:shaderMetadata} extraTextures={donor?view?.extraTextures:extraTextures}/></group>;})}
+      {!cinematic && joinedPreview?.sourcePreflight && (() => {
+        const {examples, lightingExamples} = joinedPreview.sourcePreflight;
+        const outline = (vertices: [Vec3, Vec3, Vec3], color: string, key: string) =>
+          <Line key={key} points={[...vertices, vertices[0]]} color={color}
+            raycast={() => null} lineWidth={3} depthTest={false} renderOrder={1000} />;
+        return <>
+          {lightingExamples.map(issue => outline(issue.vertices, '#ffe280', `lighting-${issue.triangle}`))}
+          {examples.map(issue => outline(issue.vertices, '#ff617a', `blocked-${issue.triangle}`))}
+          {examples.flatMap(issue => issue.overlappingVertices
+            ? [outline(issue.overlappingVertices, '#ff9e68', `overlap-${issue.triangle}`)]
+            : [])}
+        </>;
+      })()}
       {surfacePick?.edge&&(()=>{const donor=surfacePick.sourceHash===project.bspAssembly?.donorSource.sha256;const points=surfacePick.edge.vertices.map(p=>donor&&project.bspAssembly?donorPoint(p,project.bspAssembly):p);return <Line points={points} color="#ffe280" lineWidth={4} depthTest={false} renderOrder={1000}/>;})()}
       {all
         .filter((o) => o.id !== selected&&!(playerView&&o.id===cameraStartId&&o.kind==='Player spawn'))

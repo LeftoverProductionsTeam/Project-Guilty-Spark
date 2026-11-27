@@ -754,7 +754,7 @@ async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String,include_geo
                     }
                 }
             }
-            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor,"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
+            result["viewport"]=serde_json::json!({"projectId":project_id,"sourceSha256":i.sha256,"donorSha256":donor.sha256,"assembly":plan,"retainsBase":plan.separate_native_bsps && i.mesh.parts.len() > 1,"retainsDonor":preserve_donor,"sourcePreflight":result["sourcePreflight"].clone(),"surfaces":core::bsp_assembly::viewport_surfaces(&geometry,&i,&donor).map_err(error)?});
         }
         Ok(result)
     }).await.map_err(error)?

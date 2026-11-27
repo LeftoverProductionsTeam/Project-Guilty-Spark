@@ -341,9 +341,12 @@ pub struct AssemblySourceIssue {
     pub triangle: usize,
     pub material: String,
     pub center: V,
+    pub vertices: [V; 3],
     pub reason: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overlaps_triangle: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overlapping_vertices: Option<[V; 3]>,
 }
 
 #[derive(Default, Serialize)]
@@ -499,7 +502,9 @@ impl AssemblyGeometry {
                     report.lighting_examples.push(AssemblySourceIssue {
                         triangle, material: material.name.clone(),
                         center: mul(add(add(a, b), c), 1. / 3.),
+                        vertices: points,
                         reason: "thin terrain chart may fail native lighting",
+                        overlapping_vertices: None,
                         overlaps_triangle: None,
                     });
                 }
@@ -509,7 +514,8 @@ impl AssemblyGeometry {
                 if report.examples.len() < 8 {
                     report.examples.push(AssemblySourceIssue {
                         triangle, material: material.name.clone(),
-                        center: mul(add(add(a, b), c), 1. / 3.), reason, overlaps_triangle: None,
+                        center: mul(add(add(a, b), c), 1. / 3.),
+                        vertices: points, reason, overlaps_triangle: None, overlapping_vertices: None,
                     });
                 }
             }
@@ -544,7 +550,9 @@ impl AssemblyGeometry {
                             triangle, material: self.materials[self.triangle_materials[triangle]].name.clone(),
                             center: mul(add(add(a, b), c), 1. / 3.),
                             reason: if solid { "coplanar collision faces overlap" } else { "coplanar terrain faces overlap" },
+                            vertices: face,
                             overlaps_triangle: Some(overlap_sources[other].0),
+                            overlapping_vertices: Some(overlap_faces[other]),
                         });
                     }
                 }
