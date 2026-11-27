@@ -410,8 +410,13 @@ fn coplanar_overlap(face: [V; 3], normal: V, other: [V; 3], other_normal: V,
 }
 
 // JMS writes world positions as centimeters with six decimal places.
-fn native_export_point(point: V) -> V {
-    point.map(|coordinate| (f64::from(coordinate as f32) * 1e8).round() / 1e8)
+pub(crate) fn native_export_point(point: V) -> V {
+    point.map(|coordinate| {
+        // JMS writes six decimal places in centimeters. Tool reads those
+        // centimeters as floats, so two distinct mesh coordinates may merge.
+        let centimeters = (f64::from(coordinate as f32) * 1e8).round_ties_even() / 1e6;
+        f64::from(centimeters as f32) / 100.
+    })
 }
 
 fn triangle_area_normal([a, b, c]: [V; 3]) -> V {
@@ -1316,7 +1321,7 @@ fn generate_end(
     // At native render precision, another diagonal can eliminate a sliver
     // without moving the exported positions or crossing a material/UV seam.
     // The collision hull and its original surface flags are already sealed.
-    let retriangulated = crate::bsp_triangulate::improve_native_render(&mut gl);
+    let retriangulated = crate::bsp_triangulate::improve_at_native_precision(&mut gl);
     let ridge_projection = assembly.high_ground.as_ref().and_then(|ridge| {
         let seam = assembly.terrain_seam.as_ref()?;
         let ribbon = terrain_ribbon.as_ref()?;
@@ -3697,15 +3702,19 @@ fn collision_precision_cleanup(mut output: MeshGL64) -> Result<MeshGL64> {
         let mut faces=std::collections::BTreeSet::new();
         mesh.tri_verts.chunks_exact(3).enumerate().any(|(face,t)| {
             let p:[V;3]=std::array::from_fn(|k|std::array::from_fn(|j|f64::from(mesh.vert_properties[t[k] as usize*3+j] as f32)));
-            let n=cross(sub(p[1],p[0]),sub(p[2],p[0]));
-            let mut key=p.map(|v|v.map(f64::to_bits));key.sort();
+            let p = p.map(native_export_point);
+            let n = triangle_area_normal(p);
+            let mut key = p.map(|v| v.map(|axis| if axis == 0. { 0 } else { axis.to_bits() }));
+            key.sort_unstable();
             dot(n,n)==0. || !faces.insert((mesh.face_id[face],key))
         })
     };
     for _ in 0..3 {
-        crate::bsp_triangulate::improve(&mut output);
+        crate::bsp_triangulate::improve_at_native_precision(&mut output);
         if !problem(&output) { return Ok(output); }
-        for value in &mut output.vert_properties { *value=f64::from(*value as f32); }
+        for vertex in output.vert_properties.chunks_exact_mut(3) {
+            vertex.copy_from_slice(&native_export_point([vertex[0], vertex[1], vertex[2]]));
+        }
         output.merge();
         let body=checked(Manifold::from_mesh_gl64_robust(&output),"Rounded collision import")?;
         let body=checked(body.rebuild_solid(manifold_rust::types::WindingRule::Positive),"Rounded collision regularization")?;
@@ -3920,6 +3929,20 @@ mod tests {
         assert_eq!(report.examples[0].triangle, 2);
         assert_eq!(report.examples[0].overlaps_triangle, Some(0));
         assert!(report.require_buildable().unwrap_err().to_string().contains("with triangle 0"));
+    }
+
+    #[test]
+    fn jms_centimeter_conversion_collapses_distinct_mesh_floats() {
+        let a = f32::from_bits(82f32.to_bits() + 2);
+        let b = f32::from_bits(a.to_bits() + 1);
+        assert!(a < b);
+        let points = [[a.into(), 0., 0.], [b.into(), 0., 0.], [a.into(), 1., 0.]];
+        assert_ne!(triangle_area_normal(points), [0.; 3]);
+        let from_jms = points.map(|point| point.map(|axis| {
+            f64::from(format!("{:.6}", axis * 100.).parse::<f32>().unwrap()) / 100.
+        }));
+        assert_eq!(points.map(native_export_point), from_jms);
+        assert_eq!(triangle_area_normal(from_jms), [0.; 3]);
     }
 
     #[test]

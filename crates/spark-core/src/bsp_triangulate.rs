@@ -2,7 +2,7 @@
 //! needle triangles. For generated terrain, also weld tiny intersection
 //! edges while protecting stock vertices, planes and affine UV charts.
 use manifold_rust::types::MeshGL64;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 type V = [f64; 3];
 fn sub(a: V, b: V) -> V {
     std::array::from_fn(|i| a[i] - b[i])
@@ -53,21 +53,20 @@ fn affine(m: &MeshGL64, t: [u64; 3], d: u64, uv_tolerance: f64) -> bool {
     })
 }
 pub(crate) fn improve(m: &mut MeshGL64) -> usize { improve_material(m, None, false) }
-pub(crate) fn improve_native_render(m: &mut MeshGL64) -> usize { improve_material(m, None, true) }
+pub(crate) fn improve_at_native_precision(m: &mut MeshGL64) -> usize { improve_material(m, None, true) }
 fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool) -> usize {
     if m.num_prop < 3 || m.face_id.len() != m.num_tri() {
         return 0;
     }
     let point = |mesh: &MeshGL64, id| {
         let position = at(mesh, id);
-        if native_render { position.map(|axis| f64::from(axis as f32)) } else { position }
+        if native_render { crate::bsp_assembly::native_export_point(position) } else { position }
     };
     let quality = |mesh: &MeshGL64, ids: [u64; 3]| triangle_quality(ids.map(|id| point(mesh, id)));
     let mut flips = 0;
     for _ in 0..16 {
         let mut edges: BTreeMap<(u64, u64), Vec<(usize, u64, u64, u64)>> = BTreeMap::new();
         for (f, t) in m.tri_verts.chunks_exact(3).enumerate() {
-            if selected.is_some_and(|id|m.face_id[f]!=id){continue;}
             for k in 0..3 {
                 let (a, b, c) = (t[k], t[(k + 1) % 3], t[(k + 2) % 3]);
                 edges
@@ -77,6 +76,7 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             }
         }
         let mut changed = vec![false; m.num_tri()];
+        let mut new_edges = BTreeSet::new();
         let before = flips;
         for pair in edges.values().filter(|p| p.len() == 2) {
             let (f, a, b, c) = pair[0];
@@ -87,6 +87,7 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
                 || b != u
                 || c == d
                 || m.face_id[f] != m.face_id[g]
+                || selected.is_some_and(|material| m.face_id[f] != material)
             {
                 continue;
             }
@@ -126,7 +127,9 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             let right = [d, c, a];
             let (nl, ql) = quality(m, left);
             let (nr, qr) = quality(m, right);
-            if dot(reference, nl) < 1. - 1e-10
+            let diagonal = (c.min(d), c.max(d));
+            if edges.contains_key(&diagonal) || new_edges.contains(&diagonal)
+                || dot(reference, nl) < 1. - 1e-10
                 || dot(reference, nr) < 1. - 1e-10
                 || ql.min(qr) <= q.min(q2) * 1.01 + 1e-10
             {
@@ -136,6 +139,7 @@ fn improve_material(m: &mut MeshGL64, selected: Option<u64>, native_render: bool
             m.tri_verts[g * 3..g * 3 + 3].copy_from_slice(&right);
             changed[f] = true;
             changed[g] = true;
+            new_edges.insert(diagonal);
             flips += 1;
         }
         if flips == before {
@@ -375,7 +379,7 @@ mod tests {
             ..Default::default()
         };
         let original = mesh.vert_properties.clone();
-        assert_eq!(improve_native_render(&mut mesh), 1);
+        assert_eq!(improve_at_native_precision(&mut mesh), 1);
         assert_eq!(mesh.vert_properties, original);
         assert_eq!(mesh.face_id, [17, 17]);
         assert_eq!(mesh.tri_verts, [2, 3, 1, 3, 2, 0]);
@@ -398,7 +402,7 @@ mod tests {
         };
         let authored = input.vert_properties.clone();
         assert_eq!(improve(&mut input), 0);
-        assert_eq!(improve_native_render(&mut input), 1);
+        assert_eq!(improve_at_native_precision(&mut input), 1);
         assert_eq!(input.vert_properties, authored);
         assert_eq!(input.face_id, [65, 65]);
         assert!(input.tri_verts.chunks_exact(3).all(|t| face(&input, [t[0], t[1], t[2]]).1 > 0.08));

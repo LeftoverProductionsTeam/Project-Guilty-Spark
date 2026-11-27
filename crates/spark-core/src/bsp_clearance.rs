@@ -874,16 +874,17 @@ mod tests {
         road
     }
     #[test]
-    fn graded_road_detects_an_obstruction_between_the_center_and_edges() {
+    fn placed_roads_detect_obstructions_between_the_center_and_edges() {
         let mut road = outdoor_road();
-        let seam = road.terrain_seam.as_mut().unwrap();
-        seam.bearing_degrees = Some(0.);
+        road.terrain_seam.as_mut().unwrap().bearing_degrees = Some(0.);
         let mut mesh = corridor(road.tunnel_width.into(), road.tunnel_height.into());
-        quad(&mut mesh, [[5., 0.9, 0.], [5., 1.6, 0.], [5., 1.6, 1.6], [5., 0.9, 1.6]]);
         assert!(verify_route(&mesh, &road).is_ok());
-        road.terrain_seam.as_mut().unwrap().grade_road = true;
-        let error = verify_route(&mesh, &road).unwrap_err().to_string();
-        assert!(error.contains("route side has a step or obstruction"), "{error}");
+        quad(&mut mesh, [[5., 0.9, 0.], [5., 1.6, 0.], [5., 1.6, 1.6], [5., 0.9, 1.6]]);
+        for graded in [false, true] {
+            road.terrain_seam.as_mut().unwrap().grade_road = graded;
+            let error = verify_route(&mesh, &road).unwrap_err().to_string();
+            assert!(error.contains("step or obstruction off center"), "{error}");
+        }
     }
     #[test]
     fn return_sampling_keeps_the_authored_terrain_orientation() {
