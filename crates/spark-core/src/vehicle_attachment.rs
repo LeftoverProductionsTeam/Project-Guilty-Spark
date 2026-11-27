@@ -153,7 +153,9 @@ pub fn run(
         fs::create_dir_all(&out)?;
         final_lease.mark_owned()?;
         let scenario = crate::safe_relative(&inspection.scenario_path)?;
-        let output = out.join(scenario.file_name().ok_or_else(|| missing("Invalid MCC scenario name"))?).with_extension("map");
+        let cache_directory = out.join("output");
+        fs::create_dir(&cache_directory)?;
+        let output = cache_directory.join(scenario.file_name().ok_or_else(|| missing("Invalid MCC scenario name"))?).with_extension("map");
         fs::copy(built, &output)?;
         if maps::hash_file(&output)? != output_sha256 { return invalid("Copied attachment cache differs from the verified output"); }
         let record = BuildRecord {

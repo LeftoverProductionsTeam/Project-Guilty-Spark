@@ -1038,11 +1038,15 @@ try{
         const build=(await invoke(main,'open_project',{id:entry.id})).project.builds.find(item=>!before.includes(item.id)&&item.status==='validated');
         const output=path.resolve(build.output);
         expect(path.relative(path.join(root,'library','jobs'),output)).not.toMatch(/^\.\./);
-        receipt=JSON.parse(await fs.readFile(path.join(path.dirname(output),'vehicle-attachment.json'),'utf8'));
+        expect(path.basename(path.dirname(output))).toBe('output');
+        const jobFolder=path.dirname(path.dirname(output));
+        receipt=JSON.parse(await fs.readFile(path.join(jobFolder,'vehicle-attachment.json'),'utf8'));
         expect(receipt.privateMap.sha256).toBe(build.sha256);
         expect(crypto.createHash('sha256').update(await fs.readFile(output)).digest('hex')).toBe(build.sha256);
-        const snap=path.join(path.dirname(output),'receipt.json');
+        const snap=path.join(jobFolder,'receipt.json');
         expect(JSON.parse(await fs.readFile(snap,'utf8')).id).toBe(build.id);
+        const artifact=await invoke(main,'open_built_map',{projectId:entry.id,buildId:build.id});
+        expect(artifact.inspection.sha256).toBe(build.sha256);
         step('Built the reviewed Warthog attachment using Spark’s normal Build button and recorded the isolated native cache');
       }else{
         const {stdout}=await runOwned(process.execPath,['scripts/test-warthog-plow-native.mjs',nativeMap,nativeKit,invaderDirectory],{
