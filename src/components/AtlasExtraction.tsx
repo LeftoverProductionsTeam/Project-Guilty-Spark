@@ -57,6 +57,9 @@ export default function AtlasExtraction({region,layout,readOnly,onLayout}:{
     <button disabled={!native||working} onClick={()=>void readPoints()}>{working?'Reviewing native points…':'Read native points'}</button>
     {error&&<p role="alert">{error}</p>}
     {candidates&&<>
+      {!candidates.vehicles.length&&<p role="status" className="atlas-note">
+        This region has no eligible native vehicle placement. Add an unnamed multiplayer vehicle on supported ground in an editable copy of the region, then review the rebuilt source before saving its pool.
+      </p>}
       <div className="atlas-controls">
         {fields.map(([kind,label])=><label key={kind}>{label} ({pool[kind].length} selected)
           <select multiple size={5} aria-label={label} value={pool[kind].map(String)} disabled={readOnly}

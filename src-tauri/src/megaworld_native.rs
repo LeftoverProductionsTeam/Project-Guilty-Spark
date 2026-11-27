@@ -1,7 +1,7 @@
 use super::*;
 use spark_core as core;
 use core::megaworld::Atlas;
-fn cached(state:&AppState)->Reply<Option<Atlas>>{
+pub(super) fn cached(state:&AppState)->Reply<Option<Atlas>>{
     let file=state.root.join("megaworld-atlas.json");core::reject_links(&file).map_err(error)?;
     if !file.is_file(){return Ok(None);}if fs::metadata(&file).map_err(error)?.len()>8*1024*1024{return Err("Atlas metadata exceeds 8 MiB".into());}
     serde_json::from_slice(&fs::read(file).map_err(error)?).map(Some).map_err(error)
@@ -18,7 +18,7 @@ pub(super) async fn megaworld_atlas(app:tauri::AppHandle)->Reply<Atlas>{
         project::atomic_write(&state.root.join("megaworld-atlas.json"),&serde_json::to_vec(&atlas).map_err(error)?,false).map_err(error)?;Ok(atlas)
     }).await.map_err(error)?
 }
-fn region_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megaworld::LayoutRegion)
+pub(super) fn region_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megaworld::LayoutRegion)
     -> Reply<(PathBuf, Arc<MapInspection>)> {
     let saved = {
         let library = lock(&state.library)?;

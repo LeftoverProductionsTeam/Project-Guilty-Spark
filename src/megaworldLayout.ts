@@ -4,7 +4,7 @@ export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
 export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean;surfaceAccess?:{surfaceRegionId:string;roofClearance:number;headingDegrees:number}}
 export interface ExtractionPool {playerStarts:number[];weapons:number[];vehicles:number[]}
-export interface ExtractionPoint {row:number;label:string;position:Vec3}
+export interface ExtractionPoint {row:number;label:string;position:Vec3;teamIndex?:number}
 export type ExtractionPoints = Record<keyof ExtractionPool, ExtractionPoint[]>;
 export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[];extraction?:Record<string, ExtractionPool>}
 

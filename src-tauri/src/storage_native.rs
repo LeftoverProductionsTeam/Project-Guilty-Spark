@@ -188,13 +188,16 @@ pub(super) async fn storage_export_map(
             }
             fs::create_dir(&base).map_err(error)?;
         }
-        let result = build::export_map_copy(&store(&state)?, &project_id, &record, runtime_id, &base).map_err(error)?;
+        let result = build::export_map_copy_with_atlas(&store(&state)?, &project_id, &record, runtime_id,
+            &base, project.megaworld_layout.as_ref()).map_err(error)?;
         // An edit in another window cannot make a completed export appear to
         // describe a newer revision. Its receipt retains the exact old hash.
         let credit_text = {
             let library = lock(&state.library)?;
             let current = library.get(&project_id).map_err(error)?;
-            if current.fingerprint().map_err(error)? != record.project_fingerprint {
+            if current.fingerprint().map_err(error)? != record.project_fingerprint
+                || current.megaworld_layout != project.megaworld_layout {
+
                 return Err(format!("The map changed during export. The verified earlier revision is retained at {}; rebuild before exporting the current edits.", result.output.display()));
             }
             map_export_credits(&library, &current, &result)
@@ -202,7 +205,14 @@ pub(super) async fn storage_export_map(
         let credits = build::write_map_export_credits(&result, &credit_text).map_err(|reason| {
             format!("Map exported to {}. Its credit file could not be saved: {reason}", result.output.display())
         })?;
-        let (mode_metadata, gameplay_mode) = build::write_map_export_mode(&result, &project).map_err(|reason| {
+        let mut atlas = None;
+        let (mode_metadata, gameplay_mode) = build::write_map_export_mode_with_atlas_sources(&result, &project, |region| {
+            if atlas.is_none() {
+                atlas = Some(megaworld_native::cached(&state).map_err(spark_core::SparkError::Invalid)?);
+            }
+            megaworld_native::region_source(&state, atlas.as_ref().and_then(Option::as_ref), region)
+                .map_err(spark_core::SparkError::Invalid)
+        }).map_err(|reason| {
             format!("Map exported to {}. Mode metadata could not be saved: {reason}", result.output.display())
         })?;
         Ok(CreditedMapExport { map: result, credits, mode_metadata, gameplay_mode })

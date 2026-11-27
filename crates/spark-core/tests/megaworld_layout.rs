@@ -1,5 +1,5 @@
 use spark_core::{megaworld::{Layout,LayoutRegion},project::{self,Project}};
-fn layout()->Layout{Layout{schema_version:1,regions:vec![LayoutRegion{region_id:format!("{}:0","a".repeat(64)),cache_sha256:"a".repeat(64),cache_version:609,bsp_index:0,map_name:"timberland".into(),bsp_name:"levels/test/timberland".into(),minimum:[-10.,-5.,-2.],maximum:[10.,5.,4.],translation:[0.;3],yaw_degrees:0.,hex_slot:None,underground:false,surface_access:None}]}}
+fn layout()->Layout{Layout{schema_version:1,regions:vec![LayoutRegion{region_id:format!("{}:0","a".repeat(64)),cache_sha256:"a".repeat(64),cache_version:609,bsp_index:0,map_name:"timberland".into(),bsp_name:"levels/test/timberland".into(),minimum:[-10.,-5.,-2.],maximum:[10.,5.,4.],translation:[0.;3],yaw_degrees:0.,hex_slot:None,underground:false,surface_access:None}],extraction:Default::default()}}
 #[test]fn layout_save_reopen_preserves_hash_bound_plans_without_invalidating_native_build(){
  let temp=tempfile::tempdir().unwrap();let file=temp.path().join("world.gsproject");let mut p=Project::new("Atlas plan");let before=p.fingerprint().unwrap();
  let legacy=serde_json::to_value(&p).unwrap();assert!(legacy.get("megaworldLayout").is_none());assert!(serde_json::from_value::<Project>(legacy).unwrap().megaworld_layout.is_none());
@@ -112,6 +112,83 @@ fn saved_atlas_edge_reconstructs_stock_timberland_sidewinder_terrain() {
     assert_eq!(maps::hash_file(&stock.join(Path::new("sidewinder.map"))).unwrap(),b.sha256);
 }
 
+
+#[test]
+#[ignore = "requires the released MegaWorld and owned CE Timberland and Sidewinder caches"]
+fn exports_two_authored_pools_in_the_same_native_bsp() {
+    use spark_core::{build::{self, MapExport}, maps, megaworld::{self, ExtractionPool}, runtime::RuntimeId};
+    use std::{path::PathBuf, sync::Arc};
+
+    let stock = PathBuf::from(std::env::var_os("SPARK_ATLAS_STOCK").expect("owned CE maps directory"));
+    let released = PathBuf::from(std::env::var_os("SPARK_ATLAS_COMPILED").expect("released MegaWorld"));
+    let compiled = maps::inspect_map(&released, None).unwrap();
+    assert_eq!(compiled.sha256, "fcfe9d449aed9683421e22ed80c412e74ebb05fdcb121ae988b13b3ea5e7f01f");
+    let scratch = tempfile::tempdir().unwrap();
+    let output = scratch.path().join("megaworld_19_playtest.map");
+    std::fs::copy(&released, &output).unwrap();
+
+    let mut project = Project::new("MegaWorld regional Extraction");
+    let mut authoring = layout();
+    authoring.regions.clear();
+    let mut sources = std::collections::BTreeMap::new();
+    let mut expected = Vec::new();
+    for (name, translation) in [
+        ("timberland", [0.; 3]),
+        ("sidewinder", [114.02209091186523, 9.3280029296875, -17.233085022040342]),
+    ] {
+        let path = stock.join(format!("{name}.map"));
+        let source = Arc::new(maps::inspect_map(&path, Some(&stock)).unwrap());
+        let mut region = layout().regions.remove(0);
+        region.cache_sha256 = source.sha256.clone();
+        region.region_id = format!("{}:0", source.sha256);
+        region.map_name = name.into();
+        region.bsp_name = source.mesh.parts[0].name.clone();
+        region.translation = translation;
+
+        let bindings = megaworld::review_compiled_extraction_bindings(&region, (&path, &source), (&released, &compiled), 0).unwrap();
+        let starts = [&bindings.player_starts[0], &bindings.player_starts[1]];
+        let weapons = &bindings.weapons[..4];
+        let vehicles = &bindings.vehicles[..2];
+        authoring.extraction.insert(region.region_id.clone(), ExtractionPool {
+            player_starts: starts.map(|binding| binding.source_row),
+            weapons: weapons.iter().map(|binding| binding.source_row).collect(),
+            vehicles: vehicles.iter().map(|binding| binding.source_row).collect(),
+        });
+        expected.push(serde_json::json!({
+            "regionId": region.region_id, "bspIndex": 0,
+            "playerStarts": starts.map(|binding| binding.compiled_row),
+            "weapons": weapons.iter().map(|binding| binding.compiled_row).collect::<Vec<_>>(),
+            "vehicles": vehicles.iter().map(|binding| binding.compiled_row).collect::<Vec<_>>()
+        }));
+        sources.insert(region.region_id.clone(), (path, source));
+        authoring.regions.push(region);
+    }
+    project.megaworld_layout = Some(authoring);
+    let mode_path = output.with_extension("spark-mode.json");
+    let export = MapExport {
+        project_id: project.id.clone(), build_id: "native-pool-test".into(),
+        project_fingerprint: project.fingerprint().unwrap(), sha256: compiled.sha256.clone(),
+        bytes: std::fs::metadata(&output).unwrap().len(), output, cache_version: 13,
+        runtime_id: RuntimeId::ChupathingyCe, reused: false,
+    };
+    let sources_for = |region: &LayoutRegion| Ok(sources[&region.region_id].clone());
+    assert!(build::write_map_export_mode(&export, &project).is_err());
+    assert!(!mode_path.exists());
+    let (receipt, mode) = build::write_map_export_mode_with_atlas_sources(&export, &project, sources_for).unwrap();
+    assert_eq!(mode, "extraction");
+    let receipt_bytes = std::fs::read(&receipt).unwrap();
+    let metadata: serde_json::Value = serde_json::from_slice(&receipt_bytes).unwrap();
+    assert_eq!(metadata["extractionPools"], serde_json::json!(expected));
+    assert!(metadata["requiredNativeFeatures"].as_array().unwrap().iter()
+        .any(|feature| feature == megaworld::REGIONAL_EXTRACTION_POOLS_FEATURE));
+
+    project.megaworld_layout.as_mut().unwrap().regions[1].translation[0] += 2.;
+    assert!(build::write_map_export_mode_with_atlas_sources(&export, &project, sources_for).is_err());
+    assert_eq!(std::fs::read(&receipt).unwrap(), receipt_bytes);
+    assert_eq!(maps::hash_file(&released).unwrap(), compiled.sha256);
+    println!("Authored Extraction mode receipt: {}", serde_json::to_string(&metadata).unwrap());
+}
+
 #[test]
 #[ignore = "requires the original CE Timberland and Blood Gulch caches"]
 fn placed_road_sweeps_the_compact_timberland_blood_gulch_band() {
@@ -139,7 +216,7 @@ fn placed_road_sweeps_the_compact_timberland_blood_gulch_band() {
         }
         row
     }).collect::<Vec<_>>();
-    base.megaworld_layout = Some(spark_core::megaworld::Layout { schema_version: 1, regions });
+    base.megaworld_layout = Some(spark_core::megaworld::Layout { schema_version: 1, regions, extraction: Default::default() });
     let regions = &base.megaworld_layout.as_ref().unwrap().regions;
     let draft = bsp_assembly::plan_from_atlas(&base, &a, &donor, &b, &regions[0], &regions[1], PathBuf::new(), true).unwrap();
     assert_eq!(draft.translation, regions[1].translation);

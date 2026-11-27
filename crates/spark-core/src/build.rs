@@ -39,6 +39,15 @@ pub fn export_map_copy(
     manager: &crate::storage::Store, project_id: &str, build: &BuildRecord,
     runtime_id: crate::runtime::RuntimeId, base: &Path,
 ) -> Result<MapExport> {
+    export_map_copy_with_atlas(manager, project_id, build, runtime_id, base, None)
+}
+
+/// Track the author's pool revision independently of the compiled geometry.
+/// Re-exporting changed pools preserves the earlier self-contained bundle.
+pub fn export_map_copy_with_atlas(
+    manager: &crate::storage::Store, project_id: &str, build: &BuildRecord,
+    runtime_id: crate::runtime::RuntimeId, base: &Path, layout: Option<&crate::megaworld::Layout>,
+) -> Result<MapExport> {
     use std::io::{Read, Write};
     for id in [project_id, build.id.as_str()] {
         uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid map export identity".into()))?;
@@ -61,7 +70,16 @@ pub fn export_map_copy(
         return invalid("Export requires an ordinary native .map filename");
     }
     let base = fs::canonicalize(base)?;
-    let directory = base.join(format!("Spark-{}", build.id));
+    let name_prefix = format!("Spark-{}", build.id);
+    let directory = if let Some(layout) = layout.filter(|layout| !layout.extraction.is_empty()) {
+        layout.validate()?;
+        let selected: Vec<_> = layout.regions.iter().filter_map(|region|
+            layout.extraction.get(&region.region_id).map(|pool| (region, pool))).collect();
+        let digest = crate::hex_bytes(Sha256::digest(serde_json::to_vec(&selected)?));
+        base.join(format!("{name_prefix}-{}", &digest[..16]))
+    } else {
+        base.join(name_prefix)
+    };
     crate::reject_links(&directory)?;
     let output = directory.join(name);
     let receipt = directory.join("spark-map-export.json");
@@ -130,6 +148,15 @@ pub fn write_map_export_credits(export: &MapExport, text: &str) -> Result<PathBu
 /// Derive mode and dependency evidence from the exact exported cache and its
 /// verified authoring revision. The contract is independent of the filename.
 pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(PathBuf, &'static str)> {
+    write_map_export_mode_with_atlas_sources(export, project, |region|
+        invalid(format!("Open the owned {} source in the Atlas to export its Extraction pool", region.map_name)))
+}
+
+pub fn write_map_export_mode_with_atlas_sources(
+    export: &MapExport,
+    project: &Project,
+    source_for: impl FnMut(&crate::megaworld::LayoutRegion) -> Result<(PathBuf, Arc<MapInspection>)>,
+) -> Result<(PathBuf, &'static str)> {
     if export.project_id != project.id || export.project_fingerprint != project.fingerprint()? {
         return invalid("Mode metadata belongs to a different authoring revision");
     }
@@ -182,13 +209,24 @@ pub fn write_map_export_mode(export: &MapExport, project: &Project) -> Result<(P
             native_features.push(feature.to_owned());
         }
     }
-    let receipt = serde_json::json!({
+    let pools = if native_features.iter().any(|feature| feature == crate::creative::MEGAWORLD_EXTRACTION_FEATURE) {
+        crate::megaworld::compiled_extraction_pools(project, output, &map, source_for)?
+    } else {
+        Vec::new()
+    };
+    if !pools.is_empty() {
+        native_features.push(crate::megaworld::REGIONAL_EXTRACTION_POOLS_FEATURE.to_owned());
+    }
+    let mut receipt = serde_json::json!({
         "schemaVersion": 1, "fileName": name, "cacheSha256": export.sha256,
         "cacheVersion": map.header.version, "scenarioPath": map.scenario_path,
         "scenarioType": map.header.scenario_type, "mode": mode,
         "requiredResourceBanks": resources, "requiredNativeFeatures": native_features,
         "runtimeSettings": runtime_settings,
     });
+    if !pools.is_empty() {
+        receipt["extractionPools"] = serde_json::to_value(pools)?;
+    }
     if maps::hash_file(output)? != export.sha256 {
         return invalid("Exported map changed while reviewing its mode");
     }

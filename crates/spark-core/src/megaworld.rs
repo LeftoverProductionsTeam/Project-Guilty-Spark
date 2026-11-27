@@ -80,12 +80,14 @@ impl ExtractionPool {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractionPoint {
     row: u16,
     label: String,
     position: [f32; 3],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    team_index: Option<i16>,
 }
 
 #[derive(Serialize)]
@@ -110,10 +112,18 @@ fn read_supported_extraction_points(region: &LayoutRegion, path: &Path, map: &Ma
         return invalid("Extraction points need the exact owned CE609 or MCC13 multiplayer region");
     }
     let slot = region.bsp_index as u16;
-    let point = |row: usize, label: String, position| ExtractionPoint { row: row as u16, label, position };
+    let point = |row: usize, label: String, position| ExtractionPoint {
+        row: row as u16, label, position, team_index: None,
+    };
     let starts = maps::scenario_region_starts(path, map)?.into_iter().enumerate()
         .filter(|(_, row)| row.bsp_index == -1 || row.bsp_index == slot as i16)
-        .map(|(index, row)| point(index, format!("Player start {}", index + 1), row.position))
+        .filter_map(|(index, row)| {
+            let faction = match row.team_index { -1 => "Either faction", 0 => "UNSC", 1 => "Covenant", _ => return None };
+            Some(ExtractionPoint {
+                team_index: Some(row.team_index),
+                ..point(index, format!("Player start {} ({faction})", index + 1), row.position)
+            })
+        })
         .collect::<Vec<_>>();
     let pickups = maps::scenario_netgame_pickups(path, map)?;
     let names = pickups.iter().map(|row| row.collection.clone()).collect::<BTreeSet<_>>();
@@ -128,6 +138,7 @@ fn read_supported_extraction_points(region: &LayoutRegion, path: &Path, map: &Ma
     }).collect::<Vec<_>>();
     let vehicles = maps::scenario_vehicles(path, map)?.into_iter().enumerate()
         .take(crate::bsp_vehicles::limit(map.header.version))
+        .filter(|(_, row)| row.name.is_none() && row.not_placed & 1 == 0)
         .filter_map(|(index, row)| row.tag.map(|tag| point(index, tag, row.position)))
         .collect::<Vec<_>>();
 
@@ -140,7 +151,7 @@ fn read_supported_extraction_points(region: &LayoutRegion, path: &Path, map: &Ma
                 if location.bsps == [slot] && location.supports.iter().any(|surface| surface.bsp == slot)
                     && (!distinct_positions || !review.iter().any(|existing| existing.position == point.position))
                 {
-                    review.push(ExtractionPoint { row: point.row, label: point.label.clone(), position: point.position });
+                    review.push(point.clone());
                 }
             }
         }
@@ -189,6 +200,7 @@ fn bind_extraction_rows(
     source.iter().filter_map(|point| {
         let expected = crate::bsp_assembly::transform(point.position.map(f64::from), region.translation, region.yaw_degrees);
         let mut matches = compiled.iter().filter(|candidate|
+            candidate.team_index == point.team_index &&
             (!asset_tag || pickup_namespace(&candidate.label) == pickup_namespace(&point.label)) &&
             candidate.position.iter().zip(expected).all(|(axis, target)| (f64::from(*axis) - target).abs() <= 0.0002)
         );
@@ -220,6 +232,134 @@ pub fn review_compiled_extraction_bindings(
         weapons: bind_extraction_rows(&original.weapons, &target.weapons, region, true),
         vehicles: bind_extraction_rows(&original.vehicles, &target.vehicles, region, true),
     })
+}
+
+pub const REGIONAL_EXTRACTION_POOLS_FEATURE: &str = "extraction.regional_pools.v1";
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledExtractionPool {
+    region_id: String,
+    bsp_index: u16,
+    player_starts: [u16; 2],
+    weapons: Vec<u16>,
+    vehicles: Vec<u16>,
+}
+
+fn selected_extraction_points(points: &[ExtractionPoint], rows: &[u16], region: &str, kind: &str) -> Result<Vec<ExtractionPoint>> {
+    rows.iter().map(|row| points.iter().find(|point| point.row == *row).cloned().ok_or_else(||
+        crate::SparkError::Invalid(format!("{region} {kind} row {row} is no longer supported by the source BSP"))))
+        .collect()
+}
+
+fn compiled_extraction_rows(
+    original: &[ExtractionPoint], compiled: &[ExtractionPoint], region: &LayoutRegion, kind: &str, asset_tag: bool,
+    seen: &mut BTreeSet<u16>,
+) -> Result<Vec<u16>> {
+    let bindings = bind_extraction_rows(original, compiled, region, asset_tag);
+    if bindings.len() != original.len() {
+        let missing = original.iter().find(|point| !bindings.iter().any(|binding| binding.source_row == point.row))
+            .map_or_else(String::new, |point| point.row.to_string());
+        return invalid(format!("{} {kind} row {missing} has no unique compiled placement. Recheck the Atlas position and rebuild.", region.map_name));
+    }
+    bindings.into_iter().map(|binding| {
+        if !seen.insert(binding.compiled_row) {
+            return invalid(format!("{} {kind} shares compiled row {} with another pool", region.map_name, binding.compiled_row));
+        }
+        Ok(binding.compiled_row)
+    }).collect()
+}
+
+/// Bind exact authored source rows to the exported scenario. Determine each
+/// physical owner from the compiled geometry so merged logical regions can
+/// share a BSP and reviewed same-slot replacements keep their native index.
+pub fn compiled_extraction_pools(
+    project: &crate::project::Project,
+    output: &Path,
+    compiled: &MapInspection,
+    mut source_for: impl FnMut(&LayoutRegion) -> Result<(PathBuf, std::sync::Arc<MapInspection>)>,
+) -> Result<Vec<CompiledExtractionPool>> {
+    let Some(layout) = &project.megaworld_layout else { return Ok(Vec::new()); };
+    if layout.extraction.is_empty() { return Ok(Vec::new()); }
+    layout.validate()?;
+    if compiled.header.version != 13 || compiled.header.scenario_type != 1 || compiled.header.extended
+        || layout.extraction.len() > 64
+    {
+        return invalid("Regional Extraction pools need a native MCC13 multiplayer export and at most 64 logical regions");
+    }
+    let origin = project.inherited_bsp_connections.iter()
+        .chain(project.bsp_assembly.as_ref())
+        .find_map(|plan| plan.atlas_origin.as_ref());
+    let mut targets = BTreeMap::<u16, ExtractionPoints>::new();
+    let mut result = Vec::with_capacity(layout.extraction.len());
+    let (mut seen_starts, mut seen_weapons, mut seen_vehicles) = (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
+    for region in &layout.regions {
+        let Some(pool) = layout.extraction.get(&region.region_id) else { continue; };
+        let (path, source) = source_for(region)?;
+        crate::reject_links(&path)?;
+        if maps::hash_file(&path)? != region.cache_sha256 {
+            return invalid(format!("{} source cache changed since the pool was authored", region.map_name));
+        }
+        let original = review_extraction_points(region, &path, &source)?;
+        let starts = selected_extraction_points(&original.player_starts, &pool.player_starts, &region.map_name, "player start")?;
+        let weapons = selected_extraction_points(&original.weapons, &pool.weapons, &region.map_name, "weapon")?;
+        let vehicles = selected_extraction_points(&original.vehicles, &pool.vehicles, &region.map_name, "vehicle")?;
+        if maps::hash_file(&path)? != region.cache_sha256 {
+            return invalid(format!("{} source cache changed during pool readback", region.map_name));
+        }
+
+        let mut native_region = region.clone();
+        if let Some(origin) = origin {
+            let translated = std::array::from_fn(|axis| region.translation[axis] - origin.translation[axis]);
+            native_region.translation = crate::bsp_assembly::transform(translated, [0.; 3], -origin.yaw_degrees);
+            native_region.yaw_degrees = region.yaw_degrees - origin.yaw_degrees;
+        }
+        let poses = starts.iter().chain(&weapons).chain(&vehicles).map(|point|
+            crate::bsp_assembly::transform(point.position.map(f64::from), native_region.translation, native_region.yaw_degrees)
+                .map(|axis| axis as f32)).collect::<Vec<_>>();
+        let mut occupied = BTreeSet::new();
+        for position in &poses[starts.len()..] {
+            // Normalize signed zero so equal native coordinates share a key.
+            let key = position.map(|axis| if axis == 0. { 0 } else { axis.to_bits() });
+            if !occupied.insert(key) {
+                return invalid(format!("{} needs separate compiled weapon and vehicle points", region.map_name));
+            }
+        }
+        let mut owner = None;
+        for chunk in poses.chunks(1024) {
+            for location in maps::bsp_point_locations(output, compiled, chunk, None)? {
+                let [slot] = location.bsps.as_slice() else {
+                    return invalid(format!("{} pool has a point without a unique compiled BSP owner", region.map_name));
+                };
+                if *slot >= 16 || owner.is_some_and(|owner| owner != *slot) {
+                    return invalid(format!("{} pool points must share one supported compiled BSP", region.map_name));
+                }
+                owner = Some(*slot);
+            }
+        }
+        let bsp_index = owner.ok_or_else(|| crate::SparkError::Invalid("Extraction pool has no compiled points".into()))?;
+        let target = match targets.entry(bsp_index) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                let compiled_region = LayoutRegion {
+                    region_id: format!("{}:{bsp_index}", compiled.sha256), cache_sha256: compiled.sha256.clone(),
+                    cache_version: 13, bsp_index: usize::from(bsp_index), ..native_region.clone()
+                };
+                entry.insert(read_supported_extraction_points(&compiled_region, output, compiled, false)?)
+            }
+        };
+        let start_rows = compiled_extraction_rows(&starts, &target.player_starts, &native_region, "player start", false, &mut seen_starts)?;
+        result.push(CompiledExtractionPool {
+            region_id: native_region.region_id.clone(), bsp_index,
+            player_starts: [start_rows[0], start_rows[1]],
+            weapons: compiled_extraction_rows(&weapons, &target.weapons, &native_region, "weapon", true, &mut seen_weapons)?,
+            vehicles: compiled_extraction_rows(&vehicles, &target.vehicles, &native_region, "vehicle", true, &mut seen_vehicles)?,
+        });
+    }
+    if seen_weapons.iter().chain(&seen_vehicles).any(|row| *row >= 1024) {
+        return invalid("A compiled weapon or vehicle row exceeds Forerunner's regional pool table");
+    }
+    Ok(result)
 }
 
 impl Layout {
@@ -496,6 +636,27 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
         pool.weapons = vec![3, 5, 9];
         pool.vehicles.clear();
         assert!(pool.validate(609).is_err());
+    }
+
+    #[test]
+    fn binds_compiled_start_by_faction_even_at_a_shared_position() {
+        let region = LayoutRegion {
+            region_id: "fixture".into(), cache_sha256: "a".repeat(64),
+            cache_version: 609, bsp_index: 0, map_name: "fixture".into(),
+            bsp_name: "fixture".into(), minimum: [0.; 3], maximum: [4.; 3],
+            translation: [2., 1., 0.], yaw_degrees: 0.,
+            hex_slot: None, underground: false, surface_access: None,
+        };
+        let start = |row, team_index, position| ExtractionPoint {
+            row, team_index: Some(team_index), position, label: String::new(),
+        };
+        let source = [start(0, 0, [0.; 3])];
+        let wrong_team = start(7, 1, [2., 1., 0.]);
+        let right_team = start(8, 0, [2., 1., 0.]);
+        assert!(bind_extraction_rows(&source, &[wrong_team.clone()], &region, false).is_empty());
+        let bindings = bind_extraction_rows(&source, &[wrong_team, right_team], &region, false);
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].compiled_row, 8);
     }
 
     #[test]
