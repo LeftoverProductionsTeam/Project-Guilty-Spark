@@ -24,12 +24,39 @@ const hash=async file=>{
 const originalMapHash=await hash(map);
 const blender=process.env.SPARK_WARTHOG_BLENDER;
 const paintSource=process.env.SPARK_WARTHOG_PAINT_PNG;
+const projectFile=process.env.SPARK_WARTHOG_SHAPE_PROJECT;
 const buildPrivate=process.env.SPARK_WARTHOG_PRIVATE_MAP==='1';
-const bladeProfile=process.env.SPARK_WARTHOG_ROAD_BLADE==='1'?'moldboard':'v';
-const [curl,sweep]=bladeProfile==='moldboard'?[80,0]:[62,30];
+if(projectFile&&paintSource)throw Error('Choose either the saved shape draft or a separate paint fixture');
+
+async function readShapeProject(file){
+  const stat=await fs.lstat(file);
+  if(!stat.isFile()||stat.size>32*1024**2)throw Error('Choose a physical Spark project.json within 32 MiB');
+  const bytes=await fs.readFile(file);
+  if(bytes.length!==stat.size)throw Error('Project size changed while reading the saved draft');
+  const project=JSON.parse(bytes.toString('utf8'));
+  const draft=project.shapeDraft;
+  if(project.source?.sha256&&project.source.sha256!==originalMapHash)
+    throw Error('Saved draft uses a different source cache from this vehicle');
+  const percent=value=>Number.isFinite(value)&&value>=0&&value<=100;
+  if(!draft||draft.shape!=='plow'||!['moldboard','rounded','v'].includes(draft.profile)||
+     !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(draft.id)||
+     !Array.isArray(draft.dimensions)||draft.dimensions.length!==3||
+     !draft.dimensions.every(value=>Number.isFinite(value)&&value>=.05&&value<=32)||
+     !percent(draft.curl)||!percent(draft.sweep))throw Error('Apply and save an editable plow draft in Spark first');
+  const prefix='data:image/png;base64,';
+  if(typeof draft.paintPng!=='string'||!draft.paintPng.startsWith(prefix)||draft.paintPng.length>prefix.length+1_500_000)
+    throw Error('Saved shape paint must be a bounded PNG');
+  const encoded=draft.paintPng.slice(prefix.length);
+  const png=Buffer.from(encoded,'base64');
+  if(png.toString('base64')!==encoded)throw Error('Saved shape paint has malformed PNG encoding');
+  return {draft,png,sourceSha256:createHash('sha256').update(bytes).digest('hex')};
+}
+const supplied=projectFile?await readShapeProject(path.resolve(projectFile)):null;
+const bladeProfile=supplied?.draft.profile??(process.env.SPARK_WARTHOG_ROAD_BLADE==='1'?'moldboard':'v');
+const [curl,sweep]=supplied?[supplied.draft.curl,supplied.draft.sweep]:bladeProfile==='moldboard'?[80,0]:[62,30];
 const runtimePath=process.env.SPARK_WARTHOG_PLAYTEST_RUNTIME;
 if(runtimePath&&!buildPrivate)throw Error('The normal-menu playtest requires a verified private cache');
-if(buildPrivate&&(!blender||!paintSource))throw Error('Private cache proof requires both paint and collision');
+if(buildPrivate&&(!blender||(!paintSource&&!supplied)))throw Error('Private cache proof requires both paint and collision');
 if(blender&&!(await fs.stat(blender)).isFile())throw Error('Expected the installed Blender executable');
 
 await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
@@ -64,13 +91,18 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
   const hullPoints=triangles(stock).filter(face=>face.region==='hull').flatMap(face=>face.points);
   const points=hullPoints;
   const front=Math.max(...points.map(p=>p[0])),width=Math.max(...points.map(p=>p[1]))-Math.min(...points.map(p=>p[1])),bottom=Math.min(...points.map(p=>p[2]));
-  const bladeWidth=Math.min(width*1.1/100,2.5);
-  const dimensions=[.22,bladeWidth,.65];
+  const dimensions=supplied?.draft.dimensions??[.22,Math.min(width*1.1/100,2.5),.65];
+  const bladeWidth=dimensions[1];
   const mesh=plowMesh(dimensions,curl,sweep,bladeProfile);
   // Seat the road blade farther into the hood so the rear face crosses the
   // hull decisively instead of leaving a barely intersecting strip.
   const origin=[front+(bladeProfile==='moldboard'?13:15),0,bottom+5],proof=[];
-  const paint=paintSource?await compileNativePartPaint({source:path.resolve(paintSource),tags,data,run}):null;
+  let paintPath=paintSource?path.resolve(paintSource):null;
+  if(supplied){
+    paintPath=path.join(context.directory,'saved-shape-paint.png');
+    await fs.writeFile(paintPath,supplied.png,{flag:'wx'});
+  }
+  const paint=paintPath?await compileNativePartPaint({source:paintPath,tags,data,run}):null;
   const mount={node:'frame hull',region:'hull',material:paint?.name??'warthog hull',position:origin.map(x=>x/100)};
   for(const name of await fs.readdir(base)){
     const original=await fs.readFile(path.join(base,name),'utf8');
@@ -219,7 +251,10 @@ await withDevelopmentWorkspace('warthog-plow-readback',async context=>{
     privateMap={sha256:await hash(output),scenario,engine,compilerSha256,crcMismatch:0,vehicleReferencesVerified:true,gameplayVerified:false};
   }
   if(await hash(map)!==originalMapHash)throw Error('Original map changed during the native proof');
+  if(supplied&&await hash(path.resolve(projectFile))!==supplied.sourceSha256)
+    throw Error('Saved project changed during the native proof. Save your changes and try again.');
   console.log(JSON.stringify({mapSha256:originalMapHash,cutoffs:tune.map(Number),vehicle,renderReferenceVerified:true,collision,paint,privateMap,proof,bladeTriangles:mesh.indices.length/3,bladeProfile,curl,sweep,bladeDimensions:dimensions,mountCentimeters:origin,
+    shapeDraft:supplied?{id:supplied.draft.id,savedProjectSha256:supplied.sourceSha256}:null,
     compilerOutput:raw.slice(-250),scope:'Compiled vehicle tag readback; gameplay requires separate validation.'}));
   if(!proof.every(p=>p.after===p.expected&&p.matchedBlade===mesh.indices.length/3&&p.matchedStock===p.original&&p.checksum===stock.checksum&&p.rigIdentical&&p.markersIdentical))throw Error('H1A stock rig or blade failed exact readback');
   if(runtimePath){

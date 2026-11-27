@@ -905,6 +905,12 @@ try{
   if(process.env.SPARK_LIFECYCLE_RESPONSIVE==='1'){if(!launchOnly)throw Error('Responsive layout acceptance uses the existing launch-only fixture');const {nativeResponsiveLayout}=await import('./native-responsive-layout.mjs');await nativeResponsiveLayout({page:main,root,invoke,report,step,baseline:process.env.SPARK_LIFECYCLE_LAYOUT_BASELINE==='1'});}
   if (process.env.SPARK_LIFECYCLE_SHAPE_PAINT === '1') {
     if (!launchOnly) throw Error('Shape and paint acceptance uses the isolated launch-only fixture');
+    const nativeKit=process.env.SPARK_WARTHOG_NATIVE_KIT;
+    if(nativeKit&&(!nativeMap||!invaderDirectory||!process.env.SPARK_WARTHOG_BLENDER))
+      throw Error('Native Workshop proof needs the Warthog map, H1A Kit, Invader and Blender');
+    const expectedWidth=nativeKit?'1.03':'3';
+    const expectedCurl=nativeKit?'80':'65';
+    const expectedHeight=nativeKit?'0.65':'0.72';
     await createMultiplayerMap(main, 'Native shape and paint', 'haloCustomEdition');
     await chooseTool(main, 'Asset workshop');
     const toggle = main.getByRole('button', { name: 'Shape & paint', exact: true, includeHidden: true });
@@ -918,44 +924,55 @@ try{
     await profile.selectOption('v');
     await profile.selectOption('moldboard');
     const scoop = editor.getByRole('spinbutton', { name: 'Blade curl (%)', exact: true });
-    await scoop.fill('65');
+    await scoop.fill(expectedCurl);
     await scoop.press('Tab');
     const width = editor.getByRole('spinbutton', { name: 'Width', exact: true });
-    await width.fill('3');
+    await width.fill(expectedWidth);
     await width.press('Tab');
+    const height=editor.getByRole('spinbutton',{name:'Height',exact:true});
+    await height.fill(expectedHeight);
+    await height.press('Tab');
     await editor.getByRole('button', { name: 'Paint mesh', exact: true }).click();
     const canvas = editor.locator('canvas');
-    await canvas.scrollIntoViewIfNeeded();
-    const box = await canvas.boundingBox();
-    await main.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     const undo = editor.getByRole('button', { name: 'Undo paint', exact: true });
-    await expect(undo).toBeEnabled();
+    async function paintBlade(){
+      await canvas.scrollIntoViewIfNeeded();
+      await canvas.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+      const box=await canvas.boundingBox();
+      // The projection can differ after collapsing the workspace or changing
+      // the blade aspect ratio. Try several visible pixels around the model center.
+      for(const [x,y] of [[.5,.5],[.5,.56],[.45,.52],[.55,.48],[.5,.43]]){
+        await canvas.click({position:{x:box.width*x,y:box.height*y}});
+        if(await undo.isEnabled())break;
+      }
+      await expect(undo).toBeEnabled({timeout:3000});
+    }
+    await paintBlade();
     await main.screenshot({ path: path.join(root, 'native-painted-plow.png') });
     await main.getByRole('button', { name: 'Close shape & paint', exact: true }).click();
     await expect(canvas).toHaveCount(0);
     await toggle.click();
-    await expect(width).toHaveValue('3');
+    await expect(width).toHaveValue(expectedWidth);
     await expect(profile).toHaveValue('moldboard');
-    await expect(scoop).toHaveValue('65');
+    await expect(scoop).toHaveValue(expectedCurl);
     await expect(undo).toBeEnabled();
     await undo.click();
     await expect(undo).toBeDisabled();
-    const changed = await canvas.boundingBox();
-    await main.mouse.click(changed.x + changed.width / 2, changed.y + changed.height / 2);
-    await expect(undo).toBeEnabled();
+    await paintBlade();
     const apply = editor.getByRole('button', { name: 'Apply shape & paint', exact: true });
     await apply.click();
     await expect(editor.getByText('Save the project to keep the applied draft.')).toBeVisible();
     await main.keyboard.press('Control+z');
     await expect(width).toHaveValue('2.5');
     await main.keyboard.press('Control+y');
-    await expect(width).toHaveValue('3');
+    await expect(width).toHaveValue(expectedWidth);
     await main.keyboard.press('Control+s');
     await expect(main.getByRole('button',{name:'Saved',exact:true}).first()).toBeVisible();
     const entry=(await invoke(main,'bootstrap')).entries.find(entry=>entry.title==='Native shape and paint');
     expect(entry).toBeTruthy();
     const saved=(await invoke(main,'open_project',{id:entry.id})).project.shapeDraft;
-    expect(saved).toMatchObject({shape:'plow',profile:'moldboard',curl:65,dimensions:[.22,3,.72]});
+    const dimensions=[.22,Number(expectedWidth),Number(expectedHeight)];
+    expect(saved).toMatchObject({shape:'plow',profile:'moldboard',curl:Number(expectedCurl),dimensions});
     const painted=await main.evaluate(async url=>{
       const image=new Image();image.src=url;await image.decode();
       const canvas=document.createElement('canvas');canvas.width=canvas.height=512;
@@ -972,13 +989,37 @@ try{
     await main.locator('.map-card[data-project-id="'+entry.id+'"]').click();
     await chooseTool(main,'Asset workshop');
     const reopened=main.getByRole('region',{name:'Shape and paint'});
-    await expect(reopened.getByRole('spinbutton',{name:'Width',exact:true})).toHaveValue('3');
-    await expect(reopened.getByRole('spinbutton',{name:'Blade curl (%)',exact:true})).toHaveValue('65');
+    await expect(reopened.getByRole('spinbutton',{name:'Width',exact:true})).toHaveValue(expectedWidth);
+    await expect(reopened.getByRole('spinbutton',{name:'Blade curl (%)',exact:true})).toHaveValue(expectedCurl);
     await reopened.getByRole('button',{name:'Apply shape & paint',exact:true}).click();
     await expect(reopened.getByRole('status')).toHaveText('This shape and paint are already in the project.');
     expect((await invoke(main,'open_project',{id:entry.id})).project.shapeDraft).toEqual(saved);
-    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: 65, width: 3, pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
+    report.shapePaint = { shape: 'plow', profile: 'moldboard', curl: Number(expectedCurl), width: Number(expectedWidth), pointerPaint: true, retainedOnCollapse: true, undo: true, projectUndoRedo:true, savedPaint:true, fullProcessRestart:true };
     step('Shaped and painted the plow, undid and redid the project draft, then restored the same paint after a native app restart', report.shapePaint);
+    if(nativeKit){
+      const projectFile=path.resolve(entry.projectPath);
+      const relative=path.relative(path.join(root,'library'),projectFile);
+      if(!relative||relative.startsWith('..')||path.isAbsolute(relative))throw Error('Saved Workshop draft escaped its isolated library');
+      const projectBytes=await fs.readFile(projectFile);
+      const projectSha256=crypto.createHash('sha256').update(projectBytes).digest('hex');
+      expect(JSON.parse(projectBytes).shapeDraft).toEqual(saved);
+      const paintSha256=crypto.createHash('sha256').update(Buffer.from(saved.paintPng.split(',')[1],'base64')).digest('hex');
+      const {stdout}=await runOwned(process.execPath,['scripts/test-warthog-plow-native.mjs',nativeMap,nativeKit,invaderDirectory],{
+        timeout:120000,maxBuffer:1024**2,windowsHide:true,env:{...process.env,
+          SPARK_WARTHOG_SHAPE_PROJECT:projectFile,SPARK_WARTHOG_PRIVATE_MAP:'1'}
+      });
+      const receipt=stdout.trim().split(/\r?\n/).map(line=>JSON.parse(line)).find(row=>row.privateMap);
+      expect(receipt.shapeDraft).toEqual({id:saved.id,savedProjectSha256:projectSha256});
+      expect(receipt.bladeDimensions).toEqual(dimensions);
+      expect(receipt.curl).toBe(saved.curl);
+      expect(receipt.sweep).toBe(saved.sweep);
+      expect(receipt.paint.sha256).toBe(paintSha256);
+      expect(receipt.collision.warnings).toEqual([]);
+      expect(receipt.privateMap.crcMismatch).toBe(0);
+      report.shapePaint.native={projectSha256,paintSha256,cacheSha256:receipt.privateMap.sha256,hull:receipt.collision.hullSurfaces};
+      step('Compiled the actual saved Workshop dimensions and paint into a private MCC Warthog cache',report.shapePaint.native);
+      console.log(JSON.stringify(report.shapePaint.native));
+    }
   }
   if(process.env.SPARK_LIFECYCLE_SETUP_FLAVORS==='1'){
     if(!launchOnly)throw Error('Setup flavor acceptance uses the existing launch-only fixture');

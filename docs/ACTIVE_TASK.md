@@ -4,8 +4,8 @@ Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native ga
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
 Latest verified revision: Spark 96ab5c7e / 9b5d9937. Windows Shape & Paint applied an editable plow, passed project Undo/Redo and reopened the exact painted texture after Save and full restart. Previous a76db616 / c651df64. Blender, eight-size, OpenCE and window evidence remains in Git. Monitor patrol remains open.
-Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded earlier road blade 901cacc5 through Host Zombie Apocalypse. Stock collider built clean. H1A marked the blade/hood tangent at x92.9 z46.7 cm. A 2 cm deeper mount and removal of redundant planar edges produced clean MCC13 cdcbe2c5 with matching CRC, paint/LOD readback and all three contact samples. V-plow warning, road-blade driving and creator attachment workflow remain open.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive cdcbe2c5 and connect the accepted Workshop draft to reviewed native vehicle attachment.
+Zombie Survival: 05a4268a logged 102 failed carrier exits. Forerunner deaca69b loaded road-blade control 901cacc5 through Host Zombie Apocalypse. A deeper mount removed the near-coplanar warning (cdcbe2c5). Actual Windows Workshop Save/reopen → native harness compiled the same 1.03-wide painted draft, project c3114072 / paint 3a799c31 / MCC13 72e6555c, with correct CRC and no collision warnings. Ordinary Spark Build attachment, driving and V-plow warning remain open.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the clean road blade and expose reviewed native vehicle attachment through Spark Build.
 
 ## Acceptance
 
