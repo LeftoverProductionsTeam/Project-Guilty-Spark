@@ -3,9 +3,9 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest verified revision: Spark 59f954c2 / 4db2570a. Windows shape/paint and Blender review/apply/Undo/Redo/Save/reopen passed. A second Blender save leaves accepted bytes intact. Continuous brush export passed. Previous 17e00308 / 723b6cd9. Native window handoff, eight-size Games & tools and OpenCE restart evidence retained. Monitor patrol and native Warthog deployment remain open.
+Latest verified revision: Spark a76db616 / c651df64. Windows app passed Road plow profile, curl, paint, collapse/reopen and Undo. Previous 59f954c2 / 4db2570a retains verified Blender review/apply/Undo/Redo/Save/reopen. Prior eight-size, OpenCE restart and window handoff evidence retained. Monitor patrol remains open.
 Zombie Survival: 05a4268a logged 102 failed carrier exits. The photo-based road blade has a circular face and stable paint UVs. Private MCC13 cache 901cacc5 passed CRC, paint binding, four LODs and collision contact readback on the preserved Demolisher rig. Near-coplanar warning and gameplay remain open.
-Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently verify the road blade in desktop Spark and drive the private Zombie Survival variant.
+Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Bounded staging search found only released fcfe9d44. Independently drive the private Zombie Survival variant and review its hull warning.
 
 ## Acceptance
 
