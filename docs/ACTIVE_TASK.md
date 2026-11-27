@@ -3,7 +3,8 @@
 Task: Product Completion V3. Compact MegaWorld, the creator toolchain, native gameplay, Machinima, upstream reuse and quality.
 Status: active
 Starting revision: 42499887481c37ec5a5dffc4261cc86db8132c32, canonical master.
-Latest: Spark 35f23772 / 706aff6c adds Shape & Paint. Previous dc925df9 / a7532192 passed native startup, paused/reduced-motion Monitor pointer follow, and Cortana playback. Games & tools passed native Windows control reachability at eight window sizes (800×600 to 5120×1440) and 125% UI scale. The new curved/V plow exports a closed painted solid. Native Warthog rig/collision and Monitor patrol remain open. Gameplay maps are separate.
+Latest: Spark 17e00308 / 723b6cd9 ships Rounded and V-plow profiles, adjustable scoop/wrap and solid OBJ/JMS export with paint UVs. Windows startup, pointer painting, hide/reopen and Undo passed before promotion. Previous: 35f23772 / 706aff6c. Native Games & tools passed eight window sizes (800×600 to 5120×1440) and 125% UI scale. Installed OpenCE flavor selection survived a full process restart. Native Warthog rig/collision, Monitor patrol and external-edit Undo remain open. Gameplay maps are separate.
+Zombie Survival: The owner session loaded zombie_carrier_compare (05a4268a). Forerunner logged 102 failed seat-exit placements during the relevant time window. Those failures affect several rider types. The screenshot does not identify each actor. Retain the original and require native damage, movement and attack evidence for the correction.
 Next action: Locate a surviving exact b5178c77/bake copy and package with the verified expanded-sky and vehicle-mask compiler. Continue entrance checks and independent creator work. Retained fd7a49fa is available in Spark’s sealed handoff.
 
 ## Acceptance
