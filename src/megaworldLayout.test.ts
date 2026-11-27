@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import stockAtlas from '../docs/fixtures/c43-original-bsp-atlas.json';
-import {alignAtlasDonor,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout} from './megaworldLayout';
-import type {AtlasRegion} from './megaworldLayout';
+import {alignAtlasDonor,applyCompactStockLayout,applyAtlasSurfaceAccess,atlasAdjacentRegions,atlasCoveringRegions,originalMultiplayerMaps,originalRegions,addLayoutRegions,regionFootprint,overlappingRegions,spreadLayout,selectedExtractionPoints,previewExtractionRoll} from './megaworldLayout';
+import type {AtlasRegion,ExtractionPoint,ExtractionPoints} from './megaworldLayout';
 const region=(name:string,index=0):AtlasRegion=>({id:index.toString(16).padStart(64,'0')+':0',cacheSha256:index.toString(16).padStart(64,'0'),cacheVersion:609,bspIndex:0,mapName:name,bspName:name,scenarioType:1,minimum:[-10,-5,-2],maximum:[10,5,4],translation:[0,0,0],yawDegrees:0,coordinates:'Halo Z up',collisionTriangles:2,renderTriangles:2,boundaryEdges:0,nonmanifoldEdges:0,degenerateTriangles:0,shaders:[],runtimes:['CE']});
 describe('source-bound Megaworld layout',()=>{
  it('keeps all19 original source identities, refuses ambiguous edition selection and reports missing regions',()=>{
@@ -103,4 +103,32 @@ it('loads the stock compact layout and preserves built surface frames', () => {
   expect(rotated.regions.find(row => row.mapName === 'chillout')).toMatchObject({translation: [10, 13.000000000000002, -35], surfaceAccess: {headingDegrees: -90}});
   expect(() => applyCompactStockLayout(null, sources.slice(1))).toThrow('Missing');
   expect(() => applyCompactStockLayout(plan, sources, [region('timberland'), {...region('sidewinder'), translation: [80, 0, 0]}])).toThrow('move compiled');
+});
+
+it('draws exactly one vehicle and three distinct weapons from reviewed points without changing the pool',()=>{
+ const row=(index:number, base:number):ExtractionPoint=>({row:index,label:'point'+index,position:[base+index,0,0]});
+ const candidates:ExtractionPoints={
+  playerStarts:[row(1,0),row(2,0)],
+  weapons:[row(0,10),row(3,10),row(4,10),row(6,10)],
+  vehicles:[row(1,20),row(2,20)],
+ };
+ const pool={playerStarts:[1,2],weapons:[0,3,4,6],vehicles:[1,2]};
+ const reviewed=selectedExtractionPoints(pool,candidates);
+ expect(previewExtractionRoll(reviewed,()=>0).weapons.map(point=>point.row)).toEqual([0,3,4]);
+ const last=previewExtractionRoll(reviewed,()=>0.99);
+ expect(last.weapons.map(point=>point.row)).toEqual([6,4,3]);
+ expect(last.vehicles.map(point=>point.row)).toEqual([2]);
+ expect(last.playerStarts.map(point=>point.row)).toEqual([2]);
+ expect(pool.weapons).toEqual([0,3,4,6]);
+ expect(()=>selectedExtractionPoints({...pool,playerStarts:[1,1]},candidates)).toThrow('two player starts');
+ expect(()=>selectedExtractionPoints({...pool,weapons:[0,3,9]},candidates)).toThrow('unavailable');
+ expect(()=>selectedExtractionPoints(pool,{...candidates,vehicles:[{...candidates.vehicles[0],position:candidates.weapons[0].position},candidates.vehicles[1]]})).toThrow('separate');
+});
+
+it('keeps a saved Extraction pool when reorganizing or adding Atlas regions',()=>{
+ const source=region('fixture');
+ const plan=addLayoutRegions(null,[source]);
+ const extraction={[source.id]:{playerStarts:[1,3],weapons:[2,5,6],vehicles:[1]}};
+ expect(spreadLayout({...plan,extraction}).extraction).toEqual(extraction);
+ expect(addLayoutRegions({...plan,extraction},[region('neighbor',1)]).extraction).toEqual(extraction);
 });

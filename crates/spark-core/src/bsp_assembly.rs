@@ -131,7 +131,7 @@ fn is_zero_index(value: &usize) -> bool { *value == 0 }
 impl BspAssembly {
     pub fn validate(&self) -> Result<()> {
         if let Some(origin) = &self.atlas_origin {
-            crate::megaworld::Layout { schema_version: 1, regions: vec![origin.clone()] }.validate()?;
+            crate::megaworld::Layout { schema_version: 1, regions: vec![origin.clone()], extraction: Default::default() }.validate()?;
         }
         if self.schema_version != 1 || self.donor_bsp_index > 15 || self.base_bsp_index > 15
             || (!self.separate_native_bsps && self.base_bsp_index != 0) || self.donor_title.len() > 256

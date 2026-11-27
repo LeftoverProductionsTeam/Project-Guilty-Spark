@@ -46,7 +46,112 @@ pub struct SurfaceAccess {
 
 #[derive(Clone,Debug,Serialize,Deserialize,PartialEq)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Layout {pub schema_version:u32,pub regions:Vec<LayoutRegion>}
+pub struct Layout {
+    pub schema_version: u32,
+    pub regions: Vec<LayoutRegion>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extraction: BTreeMap<String, ExtractionPool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExtractionPool {
+    pub player_starts: [u16; 2],
+    pub weapons: Vec<u16>,
+    pub vehicles: Vec<u16>,
+}
+
+impl ExtractionPool {
+    fn validate(&self, cache_version: u32) -> Result<()> {
+        if !matches!(cache_version, 609 | 13) { return invalid("Extraction pools require CE609 or MCC13 sources"); }
+        for (rows, minimum, limit) in [
+            (self.player_starts.as_slice(), 2, maps::player_start_read_limit(cache_version)),
+            (self.weapons.as_slice(), 3, maps::netgame_equipment_read_limit(cache_version)),
+            (self.vehicles.as_slice(), 1, crate::bsp_vehicles::limit(cache_version)),
+        ] {
+            if !(minimum..=limit).contains(&rows.len())
+                || rows.iter().any(|&row| usize::from(row) >= limit)
+                || rows.iter().collect::<BTreeSet<_>>().len() != rows.len()
+            {
+                return invalid("Extraction needs two distinct starts and enough distinct native points for three weapons and one vehicle");
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionPoint {
+    row: u16,
+    label: String,
+    position: [f32; 3],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionPoints {
+    player_starts: Vec<ExtractionPoint>,
+    weapons: Vec<ExtractionPoint>,
+    vehicles: Vec<ExtractionPoint>,
+}
+
+/// Resolve authored stock positions against the exact source region. The
+/// indices reference the source rows, not the rebuilt scenario's indices.
+pub fn review_extraction_points(region: &LayoutRegion, path: &Path, map: &MapInspection) -> Result<ExtractionPoints> {
+    if map.sha256 != region.cache_sha256 || map.header.version != region.cache_version
+        || map.header.scenario_type != 1 || map.header.extended || !matches!(map.header.version, 609 | 13)
+        || map.mesh.parts.get(region.bsp_index).is_none()
+    {
+        return invalid("Extraction points need the exact owned CE609 or MCC13 multiplayer region");
+    }
+    let slot = region.bsp_index as u16;
+    let point = |row: usize, label: String, position| ExtractionPoint { row: row as u16, label, position };
+    let starts = maps::scenario_region_starts(path, map)?.into_iter().enumerate()
+        .filter(|(_, row)| row.bsp_index == -1 || row.bsp_index == slot as i16)
+        .map(|(index, row)| point(index, format!("Player start {}", index + 1), row.position))
+        .collect::<Vec<_>>();
+    let pickups = maps::scenario_netgame_pickups(path, map)?;
+    let names = pickups.iter().map(|row| row.collection.clone()).collect::<BTreeSet<_>>();
+    let collections = maps::native_item_collections(path, map, &names)?;
+    let weapons = pickups.into_iter().enumerate().filter_map(|(index, row)| {
+        let mut items = collections.get(&row.collection)?.permutations.iter().filter_map(|(weight, tag)| {
+            let weight = f32::from_bits(*weight);
+            (weight.is_finite() && weight > 0.).then_some(tag)
+        }).peekable();
+        let is_weapon = items.peek().is_some() && items.all(|tag| tag.ends_with(".weapon"));
+        is_weapon.then(|| point(index, row.collection, row.position))
+    }).collect::<Vec<_>>();
+    let vehicles = maps::scenario_vehicles(path, map)?.into_iter().enumerate()
+        .take(crate::bsp_vehicles::limit(map.header.version))
+        .filter_map(|(index, row)| row.tag.map(|tag| point(index, tag, row.position)))
+        .collect::<Vec<_>>();
+
+    let supported = |candidates: Vec<ExtractionPoint>| -> Result<Vec<ExtractionPoint>> {
+        let mut review: Vec<ExtractionPoint> = Vec::new();
+        for chunk in candidates.chunks(1024) {
+            let poses = chunk.iter().map(|point| point.position).collect::<Vec<_>>();
+            let locations = maps::bsp_point_locations(path, map, &poses, None)?;
+            for (point, location) in chunk.iter().zip(locations) {
+                if location.bsps == [slot] && location.supports.iter().any(|surface| surface.bsp == slot)
+                    && !review.iter().any(|existing| existing.position == point.position)
+                {
+                    review.push(ExtractionPoint { row: point.row, label: point.label.clone(), position: point.position });
+                }
+            }
+        }
+        Ok(review)
+    };
+    let floor = crate::bsp_clearance::RouteChecker::for_part(&map.mesh, region.bsp_index)?;
+    let player_starts = supported(starts)?.into_iter()
+        .filter(|point| floor.verify_start(point.position.map(f64::from)).is_ok())
+        .collect();
+    Ok(ExtractionPoints {
+        player_starts,
+        weapons: supported(weapons)?,
+        vehicles: supported(vehicles)?,
+    })
+}
 impl Layout {
     pub fn connection(&self, base: &str, donor: &str) -> Result<(&LayoutRegion, &LayoutRegion)> {
         self.validate()?;
@@ -87,6 +192,11 @@ impl Layout {
                 ||(0..3).any(|a|r.minimum[a]>r.maximum[a]) {
                 return invalid("Atlas layout has invalid bounds or transform");
             }
+        }
+        for (id, pool) in &self.extraction {
+            let region = self.regions.iter().find(|row| &row.region_id == id)
+                .ok_or_else(|| crate::SparkError::Invalid("Extraction pool refers to a removed Atlas region".into()))?;
+            pool.validate(region.cache_version)?;
         }
         for room in &self.regions {
             let Some(access) = &room.surface_access else { continue; };
@@ -304,6 +414,44 @@ pub fn inventory(inputs:&[(PathBuf,String)],previous:Option<&Atlas>)->Result<Atl
     atlas.elapsed_ms=start.elapsed().as_millis() as u64;Ok(atlas)
 }
 #[cfg(test)]mod tests{
+    #[test]
+    fn rejects_conflicting_atlas_extraction_rows() {
+        let mut pool = ExtractionPool { player_starts: [1, 2], weapons: vec![3, 5, 9], vehicles: vec![4] };
+        assert!(pool.validate(609).is_ok());
+        pool.player_starts = [1, 1];
+        assert!(pool.validate(609).is_err());
+        pool.player_starts = [1, 2];
+        pool.weapons = vec![3, 3, 9];
+        assert!(pool.validate(609).is_err());
+        pool.weapons = vec![3, 5, 9];
+        pool.vehicles.clear();
+        assert!(pool.validate(609).is_err());
+    }
+
+    #[test]
+    #[ignore = "requires owner-installed stock Timberland; set SPARK_REVIEW_STOCK_TIMBERLAND"]
+    fn reviews_native_timberland_extraction_points() {
+        let source = std::env::var_os("SPARK_REVIEW_STOCK_TIMBERLAND").expect("provide owned Timberland cache");
+        let path = Path::new(&source);
+        let map = maps::inspect_map(path, path.parent()).unwrap();
+        assert_eq!(map.header.name, "timberland");
+        let region = LayoutRegion {
+            region_id: format!("{}:0", map.sha256), cache_sha256: map.sha256.clone(),
+            cache_version: 609, bsp_index: 0, map_name: "timberland".into(), bsp_name: "timberland".into(),
+            minimum: [0.; 3], maximum: [0.; 3], translation: [0.; 3], yaw_degrees: 0.,
+            hex_slot: None, underground: false, surface_access: None,
+        };
+        let points = review_extraction_points(&region, path, &map).unwrap();
+        assert!(points.player_starts.len() >= 2);
+        assert!(points.weapons.len() >= 3);
+        assert!(!points.vehicles.is_empty());
+        let mut wrong_source = region;
+        wrong_source.cache_sha256 = "0".repeat(64);
+        assert!(review_extraction_points(&wrong_source, path, &map).is_err());
+        println!("Reviewed {} player starts, {} weapon points and {} vehicle points",
+            points.player_starts.len(), points.weapons.len(), points.vehicles.len());
+    }
+
     use super::*;
     #[test]
     fn native_burial_measures_rotated_roof_and_refuses_to_fill_missing_ground() {

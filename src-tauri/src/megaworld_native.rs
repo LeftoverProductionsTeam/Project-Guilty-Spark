@@ -18,7 +18,7 @@ pub(super) async fn megaworld_atlas(app:tauri::AppHandle)->Reply<Atlas>{
         project::atomic_write(&state.root.join("megaworld-atlas.json"),&serde_json::to_vec(&atlas).map_err(error)?,false).map_err(error)?;Ok(atlas)
     }).await.map_err(error)?
 }
-fn burial_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megaworld::LayoutRegion)
+fn region_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megaworld::LayoutRegion)
     -> Reply<(PathBuf, Arc<MapInspection>)> {
     let saved = {
         let library = lock(&state.library)?;
@@ -34,7 +34,7 @@ fn burial_source(state: &AppState, atlas: Option<&Atlas>, region: &core::megawor
     }
     let path = atlas.and_then(|atlas| atlas.regions.iter().find(|row| row.id == region.region_id))
         .and_then(|row| row.source_paths.iter().find(|path| path.is_file()))
-        .ok_or("Open the region’s owned source or scan its installation before reviewing burial")?;
+        .ok_or("Open the region’s owned source or scan its installation before reviewing the layout")?;
     core::reject_links(path).map_err(error)?;
     let map = maps::inspect_map(path, path.parent()).map_err(error)?;
     Ok((path.clone(), Arc::new(map)))
@@ -45,8 +45,8 @@ pub(super) fn review_atlas_sources(
     interior: &core::megaworld::LayoutRegion, clearance: f64,
 ) -> Reply<core::megaworld::BurialReview> {
     let atlas = cached(state)?;
-    let (surface_path, surface_map) = burial_source(state, atlas.as_ref(), surface)?;
-    let (interior_path, interior_map) = burial_source(state, atlas.as_ref(), interior)?;
+    let (surface_path, surface_map) = region_source(state, atlas.as_ref(), surface)?;
+    let (interior_path, interior_map) = region_source(state, atlas.as_ref(), interior)?;
     core::megaworld::review_burial(surface, interior, (&surface_path, &surface_map),
         (&interior_path, &interior_map), clearance).map_err(error)
 }
@@ -65,6 +65,22 @@ pub(super) async fn review_atlas_burial(
         let interior = layout.regions.iter().find(|region| region.region_id == interior_id)
             .ok_or("Choose an underground region from the saved layout")?;
         review_atlas_sources(&state, surface, interior, clearance)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+pub(super) async fn review_atlas_extraction_points(
+    app: tauri::AppHandle, layout: core::megaworld::Layout, region_id: String,
+) -> Reply<core::megaworld::ExtractionPoints> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        state.startup.wait()?;
+        layout.validate().map_err(error)?;
+        let region = layout.regions.iter().find(|row| row.region_id == region_id)
+            .ok_or("Choose a region from the saved layout")?;
+        let atlas = cached(&state)?;
+        let (path, map) = region_source(&state, atlas.as_ref(), region)?;
+        core::megaworld::review_extraction_points(region, &path, &map).map_err(error)
     }).await.map_err(error)?
 }
 

@@ -3,7 +3,40 @@ import stockCompactAtlas from './stockCompactAtlas.json';
 export const originalMultiplayerMaps=['beavercreek','bloodgulch','boardingaction','carousel','chillout','damnation','dangercanyon','deathisland','gephyrophobia','hangemhigh','icefields','infinity','longest','prisoner','putput','ratrace','sidewinder','timberland','wizard'] as const;
 export interface AtlasRegion {id:string;mapName:string;bspName:string;bspIndex:number;cacheSha256:string;cacheVersion:number;scenarioType:number;coordinates:string;minimum:Vec3;maximum:Vec3;collisionTriangles:number;renderTriangles:number;boundaryEdges:number;nonmanifoldEdges:number;degenerateTriangles:number;shaders:string[];runtimes:string[];translation:Vec3;yawDegrees:number}
 export interface LayoutRegion {regionId:string;cacheSha256:string;cacheVersion:number;bspIndex:number;mapName:string;bspName:string;minimum:Vec3;maximum:Vec3;translation:Vec3;yawDegrees:number;hexSlot?:[number,number];underground?:boolean;surfaceAccess?:{surfaceRegionId:string;roofClearance:number;headingDegrees:number}}
-export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[]}
+export interface ExtractionPool {playerStarts:number[];weapons:number[];vehicles:number[]}
+export interface ExtractionPoint {row:number;label:string;position:Vec3}
+export type ExtractionPoints = Record<keyof ExtractionPool, ExtractionPoint[]>;
+export interface MegaworldLayout {schemaVersion:1;regions:LayoutRegion[];extraction?:Record<string, ExtractionPool>}
+
+export function selectedExtractionPoints(pool:ExtractionPool, candidates:ExtractionPoints):ExtractionPoints {
+  const select = (kind:keyof ExtractionPool, minimum:number, maximum=Infinity) => {
+    const rows = pool[kind];
+    if (rows.length<minimum || rows.length>maximum || new Set(rows).size!==rows.length)
+      throw Error('Choose two player starts, at least three weapon points and at least one vehicle point.');
+    return rows.map(row=>{
+      const point=candidates[kind].find(candidate=>candidate.row===row);
+      if (!point) throw Error('A saved point is unavailable on the exact source. Review the selected rows.');
+      return point;
+    });
+  };
+  const playerStarts=select('playerStarts',2,2), weapons=select('weapons',3), vehicles=select('vehicles',1);
+  const occupied=new Set([...weapons,...vehicles].map(point=>point.position.join(',')));
+  if (occupied.size!==weapons.length+vehicles.length) throw Error('Choose separate weapon and vehicle points.');
+  return {playerStarts,weapons,vehicles};
+}
+
+export function previewExtractionRoll(points:ExtractionPoints, random=Math.random):ExtractionPoints {
+  const draw=(pool:ExtractionPoint[], count:number)=>{
+    const options=pool.slice();
+    const selected:ExtractionPoint[]=[];
+    for(let i=0;i<count;i++){
+      const [point]=options.splice(Math.floor(random()*options.length),1);
+      selected.push(point);
+    }
+    return selected;
+  };
+  return {playerStarts:draw(points.playerStarts,1),weapons:draw(points.weapons,3),vehicles:draw(points.vehicles,1)};
+}
 export function planRegion(region:AtlasRegion):LayoutRegion {
   return {regionId:region.id,cacheSha256:region.cacheSha256,cacheVersion:region.cacheVersion,bspIndex:region.bspIndex,mapName:region.mapName,bspName:region.bspName,minimum:[...region.minimum],maximum:[...region.maximum],translation:[0,0,0],yawDegrees:0};
 }
@@ -11,7 +44,7 @@ export function addLayoutRegions(layout:MegaworldLayout|undefined|null,regions:A
   const next=layout?.regions.slice()??[],seen=new Set(next.map(r=>r.regionId));
   for(const region of regions)if(!seen.has(region.id)){next.push(planRegion(region));seen.add(region.id);}
   if(next.length>64)throw Error('The Atlas layout holds at most 64 region plans.');
-  return {schemaVersion:1,regions:next};
+  return {...layout,schemaVersion:1,regions:next};
 }
 /** Add already opened or user-imported maps without an installation scan. */
 export function addOpenedAtlasBsp(layout:MegaworldLayout|null|undefined,map:MapInspection,bspIndex:number):MegaworldLayout {
@@ -33,7 +66,7 @@ export function addOpenedAtlasBsp(layout:MegaworldLayout|null|undefined,map:MapI
   const regions=layout?.regions??[];
   if(regions.some(old=>old.regionId===row.regionId))return layout!;
   if(regions.length>=64)throw Error('The Atlas layout holds at most 64 region plans.');
-  return {schemaVersion:1,regions:[...regions,row]};
+  return {...layout,schemaVersion:1,regions:[...regions,row]};
 }
 
 /** Require an explicit edition when a map name has multiple source hashes. */
@@ -111,7 +144,7 @@ export function applyCompactStockLayout(layout: MegaworldLayout | null | undefin
     stockRegion.hexSlot![0] === region.hexSlot![0] && stockRegion.hexSlot![1] === region.hexSlot![1]))) {
     throw Error('A custom region occupies a stock hex slot. Move it before loading the compact stock layout.');
   }
-  return {schemaVersion: 1, regions: [...stockRegions, ...extra]};
+  return {...layout,schemaVersion:1,regions:[...stockRegions,...extra]};
 }
 
 function linkedSurface(a: LayoutRegion, b: LayoutRegion): boolean {
@@ -239,5 +272,5 @@ export function spreadLayout(layout:MegaworldLayout,centerId=layout.regions[0]?.
     return {...region,translation:[original[0]+after[0]-before[0],original[1]+after[1]-before[1],original[2]]};
   });
   if(attached.some(r=>r.translation.some(n=>!Number.isFinite(n)||Math.abs(n)>1000000)))throw Error('These bounds exceed the supported layout range. Arrange them individually.');
-  return {schemaVersion:1,regions:attached};
+  return {...layout,schemaVersion:1,regions:attached};
 }

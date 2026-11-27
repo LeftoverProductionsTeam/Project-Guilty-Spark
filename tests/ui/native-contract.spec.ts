@@ -3715,6 +3715,53 @@ test('compact stock Atlas keeps the full native plan through Undo and reopen', a
   await expect(page.getByLabel('Saved region layout',{exact:true}).getByLabel('Planned Atlas region').locator('option')).toHaveCount(19);
 });
 
+
+test('Atlas authors a shared Extraction roll without changing stock placement rows', async ({page})=>{
+  await mockDesktop(page);
+  await openFixture(page);
+  const stock = JSON.parse(await readFile('docs/fixtures/c43-original-bsp-atlas.json','utf8')).regions
+    .find((region: any) => region.mapName === 'timberland' && region.cacheVersion === 609 && region.bspIndex === 0);
+  await page.evaluate((region) => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke;
+    const point = (row: number, category: string, y: number) => ({row,label:category+' '+row,position:[row,y,0]});
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'megaworld_atlas') return {regions:[region],caches:[],elapsedMs:1,limitations:[]};
+      if (command === 'review_atlas_extraction_points') {
+        if (args.regionId !== region.id) throw Error('Wrong reviewed region');
+        return {playerStarts:[0,1,2].map(row=>point(row,'Start',0)),
+          weapons:[0,1,2,3].map(row=>point(row,'Weapon',1)),
+          vehicles:[0,1].map(row=>point(row,'Vehicle',2))};
+      }
+      return invoke(command,args);
+    };
+  }, stock);
+  await chooseTool(page,'Level editor');
+  await openDrawer(page,'Construction');
+  const assembly=page.locator('.bsp-assembly>summary');
+  await revealPagedControl(assembly);await assembly.click();
+  const atlas=page.locator('.megaworld-atlas>summary');
+  await revealPagedControl(atlas);await atlas.click();
+  await (await pagedControl(page,'button','Scan installed maps')).click();
+  await (await pagedControl(page,'button','Add originals to layout')).click();
+  const pool=page.locator('details.atlas-region').filter({hasText:'Extraction spawns and loot'});
+  await revealPagedControl(pool.locator('summary'));await pool.locator('summary').click();
+  await (await pagedControl(page,'button','Read native points',pool)).click();
+  await (await pagedControl(page,'listbox','Possible player starts',pool)).selectOption(['0','2']);
+  await (await pagedControl(page,'listbox','Weapon points',pool)).selectOption(['0','1','2','3']);
+  await (await pagedControl(page,'listbox','Vehicle points',pool)).selectOption(['0','1']);
+  await (await pagedControl(page,'button','Preview a roll',pool)).click();
+  await expect(pool.getByRole('list',{name:'Previewed Extraction roll'}).getByRole('listitem')).toHaveCount(3);
+  await (await pagedControl(page,'button','Save region pool',pool)).click();
+  const saved=()=>page.evaluate(id=>(window as any).__sparkMock.saved?.megaworldLayout?.extraction?.[id]??null,stock.id);
+  await page.keyboard.press('Control+s');
+  await expect.poll(saved).toEqual({playerStarts:[0,2],weapons:[0,1,2,3],vehicles:[0,1]});
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+s');
+  await expect.poll(saved).toBeNull();
+  await page.keyboard.press('Control+y');
+  await page.keyboard.press('Control+s');
+  await expect.poll(saved).toEqual({playerStarts:[0,2],weapons:[0,1,2,3],vehicles:[0,1]});
+});
 test('presentation packs keep engine-profile choices separate and show missing or unsupported packs honestly',async({page})=>{
  await mockDesktop(page);
  await page.evaluate(async()=>{
