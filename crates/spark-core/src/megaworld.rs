@@ -99,6 +99,10 @@ pub struct ExtractionPoints {
 /// Resolve authored stock positions against the exact source region. The
 /// indices reference the source rows, not the rebuilt scenario's indices.
 pub fn review_extraction_points(region: &LayoutRegion, path: &Path, map: &MapInspection) -> Result<ExtractionPoints> {
+    read_supported_extraction_points(region, path, map, true)
+}
+
+fn read_supported_extraction_points(region: &LayoutRegion, path: &Path, map: &MapInspection, distinct_positions: bool) -> Result<ExtractionPoints> {
     if map.sha256 != region.cache_sha256 || map.header.version != region.cache_version
         || map.header.scenario_type != 1 || map.header.extended || !matches!(map.header.version, 609 | 13)
         || map.mesh.parts.get(region.bsp_index).is_none()
@@ -134,7 +138,7 @@ pub fn review_extraction_points(region: &LayoutRegion, path: &Path, map: &MapIns
             let locations = maps::bsp_point_locations(path, map, &poses, None)?;
             for (point, location) in chunk.iter().zip(locations) {
                 if location.bsps == [slot] && location.supports.iter().any(|surface| surface.bsp == slot)
-                    && !review.iter().any(|existing| existing.position == point.position)
+                    && (!distinct_positions || !review.iter().any(|existing| existing.position == point.position))
                 {
                     review.push(ExtractionPoint { row: point.row, label: point.label.clone(), position: point.position });
                 }
@@ -152,6 +156,72 @@ pub fn review_extraction_points(region: &LayoutRegion, path: &Path, map: &MapIns
         vehicles: supported(vehicles)?,
     })
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionRowBinding {
+    pub source_row: u16,
+    pub compiled_row: u16,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionBindings {
+    pub region_id: String,
+    pub bsp_index: usize,
+    pub player_starts: Vec<ExtractionRowBinding>,
+    pub weapons: Vec<ExtractionRowBinding>,
+    pub vehicles: Vec<ExtractionRowBinding>,
+}
+
+fn pickup_namespace(path: &str) -> &str {
+    let Some((prefix, rest)) = path.split_once('/') else { return path; };
+    let Some(suffix) = prefix.strip_prefix("gspickup_") else { return path; };
+    if matches!(suffix.len(), 8 | 17) && suffix.split('_').all(|id| id.len() == 8 && id.bytes().all(|byte| byte.is_ascii_hexdigit())) {
+        pickup_namespace(rest)
+    } else {
+        path
+    }
+}
+
+fn bind_extraction_rows(
+    source: &[ExtractionPoint], compiled: &[ExtractionPoint], region: &LayoutRegion, asset_tag: bool,
+) -> Vec<ExtractionRowBinding> {
+    source.iter().filter_map(|point| {
+        let expected = crate::bsp_assembly::transform(point.position.map(f64::from), region.translation, region.yaw_degrees);
+        let mut matches = compiled.iter().filter(|candidate|
+            (!asset_tag || pickup_namespace(&candidate.label) == pickup_namespace(&point.label)) &&
+            candidate.position.iter().zip(expected).all(|(axis, target)| (f64::from(*axis) - target).abs() <= 0.0002)
+        );
+        let candidate = matches.next()?;
+        if matches.next().is_some() { return None; }
+        Some(ExtractionRowBinding { source_row: point.row, compiled_row: candidate.row })
+    }).collect()
+}
+
+/// This readback expects the transform in compiled-cache coordinates. Resolve
+/// each stock point at its transformed pose and require one physical BSP owner.
+/// Logical regions can share that physical slot.
+pub fn review_compiled_extraction_bindings(
+    region: &LayoutRegion, source: (&Path, &MapInspection), compiled: (&Path, &MapInspection), bsp_index: usize,
+) -> Result<ExtractionBindings> {
+    if compiled.1.header.version != 13 {
+        return invalid("Compiled regional Extraction bindings require MCC13");
+    }
+    let original = review_extraction_points(region, source.0, source.1)?;
+    let compiled_region = LayoutRegion {
+        region_id: format!("{}:{bsp_index}", compiled.1.sha256), cache_sha256: compiled.1.sha256.clone(),
+        cache_version: 13, bsp_index, translation: [0.; 3], yaw_degrees: 0., ..region.clone()
+    };
+    let target = read_supported_extraction_points(&compiled_region, compiled.0, compiled.1, false)?;
+    Ok(ExtractionBindings {
+        region_id: region.region_id.clone(),
+        bsp_index,
+        player_starts: bind_extraction_rows(&original.player_starts, &target.player_starts, region, false),
+        weapons: bind_extraction_rows(&original.weapons, &target.weapons, region, true),
+        vehicles: bind_extraction_rows(&original.vehicles, &target.vehicles, region, true),
+    })
+}
+
 impl Layout {
     pub fn connection(&self, base: &str, donor: &str) -> Result<(&LayoutRegion, &LayoutRegion)> {
         self.validate()?;

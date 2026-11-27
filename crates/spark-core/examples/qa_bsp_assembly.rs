@@ -65,6 +65,27 @@ fn main() -> Result<()> {
         if report.starts.iter().any(|s| s.issue.is_some()) { std::process::exit(2); }
         return Ok(());
     }
+    if a.len() == 9 && a[1] == "--review-extraction-bindings" {
+        let cache = Path::new(&a[2]);
+        let stock = Path::new(&a[3]);
+        let compiled = maps::inspect_map(cache, None)?;
+        let source = maps::inspect_map(stock, stock.parent())?;
+        let number = |value: &str| value.parse::<f64>().ok().filter(|v| v.is_finite() && v.abs() <= 1500.)
+            .ok_or_else(|| spark_core::SparkError::Invalid("Translation and yaw must be finite and within native bounds".into()));
+        let slot = a[4].parse::<usize>().map_err(|_| spark_core::SparkError::Invalid("A native BSP slot is required".into()))?;
+        let region = spark_core::megaworld::LayoutRegion {
+            region_id: format!("{}:0", source.sha256), cache_sha256: source.sha256.clone(),
+            cache_version: source.header.version, bsp_index: 0, map_name: source.header.name.clone(),
+            bsp_name: source.mesh.parts.first().ok_or_else(|| spark_core::SparkError::Invalid("Source BSP missing".into()))?.name.clone(),
+            minimum: [0.; 3], maximum: [0.; 3],
+            translation: [number(&a[5])?, number(&a[6])?, number(&a[7])?], yaw_degrees: number(&a[8])?,
+            hex_slot: None, underground: false, surface_access: None,
+        };
+        let bindings = spark_core::megaworld::review_compiled_extraction_bindings(
+            &region, (stock, &source), (cache, &compiled), slot)?;
+        println!("{}", serde_json::json!({"cacheSha256": compiled.sha256,"bindings": bindings}));
+        return Ok(());
+    }
     if a.len() == 3 && a[1] == "--read-native-transitions" {
         let file = Path::new(&a[2]);
         let map = maps::inspect_map(file, None)?;
