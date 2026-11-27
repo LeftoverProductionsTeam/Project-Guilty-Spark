@@ -3,6 +3,7 @@
 use super::*;
 
 const ROAD_FILL_DEPTH: f64 = 1.5;
+const TELEPORTER_PAD_RADIUS: f64 = 0.6;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
@@ -147,6 +148,9 @@ fn plan_terrain(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut pla
     let start=plan.tunnel_points[0];
     let plan_end=plan.tunnel_points[1];
     let (start,base_face,end,donor_face)=if let Some(bearing)=bearing {
+        let mut pads = supported_teleporter_pads(base_path, base, &a, plan.base_bsp_index, ([0.; 3], 0.))?;
+        pads.extend(supported_teleporter_pads(&plan.donor_source.preserved_path, donor, &b,
+            plan.donor_bsp_index, (plan.translation, plan.yaw_degrees))?);
         let mut angles=[bearing,0.,90.,180.,-90.];
         angles[1..].sort_by(|a,b|wrapped_angle(*a-bearing).abs().total_cmp(&wrapped_angle(*b-bearing).abs()));
         let mut closest_gap=None::<f64>;
@@ -161,13 +165,13 @@ fn plan_terrain(base_path:&Path,base:&MapInspection,donor:&MapInspection,mut pla
             }
             if !boundary.adjacent(true) {continue;}
             supported_boundary=true;
-            if let Ok(landings)=aligned_landings(&a,&af,&b,&bf,&plan,boundary) {
+            if let Ok(landings)=aligned_landings(&a,&af,&b,&bf,&plan,boundary,&pads) {
                 result=Some(landings);
                 break;
             }
         }
         result.ok_or_else(||SparkError::Invalid(if supported_boundary {
-            "The saved placement leaves a terrain strip, but neither side offers a continuous landing for the road and shoulders. Check the approach width or move the neighboring region.".into()
+            "No facing road has continuous landings clear of raised teleporter pads. Move or widen the approach in the viewport.".into()
         } else {
             format!("The closest facing strip measures {:.2} units. Leave 1.6–24 units between the native boundaries before joining them.",closest_gap.unwrap_or(0.))
         }))?
@@ -196,7 +200,7 @@ fn wrapped_angle(angle:f64)->f64{
 
 /// Fit facing landings in the reviewed world frame without moving either map.
 fn aligned_landings(
-    a:&MeshData,af:&[CollisionFace],b:&MeshData,bf:&[CollisionFace],plan:&BspAssembly,boundary:Boundary,
+    a:&MeshData,af:&[CollisionFace],b:&MeshData,bf:&[CollisionFace],plan:&BspAssembly,boundary:Boundary, pads:&[V],
 )->Result<(V,usize,V,usize)>{
     let axis=boundary.axis;
     let side=[-axis[1],axis[0],0.];
@@ -228,7 +232,8 @@ fn aligned_landings(
             for &(start,base_face) in &base_candidates {
                 for &(end,donor_face) in &donor_candidates {
                     let run=dot(sub(end,start),axis);
-                    if (4. ..=96.).contains(&run)&&(end[2]-start[2]).abs()<=0.30*run {
+                    if (4. ..=96.).contains(&run) && (end[2]-start[2]).abs() <= 0.30*run
+                        && !pads.iter().any(|&pad| raised_pad_interrupts_road(start, end, 6., pad)) {
                         return Ok((start,base_face,end,donor_face));
                     }
                 }
@@ -237,6 +242,35 @@ fn aligned_landings(
     }
     invalid("No supported pair of graded landings")
 }
+fn supported_teleporter_pads(
+    path: &Path, map: &MapInspection, mesh: &MeshData, bsp: usize, placement: (V, f64),
+) -> Result<Vec<V>> {
+    if map.header.scenario_type != 1 { return Ok(Vec::new()); }
+    let flags = maps::scenario_netgame_flags(path, map)?;
+    let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, bsp)?;
+    Ok(flags.into_iter().filter(|flag| matches!(flag.kind, 6 | 7)).filter_map(|flag| {
+        let mut near = flag.position;
+        near[2] += 0.05;
+        let floor = checker.native_ground_z(near, 0.5)?;
+        ((flag.position[2] - floor).abs() <= 0.15)
+            .then(|| transform(flag.position.map(f64::from), placement.0, placement.1))
+    }).collect())
+}
+
+fn raised_pad_interrupts_road(start: V, end: V, width: f64, pad: V) -> bool {
+    let delta = sub(end, start);
+    let span = delta[0].hypot(delta[1]);
+    let forward = [delta[0] / span, delta[1] / span, 0.];
+    let side = [-forward[1], forward[0], 0.];
+    let relative = sub(pad, start);
+    let station = dot(relative, forward);
+    let margin = TELEPORTER_PAD_RADIUS * (forward[0].abs() + forward[1].abs());
+    let road_floor = start[2] + delta[2] * (station / span).clamp(0., 1.);
+    station >= -margin && station <= span + margin
+        && dot(relative, side).abs() < (width - 0.45) * 0.5 + margin
+        && pad[2] - road_floor > 0.15
+}
+
 // Preserve both native edge profiles and split precisely at the material
 // boundary. A flat connector needs no uniform subdivision; shaped shoulders
 // use at most one station per four world units, not a dense tessellated sheet.
@@ -299,11 +333,24 @@ impl Ribbon {
                     Ok(p)
                 }).collect()
             };
-            let before=floor_row(sub(start,mul(direction,collar)),false)?;
-            let after=floor_row(add(end,mul(direction,collar)),true)?;
-            if (before[3][2]-start[2]).abs()>0.35*collar || (after[3][2]-end[2]).abs()>0.35*collar {
-                return invalid("The graded road needs walkable terrain just beyond both landings. Pick a gentler approach." );
-            }
+            let fit_collar = |landing: V, donor: bool| -> Result<Vec<V>> {
+                // Try the requested apron first, then shorten it only to the
+                // same minimum used by the standard graded road.
+                for fraction in [1., 0.75, 0.5, 0.25, 0.] {
+                    let span = 1.5 + (collar - 1.5) * fraction;
+                    let point = add(landing, mul(direction, if donor { span } else { -span }));
+                    if let Ok(row) = floor_row(point, donor) {
+                        if row[2..=4].iter().all(|point| (point[2] - landing[2]).abs() <= 0.35 * span) {
+                            return Ok(row);
+                        }
+                    }
+                    if span <= 1.5 { break; }
+                }
+                let side = if donor { "neighboring" } else { "starting" };
+                invalid(format!("The graded road needs supported terrain beyond its {side} landing near ({:.2}, {:.2}, {:.2}). Move that landing onto a wider, gentler floor.", landing[0], landing[1], landing[2]))
+            };
+            let before = fit_collar(start, false)?;
+            let after = fit_collar(end, true)?;
             let last=rows.len()-1;
             for (index,row) in rows.iter_mut().enumerate() {
                 let t=dot(sub(row[3],start),direction)/length;
@@ -343,7 +390,7 @@ impl Ribbon {
         if map.header.scenario_type != 1 { return Ok(ribbon); }
         let existing = maps::scenario_netgame_flags(path, map)?;
         let checker = crate::bsp_clearance::RouteChecker::for_part(mesh, bsp)?;
-        let radius = 0.6;
+        let radius = TELEPORTER_PAD_RADIUS;
         let min: V = std::array::from_fn(|i| self.rows.iter().flatten().map(|p| p[i]).fold(f64::INFINITY, f64::min));
         let max: V = std::array::from_fn(|i| self.rows.iter().flatten().map(|p| p[i]).fold(f64::NEG_INFINITY, f64::max));
         for flag in existing.iter().filter(|flag| matches!(flag.kind, 6 | 7)) {
@@ -481,6 +528,17 @@ pub(super) fn portal(center:V,direction:V,width:f64,roof:f64)->Result<[V;4]>{
 #[cfg(test)]
 mod tests{
     use super::*;
+    #[test]
+    fn road_landing_search_preserves_a_raised_teleporter_off_the_centerline() {
+        let start = [38.81, 34.45, -21.08];
+        let end = [71.60, 34.45, -21.08];
+        let pad = [61.74, 31.97, -17.07];
+        assert!(raised_pad_interrupts_road(start, end, 6.5, pad));
+        assert!(!raised_pad_interrupts_road([38.81, 36.5, -21.08], [76., 35.65, -21.08], 6.5, pad));
+        assert!(!raised_pad_interrupts_road(start, end, 6.5, [61.74, 31.97, -21.08]));
+        assert!(!raised_pad_interrupts_road(start, end, 6.5, [75., 31.97, -17.07]));
+    }
+
     #[test]
     fn flat_strip_keeps_exact_edges_and_shader_boundary_with_bounded_geometry(){
         assert_eq!(stations(32.,0.375,true),vec![0.,0.375,1.]);
